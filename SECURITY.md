@@ -54,8 +54,12 @@ server.
 * Both published packages have **zero runtime dependencies** other than `@toolbench/runtime` depending on
   `@toolbench/sdk`. There is nothing else in the tree a consumer installs.
 * Releases are published from CI with **npm provenance**, so npm shows a signed attestation tying the
-  tarball to the commit and workflow that built it. If a version has no provenance, treat it as
-  suspicious.
+  tarball to the commit and workflow that built it.
+* **0.1.0 is the one exception.** It was published by hand during bootstrap, so it carries no
+  attestation. npm will not let a trusted publisher be configured until a package exists, and provenance
+  needs OIDC, which only exists in CI: the first release of a package cannot have both. Every release
+  from 0.1.1 onward is published from CI and attested. A later version without provenance would be
+  worth treating as suspicious.
 * `files: ["dist"]`, and CI prints `npm pack --dry-run` for both packages on every build, so what ships
   is visible in the log.
 * Development requires Node 24 and pnpm with a frozen lockfile in CI.

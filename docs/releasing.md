@@ -12,6 +12,7 @@ How versions are decided, how a release happens, and the one-time setup it needs
 6. [One-time setup](#6-one-time-setup)
 7. [What gets published](#7-what-gets-published)
 8. [Publishing by hand](#8-publishing-by-hand)
+8b. [The bootstrap, and the passkey trap](#8b-the-bootstrap-and-the-passkey-trap)
 9. [If a bad version ships](#9-if-a-bad-version-ships)
 
 ---
@@ -221,6 +222,52 @@ pnpm release                    # builds, then changeset publish
 
 `pnpm release` is `pnpm build && changeset publish`, so it cannot publish a stale `dist`. You need to be
 logged in (`npm login`) and a member of the org.
+
+## 8b. The bootstrap, and the passkey trap
+
+Recorded because it took six failed attempts and none of it is written down by npm.
+
+**The circular dependency.** npm configures trusted publishing per package, through that package's own
+settings page, so the package has to exist. Provenance requires OIDC, which only exists in CI. So the
+very first release of a package cannot have both a trusted publisher and an attestation. Something has to
+give, and it is provenance on 0.1.0.
+
+**A granular token inherits the 2FA requirement it was created under.** The token here was issued while
+the account was set to "authorization and writes". Relaxing the account to authorization-only afterwards
+did not change the token: CI kept failing with `EOTP`, asking for a one-time password no runner can
+type. If you need a token to publish unattended, create it *after* setting the account to
+authorization-only, not before.
+
+**⚠️ A passkey cannot satisfy npm's CLI one-time-password prompt.** This is the one that actually blocks
+you. If your 2FA is a passkey (Bitwarden, iCloud Keychain, a hardware key) rather than a TOTP app, there
+is no six-digit code to type. npm's own CLI handles this by printing a URL and deferring to the browser,
+where a passkey works. `changeset publish` does not: it prompts for a TOTP itself and never reaches
+npm's browser flow.
+
+So the bootstrap publish goes around changesets, while still letting pnpm rewrite the workspace protocol:
+
+```sh
+pnpm build
+# pnpm pack rewrites "workspace:^" to a real range. Plain `npm publish` would not, and would ship a
+# dependency no consumer can resolve.
+pnpm --filter @toolbench/sdk exec pnpm pack --pack-destination /tmp/tb
+pnpm --filter @toolbench/runtime exec pnpm pack --pack-destination /tmp/tb
+
+# Verify the rewrite happened before publishing anything.
+tar -xzOf /tmp/tb/toolbench-runtime-0.1.0.tgz package/package.json | grep toolbench/sdk
+
+# npm, not changesets: this is the path that offers browser authentication.
+npm publish /tmp/tb/toolbench-sdk-0.1.0.tgz --access public
+npm publish /tmp/tb/toolbench-runtime-0.1.0.tgz --access public
+```
+
+`publishConfig.provenance` has to come out of both `package.json` files for a local publish, or npm
+fails with `EUSAGE: Automatic provenance generation not supported for provider: null`. Put it back
+afterwards; CI needs it.
+
+One more thing that wasted time: after a successful publish the registry metadata endpoint returned 404
+for about a minute while the search index already showed both packages. The publish had worked. Check
+`npm access list packages @toolbench` and the search index before concluding anything failed.
 
 ## 9. If a bad version ships
 
