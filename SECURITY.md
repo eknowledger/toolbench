@@ -53,7 +53,10 @@ server.
 
 * Both published packages have **zero runtime dependencies** other than `@toolbench/runtime` depending on
   `@toolbench/sdk`. There is nothing else in the tree a consumer installs.
-* Releases are published from CI with **npm provenance**, so npm shows a signed attestation tying the
+* Releases are published from CI with **no stored npm credential**. Authentication is an OIDC token
+  validated against a trusted publisher pinned to this repository, this workflow, and the `npm-publish`
+  environment, which requires a manual approval. Verify with `npm audit signatures`.
+* Releases carry **npm provenance**, so npm shows a signed attestation tying the
   tarball to the commit and workflow that built it.
 * **0.1.0 is the one exception.** It was published by hand during bootstrap, so it carries no
   attestation. npm will not let a trusted publisher be configured until a package exists, and provenance

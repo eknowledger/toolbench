@@ -163,10 +163,21 @@ of saying "make the org first".
 **2. Authentication.** Two ways, and the workflow supports both. `changesets/action` prefers OIDC when
 it is available, so the token is a fallback rather than the plan.
 
-*Trusted publishing (preferred, no stored secret).* Configure `eknowledger/toolbench` and
-`.github/workflows/release.yml` as the trusted publisher for each package on npmjs.com. It is configured
-per package, so the package has to exist first: publish 0.1.0 by hand (§8), then switch, then no secret
-is stored anywhere.
+*Trusted publishing. This is not optional here.* Configure, per package on npmjs.com:
+
+| Field | Value |
+|---|---|
+| Repository | `eknowledger/toolbench` |
+| Workflow | `.github/workflows/release.yml` |
+| Environment name | `npm-publish` |
+| Allow `npm publish` | checked |
+
+Naming the environment means npm refuses an OIDC token from any job not running in it, and that
+environment requires a manual approval, so a workflow edit alone cannot publish. Leaving "allow npm
+publish" unchecked would restrict this to staged publishing, which `changeset publish` does not support.
+
+It is configured per package, so the package must exist first: publish the first version by hand (§8b),
+then switch. After that no credential is stored anywhere, and `NPM_TOKEN` can be deleted.
 
 *Token (only if you are not doing the first publish by hand).* Create a **granular access token** with
 write access to the `@toolbench` scope, give it an expiry, and add it as a repository secret:
@@ -193,7 +204,34 @@ Without this, the release job still runs and still opens release PRs, but never 
 exists because a release workflow with no npm identity fails on every push to `main`, and a permanently
 red `main` is worse than a switch, since it teaches everyone to stop reading the crosses.
 
-**4. Provenance** is already on (`id-token: write` plus `NPM_CONFIG_PROVENANCE`). It publishes a signed
+**4. Two repository settings that are not obvious.** Both were found the hard way, and a release fails
+without the first.
+
+*Allow Actions to create pull requests.* Off by default. Without it the `version` job bumps versions,
+writes changelogs, pushes `changeset-release/main`, and then fails on the last call with "GitHub Actions
+is not permitted to create or approve pull requests".
+
+```sh
+gh api -X PUT repos/:owner/:repo/actions/permissions/workflow \
+  -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+```
+
+*⚠️ Release PRs need `--admin` to merge.* GitHub does not trigger workflows for events caused by
+`GITHUB_TOKEN`, so the release PR the bot opens never gets `tests` or `build` run against it. Branch
+protection requires those checks, so the PR sits at `BLOCKED` with "no checks reported" forever:
+
+```sh
+gh pr merge <n> --squash --admin
+```
+
+There is no configuration that keeps both properties. The alternatives are a personal access token,
+which reintroduces exactly the long-lived credential trusted publishing exists to remove, or dropping
+the required checks, which weakens every other pull request. Admin bypass is the right trade here
+because nothing actually goes unverified: the code was checked on the PR that carried the changeset, the
+release PR contains only generated version bumps and changelogs, and the publish job re-runs typecheck,
+the full test suite and a build before publishing.
+
+**5. Provenance** is already on (`id-token: write` plus `NPM_CONFIG_PROVENANCE`). It publishes a signed
 attestation tying the tarball to this commit and this workflow, and npm shows it on the package page. It
 is free and it is the main defence a small package has against someone shipping a tarball that does not
 match the source.
