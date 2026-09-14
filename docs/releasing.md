@@ -91,31 +91,47 @@ Two merges, with a person in between.
 you: open a PR, include a changeset      (pnpm changeset)
         │
         ▼
-merge to main
+merge to main                            main is protected: PR required, checks must pass
         │
         ▼
-release.yml sees pending changesets
+release.yml: `pending` job finds changeset files
         │
         ▼
-opens or updates "Release: version packages"
+`version` job opens or updates "Release: version packages"
    version numbers bumped, CHANGELOG.md written
         │
         ▼
-you: read that diff. This is the gate.
+GATE 1  you read that diff and merge it
         │
         ▼
-merge the release PR
+release.yml: `pending` job finds nothing pending
         │
         ▼
-release.yml sees no pending changesets
-   typecheck, test, build, then `changeset publish`
+`publish` job waits on the npm-publish environment
+        │
+        ▼
+GATE 2  you approve the deployment in the Actions tab
+        │
+        ▼
+typecheck, test, build, then `changeset publish`
         │
         ▼
 npm + git tag + GitHub release
 ```
 
-The gate is deliberately a merge and not a green tick. What you are approving is the exact version bump
-and the exact changelog, which is the thing worth a human read. npm has no undo.
+Two gates, and they check different things. **Gate 1** is the version numbers and the changelog: a diff
+worth reading, because it is what consumers will see. **Gate 2** is the last stop before the registry,
+and it exists because a merge can happen for all sorts of reasons while an explicit "yes, publish this"
+cannot happen by accident. npm has no undo.
+
+⚠️ The workflow is three jobs rather than one because `environment:` is job-level in GitHub Actions, not
+step-level. A single job carrying the environment would demand an approval on **every** push to `main`,
+including versioning runs that publish nothing, and an approval prompt that fires constantly is one
+nobody reads.
+
+`main` is protected: pull request required, `tests` and `build` must pass, no force pushes, no branch
+deletion, linear history. Admins can bypass, which keeps a solo repository unblocked, and approvals are
+set to zero because you cannot approve your own pull request.
 
 Adding a changeset:
 

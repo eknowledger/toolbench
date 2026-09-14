@@ -1,11 +1,16 @@
-# Publish to npm, in two steps with a human in the middle.
+# Publish to npm, with two gates and a human at both.
 #
-# 1. Someone merges a PR to main that contains a changeset. This workflow opens (or updates) a
+# 1. Someone merges a PR to main that contains a changeset. The `version` job opens (or updates) a
 #    "Release: version packages" PR: version numbers bumped, changelogs written.
-# 2. Someone merges THAT PR. This workflow runs again, finds no pending changesets, and publishes.
+# 2. Someone merges THAT PR. There are now no pending changesets, so the `publish` job runs, waits for
+#    a manual approval on the npm-publish environment, and publishes.
 #
-# The gate is merging the release PR, so nothing reaches npm because a test happened to pass. The
-# diff you approve is the exact version bump and changelog that ships.
+# Merging the release PR is where you approve the version numbers and the changelog. The environment
+# approval is the last stop before something is on npm, and npm has no undo.
+#
+# ⚠️ The jobs are split because `environment:` is job-level, not step-level. One combined job would
+# make every push to main wait for an approval, including the versioning runs that publish nothing,
+# and an approval prompt that fires constantly is an approval prompt nobody reads.
 #
 # Setup this needs once, see docs/releasing.md:
 #   - an npm org named `toolbench`, created at npmjs.com/org/create (no CLI for this)
@@ -26,49 +31,46 @@ permissions:
   contents: read
 
 jobs:
-  release:
-    name: version or publish
+  # ── Is there anything waiting to be released? ────────────────────────────────────────────────────
+  pending:
+    name: check for pending changesets
+    runs-on: ubuntu-latest
+    outputs:
+      has_changesets: ${{ steps.check.outputs.has_changesets }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: check
+        # .changeset/ always holds README.md and config.json. Any OTHER markdown file is a pending
+        # release note, which means we version rather than publish.
+        run: |
+          if [ -n "$(find .changeset -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+            echo "Pending changesets found: will open or update a release PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+            echo "No pending changesets: a publish may be due." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ── Pending changesets: bump versions and write changelogs, in a PR ──────────────────────────────
+  version:
+    name: open the release PR
+    needs: pending
+    if: needs.pending.outputs.has_changesets == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # commit the version bump, create the git tag and the GitHub release
+      contents: write # commit the version bump
       pull-requests: write # open and update the release PR
-      id-token: write # npm provenance: proves on npm that this build came from this commit
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # changesets needs history to work out what changed
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org # writes the .npmrc auth line for us
-
       - run: pnpm install --frozen-lockfile
-
-      - name: Verify before publishing
-        # Deliberately duplicates tests.yml and build.yml rather than trusting that they ran. This is
-        # the last gate before something is public and unrepealable, and npm has no undo.
-        run: |
-          pnpm typecheck
-          pnpm test
-          pnpm build
-
-      # ── Two paths, chosen by the repository variable PUBLISH_TO_NPM ──────────────────────────────
-      #
-      # Publishing stays off until npm is actually set up (the org, and either a token or a trusted
-      # publisher). Without this gate every push to main fails on ENEEDAUTH, which trains everyone to
-      # ignore a red cross on main. Turn it on with:
-      #
-      #     gh variable set PUBLISH_TO_NPM --body true
-      #
-      # Versioning runs either way, so release PRs accumulate correctly before the first publish.
-
-      - name: Version only (publishing not enabled yet)
-        id: version_only
-        if: vars.PUBLISH_TO_NPM != 'true'
-        uses: changesets/action@v1
+      - uses: changesets/action@v1
         with:
           version: pnpm changeset version
           commit: "chore: version packages"
@@ -76,17 +78,44 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Version or publish
+  # ── Nothing pending: publish, after a human says so ──────────────────────────────────────────────
+  publish:
+    name: publish to npm
+    needs: pending
+    if: needs.pending.outputs.has_changesets == 'false' && vars.PUBLISH_TO_NPM == 'true'
+    runs-on: ubuntu-latest
+    # Requires a manual approval before any step runs. This is the last gate before npm.
+    environment: npm-publish
+    permissions:
+      contents: write # create the git tag and the GitHub release
+      id-token: write # npm provenance: proves on npm that this build came from this commit
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org # writes the .npmrc auth line for us
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify before publishing
+        # Deliberately duplicates tests.yml and build.yml rather than trusting that they ran. This is
+        # the last gate before something is public and unrepealable.
+        run: |
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
+      - name: Publish
         id: changesets
-        if: vars.PUBLISH_TO_NPM == 'true'
         uses: changesets/action@v1
         with:
           # `pnpm release` builds first, then publishes. Building inside the release script rather
           # than relying on the step above means a manual `pnpm release` cannot publish stale dist.
           publish: pnpm release
-          version: pnpm changeset version
-          commit: "chore: version packages"
-          title: "Release: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Only needed until trusted publishing is configured on both packages. changesets/action
@@ -97,19 +126,11 @@ jobs:
       - name: Say what happened
         if: always()
         env:
-          ENABLED: ${{ vars.PUBLISH_TO_NPM }}
           PUBLISHED: ${{ steps.changesets.outputs.published }}
           PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
         run: |
           {
-            if [ "$ENABLED" != "true" ]; then
-              echo "### Publishing is not enabled"
-              echo
-              echo "Versioning ran; nothing was published. To turn publishing on, see"
-              echo "docs/releasing.md section 6, then:"
-              echo
-              echo '    gh variable set PUBLISH_TO_NPM --body true'
-            elif [ "$PUBLISHED" = "true" ]; then
+            if [ "$PUBLISHED" = "true" ]; then
               echo "### Published"
               echo
               echo '```json'
@@ -118,6 +139,6 @@ jobs:
             else
               echo "### Nothing to publish"
               echo
-              echo "Either a release PR is waiting to be merged, or there was nothing pending."
+              echo "Every package version in this commit is already on npm."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
