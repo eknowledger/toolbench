@@ -37,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has_changesets: ${{ steps.check.outputs.has_changesets }}
+      unpublished: ${{ steps.registry.outputs.unpublished }}
     steps:
       - uses: actions/checkout@v5
       - id: check
@@ -50,6 +51,29 @@ jobs:
             echo "has_changesets=false" >> "$GITHUB_OUTPUT"
             echo "No pending changesets: a publish may be due." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - id: registry
+        # ⚠️ Without this, every push to main with no pending changesets parks a deployment waiting for
+        # a human, even when every version is already on npm and there is nothing to do. An approval
+        # prompt that fires constantly is one nobody reads, which defeats the gate.
+        #
+        # So ask the registry. If any package's local version is not published, a release is genuinely
+        # due; otherwise the publish job is skipped entirely and nobody is interrupted.
+        run: |
+          unpublished=false
+          for dir in packages/*/; do
+            name=$(node -p "require('./${dir}package.json').name")
+            private=$(node -p "require('./${dir}package.json').private === true")
+            [ "$private" = "true" ] && continue
+            local_v=$(node -p "require('./${dir}package.json').version")
+            if npm view "$name@$local_v" version >/dev/null 2>&1; then
+              echo "$name@$local_v is already on npm"
+            else
+              echo "$name@$local_v is NOT on npm: a publish is due"
+              unpublished=true
+            fi
+          done
+          echo "unpublished=$unpublished" >> "$GITHUB_OUTPUT"
 
   # ── Pending changesets: bump versions and write changelogs, in a PR ──────────────────────────────
   version:
@@ -82,7 +106,7 @@ jobs:
   publish:
     name: publish to npm
     needs: pending
-    if: needs.pending.outputs.has_changesets == 'false' && vars.PUBLISH_TO_NPM == 'true'
+    if: needs.pending.outputs.has_changesets == 'false' && needs.pending.outputs.unpublished == 'true' && vars.PUBLISH_TO_NPM == 'true'
     runs-on: ubuntu-latest
     # Requires a manual approval before any step runs. This is the last gate before npm.
     environment: npm-publish
