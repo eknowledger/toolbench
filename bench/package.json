@@ -13,5 +13,7 @@
     "@toolbench/runtime": "workspace:*",
     "@toolbench/sdk": "workspace:*"
   },
-  "devDependencies": { "vite": "7.3.6" }
+  "devDependencies": {
+    "vite": "7.3.6"
+  }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@toolbench/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The contract a Toolbench tool implements: types, manifest validation, version migration, and a fixture runner. No runtime dependencies, no DOM.",
   "license": "MIT",
   "author": "Ahmed Elmalt",
