@@ -14,6 +14,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    /* Embed the TypeScript source in the .map files. Without this the published maps point at
+       ../src/*.ts, which `files: ["dist"]` never ships, so a consumer stepping into the package gets
+       nothing. Embedding is preferable to shipping src/ separately: the map is then self-contained
+       and cannot reference a file that is not there. */
+    "inlineSources": true,
     "erasableSyntaxOnly": true,
     /* Node's type stripping requires the real extension; these two let the same source compile to
        correct .js imports for publishing. Without them you must choose one or the other. */

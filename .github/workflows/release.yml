@@ -14,7 +14,8 @@
 #
 # Setup this needs once, see docs/releasing.md:
 #   - an npm org named `toolbench`, created at npmjs.com/org/create (no CLI for this)
-#   - either a trusted publisher on npm, or a repository secret NPM_TOKEN
+#   - a trusted publisher on npm for each package, naming this repo, this workflow, and the
+#     npm-publish environment
 #   - a repository variable PUBLISH_TO_NPM set to "true"
 name: release
 
@@ -142,9 +143,10 @@ jobs:
           publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only needed until trusted publishing is configured on both packages. changesets/action
-          # prefers OIDC when it is available, so this can be deleted rather than rotated.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No npm credential. Both packages have a trusted publisher pinned to this repository, this
+          # workflow, and the npm-publish environment, so authentication is the OIDC token minted by
+          # `id-token: write` below. That is also the only path that works here: the account requires
+          # 2FA for writes, and a passkey cannot answer npm's CLI one-time-password prompt.
           NPM_CONFIG_PROVENANCE: "true"
 
       - name: Say what happened
