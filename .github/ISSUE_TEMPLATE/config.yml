@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Question, or an idea you want to talk through first
+    url: https://github.com/eknowledger/toolbench/discussions
+    about: Discussions, not issues. An issue should be something to do; a question is not yet that.
   - name: Security vulnerability
     url: https://github.com/eknowledger/toolbench/security/advisories/new
     about: Report privately. Read SECURITY.md first, some things that look like vulnerabilities are documented design.
