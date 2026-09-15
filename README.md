@@ -1,19 +1,23 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+  <img src="assets/logo.svg" alt="" width="88" height="88">
+</picture>
+
 # Toolbench
 
-[![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml)
-[![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml)
-[![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime)
-[![release](https://img.shields.io/github/v/release/eknowledger/toolbench?label=release&sort=semver)](https://github.com/eknowledger/toolbench/releases)
-[![contract](https://img.shields.io/badge/contract-v2-informational)](docs/versioning.md)
-[![runtime size](https://img.shields.io/badge/runtime-16.3%20KB%20gzip-brightgreen)](#size-and-cost)
-[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install)
-[![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts)
-[![node](https://img.shields.io/badge/node-%3E%3D24%20to%20develop-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support)
-[![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+**Ship small interactive tools on a website.**
+A tool is one function and one JSON file. Toolbench builds the form, runs it, and renders the result.
 
-Ship small interactive tools on a website. A tool is one function and one JSON file. Toolbench builds
-the form, runs the function, and renders the result.
+<!-- ⚠️ All badges in a group must sit on ONE source line. GitHub renders a single newline as <br>, so
+     one badge per line stacks them vertically instead of flowing them inline. -->
+
+[![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
+[![contract](https://img.shields.io/badge/contract-v2-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-17.8%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+
+</div>
 
 ```ts
 // tools/reverse/index.ts
