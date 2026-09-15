@@ -139,6 +139,8 @@ toolbench/
 │   │       ├── types.ts            the contract: Output, InputSpec, Manifest, Ctx, Tool
 │   │       ├── validate.ts         manifest validation and the cross-field invariants
 │   │       ├── migrate.ts          version migration chain
+│   │       ├── seed.ts             build-time seeding, and safe serialisation for a script tag
+│   │       ├── fixtures.ts         the tool-directory walk. Node-only, exported at ./fixtures
 │   │       ├── testing.ts          fixture runner and result comparison
 │   │       ├── version.ts          SDK_VERSION, supported versions, changelog
 │   │       └── index.ts            public surface
@@ -715,8 +717,8 @@ Four layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 2` step, fixture comparison including its guard rails | 38 |
-| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, and every case | 9 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 2` step, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 60 |
+| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, and every case. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 10 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
 | `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 17 |
 
@@ -918,6 +920,7 @@ declaration, so browsers without that function get the light palette rather than
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
 | `runCases`, `assertCases`, `compare`, `testCtx`, `CaseResult`, `RunCasesOptions` | fixtures |
+| `checkToolDirectory`, `readToolDirectory`, `readTool`, `scanToolDirectory`, `ToolOnDisk`, `ToolDirectoryError` | **`@toolbench/sdk/fixtures`** subpath. Node-only: it reads the filesystem, which is why it is not in the main entry |
 | `seed`, `serialiseSeed`, `defaultInputs`, `SeedError`, `SeedOptions` | build-time seeding |
 | `SDK_VERSION`, `SUPPORTED_SDK_VERSIONS`, `SDK_CHANGELOG` | version |
 

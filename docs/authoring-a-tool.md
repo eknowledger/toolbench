@@ -218,8 +218,21 @@ node --test tools/cases.test.ts
 ```
 
 That file walks every tool directory, so a new tool is picked up with no registration. It checks the
-manifest validates, that `id` equals the directory name, that `cases.json` exists and is not empty,
-that every case's kind is declared in `kinds`, and then runs the cases.
+manifest validates, that `id` equals the directory name, that `cases.json` exists and is not empty, that
+every case's kind is declared in `kinds`, and then runs the cases.
+
+**On your own site**, the same suite is three lines, because the walk is exported:
+
+```ts
+import { describe, it } from "node:test";
+import { checkToolDirectory } from "@toolbench/sdk/fixtures";
+
+checkToolDirectory(new URL("../src/tools/", import.meta.url), { describe, it });
+```
+
+`describe` and `it` are passed in rather than imported, so the SDK keeps its zero dependencies and the
+same call works under Vitest. It lives on the `/fixtures` subpath because it reads the filesystem, and
+the main entry deliberately does not: `@toolbench/runtime` imports the SDK and runs in a browser.
 
 ### Step 5: see it
 

@@ -145,6 +145,19 @@ picks up new tools with no code change.
 node --test tools/cases.test.ts
 ```
 
+On your own site that suite is three lines, since the directory walk is exported:
+
+```ts
+import { describe, it } from "node:test";
+import { checkToolDirectory } from "@toolbench/sdk/fixtures";
+
+checkToolDirectory(new URL("../src/tools/", import.meta.url), { describe, it });
+```
+
+It validates every manifest, checks each tool's `id` matches its directory, refuses an empty
+`cases.json`, verifies no case expects a kind the manifest failed to declare, and runs every case. Wire
+it into CI and a change that breaks a tool fails your build instead of someone's afternoon.
+
 Full walkthrough: [docs/authoring-a-tool.md](docs/authoring-a-tool.md).
 
 ## Display modes
