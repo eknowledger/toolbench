@@ -38,6 +38,8 @@ export {
 } from "./types.ts";
 
 export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
+
+export { SeedError, defaultInputs, seed, serialiseSeed, type SeedOptions } from "./seed.ts";
 export { MIGRATIONS, VersionError, canLoad, upgradeManifest, upgradeOutput, type Migration } from "./migrate.ts";
 export { assertCases, compare, runCases, testCtx, type CaseResult, type RunCasesOptions } from "./testing.ts";
 export { SDK_CHANGELOG, SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";

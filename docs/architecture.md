@@ -383,7 +383,7 @@ Deliberately small, and deliberately not zero:
 | `tool.worker.ts` | A worker must import tool modules, and a bundler can only follow imports it can see in the host's own module graph |
 | `pageUrl` | Only the host knows its routing |
 | Rendering `help` | Markdown rendering is a host concern, and most hosts already have one |
-| Seeding | Requires running a tool during the host's build, which only the host can do |
+| Seeding | Requires running a tool during the host's build, which only the host can do. `seed()` and `serialiseSeed()` in the SDK do the work; wiring them into a build is the host's |
 
 ## 7. Control flow
 
@@ -918,6 +918,7 @@ declaration, so browsers without that function get the light palette rather than
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
 | `runCases`, `assertCases`, `compare`, `testCtx`, `CaseResult`, `RunCasesOptions` | fixtures |
+| `seed`, `serialiseSeed`, `defaultInputs`, `SeedError`, `SeedOptions` | build-time seeding |
 | `SDK_VERSION`, `SUPPORTED_SDK_VERSIONS`, `SDK_CHANGELOG` | version |
 
 `@toolbench/runtime`

@@ -450,6 +450,21 @@ What earns its place:
 * what it does **not** handle. This is the most useful part and the most often missing;
 * where the numbers come from, if any are hard-coded.
 
+## 10b. Seeding
+
+If a host puts your tool on a card, it will compute a **seed**: your tool run against its manifest
+defaults, embedded in the page so the card shows a real result before any JavaScript loads.
+
+Two consequences for you as the author, and both are easy to get wrong:
+
+* **Your defaults must produce a real result.** `seed()` throws if the tool rejects its own defaults, so
+  a default that returns `error` fails the host's build. Pick defaults that demonstrate the tool.
+* **Your defaults must be fast.** Seeding runs at build time with a 5 second budget, and it is one tool
+  among however many the host has. A default that takes seconds is a default nobody should ship.
+
+You do not have to do anything to support seeding. It is worth knowing it happens, because it makes your
+choice of defaults visible to every reader who never presses Run.
+
 ## 11. Checklist
 
 - [ ] `id` matches the directory name
@@ -464,6 +479,7 @@ What earns its place:
 - [ ] Any input-dependent loop checks `ctx.signal`, and the tool declares `thread: "worker"`
 - [ ] Four or more cases: canonical, edge, error, past bug
 - [ ] Every `subset` case has a `why` that says what is deliberately not pinned
+- [ ] Defaults produce a real result, quickly: they are what a seeded card shows
 - [ ] `README.md` says what the tool does not handle
 - [ ] `node --test tools/cases.test.ts` passes
 - [ ] Looked at it in `pnpm bench`, in all three modes

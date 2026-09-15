@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 /**
  * The bench is a plain Vite app on purpose. No framework, no meta-framework — if the runtime needs
@@ -29,7 +29,57 @@ function toolChunk(id: string, prefix: string): string | null {
 	return null;
 }
 
+/**
+ * Compute each seeded card's result at build time and inject it into the HTML.
+ *
+ * This is the pattern a real host uses, and the reason `seed()` exists. The alternative is what this
+ * bench did before: hand-written JSON in index.html, which was correct on the day it was typed and
+ * would drift the moment the tool changed, showing a confidently wrong answer to every reader who did
+ * not press Run.
+ *
+ * `transformIndexHtml` is the right hook because the seed has to be in the static markup. Anything
+ * that injects it from JavaScript has already lost the property that makes a seed worth having.
+ */
+function seedCards(): Plugin {
+	return {
+		name: "toolbench-seed-cards",
+		async transformIndexHtml(html) {
+			// Only the ids actually marked for seeding, so a page pays nothing for tools it does not seed.
+			const ids = [...html.matchAll(/<tool-host tool="([^"]+)"[^>]*data-seed\b/g)].map((m) => m[1]);
+			if (ids.length === 0) return html;
+
+			const { seed, serialiseSeed, upgradeManifest, validateManifest } = await import("@toolbench/sdk");
+			let out = html;
+			for (const id of ids) {
+				const manifest = validateManifest(
+					upgradeManifest((await import(`../tools/${id}/tool.json`, { with: { type: "json" } })).default),
+				);
+				const tool = (await import(`../tools/${id}/index.ts`)).default;
+				/*
+				 * Deliberately NOT wrapped in try/catch. seed() throws when a tool crashes on its own
+				 * defaults or rejects them, and both are authoring bugs that should fail the build rather
+				 * than silently ship a card with nothing in it.
+				 */
+				const output = await seed({ manifest, tool });
+				/*
+				 * A card renders only the FIRST part of a group, so seeding the whole thing ships markup
+				 * no reader can see. Trimming is the host's call rather than the SDK's, because it
+				 * depends on the mode the card is in: a page-mode host would keep everything.
+				 */
+				const forCard = output.kind === "group" && output.parts.length > 0 ? output.parts[0] : output;
+				const json = serialiseSeed(forCard);
+				out = out.replace(
+					new RegExp(`(<tool-host tool="${id}"[^>]*data-seed\\b[^>]*>)`),
+					`$1\n\t\t\t<script type="application/json" data-toolbench-seed>${json}</script>`,
+				);
+			}
+			return out;
+		},
+	};
+}
+
 export default defineConfig({
+	plugins: [seedCards()],
 	/*
 	 * ⚠️ `worker.format` defaults to "iife", which cannot code-split — so a worker that dynamically
 	 * imports anything (ours imports one chunk per tool) builds fine in development and fails the

@@ -159,16 +159,34 @@ which is the difference between a page that stays fast and one that does not.
 | `embed` | Same as `page` without the title, sized for the middle of an article | When it scrolls within two viewports |
 
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
-give the card a **seed**, which is the tool's result for its default inputs computed during the build.
-The card then shows a real result with no JavaScript at all:
+give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
+then shows a real result with no JavaScript at all.
 
-```html
-<tool-host tool="percentiles" mode="card">
-  <script type="application/json" data-toolbench-seed>
-    { "kind": "fields", "fields": [{ "label": "p99", "value": "1200" }] }
-  </script>
-</tool-host>
+Compute it with `seed()` rather than writing it by hand. A hand-written seed is correct on the day it is
+typed and drifts silently afterwards, showing a confidently wrong answer to every reader who does not
+press Run. That is not hypothetical: the seed in this repository's own bench was hardcoded and had drifted
+by the time `seed()` replaced it.
+
+```ts
+// In your build: a Vite plugin, an Astro integration, a script that writes HTML.
+import { seed, serialiseSeed } from "@toolbench/sdk";
+
+const output = await seed({ manifest, tool });
+// A card renders only the first part of a group, so there is no point shipping the rest.
+const forCard = output.kind === "group" ? output.parts[0] : output;
+
+html = `<tool-host tool="percentiles" mode="card">
+  <script type="application/json" data-toolbench-seed>${serialiseSeed(forCard)}</script>
+</tool-host>`;
 ```
+
+⚠️ Use `serialiseSeed`, not `JSON.stringify`. An HTML parser ends a `<script>` at the first `</script` in
+its text however the JSON is quoted, so a tool that echoes any part of its input could otherwise truncate
+your page. [`bench/vite.config.ts`](bench/vite.config.ts) is a working 30-line version of the above.
+
+`seed()` **throws** if a tool crashes on its own defaults or rejects them, because both are authoring bugs
+and a card seeded with an error is worse than an unseeded one. Wrap it if you would rather have a missing
+seed than a failed build.
 
 ## How a tool runs
 

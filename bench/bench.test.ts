@@ -119,19 +119,50 @@ describe("card mode — the facade", () => {
 	});
 
 	it("renders a seeded result as static markup, with no JavaScript run at all", async () => {
+		/*
+		 * ⚠️ The seed is COMPUTED at build time by the SDK's seed(), not hand-written. The version this
+		 * replaced was hardcoded JSON and was already wrong: it claimed p50 = 24 where the tool computes
+		 * 28. Nobody noticed, because a seed is only visible to readers who do not press Run.
+		 *
+		 * So this asserts the seed agrees with the tool rather than merely existing. Any drift, from a
+		 * hardcoded value creeping back or the plugin silently failing, fails here.
+		 */
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
-		/*
-		 * The seed is inline JSON in the page source — what a server-rendering host emits. It must show
-		 * before activation, which is what makes a card useful with scripting off.
-		 */
-		const seeded = await page.$$eval("tool-host[tool=percentiles]", (hosts) =>
-			hosts
-				.map((h) => (h as HTMLElement & { shadowRoot: ShadowRoot }).shadowRoot.textContent ?? "")
-				.filter((text) => text.includes("1200")),
-		);
-		assert.ok(seeded.length > 0, "the seeded card should show its precomputed result before anything runs");
+		const host = page.locator("tool-host[data-seed]");
+		await host.scrollIntoViewIfNeeded();
+
+		const raw = await host.locator("script[data-toolbench-seed]").textContent();
+		assert.ok(raw, "the build must have injected a seed");
+		assert.doesNotMatch(raw, /<\/script/i, "serialiseSeed must not leave a closing script tag in the markup");
+
+		const seedOutput = JSON.parse(raw) as { kind: string; fields: { label: string; value: string }[] };
+		assert.equal(seedOutput.kind, "fields", "a card seeds the first part of a group, not the whole thing");
+		const p50 = seedOutput.fields.find((f) => f.label === "p50")?.value;
+
+		// The same numbers must be on screen before anything is clicked, and before any form exists.
+		const shown = await page.evaluate(() => {
+			const card = document.querySelector("tool-host[data-seed]");
+			return {
+				fields: [...(card?.shadowRoot?.querySelectorAll(".tb-field") ?? [])].map((f) => f.textContent?.replace(/\s+/g, " ").trim()),
+				hint: card?.shadowRoot?.querySelector(".tb-facade-hint")?.textContent,
+				hasForm: Boolean(card?.shadowRoot?.querySelector(".tb-form")),
+			};
+		});
+		assert.ok(shown.fields.some((f) => f?.includes(`p50${p50}`)), `the rendered card must show the seeded p50 (${p50}): ${shown.fields.join(" | ")}`);
+		assert.equal(shown.hint, "Try it", "a seeded card invites a try rather than announcing itself as unopened");
+		assert.equal(shown.hasForm, false, "and it is still a facade: nothing has loaded");
 		await page.close();
+	});
+
+	it("keeps the seed usable with JavaScript disabled, which is the whole point", async () => {
+		const context = await browser.newContext({ javaScriptEnabled: false });
+		const page = await context.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const raw = await page.locator("tool-host[data-seed] script[data-toolbench-seed]").textContent();
+		assert.match(String(raw), /"p50"/, "the result must be in the served markup, not produced by script");
+		await page.close();
+		await context.close();
 	});
 
 	it("does not run on activation — Run is the trigger, and it does something", async () => {
