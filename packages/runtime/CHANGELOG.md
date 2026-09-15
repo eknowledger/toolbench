@@ -1,5 +1,12 @@
 # @toolbench/runtime
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`725e880`](https://github.com/eknowledger/toolbench/commit/725e880295f99c74e8810183ba99575e6be8f0bb), [`93d319b`](https://github.com/eknowledger/toolbench/commit/93d319b6601384205951231d01b79c5b45ff34b1)]:
+  - @toolbench/sdk@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

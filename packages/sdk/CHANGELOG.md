@@ -1,5 +1,35 @@
 # @toolbench/sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- [#32](https://github.com/eknowledger/toolbench/pull/32) [`725e880`](https://github.com/eknowledger/toolbench/commit/725e880295f99c74e8810183ba99575e6be8f0bb) Thanks [@eknowledger](https://github.com/eknowledger)! - Adds `seed()` and `serialiseSeed()` for computing a card's static result at build time, so a seed cannot drift from the tool it describes.
+
+  `seed(loaded)` runs a tool against its manifest defaults and returns the `Output`. It throws if the tool crashes on its own defaults or rejects them, because both are authoring bugs and a card seeded with an error message is worse than an unseeded card.
+
+  `serialiseSeed(output)` produces JSON safe to embed in `<script type="application/json">`. Use it rather than `JSON.stringify`: an HTML parser ends a `<script>` at the first `</script` in its text however the JSON is quoted, so a tool echoing any part of its input could otherwise truncate the page.
+
+  Also exports `defaultInputs()` and `SeedError`.
+
+- [#34](https://github.com/eknowledger/toolbench/pull/34) [`93d319b`](https://github.com/eknowledger/toolbench/commit/93d319b6601384205951231d01b79c5b45ff34b1) Thanks [@eknowledger](https://github.com/eknowledger)! - Adds a `@toolbench/sdk/fixtures` subpath exporting the tool-directory harness, so a host authoring its own tools gets the compatibility guarantees in three lines rather than copying forty:
+
+  ```ts
+  import { describe, it } from "node:test";
+  import { checkToolDirectory } from "@toolbench/sdk/fixtures";
+
+  checkToolDirectory(new URL("../src/tools/", import.meta.url), {
+    describe,
+    it,
+  });
+  ```
+
+  It validates every manifest, checks each tool's `id` matches its directory name, refuses an empty `cases.json`, verifies no case expects an output kind the manifest failed to declare, and runs every case with a 50 ms bound for main-thread tools.
+
+  Also exports `readToolDirectory`, `readTool` and `scanToolDirectory` for build-time use, such as generating a registry or precomputing seeds, plus `ToolDirectoryError` and `ToolOnDisk`.
+
+  `describe` and `it` are passed in rather than imported, so this package keeps its zero dependencies and the same call works under other runners. It is a subpath rather than part of the main entry because it reads the filesystem, and the main entry deliberately does not: `@toolbench/runtime` imports this package and runs in a browser.
+
 ## 0.2.0
 
 ### Minor Changes
