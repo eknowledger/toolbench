@@ -38,6 +38,7 @@ The tool has no idea it is on the web. The website needs no framework.
 
 ## Contents
 
+- [What it looks like](#what-it-looks-like)
 - [Why](#why)
 - [Install](#install)
 - [Quick start](#quick-start)
@@ -51,6 +52,55 @@ The tool has no idea it is on the web. The website needs no framework.
 - [Non-goals](#non-goals)
 - [Repository layout](#repository-layout)
 - [Documentation](#documentation)
+
+## What it looks like
+
+Every screenshot below is the test bench in `bench/`, which is the same runtime a host installs. Nothing
+is mocked up.
+
+### A card costs nothing until someone opens it
+
+On the left the card is **static markup**: a result computed at build time by `seed()`, with not one byte
+of the tool's code downloaded. On the right, the same card after one click.
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/card-closed-dark.png" alt="A Toolbench card before activation, showing a precomputed result and a Try it link"></td>
+<td width="50%"><img src="assets/screenshots/card-open-dark.png" alt="The same card after being clicked, now showing a full form with a Run button and the computed result"></td>
+</tr>
+<tr>
+<td align="center"><em>Closed: markup only, 0 bytes of tool code</em></td>
+<td align="center"><em>Opened: one chunk fetched, form generated from the manifest</em></td>
+</tr>
+</table>
+
+### Results are typed shapes, not HTML
+
+A tool returns one of a closed set of shapes and the runtime draws it. Below is `bytes`, for wire
+formats: offsets, hex, a printable gutter, and named ranges. The highlight on the four-byte character
+**spans the row break**, which is what a table cannot do and why the kind exists.
+
+The same tool in both themes. A tool inherits the page it is on; theming is a dozen CSS custom
+properties and nothing else.
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/bytes-light.png" alt="The bytes output in a light theme: a hex dump with offsets, highlighted byte ranges and a legend naming each one"></td>
+<td width="50%"><img src="assets/screenshots/bytes-dark.png" alt="The same bytes output in a dark theme, with the same highlights"></td>
+</tr>
+</table>
+
+### A chart also ships its numbers
+
+A chart is an image, and a screen reader gets nothing from an image. So every `series` result renders the
+same data as a table inside a `<details>`, automatically. The tool author does nothing to get this.
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/chart-light.png" alt="A line chart with two axes, a legend and an annotation, above a disclosure showing the same data as a table"></td>
+<td width="50%"><img src="assets/screenshots/chart-dark.png" alt="The same chart and data table in a dark theme"></td>
+</tr>
+</table>
 
 ## Why
 
