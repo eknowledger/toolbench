@@ -240,7 +240,7 @@ repository was found by looking at the thing, not by reasoning about it.
 | `name` | yes | Sentence case. It is a heading, not a title. |
 | `blurb` | yes | One sentence, under 200 characters. It is the card line and the page's meta description. Say what the tool does, not that it is useful. |
 | `version` | yes | The tool's own version. Semver by convention. Nothing branches on it. |
-| `capabilities` | yes | `["pure"]`. That is the only value in contract version 1. |
+| `capabilities` | yes | `["pure"]`. Still the only value at contract version 2. |
 | `runtime.entry` | yes | Relative to the tool directory. |
 | `runtime.thread` | no | `"main"` (default) or `"worker"`. See §7. |
 | `inputs` | yes | At least one. A tool with none is a constant. |
@@ -305,8 +305,21 @@ which is how one result holds two comparable sets: `tools/queue-explorer` uses "
 
 { kind: "code", lang: "json", source: '{"ok":true}' }
 
+{ kind: "bytes",
+  bytes: [72, 195, 169, 108],
+  offset: 0,                    // what to LABEL the first byte, for a window into something larger
+  caption: "Highlighted runs are one character each",
+  highlight: [{ at: 1, len: 2, label: "U+00E9 é", tone: "normal" }] }
+
 { kind: "group", parts: [ /* any of the above */ ] }
 ```
+
+Three notes on `bytes`, added in contract version 2 for wire formats. **Every highlight needs a
+`label`**, because colour alone tells a reader something is interesting without saying what, and tells a
+screen reader nothing at all: the labels become a legend under the dump. **`at` is always relative to
+`bytes`**, never to `offset`, which only changes what the first row is *labelled*. And **`tone` is for
+real severity only**: the default palette resolves `warn` and `accent` to the same colour, so a tone
+used decoratively implies a distinction the reader cannot see.
 
 Two notes on `group`. Order matters: a **card renders only the first part**, so put the part that works
 alone at the front. And declare every kind you use, `"group"` included.

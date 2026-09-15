@@ -18,6 +18,7 @@ export {
 	OUTPUT_KINDS,
 	type Capability,
 	type Case,
+	type ByteRange,
 	type Cell,
 	type Chart,
 	type Column,

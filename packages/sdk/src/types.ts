@@ -61,6 +61,21 @@ export interface Chart {
 }
 
 /**
+ * A run of bytes worth calling out inside a `bytes` output: a header field, a length prefix, the
+ * region an error points at.
+ *
+ * `label` is what makes this more than colour. A highlight a reader cannot name tells them something
+ * is interesting without saying what, and the label is also the only thing a screen reader gets.
+ */
+export interface ByteRange {
+	/** Offset from the start of `bytes`, not from `offset`. */
+	at: number;
+	len: number;
+	label: string;
+	tone?: Tone;
+}
+
+/**
  * What a tool returns. A closed union: a runtime can render every member, and a tool cannot invent
  * a shape nobody can draw.
  *
@@ -74,6 +89,18 @@ export type Output =
 	| { kind: "table"; columns: Column[]; rows: Cell[][]; caption?: string }
 	| { kind: "series"; chart: Chart }
 	| { kind: "group"; parts: Output[] }
+	/**
+	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
+	 * middle, printable characters in a gutter, and named ranges over the top.
+	 *
+	 * ⚠️ Added in contract version 2. A `table` can approximate this and gets it wrong in a way that
+	 * matters: alignment has to be fought rather than given, and there is nowhere to put a highlight
+	 * that spans columns or wraps a row.
+	 *
+	 * `offset` is what the first byte should be *labelled*, for a tool showing a window into
+	 * something larger. It does not shift `ByteRange.at`, which is always relative to `bytes`.
+	 */
+	| { kind: "bytes"; bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
 	/**
 	 * The INPUT was wrong, and the tool worked correctly by saying so. `input` names the control at
 	 * fault so a generated form can mark it invalid and point a screen reader at the message —
@@ -94,6 +121,7 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 	"series",
 	"group",
 	"error",
+	"bytes",
 ];
 
 // ---------------------------------------------------------------------------

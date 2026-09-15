@@ -231,6 +231,45 @@ export const STYLES = /* css */ `
 .tb-chart-data summary { color: var(--tb-faint); cursor: pointer; }
 .tb-chart-data table { margin-top: 0.5rem; }
 
+/* ── bytes ────────────────────────────────────────────────────────────────────────────────── */
+.tb-out-bytes { margin: 0; }
+.tb-bytes-caption { color: var(--tb-faint); font-size: 0.78rem; padding-bottom: 0.375rem; }
+.tb-bytes-grid {
+  font-family: var(--tb-mono); font-size: 0.78rem; line-height: 1.6;
+  background: var(--tb-surface); border: 1px solid var(--tb-border); border-radius: 8px;
+  padding: 0.5rem 0.625rem; overflow-x: auto;
+}
+/* ⚠️ ONE grid for the whole dump, with the rows as display:contents.
+   Each row being its own grid was the first version, and the columns then sized per row: a final row
+   with three bytes had a narrower hex column, so its ASCII gutter sat several characters left of the
+   row above. A hex dump whose columns shift is not a hex dump. */
+.tb-bytes-grid-inner { display: grid; grid-template-columns: auto auto auto; gap: 0 0.875rem; justify-content: start; }
+.tb-bytes-row { display: contents; }
+.tb-bytes-offset, .tb-bytes-hex, .tb-bytes-ascii { white-space: pre; }
+.tb-bytes-offset { color: var(--tb-faint); }
+.tb-bytes-hex .tb-byte + .tb-byte { margin-left: 0.5ch; }
+.tb-bytes-ascii { color: var(--tb-muted); }
+/* Tone marks a byte's range. The background carries it rather than the text colour, because two hex
+   digits are too small a target to read a colour from.
+   ⚠️ The normal tone gets a SOLID accent, not the wash. The wash (--tb-accent-bg) was the first choice and
+   it is nearly the surface colour: every two and three-byte highlight was invisible, and only the one
+   range that happened to carry a tone showed up at all. */
+.tb-byte[data-tone] { border-radius: 2px; }
+.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-bg); }
+.tb-byte[data-tone="good"]   { background: var(--tb-good); color: var(--tb-bg); }
+.tb-byte[data-tone="warn"]   { background: var(--tb-warn); color: var(--tb-bg); }
+.tb-byte[data-tone="bad"]    { background: var(--tb-bad); color: var(--tb-bg); }
+.tb-bytes-legend {
+  display: flex; flex-wrap: wrap; gap: 0.75rem;
+  margin: 0.5rem 0 0; padding: 0; list-style: none;
+  font-size: 0.78rem; color: var(--tb-muted);
+}
+.tb-bytes-legend li { display: flex; align-items: center; gap: 0.375rem; }
+.tb-bytes-swatch { width: 0.75rem; height: 0.75rem; border-radius: 2px; background: var(--tb-accent); }
+.tb-bytes-legend li[data-tone="good"] .tb-bytes-swatch { background: var(--tb-good); }
+.tb-bytes-legend li[data-tone="warn"] .tb-bytes-swatch { background: var(--tb-warn); }
+.tb-bytes-legend li[data-tone="bad"]  .tb-bytes-swatch { background: var(--tb-bad); }
+
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
 .tb-facade {
   display: block; width: 100%; text-align: start;

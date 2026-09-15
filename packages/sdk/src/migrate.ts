@@ -37,27 +37,32 @@ export interface Migration {
 }
 
 /**
- * The chain, ordered by `from`.
+ * The chain, ordered by `from`. One step per version boundary, and every step must exist: a gap is a
+ * `VersionError` rather than a silent pass-through.
  *
- * Empty at contract version 1 — there is nothing before it. The machinery exists now, with tests,
- * because a compatibility mechanism written at the moment it is first needed is a compatibility
- * mechanism written under pressure.
+ * The machinery was built before it was needed, which is why the first real entry below was a
+ * five-line change rather than a design exercise. It also caught a bug in itself: `chainFrom` used
+ * the module constant instead of the injected `currentVersion`, so chains silently did nothing.
  *
- * A future entry looks like this (from the real plan for version 2, which adds a `bytes` output for
- * hex dumps):
- *
- * ```ts
- * {
- *   from: 1,
- *   // A v1 manifest cannot mention `bytes`, so nothing to change.
- *   manifest: (m) => m,
- *   // A v1 tool cannot return `bytes` either. Identity — and that is the shape of a healthy
- *   // additive change: the migration is trivial precisely because nothing was taken away.
- *   output: (o) => o,
- * }
- * ```
+ * ⚠️ A healthy entry has `manifest` and `output` both as the identity function. That is the mechanical
+ * test of whether a contract change was additive. If either half has to transform something, the
+ * change took something away, and docs/versioning.md §7 governs it instead.
  */
-export const MIGRATIONS: readonly Migration[] = [];
+export const MIGRATIONS: readonly Migration[] = [
+	{
+		from: 1,
+		/*
+		 * 1 → 2 added the `bytes` output kind.
+		 *
+		 * Both halves are the identity function, and that is the point rather than laziness: a v1
+		 * manifest cannot name a kind that did not exist, and a v1 tool cannot return one. If either
+		 * half had needed to transform something, the change would not have been additive and
+		 * docs/versioning.md §7 would apply instead.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
+];
 
 export class VersionError extends Error {
 	constructor(message: string) {

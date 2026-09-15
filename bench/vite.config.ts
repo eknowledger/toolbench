@@ -16,7 +16,17 @@ import { defineConfig } from "vite";
  */
 function toolChunk(id: string, prefix: string): string | null {
 	const match = /\/(?:tools|fixtures)\/([^/]+)\/index\.ts$/.exec(id);
-	return match ? `${prefix}${match[1]}` : null;
+	if (match) return `${prefix}${match[1]}`;
+	/*
+	 * ⚠️ The bench's theme control gets its own chunk, and the reason is honesty rather than size.
+	 *
+	 * `boot` is runtime plus page wiring, and it is the number the README quotes for what a consumer
+	 * pays. The theme switch is a test instrument that no consumer ships, so leaving it in `boot` would
+	 * inflate a published figure with bytes nobody downloads. Rollup would otherwise inline it, since
+	 * all three entries import it statically.
+	 */
+	if (/\/bench\/src\/theme\.ts$/.test(id)) return "bench-theme";
+	return null;
 }
 
 export default defineConfig({
@@ -54,6 +64,15 @@ export default defineConfig({
 			},
 		},
 	},
-	server: { port: 5180, fs: { allow: [resolve(import.meta.dirname, "..")] } },
-	preview: { port: 4173 },
+	/*
+	 * ⚠️ strictPort, set on the scripts as well as here.
+	 *
+	 * Without it, a dev server left running from an earlier session keeps 5180 and the new one quietly
+	 * moves to 5181. You then test the old server, and since `import.meta.glob` is resolved at transform
+	 * time, a tool added after that server started does not exist as far as it is concerned. The symptom
+	 * is "No tool with id ..." on a tool you just wrote, which sends you looking in the registry.
+	 * Failing loudly on a taken port is worth more than starting successfully on the wrong one.
+	 */
+	server: { port: 5180, strictPort: true, fs: { allow: [resolve(import.meta.dirname, "..")] } },
+	preview: { port: 4173, strictPort: true },
 });

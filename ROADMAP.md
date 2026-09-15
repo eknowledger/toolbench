@@ -43,18 +43,26 @@ intended as the second way to get tools into a site and is filed as a spike, bec
 is the constraint it has to respect: a manifest is data and can arrive any time, but a module is code and
 the bundler has to have seen it.
 
-## [0.3.0 - contract v2](https://github.com/eknowledger/toolbench/milestone/3)
+## [0.3.0 - later contract work](https://github.com/eknowledger/toolbench/milestone/3)
 
-The migration chain is empty and tested only with synthetic versions. Until a real version bump goes
-through it, "old tools keep working" is a claim backed by test doubles.
+**Contract v2 moved into 0.2.0 and has shipped.** It was pulled forward because the first tool being
+built on Toolbench outside this repository is a packet decoder, and a decoder returns a `group` of
+`fields` + `table` + `bytes`. A `table` approximates a hex dump badly, so the integration was genuinely
+blocked on the kind rather than merely inconvenienced.
 
-`bytes` is the smallest honest way to find out, and the worked example is already written in
-[versioning.md §6](docs/versioning.md#6-worked-example-adding-a-bytes-output). The acceptance criterion
-that matters is that every existing tool passes its fixtures **unedited**.
+The `bytes` kind, its renderer and the `1 → 2` migration are done, and the thing worth recording is that
+the policy held: both migration halves are the identity function and no existing tool's fixtures were
+touched. The chain is no longer backed by test doubles.
+
+What remains here is the contract work nothing needs yet.
 
 A `file` input is filed as a spike rather than a feature, because it is the first change that breaks the
 "a tool is a function of its declared inputs" property that fixtures and seeding both rest on. Four
 questions need answering before any code.
+
+Splitting the chart renderer into its own chunk is filed as "measure, then probably close". It became
+more interesting after contract v2, which added about 1.5 KB to the runtime for a renderer most tools
+never use: the same argument now applies twice.
 
 ## [1.0.0 - stable API](https://github.com/eknowledger/toolbench/milestone/4)
 

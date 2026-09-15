@@ -56,6 +56,16 @@
 			</script>
 		</tool-host>
 
+		<h2>Bytes — contract version 2</h2>
+		<p class="note">
+			The <code>bytes</code> kind, added in contract version 2. Offsets, hex, printable gutter, and
+			<strong>named highlight ranges</strong> that can start mid-row and wrap. A <code>table</code> can
+			approximate this and gets alignment and spanning wrong, which is why it earned its own renderer.
+			The legend is not decoration: colour alone tells a reader something is interesting without saying
+			what, and tells a screen reader nothing.
+		</p>
+		<tool-host tool="utf8-bytes" mode="page"></tool-host>
+
 		<h2>What failure looks like</h2>
 		<p class="note">
 			A tool that misbehaves on purpose. <strong>Spin forever</strong> ignores its abort signal, so only

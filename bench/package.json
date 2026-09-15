@@ -5,9 +5,9 @@
   "description": "The test bench: every display mode, every output kind, and both threading modes, in one place you can look at.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --strictPort",
     "build": "vite build",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173 --strictPort"
   },
   "dependencies": {
     "@toolbench/runtime": "workspace:*",

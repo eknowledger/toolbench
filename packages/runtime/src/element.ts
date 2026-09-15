@@ -632,6 +632,18 @@ function summarise(output: Output, brief = false): string {
 			return `table, ${output.rows.length} row${output.rows.length === 1 ? "" : "s"}`;
 		case "series":
 			return `chart, ${output.chart.series.length} series`;
+		case "bytes": {
+			// The named ranges are the useful part: "84 bytes" tells a screen-reader user nothing they
+			// can act on, whereas the field names are the reason they ran the tool.
+			const named = output.highlight?.length ?? 0;
+			const size = `${output.bytes.length} byte${output.bytes.length === 1 ? "" : "s"}`;
+			/*
+			 * "ranges", not "fields". The first wording made a group of fields plus bytes announce
+			 * itself as "4 fields, 19 bytes, 4 fields marked", where the two counts of "fields" meant
+			 * different things and neither was wrong on its own.
+			 */
+			return named > 0 ? `${size}, ${named} range${named === 1 ? "" : "s"} marked` : size;
+		}
 		case "text":
 		case "code":
 			return "result ready";

@@ -6,6 +6,9 @@
  */
 import { defineToolHost, RegistrySource } from "@toolbench/runtime";
 import { registry } from "./registry.ts";
+import { installThemeControl } from "./theme.ts";
+
+installThemeControl();
 
 export const source = new RegistrySource(registry);
 

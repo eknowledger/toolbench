@@ -12,7 +12,7 @@
  * first few values, but an error is never shortened — a partial error reads as a complete answer,
  * which is the one failure mode worse than showing nothing.
  */
-import type { Cell, Field, Output } from "@toolbench/sdk";
+import type { ByteRange, Cell, Field, Output } from "@toolbench/sdk";
 import { el } from "../dom.ts";
 import { renderChart } from "./chart.ts";
 
@@ -55,6 +55,8 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			}
 			return el("div", { class: "tb-group" }, ...output.parts.map((part) => render(part, options)));
 		}
+		case "bytes":
+			return renderBytes(output, options);
 		case "error":
 			return renderError(output);
 		default: {
@@ -178,6 +180,108 @@ function renderTable(
 			el("thead", {}, head),
 			el("tbody", {}, ...body),
 		),
+	);
+}
+
+/** How many bytes per row. 16 is the convention every hex dump uses, and readers expect it. */
+const BYTES_PER_ROW = 16;
+/** Above this, a card would be a page. The full tool shows everything. */
+const COMPACT_ROWS = 4;
+
+/**
+ * Raw bytes the way someone reading a wire format wants them: offset, hex, printable gutter.
+ *
+ * ⚠️ Two things this does that a `table` cannot, which is why the kind exists.
+ *
+ * A highlight spans a *byte range*, not cells, so it can start mid-row and wrap. Each byte carries
+ * its range's tone, and the legend names every range, because colour alone tells a reader something
+ * is interesting without saying what — and tells a screen reader nothing at all.
+ *
+ * The printable gutter replaces a non-printable byte with `.`, the convention, rather than trying to
+ * render control characters. A byte is only shown as itself between 0x20 and 0x7e.
+ */
+function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: RenderOptions): HTMLElement {
+	const { bytes, highlight = [], offset = 0 } = output;
+	/*
+	 * One lookup per byte, built once. The alternative is scanning every range per byte, which is
+	 * O(bytes x ranges) and shows up immediately on a packet-sized dump.
+	 */
+	const rangeOf = new Map<number, ByteRange>();
+	for (const range of highlight) {
+		for (let i = range.at; i < range.at + range.len && i < bytes.length; i++) rangeOf.set(i, range);
+	}
+
+	const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW);
+	const rows = options.compact ? Math.min(totalRows, COMPACT_ROWS) : totalRows;
+	const hex = (n: number, width: number) => n.toString(16).padStart(width, "0");
+
+	const lines: HTMLElement[] = [];
+	for (let row = 0; row < rows; row++) {
+		const start = row * BYTES_PER_ROW;
+		const slice = bytes.slice(start, start + BYTES_PER_ROW);
+		lines.push(
+			el(
+				"div",
+				{ class: "tb-bytes-row" },
+				el("span", { class: "tb-bytes-offset" }, hex(offset + start, 8)),
+				el(
+					"span",
+					{ class: "tb-bytes-hex" },
+					...slice.map((byte, i) => {
+						const range = rangeOf.get(start + i);
+						return el(
+							"span",
+							{
+								class: "tb-byte",
+								...(range ? { "data-tone": range.tone ?? "normal", title: range.label } : {}),
+							},
+							hex(byte, 2),
+						);
+					}),
+				),
+				el(
+					"span",
+					{ class: "tb-bytes-ascii" },
+					...slice.map((byte, i) => {
+						const range = rangeOf.get(start + i);
+						return el(
+							"span",
+							{ class: "tb-byte", ...(range ? { "data-tone": range.tone ?? "normal" } : {}) },
+							byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : ".",
+						);
+					}),
+				),
+			),
+		);
+	}
+
+	const hidden = totalRows - rows;
+	return el(
+		"figure",
+		{ class: "tb-out-bytes" },
+		output.caption ? el("figcaption", { class: "tb-bytes-caption" }, output.caption) : null,
+		el("div", { class: "tb-bytes-grid" }, el("div", { class: "tb-bytes-grid-inner" }, ...lines)),
+		hidden > 0
+			? el("p", { class: "tb-more" }, `+${hidden * BYTES_PER_ROW} more bytes on the full tool`)
+			: null,
+		/*
+		 * The legend is the accessible half of this renderer. A hex grid is a wall of numbers to a
+		 * screen reader, so every named range is also stated as text with its offset and length.
+		 */
+		highlight.length > 0
+			? el(
+					"ul",
+					{ class: "tb-bytes-legend" },
+					...highlight.map((range) =>
+						el(
+							"li",
+							{ "data-tone": range.tone ?? "normal" },
+							el("span", { class: "tb-bytes-swatch" }),
+							`${range.label} — ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
+						),
+					),
+				)
+			: null,
 	);
 }
 

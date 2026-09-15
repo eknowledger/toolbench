@@ -208,6 +208,7 @@ export type Output =
   | { kind: "table";    columns: Column[]; rows: Cell[][]; caption?: string }
   | { kind: "series";   chart: Chart }
   | { kind: "group";    parts: Output[] }
+  | { kind: "bytes";    bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
   | { kind: "error";    message: string; input?: string; at?: number; len?: number };
 ```
 
@@ -256,7 +257,7 @@ The fields, and who reads each one:
 | `id` | source, element, host routing | Lowercase, hyphenated. Must equal the directory name. |
 | `name`, `blurb` | element, host head tags | `blurb` is capped at 200 characters so it works as a meta description. |
 | `version` | humans | The tool's own version. Nothing branches on it. |
-| `capabilities` | validate, element | `["pure"]` in contract version 1. |
+| `capabilities` | validate, element | `["pure"]` is the only value so far. |
 | `runtime.entry` | host bundler, fixture runner | Path relative to the tool directory. |
 | `runtime.thread` | runner | `"main"` (default) or `"worker"`. |
 | `inputs` | element (form), fixture runner (defaults) | |
@@ -289,10 +290,10 @@ timeoutMs: is only meaningful with runtime.thread = "worker". On the main thread
 
 The cross-field invariants at the bottom of the file are the interesting part; §8 lists them.
 
-**`migrate.ts`** holds the migration chain. At contract version 1 the chain is empty, because nothing
-precedes version 1. The machinery exists anyway, with tests that use synthetic versions, because a
-compatibility mechanism first written on the day it is needed is a compatibility mechanism written
-under pressure. It has already repaid that: the tests caught a bug where the chain silently did
+**`migrate.ts`** holds the migration chain: one step today, `1 → 2`, with both halves the identity
+function. The machinery was built before anything needed it, and tested with synthetic versions, which
+is why the first real entry was a five-line change rather than a design exercise under pressure. It
+repaid that twice over: while still synthetic, the tests caught a bug where the chain silently did
 nothing, because a helper used the module constant instead of the injected current version.
 
 **`testing.ts`** runs fixtures and compares results. Comparison is exact by default. Subset matching is
@@ -714,10 +715,10 @@ Four layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain with synthetic versions, fixture comparison including its guard rails | 33 |
-| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, and every case | 6 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 2` step, fixture comparison including its guard rails | 38 |
+| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, and every case | 9 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
-| `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 13 |
+| `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 17 |
 
 The browser layer is weighted towards things that only exist in a browser or only appear in a
 production build:
@@ -745,9 +746,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 16.3 KB | One chunk, once per page that uses a tool |
-| Stylesheet | 0.7 KB | |
-| Worker entry | 2.7 KB | Only on pages with a worker-mode tool, and only after activation |
+| Runtime plus the bench's own wiring | 17.8 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer |
+| Stylesheet | 0.9 KB | |
+| Worker entry | 3.1 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | A page with no tool | 0 bytes | Nothing is imported |
@@ -772,6 +773,10 @@ is here because the guards look arbitrary without it.
 |---|---|---|
 | Worker-mode tools were downloaded twice by the reader | The element called `source.load()` for every tool, but in worker mode the runner only ever reads `loaded.manifest`. So the main thread fetched and parsed a module it never called, doubling what a worker-mode tool costs | `Runner` takes a `Runnable` whose `tool` is optional, and the element loads the module only when this thread will call it. A browser test asserts which of the two chunks is fetched, and that neither loads under an anonymous name |
 | The worker's copies of every tool were called `index-*.js` | The duplication above was invisible in the network panel, and a chunk-name assertion could not see it | `worker.rollupOptions.output.manualChunks` names them `worker-tool-<id>`, so the panel says which thread ran |
+| Every two and three-byte highlight in a hex dump was invisible | Only the one range carrying a different tone showed at all. The `normal` tone used `--tb-accent-bg`, a wash that is nearly the surface colour, while the code comment beside it said two hex digits are too small a target to read a colour from | A solid `--tb-accent`. Browser test asserts a marked byte has a non-transparent background |
+| A hex dump's ASCII gutter drifted left on the final row | Each row was its own CSS grid, so column widths were computed per row and a short last row sized its own hex column | One grid for the dump, rows as `display: contents`. Browser test compares the gutters' x positions across rows |
+| The status region announced "4 fields, 19 bytes, 4 fields marked" | Two counts of "fields" meaning different things, neither wrong alone | Ranges are called ranges. Browser test asserts the string does not contain "fields marked" |
+| A stale dev server made a new tool look unregistered | `import.meta.glob` resolves at transform time, so a server started before the tool directory existed reported "No tool with id ...". Without `strictPort` the new server had quietly moved to another port | `strictPort` on the bench's dev and preview scripts, so a taken port fails loudly instead of succeeding on the wrong one |
 | A throttled progress frame landed after the final result and overwrote it | The chart appeared for one frame and vanished. Status said "chart, 2 series" while the screen showed the partial fields | The staleness check runs at animation-frame flush time, not at call time. Browser test asserts the chart survives a second after settling |
 | Series colour classes set `stroke` and `fill` together | Equal specificity, later in the sheet, so they beat `fill: none` and every line drew as a filled blob | One custom property per series; the shape decides whether it is a stroke or a fill |
 | The form was painted before the tool's module arrived | Run existed and did nothing. Invisible locally, a dead control on a slow connection | `#loading` keeps the facade up until the module lands. Browser test asserts the status is "press Run" only once the form exists |
@@ -787,8 +792,9 @@ is here because the guards look arbitrary without it.
 
 Known and accepted, with what each costs.
 
-* **Contract version 1 is pure functions only.** No file input, no network. A converter or an API
-  client needs version 2 or 3. This is the first real exercise the versioning policy will get.
+* **The contract is pure functions only**, at version 2. No file input, no network. A converter or an
+  API client needs version 3 or 4. Contract v2 was the first real exercise of the versioning policy and
+  it held: both migration halves were the identity function and no existing tool's fixtures changed.
 * **No sandbox.** A tool runs with the page's privileges. Worker mode isolates the *thread*, not the
   origin: it shares cookies and does not inherit the page's Content-Security-Policy. Fine for code you
   wrote; not fine for code you did not.
@@ -907,7 +913,7 @@ declaration, so browsers without that function get the light palette rather than
 
 | Export | Kind |
 |---|---|
-| `Tool`, `Ctx`, `Output`, `Field`, `Column`, `Cell`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `Capability`, `OutputKind`, `InputType` | types |
+| `Tool`, `Ctx`, `Output`, `Field`, `Column`, `Cell`, `ByteRange`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `Capability`, `OutputKind`, `InputType` | types |
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |

@@ -10,6 +10,17 @@
   --accent: light-dark(#8a5a00, #f0b040);
   color-scheme: light dark;
 }
+
+/* The theme control. Deliberately plain: it is a test instrument, not a design. */
+.theme-switch { display: flex; gap: 0; margin-left: auto; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.theme-switch button {
+  font: inherit; font-size: 0.8rem; padding: 0.25rem 0.625rem;
+  background: none; color: var(--muted); border: 0; cursor: pointer;
+}
+.theme-switch button + button { border-left: 1px solid var(--line); }
+.theme-switch button[aria-checked="true"] { background: var(--accent); color: var(--page); font-weight: 600; }
+.theme-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 * { box-sizing: border-box; }
 body {
   margin: 0;

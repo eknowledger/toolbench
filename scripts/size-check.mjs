@@ -24,7 +24,18 @@ const ASSETS = join(import.meta.dirname, "..", "bench", "dist", "assets");
  * page pays to use any tool at all". It is not the runtime alone, and the docs say so.
  */
 const BUDGETS = [
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 18_000 },
+	/*
+	 * Raised from 18,000 by contract v2: the bytes renderer is about 1.5 KB gzipped, which is real
+	 * runtime code every consumer pays for. Recorded here rather than raised quietly, and the README's
+	 * size table moved with it.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 19_000 },
+	/*
+	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
+	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
+	 * unnoticed either.
+	 */
+	{ label: "bench theme switch", pattern: /^bench-theme-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },

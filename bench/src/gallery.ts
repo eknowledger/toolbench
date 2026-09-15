@@ -1,6 +1,9 @@
 import "./boot.ts";
 import { source, } from "./boot.ts";
 import { toolIds } from "./registry.ts";
+import { installThemeControl } from "./theme.ts";
+
+installThemeControl();
 
 /**
  * Builds a card per tool, twice — once plain, once inside a themed container.

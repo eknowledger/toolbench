@@ -23,7 +23,7 @@ version. It is short on purpose. A compatibility policy nobody reads is not a po
 
 | Version | Where | Changes when | Example |
 |---|---|---|---|
-| **Contract version** | `manifest.sdk`, and `SDK_VERSION` in `packages/sdk/src/version.ts` | A new output kind, input type or capability is added. Rarely, and deliberately | `1` |
+| **Contract version** | `manifest.sdk`, and `SDK_VERSION` in `packages/sdk/src/version.ts` | A new output kind, input type or capability is added. Rarely, and deliberately | `2` |
 | **Package version** | `packages/*/package.json` | Every release, including bug fixes | `0.1.0` |
 | **Tool version** | `manifest.version` | The tool author changes the tool. Nothing in the system branches on it | `1.2.0` |
 
@@ -101,11 +101,13 @@ tool.run() ──►  upgradeOutput    ──►  render            ──►  D
                 (chain of steps)      (exhaustive switch)
 ```
 
-The chain is empty at version 1, because nothing precedes version 1. The machinery exists anyway, with
-tests that inject synthetic versions, and it has already earned that: those tests caught a bug where the
-chain silently did nothing, because `chainFrom` used the module constant instead of the injected current
-version. That defect would have been invisible until the first real migration, at which point it would
-have looked like a compatibility failure rather than a two-line bug.
+The chain holds one step today, `1 → 2`, and both of its halves are the identity function.
+
+It was built before anything needed it, and tested against synthetic versions, which is why the first
+real entry was a five-line change rather than a design exercise under pressure. It also caught a bug in
+itself while still synthetic: `chainFrom` used the module constant instead of the injected current
+version, so chains silently did nothing. That defect would have been invisible until the first real
+migration, at which point it would have looked like a compatibility failure rather than a two-line bug.
 
 ## 5. Raising the contract version
 
@@ -121,7 +123,9 @@ Six steps. All of them, in one pull request.
 4. **`packages/sdk/src/validate.ts`** Validate the new thing, and add any invariant it needs. Ask
    whether a tool using it may still be a live card; anything touching files or the network may not.
 5. **`packages/runtime`** Add the renderer or the control. The exhaustive switch in `render/index.ts`
-   will not compile until you do.
+   will not compile until you do. ⚠️ It is not the only one: `summarise` in `element.ts` also switches
+   over every kind, because a result has to announce itself to a screen reader. Contract v2 found that
+   the hard way. Expect the compiler to point at both.
 6. **Tests.** A fixture using the new feature, and a fixture proving an older tool is unaffected.
 
 Then, before merging:
@@ -137,6 +141,11 @@ Then, before merging:
 
 ## 6. Worked example: adding a `bytes` output
 
+⚠️ **This is no longer hypothetical.** It shipped as contract version 2 in 0.2.0, and it is kept here
+because it is the shape every future bump should have. The real change matched this sketch almost
+exactly; what it added was the discovery that a new output kind also breaks the *host's* exhaustive
+switch, not only the renderer's, which is covered in step 5 below.
+
 A hex-dump tool wants a byte grid with offsets, ASCII gutter, and selectable ranges. A `table` can
 approximate it and looks wrong.
 
@@ -145,7 +154,11 @@ approximate it and looks wrong.
 ```ts
 export type Output =
   | /* ... existing members ... */
-  | { kind: "bytes"; bytes: number[]; offset?: number; highlight?: { at: number; len: number }[] };
+  | { kind: "bytes"; bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string };
+
+// A highlight needs a NAME, not just a span. Colour alone tells a reader something is
+// interesting without saying what, and tells a screen reader nothing at all.
+export interface ByteRange { at: number; len: number; label: string; tone?: Tone }
 
 export const OUTPUT_KINDS = [/* ... */, "bytes"] as const;
 ```
@@ -215,11 +228,11 @@ explain what happened rather than return a 404. If the tool is replaced, put the
 | Contract version | Shipped | Adds |
 |---|---|---|
 | 1 | Initial | `fields`, `text`, `code`, `table`, `series`, `group`, `error` outputs. `text`, `textarea`, `number`, `select`, `toggle` inputs. The `pure` capability. Main and worker threads. |
+| 2 | 0.2.0 | The `bytes` output kind, for wire formats and hex dumps, with named highlight ranges. Both migration halves are the identity function, and every v1 tool's fixtures passed unedited. |
 
 Planned, in likely order. Nothing here is committed, and each would follow §5:
 
-| Version | Adds | Why it is not in version 1 |
+| Version | Adds | Why it is not in the contract yet |
 |---|---|---|
-| 2 | `bytes` output | Nothing needed it yet, and a table approximates it badly enough to be worth a real renderer |
-| 2 or 3 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
-| later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |
+| 3 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
+| 4 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |

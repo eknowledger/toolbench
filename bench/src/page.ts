@@ -1,6 +1,9 @@
 import "./boot.ts";
 import { source } from "./boot.ts";
 import { toolIds } from "./registry.ts";
+import { installThemeControl } from "./theme.ts";
+
+installThemeControl();
 
 /**
  * The full-page mode. A real host would generate one route per tool; the bench uses a query parameter

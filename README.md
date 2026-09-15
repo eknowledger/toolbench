@@ -4,7 +4,7 @@
 [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml)
 [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime)
 [![release](https://img.shields.io/github/v/release/eknowledger/toolbench?label=release&sort=semver)](https://github.com/eknowledger/toolbench/releases)
-[![contract](https://img.shields.io/badge/contract-v1-informational)](docs/versioning.md)
+[![contract](https://img.shields.io/badge/contract-v2-informational)](docs/versioning.md)
 [![runtime size](https://img.shields.io/badge/runtime-16.3%20KB%20gzip-brightgreen)](#size-and-cost)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install)
 [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts)
@@ -199,6 +199,7 @@ tool cannot invent something nobody can render.
 | `series` | A chart with axes, legend and annotations. Ships the same numbers as a table for readers who cannot see it |
 | `text` | Prose or preformatted output |
 | `code` | Source, with a language tag the host can highlight |
+| `bytes` | Raw bytes as a reader of a wire format wants them: offsets, hex, a printable gutter, and named ranges that can wrap a row |
 | `group` | Several of the above in one result. A decoder that returns fields *and* a table is the common case |
 | `error` | The input was wrong. Naming the input marks that control invalid and attaches the message to it |
 
@@ -263,8 +264,8 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime, once per page that uses a tool | 16.3 KB |
-| Worker entry, only for pages with a worker-mode tool | 2.7 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 17.8 KB |
+| Worker entry, only for pages with a worker-mode tool | 3.1 KB |
 | `percentiles` tool chunk | 1.2 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | A page with no tool on it | 0 bytes |
@@ -294,8 +295,8 @@ execute with no build step. Any bundler for the host site; the examples use Vite
 * **Not a sandbox.** A tool is code you wrote and bundled. Worker mode is a stability boundary that
   lets a slow run be stopped; it is not a security boundary, and the docs never pretend otherwise. Code
   you did not write needs a different design.
-* **Contract version 1 is pure functions only.** No file input, no network access. Both are planned as
-  additive versions, which is the case the versioning policy exists to handle.
+* **The contract is pure functions only.** No file input, no network access, at contract version 2.
+  Both are planned as additive versions, which is the case the versioning policy exists to handle.
 
 ## Repository layout
 

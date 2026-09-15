@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type Migration, upgradeManifest, upgradeOutput, VersionError } from "./migrate.ts";
+import { canLoad, MIGRATIONS, type Migration, upgradeManifest, upgradeOutput, VersionError } from "./migrate.ts";
 import type { Output } from "./types.ts";
-import { SDK_VERSION } from "./version.ts";
+import { SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";
 
 /**
  * These tests use SYNTHETIC versions rather than real ones.
@@ -121,5 +121,55 @@ describe("upgradeOutput", () => {
 		const out = upgradeOutput(withTone, 1, [one_to_two], 2);
 		assert.ok(out.kind === "fields");
 		assert.equal(out.fields[0]?.tone, "bad", "the tool's own value wins over the default the migration supplies");
+	});
+});
+
+/*
+ * The real chain, not a synthetic one.
+ *
+ * Until contract v2 shipped, every test in this file used injected fake versions. These assert the
+ * actual MIGRATIONS export, because a compatibility mechanism that only works against test doubles is
+ * not a compatibility mechanism.
+ */
+describe("the real 1 -> 2 chain", () => {
+	it("has exactly one step, and it is additive", () => {
+		assert.equal(MIGRATIONS.length, 1, "one step per version boundary");
+		assert.equal(MIGRATIONS[0]?.from, 1);
+		/*
+		 * The mechanical test from docs/versioning.md §3: if either half has to transform something,
+		 * the change took something away and is not a version bump but a break.
+		 */
+		const manifest = { sdk: 1, id: "x" };
+		const output: Output = { kind: "fields", fields: [{ label: "a", value: "1" }] };
+		assert.deepEqual(MIGRATIONS[0]?.manifest(manifest), manifest, "manifest half must be the identity");
+		assert.deepEqual(MIGRATIONS[0]?.output(output), output, "output half must be the identity");
+	});
+
+	it("carries a v1 manifest up to the current version untouched apart from sdk", () => {
+		const v1 = { sdk: 1, id: "old-tool", name: "Old", kinds: ["fields", "error"] };
+		const upgraded = upgradeManifest(v1);
+		assert.equal(upgraded.sdk, SDK_VERSION, "declares the current contract after upgrade");
+		assert.equal(upgraded.id, "old-tool");
+		assert.deepEqual(upgraded.kinds, ["fields", "error"], "nothing else is rewritten");
+	});
+
+	it("leaves a v1 tool's output alone", () => {
+		const output: Output = {
+			kind: "group",
+			parts: [
+				{ kind: "fields", fields: [{ label: "p50", value: "120" }] },
+				{ kind: "table", columns: [{ label: "n" }], rows: [["1"]] },
+			],
+		};
+		assert.deepEqual(upgradeOutput(output, 1), output);
+	});
+
+	it("still refuses a manifest from the future", () => {
+		assert.throws(() => upgradeManifest({ sdk: SDK_VERSION + 1, id: "x" }), /needs contract version/);
+	});
+
+	it("canLoad accepts every supported version and nothing above", () => {
+		for (const v of SUPPORTED_SDK_VERSIONS) assert.ok(canLoad(v), `v${v} should load`);
+		assert.equal(canLoad(SDK_VERSION + 1), false);
 	});
 });

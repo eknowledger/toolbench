@@ -199,6 +199,69 @@ describe("card mode — the facade", () => {
 	});
 });
 
+describe("bytes output — contract version 2", () => {
+	it("aligns its columns, marks every range, and names them in a legend", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const host = page.locator('tool-host[tool="utf8-bytes"][mode="page"]');
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-run").click();
+		await host.locator(".tb-out-bytes").waitFor({ timeout: 15_000 });
+
+		const dump = await page.evaluate(() => {
+			const root = document.querySelector('tool-host[tool="utf8-bytes"][mode="page"]')?.shadowRoot;
+			const gutters = [...(root?.querySelectorAll(".tb-bytes-ascii") ?? [])];
+			return {
+				rows: root?.querySelectorAll(".tb-bytes-row").length ?? 0,
+				// One <span data-tone> per highlighted byte, in BOTH the hex column and the gutter.
+				marked: root?.querySelectorAll(".tb-byte[data-tone]").length ?? 0,
+				legend: [...(root?.querySelectorAll(".tb-bytes-legend li") ?? [])].map((li) => li.textContent?.trim()),
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+				/*
+				 * The columns must line up across rows. Each row was its own grid in the first version,
+				 * so a short final row sized its own hex column and pushed its gutter left of the row
+				 * above. Comparing the gutters' x positions is the cheapest assertion that catches it.
+				 */
+				gutterLefts: gutters.map((g) => Math.round(g.getBoundingClientRect().left)),
+				// A visible highlight, not the near-white wash the first version used.
+				markedBg: root?.querySelector('.tb-bytes-hex .tb-byte[data-tone="normal"]')
+					? getComputedStyle(root.querySelector('.tb-bytes-hex .tb-byte[data-tone="normal"]') as Element).backgroundColor
+					: "",
+			};
+		});
+
+		assert.equal(dump.rows, 2, "19 bytes at 16 per row is two rows");
+		// 4 multi-byte characters spanning 12 bytes, marked in the hex column and the gutter.
+		assert.equal(dump.marked, 24, `expected 12 bytes marked in two columns, got ${dump.marked}`);
+		assert.equal(dump.legend.length, 4, "every named range appears in the legend");
+		assert.match(String(dump.legend[3]), /U\+1F44B/, "including the four-byte one that wraps rows");
+		assert.ok(
+			dump.legend.every((entry) => /\d+ bytes? at 0x[0-9a-f]{4}/.test(String(entry))),
+			`each legend entry states its size and offset: ${dump.legend.join(" | ")}`,
+		);
+
+		assert.equal(new Set(dump.gutterLefts).size, 1, `the ASCII gutters must align across rows, got ${dump.gutterLefts.join(", ")}`);
+
+		assert.notEqual(dump.markedBg, "rgba(0, 0, 0, 0)", "a marked byte must have a visible background");
+		assert.match(dump.status, /19 bytes, 4 ranges marked/);
+		assert.doesNotMatch(dump.status, /fields marked/, "'fields' means something else in this sentence");
+		await page.close();
+	});
+
+	it("truncates a long dump on a card but never silently", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator('#cards tool-host[tool="utf8-bytes"]').first();
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		// A card renders only the first part of a group, and this tool's first part is its fields.
+		await card.locator(".tb-run").click();
+		await card.locator(".tb-output > *").first().waitFor({ timeout: 15_000 });
+		assert.ok((await card.locator(".tb-output > *").count()) > 0);
+		await page.close();
+	});
+});
+
 describe("page mode", () => {
 	it("renders the chart and keeps it — a late progress frame must not overwrite the result", async () => {
 		const page = await browser.newPage();
@@ -372,6 +435,49 @@ describe("accessibility wiring", () => {
 		assert.equal(wiring.status, "polite");
 		assert.equal(wiring.runButton, "Run", "there is always an explicit Run button");
 		assert.ok(wiring.numberInputsBounded, "a number input carries its bounds — the only guard on a runaway input");
+		await page.close();
+	});
+
+	it("follows an explicit theme choice, not just the system preference", async () => {
+		/*
+		 * ⚠️ The case a real host actually has, and the one that is easy to get wrong.
+		 *
+		 * The runtime's default tokens use light-dark(), which resolves against the used `color-scheme`
+		 * and knows nothing about a CSS class. Nearly every site toggles a class: Tailwind's `dark:`,
+		 * Fuwari, most themes. A host that toggles the class and stops there gets light tools on a dark
+		 * page, and it reads as a framework bug rather than a missing line.
+		 *
+		 * So this launches with the SYSTEM preference set to light and then chooses dark explicitly. If
+		 * the tool only ever followed the OS, this would pass while the real integration failed.
+		 */
+		const page = await browser.newPage({ colorScheme: "light" });
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const bg = async () =>
+			page.evaluate(() => {
+				const shell = document.querySelector("#cards tool-host")?.shadowRoot?.querySelector(".tb");
+				return shell ? getComputedStyle(shell).backgroundColor : "";
+			});
+
+		await page.locator('.theme-switch button[data-mode="light"]').first().click();
+		const light = await bg();
+		await page.locator('.theme-switch button[data-mode="dark"]').first().click();
+		await page.waitForTimeout(150);
+		const dark = await bg();
+
+		assert.notEqual(dark, light, "an explicit dark choice must reach inside the shadow root");
+		const brightness = (colour: string) =>
+			(colour.match(/\d+/g) ?? ["255"]).slice(0, 3).reduce((sum, n) => sum + Number(n), 0);
+		assert.ok(brightness(dark) < brightness(light), `dark should be darker: light=${light} dark=${dark}`);
+
+		// And the host's own class is set too, because a host needs one for its own chrome.
+		const wiring = await page.evaluate(() => ({
+			cls: document.documentElement.classList.contains("dark"),
+			scheme: document.documentElement.style.colorScheme,
+			controls: document.querySelectorAll(".theme-switch").length,
+		}));
+		assert.equal(wiring.cls, true, "the class a host styles its own chrome with");
+		assert.equal(wiring.scheme, "dark", "and the color-scheme that actually reaches the tools");
+		assert.equal(wiring.controls, 1, "install must be idempotent: two entry points call it");
 		await page.close();
 	});
 

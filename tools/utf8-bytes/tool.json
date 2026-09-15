@@ -1,0 +1,29 @@
+{
+  "sdk": 2,
+  "id": "utf8-bytes",
+  "name": "UTF-8 bytes",
+  "blurb": "Shows the bytes behind a string, and marks every character that needs more than one of them.",
+  "version": "1.0.0",
+  "capabilities": ["pure"],
+  "runtime": { "entry": "index.ts", "thread": "main" },
+  "kinds": ["group", "fields", "bytes", "error"],
+  "card": "live",
+  "cardFields": 3,
+  "inputs": [
+    {
+      "id": "text",
+      "type": "textarea",
+      "label": "Text",
+      "description": "Any string. Emoji and combining marks are the interesting cases.",
+      "primary": true,
+      "rows": 2,
+      "maxLength": 512,
+      "default": "Héllo, 世界 👋"
+    }
+  ],
+  "help": "README.md",
+  "tags": ["encoding", "unicode", "bytes"],
+  "links": [
+    { "label": "UTF-8 (RFC 3629)", "href": "https://www.rfc-editor.org/rfc/rfc3629" }
+  ]
+}
