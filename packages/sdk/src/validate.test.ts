@@ -158,4 +158,41 @@ describe("validateManifest", () => {
 			m.samples = [{ label: "Sloppy", input: { mode: "quick" } }];
 		}, "samples[0].input.mode", "option values");
 	});
+
+	/*
+	 * The text and toggle arms of that switch were implemented and checked by hand, and nothing held
+	 * them in place: the tests above only reach the number and select arms, so a refactor could have
+	 * dropped either one and stayed green. Every arm now has a test.
+	 */
+	it("rejects a sample value that is not a string for a text input", () => {
+		failsWith((m) => {
+			m.inputs = [{ id: "pattern", type: "text", label: "Pattern", default: "" }];
+			m.samples = [{ label: "A number", input: { pattern: 42 } }];
+		}, "samples[0].input.pattern", "must be a string");
+	});
+
+	it("rejects a sample value that is not a boolean for a toggle", () => {
+		failsWith((m) => {
+			m.inputs = [{ id: "trace", type: "toggle", label: "Show trace", default: false }];
+			m.samples = [{ label: "Truthy", input: { trace: "yes" } }];
+		}, "samples[0].input.trace", "true or false");
+	});
+
+	it("rejects samples that are not an array", () => {
+		failsWith((m) => { m.samples = { label: "One", input: { value: 1 } }; }, "samples", "must be an array");
+	});
+
+	it("rejects a sample with no label, which would render as an unnamed button", () => {
+		failsWith((m) => { m.samples = [{ input: { value: 5 } }]; }, "samples[0].label", "non-empty string");
+	});
+
+	it("accepts a partial sample, which is the usual case: change the one thing the example is about", () => {
+		const m = good() as Record<string, unknown>;
+		m.inputs = [
+			{ id: "value", type: "number", label: "Value", default: 1, min: 0, max: 10 },
+			{ id: "note", type: "text", label: "Note", default: "" },
+		];
+		m.samples = [{ label: "Just the number", input: { value: 7 } }];
+		assert.deepEqual(validateManifest(m).samples?.[0]?.input, { value: 7 }, "an input the sample does not name is left alone");
+	});
 });
