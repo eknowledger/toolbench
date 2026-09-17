@@ -155,6 +155,15 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
 				case "text":
 				case "textarea": {
 					if (typeof value !== "string") fail(where, `must be a string, because "${key}" is a ${spec.type} input`);
+					/*
+					 * `maxLength` reaches the browser as the `maxlength` attribute, which constrains typing
+					 * and nothing else. Filling a control from a sample assigns its value directly and walks
+					 * straight past it, so an over-long sample would run the tool on more characters than the
+					 * tool declared it accepts. Rejected for the same reason an out-of-range number is.
+					 */
+					if (spec.maxLength !== undefined && value.length > spec.maxLength) {
+						fail(where, `is ${value.length} characters, over "${key}"'s maxLength of ${spec.maxLength}`);
+					}
 					break;
 				}
 				case "number": {

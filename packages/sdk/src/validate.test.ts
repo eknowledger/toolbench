@@ -171,6 +171,17 @@ describe("validateManifest", () => {
 		}, "samples[0].input.pattern", "must be a string");
 	});
 
+	/*
+	 * The DOM's maxlength attribute constrains typing only, and filling a control from a sample assigns
+	 * its value directly, so nothing downstream would catch this.
+	 */
+	it("rejects a sample string longer than its input's maxLength", () => {
+		failsWith((m) => {
+			m.inputs = [{ id: "pattern", type: "text", label: "Pattern", default: "", maxLength: 8 }];
+			m.samples = [{ label: "Too long", input: { pattern: "123456789" } }];
+		}, "samples[0].input.pattern", "maxLength");
+	});
+
 	it("rejects a sample value that is not a boolean for a toggle", () => {
 		failsWith((m) => {
 			m.inputs = [{ id: "trace", type: "toggle", label: "Show trace", default: false }];

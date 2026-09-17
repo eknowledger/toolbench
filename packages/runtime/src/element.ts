@@ -574,6 +574,12 @@ export class ToolHost extends HTMLElement {
 	 * So a normal tool marks its result stale and an `autoRun` tool re-runs, which is what "a sample
 	 * behaves exactly as typing does" has to mean. Treating it as the one input change that never runs
 	 * would make it an exception to the rule it follows.
+	 *
+	 * ⚠️ Every input the sample names is applied, including one a compact card would not have rendered.
+	 * That is safe only because the row is never drawn on a card: applying to visible controls alone
+	 * would fill the form differently from how the sample reads, and applying invisibly would leave the
+	 * form describing something other than what Run will use. Relaxing the card rule means resolving
+	 * that first.
 	 */
 	#applySample(sample: Sample): void {
 		for (const spec of this.#manifest?.inputs ?? []) {
@@ -587,8 +593,14 @@ export class ToolHost extends HTMLElement {
 			if (spec.type === "toggle") (control as HTMLInputElement).checked = Boolean(next);
 			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next);
 		}
-		// The last run's error described input that is no longer in the form.
-		this.#markInvalid(undefined);
+		/*
+		 * It is tempting to clear `aria-invalid` here, on the control the last error named. Deliberately
+		 * not done: typing does not clear it either, and the error is still on screen, dimmed as stale.
+		 * Clearing the marker without removing the message would leave the screen and the screen reader
+		 * disagreeing about whether there is an error, and it would make a sample the one input change
+		 * that behaves differently from the rest. The next run replaces the result and the marker
+		 * together.
+		 */
 		this.#inputChanged();
 		/*
 		 * `#markStale` has just said "inputs changed — press Run". Naming the sample is more use than

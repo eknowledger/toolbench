@@ -100,7 +100,7 @@ export const STYLES = /* css */ `
 }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible {
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible, .tb-sample:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
@@ -139,7 +139,6 @@ export const STYLES = /* css */ `
   cursor: pointer;
 }
 .tb-sample:hover { border-color: var(--tb-accent); color: var(--tb-accent); }
-.tb-sample:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 
 .tb-progress[hidden] { display: none; }
 .tb-progress {
