@@ -121,6 +121,72 @@ function validateInput(raw: unknown, path: string): InputSpec {
 }
 
 /**
+ * Samples, checked against the inputs they claim to fill.
+ *
+ * ⚠️ Stricter than the runtime's typed-input path, on purpose. A reader's out-of-range number is
+ * clamped, because refusing a keystroke leaves them with a form they cannot use. An author's
+ * out-of-range sample is static data that CI reads before anyone sees it, so it can be an error naming
+ * the field. Clamping it instead ships a button whose label says one thing and whose value says
+ * another, and nobody would ever notice.
+ *
+ * The unknown-id check is the one that matters most: without it the button renders, does nothing, and
+ * reports nothing.
+ */
+function validateSamples(raw: unknown, specs: InputSpec[]): void {
+	const samples = arr(raw, "samples");
+	if (samples.length === 0) fail("samples", "is empty; omit the key rather than declaring that there are no examples");
+	const byId = new Map(specs.map((spec) => [spec.id, spec]));
+	const labels: string[] = [];
+
+	samples.forEach((sample, i) => {
+		const at = `samples[${i}]`;
+		const so = obj(sample, at);
+		labels.push(str(so, "label", `${at}.`));
+		const input = obj(so.input, `${at}.input`);
+		const keys = Object.keys(input);
+		if (keys.length === 0) fail(`${at}.input`, "sets no values; a sample that fills nothing is a button that does nothing");
+
+		for (const key of keys) {
+			const where = `${at}.input.${key}`;
+			const spec = byId.get(key);
+			if (!spec) fail(where, `names no input of this tool. Its inputs are: ${[...byId.keys()].join(", ")}`);
+			const value = input[key];
+			switch (spec.type) {
+				case "text":
+				case "textarea": {
+					if (typeof value !== "string") fail(where, `must be a string, because "${key}" is a ${spec.type} input`);
+					break;
+				}
+				case "number": {
+					if (typeof value !== "number" || !Number.isFinite(value)) {
+						fail(where, `must be a finite number, because "${key}" is a number input`);
+					}
+					if (value < spec.min || value > spec.max) {
+						fail(where, `is ${value}, outside "${key}"'s min..max (${spec.min}..${spec.max}). A sample is not a keystroke: fix the example rather than relying on the clamp`);
+					}
+					break;
+				}
+				case "select": {
+					const values = spec.options.map((option) => option.value);
+					if (typeof value !== "string" || !values.includes(value)) {
+						fail(where, `must be one of "${key}"'s option values: ${values.join(", ")}`);
+					}
+					break;
+				}
+				case "toggle": {
+					if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
+					break;
+				}
+			}
+		}
+	});
+
+	if (new Set(labels).size !== labels.length) {
+		fail("samples", `labels must be unique, got ${labels.join(", ")}. Two identical buttons in a row is a typo`);
+	}
+}
+
+/**
  * Validate a manifest that has already been brought up to the current contract version.
  *
  * Call `upgradeManifest` first unless you know the manifest is current — this function deliberately
@@ -182,6 +248,7 @@ export function validateManifest(raw: unknown): Manifest {
 	if (primaries.length > 1) {
 		fail("inputs", `only one input may be primary (a compact card shows exactly one), got ${primaries.map((p) => p.id).join(", ")}`);
 	}
+	if (o.samples !== undefined) validateSamples(o.samples, specs);
 
 	// --- output kinds -----------------------------------------------------------------------------
 	const kinds = arr(o.kinds, "kinds");
