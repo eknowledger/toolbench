@@ -131,18 +131,25 @@ describe("upgradeOutput", () => {
  * actual MIGRATIONS export, because a compatibility mechanism that only works against test doubles is
  * not a compatibility mechanism.
  */
-describe("the real 1 -> 2 chain", () => {
-	it("has exactly one step, and it is additive", () => {
-		assert.equal(MIGRATIONS.length, 1, "one step per version boundary");
-		assert.equal(MIGRATIONS[0]?.from, 1);
+describe("the real 1 -> 3 chain", () => {
+	it("has one step per version boundary, and every step is additive", () => {
+		assert.equal(MIGRATIONS.length, 2, "one step per version boundary");
+		assert.deepEqual(
+			MIGRATIONS.map((step) => step.from),
+			[1, 2],
+		);
 		/*
-		 * The mechanical test from docs/versioning.md §3: if either half has to transform something,
-		 * the change took something away and is not a version bump but a break.
+		 * The mechanical test from docs/versioning.md §3, applied to every step rather than only to the
+		 * newest: if either half has to transform something, the change took something away and is a
+		 * break rather than a version bump.
 		 */
 		const manifest = { sdk: 1, id: "x" };
 		const output: Output = { kind: "fields", fields: [{ label: "a", value: "1" }] };
-		assert.deepEqual(MIGRATIONS[0]?.manifest(manifest), manifest, "manifest half must be the identity");
-		assert.deepEqual(MIGRATIONS[0]?.output(output), output, "output half must be the identity");
+		for (const step of MIGRATIONS) {
+			const boundary = `${step.from} -> ${step.from + 1}`;
+			assert.deepEqual(step.manifest(manifest), manifest, `${boundary} manifest half must be the identity`);
+			assert.deepEqual(step.output(output), output, `${boundary} output half must be the identity`);
+		}
 	});
 
 	it("carries a v1 manifest up to the current version untouched apart from sdk", () => {
@@ -151,6 +158,18 @@ describe("the real 1 -> 2 chain", () => {
 		assert.equal(upgraded.sdk, SDK_VERSION, "declares the current contract after upgrade");
 		assert.equal(upgraded.id, "old-tool");
 		assert.deepEqual(upgraded.kinds, ["fields", "error"], "nothing else is rewritten");
+	});
+
+	it("carries a v2 manifest up to the current version untouched apart from sdk", () => {
+		const v2 = { sdk: 2, id: "dumper", name: "Dumper", kinds: ["bytes", "error"] };
+		const upgraded = upgradeManifest(v2);
+		assert.equal(upgraded.sdk, SDK_VERSION, "declares the current contract after upgrade");
+		assert.deepEqual(upgraded.kinds, ["bytes", "error"], "nothing else is rewritten");
+		assert.equal(
+			upgraded.samples,
+			undefined,
+			"a migration must not invent an example the author did not choose",
+		);
 	});
 
 	it("leaves a v1 tool's output alone", () => {

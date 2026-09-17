@@ -62,6 +62,19 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 2,
+		/*
+		 * 2 → 3 added the optional `samples` key.
+		 *
+		 * Identity on both halves, and for the same reason as 1 → 2: a v2 manifest cannot carry samples,
+		 * and nothing about what a tool returns changed. Filling in a default here would be worse than
+		 * doing nothing, because the only default available is an example the author did not choose,
+		 * which is exactly the guess docs/versioning.md §3 forbids a migration from making.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {
