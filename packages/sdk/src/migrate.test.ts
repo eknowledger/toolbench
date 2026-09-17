@@ -7,9 +7,12 @@ import { SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";
 /**
  * These tests use SYNTHETIC versions rather than real ones.
  *
- * The point is to prove the mechanism carries an old tool forward, and to prove it while contract
- * version 1 is the only real version — otherwise the compatibility machinery would first be
- * exercised on the day it is needed, which is the day you least want to be debugging it.
+ * They were written while contract version 1 was the only real version, to prove the mechanism carries
+ * an old tool forward before anything depended on it: the alternative is exercising the compatibility
+ * machinery for the first time on the day it is needed, which is the day you least want to be
+ * debugging it. They stay now that versions 2 and 3 are real, because every real step so far is the
+ * identity function, and a synthetic chain is the only place a step that actually transforms something
+ * can be tested.
  *
  * The synthetic chain models exactly what a real additive change looks like: version 2 renames
  * nothing and removes nothing, it only adds. So the migration's job is to fill in what an old tool
