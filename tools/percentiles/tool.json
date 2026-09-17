@@ -1,9 +1,9 @@
 {
-  "sdk": 1,
+  "sdk": 3,
   "id": "percentiles",
   "name": "Percentiles",
   "blurb": "Paste latencies; get p50 to p99.9 — and see why the two common definitions disagree.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "capabilities": ["pure"],
   "runtime": { "entry": "index.ts", "thread": "main" },
   "card": "live",
@@ -33,6 +33,24 @@
         { "value": "nearest", "label": "Nearest rank" },
         { "value": "linear", "label": "Linear interpolation" }
       ]
+    }
+  ],
+  "samples": [
+    {
+      "label": "Two clusters",
+      "input": { "values": "2 2 3 3 3 4 4 4 5 5 5 6 6 7 7 180 190 195 210 240 260 300 340 900" }
+    },
+    {
+      "label": "Definitions disagree",
+      "input": { "values": "3 4 4 5 6 7 9 14 40 260", "method": "linear" }
+    },
+    {
+      "label": "Definitions agree",
+      "input": { "values": "98 99 99 100 100 100 101 101 101 102 102 103", "method": "nearest" }
+    },
+    {
+      "label": "Not a number",
+      "input": { "values": "12, 14, 15, 18ms, 21, 24, 31, 44" }
     }
   ],
   "links": [
