@@ -4,3 +4,4 @@ dist/
 .DS_Store
 bench/dist/
 test-results/
+docs/plans/
