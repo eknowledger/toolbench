@@ -178,6 +178,27 @@ export const CAPABILITIES: readonly Capability[] = ["pure"];
 // The tool itself
 // ---------------------------------------------------------------------------
 
+/**
+ * An example input a tool ships with, rendered as a button under its form.
+ *
+ * These live in the manifest rather than in a host slot because example inputs are *tool* knowledge.
+ * The author knows which input demonstrates a one-byte extension and which one is malformed; a host
+ * does not, and a slot would make every host invent its own examples for every tool.
+ *
+ * ⚠️ The malformed example is the one that earns this field. It is the most useful thing a decoder can
+ * offer and the one a reader will never type by hand, and it is how a tool shows that its failure
+ * paths were designed rather than discovered.
+ */
+export interface Sample {
+	/** What the button says. Short: it sits in a row with the others. */
+	label: string;
+	/**
+	 * Values keyed by input id. Partial on purpose: a sample may set one field and leave the rest as
+	 * the reader left them.
+	 */
+	input: InputValues;
+}
+
 export interface Manifest {
 	/** The contract version this tool was written against. */
 	sdk: number;
@@ -225,6 +246,14 @@ export interface Manifest {
 	 * decoder. Deliberately generic — a host site's own content relations are the host's business.
 	 */
 	links?: { label: string; href: string }[];
+	/**
+	 * Example inputs, rendered as a row of buttons under the form. Added in contract version 3.
+	 *
+	 * Clicking one fills the form. It does not run the tool, for the same reason typing does not: Run
+	 * is the only trigger. A compact card does not show them at all, because it has room for one input
+	 * and a Run button, and a row of buttons there would crowd out the result the card exists to show.
+	 */
+	samples?: Sample[];
 }
 
 /** Passed to `run`. Built by whatever is executing the tool, never sent across a boundary. */

@@ -31,6 +31,7 @@ export {
 	type Manifest,
 	type Output,
 	type OutputKind,
+	type Sample,
 	type Series,
 	type Tone,
 	type Tool,
