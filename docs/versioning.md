@@ -23,7 +23,7 @@ version. It is short on purpose. A compatibility policy nobody reads is not a po
 
 | Version | Where | Changes when | Example |
 |---|---|---|---|
-| **Contract version** | `manifest.sdk`, and `SDK_VERSION` in `packages/sdk/src/version.ts` | A new output kind, input type or capability is added. Rarely, and deliberately | `2` |
+| **Contract version** | `manifest.sdk`, and `SDK_VERSION` in `packages/sdk/src/version.ts` | A new output kind, input type, capability or optional manifest key is added. Rarely, and deliberately | `3` |
 | **Package version** | `packages/*/package.json` | Every release, including bug fixes | `0.1.0` |
 | **Tool version** | `manifest.version` | The tool author changes the tool. Nothing in the system branches on it | `1.2.0` |
 
@@ -101,7 +101,8 @@ tool.run() ──►  upgradeOutput    ──►  render            ──►  D
                 (chain of steps)      (exhaustive switch)
 ```
 
-The chain holds one step today, `1 → 2`, and both of its halves are the identity function.
+The chain holds two steps today, `1 → 2` and `2 → 3`, and all four of their halves are the identity
+function.
 
 It was built before anything needed it, and tested against synthetic versions, which is why the first
 real entry was a five-line change rather than a design exercise under pressure. It also caught a bug in
@@ -116,8 +117,8 @@ Six steps. All of them, in one pull request.
 1. **`packages/sdk/src/types.ts`** Add the new member, variant or optional field.
 2. **`packages/sdk/src/version.ts`** Raise `SDK_VERSION`, append the number to
    `SUPPORTED_SDK_VERSIONS` (it never shrinks), and add a `SDK_CHANGELOG` entry saying what the version
-   adds. That entry is data because error messages quote it: a tool asking for version 3 gets told what
-   version 3 is.
+   adds. That entry is data because error messages quote it: a runtime that can read a version can also
+   say what that version added, so a refusal explains itself instead of just failing.
 3. **`packages/sdk/src/migrate.ts`** Add the `Migration` for the boundary you created. Both halves are
    the identity function if the change was additive. If they are not, stop and read §7.
 4. **`packages/sdk/src/validate.ts`** Validate the new thing, and add any invariant it needs. Ask
@@ -229,10 +230,11 @@ explain what happened rather than return a 404. If the tool is replaced, put the
 |---|---|---|
 | 1 | Initial | `fields`, `text`, `code`, `table`, `series`, `group`, `error` outputs. `text`, `textarea`, `number`, `select`, `toggle` inputs. The `pure` capability. Main and worker threads. |
 | 2 | 0.2.0 | The `bytes` output kind, for wire formats and hex dumps, with named highlight ranges. Both migration halves are the identity function, and every v1 tool's fixtures passed unedited. |
+| 3 | 0.4.0 | The optional `samples` manifest key: labelled example inputs a tool ships with, which the runtime draws as a row of buttons under the form. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 
 Planned, in likely order. Nothing here is committed, and each would follow §5:
 
 | Version | Adds | Why it is not in the contract yet |
 |---|---|---|
-| 3 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
-| 4 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |
+| 4 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
+| 5 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |

@@ -263,6 +263,7 @@ The fields, and who reads each one:
 | `runtime.entry` | host bundler, fixture runner | Path relative to the tool directory. |
 | `runtime.thread` | runner | `"main"` (default) or `"worker"`. |
 | `inputs` | element (form), fixture runner (defaults) | |
+| `samples` | validate, element (the row under the form), fixture runner | Labelled example inputs, each `input` partial. Never drawn on a card. |
 | `kinds` | validate, fixture runner, host | Every kind `run` can return. Must include `"error"`. |
 | `card` | element | `"live"`, `"info"`, `"none"`. |
 | `cardFields` | renderers | How many fields a compact result shows. |
@@ -292,9 +293,9 @@ timeoutMs: is only meaningful with runtime.thread = "worker". On the main thread
 
 The cross-field invariants at the bottom of the file are the interesting part; §8 lists them.
 
-**`migrate.ts`** holds the migration chain: one step today, `1 → 2`, with both halves the identity
-function. The machinery was built before anything needed it, and tested with synthetic versions, which
-is why the first real entry was a five-line change rather than a design exercise under pressure. It
+**`migrate.ts`** holds the migration chain: two steps today, `1 → 2` and `2 → 3`, with every half the
+identity function. The machinery was built before anything needed it, and tested with synthetic versions,
+which is why the first real entry was a five-line change rather than a design exercise under pressure. It
 repaid that twice over: while still synthetic, the tests caught a bug where the chain silently did
 nothing, because a helper used the module constant instead of the injected current version.
 
@@ -557,6 +558,8 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | A select has two or more options and its default is one of them | `validate.ts` | A control with one choice, or none selected |
 | `kinds` includes `"error"` | `validate.ts` | A tool with no way to reject bad input |
 | Every case's `expect.kind` is declared in `kinds` | `tools/cases.test.ts` | `kinds` drifts into fiction |
+| Every sample fills declared inputs only, with values of the right type inside their bounds, and no two share a label | `validate.ts` | A button that fills the form with a value the form itself refuses |
+| Every declared sample runs without throwing | `tools/cases.test.ts` | The first thing a reader clicks is the first thing to crash |
 | Only a `pure` tool with no assets may be `card: "live"` | `validate.ts` | A landing page card could read files or call the network |
 | `timeoutMs` requires `thread: "worker"` | `validate.ts` | A field that cannot do what it says |
 | `autoRun` is refused on a worker-mode tool | `validate.ts` | Keystroke-triggered runs of the slowest tools |
@@ -717,10 +720,10 @@ Four layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 2` step, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 60 |
-| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, and every case. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 10 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 79 |
+| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 13 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
-| `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 17 |
+| `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 24 |
 
 The browser layer is weighted towards things that only exist in a browser or only appear in a
 production build:
@@ -729,6 +732,8 @@ production build:
 * a seeded card shows a real result before anything runs;
 * activation does not run the tool, and the status says "press Run";
 * changing an input marks the result stale without re-running, and Run clears it;
+* a sample fills the form, sets several inputs at once, leaves the ones it does not name alone, keeps
+  focus on the button that was pressed, and draws no row on a card;
 * all three modes, including two tools in one article with different threading;
 * a tool that spins forever is killed by the timeout, the page stays responsive, and the next run gets a
   fresh worker;
@@ -748,9 +753,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 17.8 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer |
+| Runtime plus the bench's own wiring | 18.9 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, and 0.9 KB with contract v3's sample row |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 3.1 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 3.3 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | A page with no tool | 0 bytes | Nothing is imported |
@@ -759,6 +764,10 @@ table cannot quietly stop being true.
 Where the budget is spent: about half the runtime chunk is the chart renderer and the stylesheet. If
 that becomes a problem the chart is the obvious thing to split into its own lazily-imported chunk, since
 most tools never draw one.
+
+That chunk now measures 18,925 bytes against a 19,000 byte ceiling, so the next thing that costs real
+bytes either buys them explicitly, by raising the budget in the commit that spends it and moving this
+table with it, or takes the chart split above.
 
 **One duplication to know about.** Vite builds a worker in a separate Rollup pass, so every tool
 reachable from the worker is emitted twice: `tool-<id>` for the main thread and `worker-tool-<id>` for
@@ -789,14 +798,16 @@ is here because the guards look arbitrary without it.
 | Vite's default `worker.format` cannot code-split | Worker mode built in development and failed the production build | `worker: { format: "es" }`, documented in the README and here |
 | A backtick inside a CSS comment | Terminated the stylesheet's template literal; the error pointed at a line 40 away | An assertion in the edit script, and a note in the file |
 | `chainFrom` used the module constant instead of the injected version | Migration chains silently did nothing | Migration tests inject synthetic versions and assert the steps ran, in order |
+| A sample could push a tool past its own `maxLength` | The field was declared on text inputs and enforced nowhere. It reaches the browser as the `maxlength` attribute, which constrains typing and nothing else, and filling a control from a sample assigns the value directly and walks straight past it, so the tool would have run on more characters than it declared it accepts | `validate.ts` rejects an over-long sample string, for the same reason it rejects an out-of-range sample number. A reader's typing still clamps: static data an author wrote can be a build error, a keystroke has nowhere else to go |
+| The additive-migration check accepted a step that rewrote an existing field | The probe fed each step a two-key manifest, so a step quietly rewriting anything outside those two keys still looked like the identity function. Confirmed by mutating the `2 → 3` step to rewrite `help`, which the old probe passed | The probe passes a whole manifest, stamped with the version of the step under test, and compares the entire key set. An allowlist rather than a denylist: asserting one key name was absent let a step inventing a misspelling of it through |
 
 ## 15. Limitations
 
 Known and accepted, with what each costs.
 
-* **The contract is pure functions only**, at version 2. No file input, no network. A converter or an
-  API client needs version 3 or 4. Contract v2 was the first real exercise of the versioning policy and
-  it held: both migration halves were the identity function and no existing tool's fixtures changed.
+* **The contract is pure functions only**, at version 3. No file input, no network. A converter or an
+  API client needs version 4 or 5. Both real version bumps so far have held the policy: every migration
+  half is the identity function, and no existing tool's fixtures changed for either.
 * **No sandbox.** A tool runs with the page's privileges. Worker mode isolates the *thread*, not the
   origin: it shares cookies and does not inherit the page's Content-Security-Policy. Fine for code you
   wrote; not fine for code you did not.

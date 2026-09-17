@@ -9,6 +9,7 @@ Writing, testing and shipping a tool, start to finish. Read
 2. [Walkthrough: build one](#2-walkthrough-build-one)
 3. [The manifest, field by field](#3-the-manifest-field-by-field)
 4. [Inputs](#4-inputs)
+   - [4b. Sample inputs](#4b-sample-inputs)
 5. [Results](#5-results)
 6. [Errors](#6-errors)
 7. [Long-running tools](#7-long-running-tools)
@@ -219,7 +220,7 @@ node --test tools/cases.test.ts
 
 That file walks every tool directory, so a new tool is picked up with no registration. It checks the
 manifest validates, that `id` equals the directory name, that `cases.json` exists and is not empty, that
-every case's kind is declared in `kinds`, and then runs the cases.
+every case's kind is declared in `kinds`, and then runs the cases and every sample the manifest declares.
 
 **On your own site**, the same suite is three lines, because the walk is exported:
 
@@ -248,15 +249,16 @@ repository was found by looking at the thing, not by reasoning about it.
 
 | Field | Required | Notes |
 |---|---|---|
-| `sdk` | yes | Contract version. `1` today. Do not raise it to get a feature that does not exist yet. |
+| `sdk` | yes | Contract version. `3` today. Do not raise it to get a feature that does not exist yet. |
 | `id` | yes | Lowercase, digits, hyphens. Must equal the directory name; a test enforces that. It is also a URL segment. |
 | `name` | yes | Sentence case. It is a heading, not a title. |
 | `blurb` | yes | One sentence, under 200 characters. It is the card line and the page's meta description. Say what the tool does, not that it is useful. |
 | `version` | yes | The tool's own version. Semver by convention. Nothing branches on it. |
-| `capabilities` | yes | `["pure"]`. Still the only value at contract version 2. |
+| `capabilities` | yes | `["pure"]`. Still the only value at contract version 3. |
 | `runtime.entry` | yes | Relative to the tool directory. |
 | `runtime.thread` | no | `"main"` (default) or `"worker"`. See §7. |
 | `inputs` | yes | At least one. A tool with none is a constant. |
+| `samples` | no | Labelled example inputs, `{ label, input }`, drawn as a row of buttons under the form. `input` is keyed by input id and may be partial. See §4b. |
 | `kinds` | yes | Every kind `run` can return, `"error"` included. Both halves are checked by tests. |
 | `card` | no | `"info"` (default) shows the blurb only, `"live"` makes it runnable, `"none"` keeps it off cards. `"live"` requires `["pure"]`. |
 | `cardFields` | no | How many fields a compact result shows before "+N more". Default 4. |
@@ -292,6 +294,113 @@ Things the validator will hold you to, and why:
 * **At most one input is `primary`.** A card shows exactly that one, so pick the one that makes the tool
   worth opening.
 * **`dir: "ltr"`** on anything that is not prose: bytes, code, patterns, identifiers.
+
+## 4b. Sample inputs
+
+Nobody arrives at a tool knowing what to put into it, and the defaults can only demonstrate one thing.
+`samples` is a list of labelled example inputs. The runtime draws them as a row of small buttons under the
+form, introduced by a visible `Try:`, and a click fills the form with that sample's values.
+
+```jsonc
+// tools/percentiles/tool.json, three of the four samples it ships
+"samples": [
+  {
+    "label": "Two clusters",
+    "input": { "values": "2 2 3 3 3 4 4 4 5 5 5 6 6 7 7 180 190 195 210 240 260 300 340 900" }
+  },
+  {
+    "label": "Definitions disagree",
+    "input": { "values": "3 4 4 5 6 7 9 14 40 260", "method": "linear" }
+  },
+  {
+    "label": "Not a number",
+    "input": { "values": "12, 14, 15, 18ms, 21, 24, 31, 44" }
+  }
+]
+```
+
+`input` is keyed by input id, and it is **partial on purpose**. Two of the three above set only `values` and
+say nothing about `method`, so whichever definition the reader had chosen stays chosen. That is the usual
+shape and usually the right one: change the one thing the example is about, and leave everything else
+where the reader put it. "Definitions disagree" sets both, because the point it makes needs both. Under
+the linear definition those ten measurements give a p90 of 62.0, and nearest rank gives 40 for the same
+data; a sample that quietly reset the definition to the default would put half of that comparison out of
+reach.
+
+### Choosing them
+
+Picking the examples is an authoring skill rather than a step in a procedure, so it deserves more thought
+than the JSON does.
+
+**Ship the malformed one.** A sample whose input the tool rejects is the most useful example a tool can
+offer. It is the one a reader will never type by hand, because nobody sits down to invent a broken input,
+and it is the only way they see how the tool behaves when something is wrong before it happens to them for
+real. It also says something about the tool: that its failure path was designed and is being shown on
+purpose, rather than discovered by accident at the least convenient moment. `percentiles` ships "Not a
+number", where a stray `18ms` sits in the middle of an otherwise clean list. A tool with no such sample
+hides its failure path until a reader stumbles into it.
+
+**Three or four, not eight.** A row of eight buttons stops being a set of examples and becomes a menu, and
+a menu is one more thing to read before the tool can be used. Each sample should show something none of
+the others do: the canonical case, one that exposes a distinction the tool exists to explain, an edge, and
+the one that fails. If two samples make the same point, keep the clearer one and delete the other.
+
+**A label says what the reader is about to see**, in two or three words. It sits on a small button in a
+row, so there is no room for a sentence, and "Two clusters" or "Definitions disagree" tell a reader what
+they are choosing. "Example 2" and "Test data" tell them nothing. Two samples may not share a label:
+identical buttons that do different things are not something anyone can choose between.
+
+### What a click does
+
+A click **fills the form and stops there**, for the same reason typing does not run the tool: Run is the
+trigger, and a sample is an input change like any other. An existing result goes stale, dims, and waits,
+which is what lets a reader hold the answer they already have beside the example they just loaded. A tool that
+set `autoRun: true` re-runs instead, again exactly as it would for typing. Samples are not an exception to
+the rule about Run, they follow it.
+
+Two details are deliberate rather than incidental. Values are written into the live controls rather than by
+rebuilding the form, so **focus stays on the button that was pressed** and a reader can move along the row
+from the keyboard. And the status region announces that the form was filled, naming the sample, and that
+Run is next: for somebody who cannot see the form change, that announcement is the only evidence the click
+did anything at all.
+
+**A card shows no samples.** A compact card has room for one input and a Run button, and a row of buttons
+there would crowd out the result the card exists to show. Samples appear in `page` and `embed` mode only,
+so do not design a tool whose form makes no sense without them.
+
+### What validation will hold you to
+
+`validateManifest` refuses the manifest, naming the field, when:
+
+* a sample names an input the tool does not declare. The message lists the ids that do exist, because this
+  is almost always a typo;
+* a value's type does not match its input: a string where a `number` is declared, a non-boolean for a
+  `toggle`;
+* a number falls outside that input's `min` and `max`;
+* a string is longer than that input's `maxLength`;
+* a `select` value is not one of that input's options;
+* a sample's `input` sets nothing at all;
+* `samples` is present but empty, which is a key that says nothing;
+* two samples share a label.
+
+⚠️ **The runtime clamps a reader's out-of-range number, and validation rejects an author's.** That looks
+inconsistent until you see who each rule protects. A reader who types 9999 into a field that stops at 1000
+has nowhere better to put that keystroke, and refusing it would leave them holding a form they cannot use,
+so the control clamps and `run` keeps its guarantee that values are in range. An author's sample is static
+data that CI reads before any reader sees the tool, so it can be a build error naming the field, fixed
+once. Clamping it instead would ship a button whose label promises one thing and whose value quietly does
+another, and nobody would ever notice.
+
+`maxLength` is the sharpest case. It reaches the browser as the `maxlength` attribute, which constrains
+typing and nothing else. Filling a control from a sample assigns its value directly and walks straight
+past it, so an over-long sample would be the one route to a value the field itself says is impossible.
+
+### What the build will hold you to
+
+`checkToolDirectory` runs every sample a tool declares, so a declared example that crashes the tool fails
+the build with the sample's label in the message. An `{ kind: "error" }` result is a **pass**: the
+malformed sample is the one that earns the feature, and rejecting bad input is the tool working. A sample
+that overruns its budget is reported as slow rather than as a crash, so the two diagnoses stay apart.
 
 ## 5. Results
 
@@ -428,6 +537,12 @@ that it is correct.
 Aim for four to six cases: the canonical example, an edge (empty, one element, the maximum), a
 bad-input error, and anything that was once a bug.
 
+The harness enforces four things a tool cannot enforce about itself: that the manifest is valid and its
+`sdk` is one this SDK can read, that `cases.json` exists and is not empty, that no case expects a kind
+`kinds` failed to declare, and that every sample in the manifest runs. The fourth is there because a
+sample is the first thing a reader clicks, so an example that crashes stays invisible until one of them
+finds it. See §4b for what counts as running.
+
 ## 9. Charts
 
 ```ts
@@ -493,6 +608,8 @@ choice of defaults visible to every reader who never presses Run.
 - [ ] Four or more cases: canonical, edge, error, past bug
 - [ ] Every `subset` case has a `why` that says what is deliberately not pinned
 - [ ] Defaults produce a real result, quickly: they are what a seeded card shows
+- [ ] If the tool ships `samples`: three or four, one of them malformed, every label two or three words
+      saying what the reader will see
 - [ ] `README.md` says what the tool does not handle
 - [ ] `node --test tools/cases.test.ts` passes
 - [ ] Looked at it in `pnpm bench`, in all three modes

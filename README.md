@@ -15,7 +15,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v2-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-17.8%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-18.9%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -209,8 +209,9 @@ checkToolDirectory(new URL("../src/tools/", import.meta.url), { describe, it });
 ```
 
 It validates every manifest, checks each tool's `id` matches its directory, refuses an empty
-`cases.json`, verifies no case expects a kind the manifest failed to declare, and runs every case. Wire
-it into CI and a change that breaks a tool fails your build instead of someone's afternoon.
+`cases.json`, verifies no case expects a kind the manifest failed to declare, runs every case, and runs
+every sample the manifest declares. Wire it into CI and a change that breaks a tool fails your build
+instead of someone's afternoon.
 
 Full walkthrough: [docs/authoring-a-tool.md](docs/authoring-a-tool.md).
 
@@ -271,6 +272,24 @@ The reader decides. Nothing runs on its own.
 
 The progress bar appears only if a run is still going after 400 ms. A bar that flashes for 20 ms draws
 the eye to report that nothing happened.
+
+**A tool can ship its own examples.** `samples` is a list of labelled inputs, which the runtime draws as
+a row of buttons under the form:
+
+```jsonc
+"samples": [
+  { "label": "Definitions disagree", "input": { "values": "3 4 4 5 6 7 9 14 40 260", "method": "linear" } },
+  { "label": "Not a number", "input": { "values": "12, 14, 15, 18ms, 21, 24, 31, 44" } }
+]
+```
+
+Clicking one fills the form, which is an input change like any other: the result goes stale and waits for
+Run, or re-runs if the tool set `autoRun`. Each `input` is partial, so a sample changes the one thing it is
+about and leaves the rest as the reader left it. The sample most worth shipping is the one the tool
+rejects, because nobody types a broken input by hand, and it is the only way a reader sees the failure path
+before meeting it for real. Cards show no samples: there is room there for one input and a Run button.
+Added in contract version 3, and
+[docs/authoring-a-tool.md](docs/authoring-a-tool.md#4b-sample-inputs) covers choosing them.
 
 ## Result shapes
 
@@ -349,8 +368,8 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 17.8 KB |
-| Worker entry, only for pages with a worker-mode tool | 3.1 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 18.9 KB |
+| Worker entry, only for pages with a worker-mode tool | 3.3 KB |
 | `percentiles` tool chunk | 1.2 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | A page with no tool on it | 0 bytes |
@@ -380,7 +399,7 @@ execute with no build step. Any bundler for the host site; the examples use Vite
 * **Not a sandbox.** A tool is code you wrote and bundled. Worker mode is a stability boundary that
   lets a slow run be stopped; it is not a security boundary, and the docs never pretend otherwise. Code
   you did not write needs a different design.
-* **The contract is pure functions only.** No file input, no network access, at contract version 2.
+* **The contract is pure functions only.** No file input, no network access, at contract version 3.
   Both are planned as additive versions, which is the case the versioning policy exists to handle.
 
 ## Repository layout
