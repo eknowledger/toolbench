@@ -32,7 +32,7 @@
  *  - there is always a Run button. Debounce-on-typing alone leaves a keyboard user no way to say
  *    "go now", and is wrong anyway for anything slow.
  */
-import type { InputSpec, InputValues, Manifest, Output } from "@toolbench/sdk";
+import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { render, unknownOutput } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -389,7 +389,14 @@ export class ToolHost extends HTMLElement {
 		const output = el("div", { class: "tb-output", tabindex: "-1" });
 
 		this.#els = { run, progress, status, output };
-		body.append(form, el("div", { class: "tb-actions" }, run, progress), status, output);
+		body.append(form);
+		/*
+		 * Not on a card. A card has room for one input and a Run button, and a row of buttons would crowd
+		 * out the result the card exists to show.
+		 */
+		const samples = manifest.samples ?? [];
+		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
+		body.append(el("div", { class: "tb-actions" }, run, progress), status, output);
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
@@ -482,10 +489,9 @@ export class ToolHost extends HTMLElement {
 				});
 				input.value = String(this.#values[spec.id] ?? spec.default);
 				input.addEventListener("input", () => {
-					const value = Number(input.value);
 					// Clamped here, not in the tool: min and max are the only guard against an input
 					// that turns a bounded computation into an unbounded one.
-					this.#values[spec.id] = Number.isFinite(value) ? Math.min(spec.max, Math.max(spec.min, value)) : spec.default;
+					this.#values[spec.id] = coerce(spec, input.value);
 					this.#inputChanged();
 				});
 				control = input;
@@ -538,6 +544,58 @@ export class ToolHost extends HTMLElement {
 		// The per-input error slot: empty until a result names this input.
 		row.append(el("p", { class: "tb-sr", id: errorId }));
 		return row;
+	}
+
+	/**
+	 * The examples row.
+	 *
+	 * Under the whole form rather than under one input. A sample may set several values, and a row
+	 * sitting beneath one control claims to fill that control while quietly changing another further
+	 * down the form.
+	 */
+	#sampleRow(samples: Sample[]): HTMLElement {
+		const labelId = "tb-samples-label";
+		// A visible "Try:" doubling as the group's accessible name, rather than an aria-label repeating
+		// it invisibly and drifting from it the first time either changes.
+		const row = el("div", { class: "tb-samples", role: "group", "aria-labelledby": labelId });
+		row.append(el("span", { class: "tb-samples-label", id: labelId }, "Try:"));
+		for (const sample of samples) {
+			const button = el("button", { class: "tb-sample", type: "button" }, sample.label);
+			button.addEventListener("click", () => this.#applySample(sample));
+			row.append(button);
+		}
+		return row;
+	}
+
+	/**
+	 * Fill the form from a sample.
+	 *
+	 * Deliberately the same path a keystroke takes: values in, controls updated, then `#inputChanged`.
+	 * So a normal tool marks its result stale and an `autoRun` tool re-runs, which is what "a sample
+	 * behaves exactly as typing does" has to mean. Treating it as the one input change that never runs
+	 * would make it an exception to the rule it follows.
+	 */
+	#applySample(sample: Sample): void {
+		for (const spec of this.#manifest?.inputs ?? []) {
+			const value = sample.input[spec.id];
+			// Partial by design: an input the sample does not name keeps whatever the reader left in it.
+			if (value === undefined) continue;
+			const next = coerce(spec, value);
+			this.#values[spec.id] = next;
+			const control = this.#controls.get(spec.id);
+			if (!control) continue;
+			if (spec.type === "toggle") (control as HTMLInputElement).checked = Boolean(next);
+			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next);
+		}
+		// The last run's error described input that is no longer in the form.
+		this.#markInvalid(undefined);
+		this.#inputChanged();
+		/*
+		 * `#markStale` has just said "inputs changed — press Run". Naming the sample is more use than
+		 * that, and it is the only confirmation a screen-reader user gets that the click did anything. An
+		 * `autoRun` tool is already announcing its own run, so leave that one alone.
+		 */
+		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${sample.label}" — press Run`);
 	}
 
 	// --- output plumbing --------------------------------------------------------------------------
@@ -621,6 +679,30 @@ export class ToolHost extends HTMLElement {
 function primaryOnly(inputs: InputSpec[]): InputSpec[] {
 	const primary = inputs.find((input) => input.primary === true);
 	return primary ? [primary] : inputs.slice(0, 1);
+}
+
+/**
+ * A value arriving from outside the form, brought into what its spec allows.
+ *
+ * `validateManifest` already refuses a sample outside a number's range, so this is a backstop rather
+ * than the guard: a manifest can reach a host without having been validated there, and at that point a
+ * clamp is the only sane thing left. It is also the one place that knows how each input type stores its
+ * value, which is why the number control's listener now shares it rather than keeping a second copy of
+ * the same clamp.
+ */
+function coerce(spec: InputSpec, value: string | number | boolean): string | number | boolean {
+	switch (spec.type) {
+		case "number": {
+			const n = Number(value);
+			return Number.isFinite(n) ? Math.min(spec.max, Math.max(spec.min, n)) : spec.default;
+		}
+		case "toggle":
+			return Boolean(value);
+		case "select":
+			return spec.options.some((option) => option.value === String(value)) ? String(value) : spec.default;
+		default:
+			return String(value);
+	}
 }
 
 /** A one-line description of a result, for the status region. Never the result itself. */

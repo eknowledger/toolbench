@@ -123,6 +123,24 @@ export const STYLES = /* css */ `
 .tb-run[data-attention] { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-run[data-attention] { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--tb-accent) 28%, transparent); }
 @media (prefers-reduced-motion: reduce) { .tb-run[data-attention] { box-shadow: none; text-decoration: underline; } }
+
+/* Quieter than the filled accent of .tb-run on purpose: a sample fills the form, it does not run the
+   tool. No margin: the .tb-body grid already spaces its children. */
+.tb-samples { display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; }
+.tb-samples-label { font-size: 0.82rem; font-weight: 600; color: var(--tb-muted); }
+.tb-sample {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+  color: var(--tb-fg);
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tb-sample:hover { border-color: var(--tb-accent); color: var(--tb-accent); }
+.tb-sample:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+
 .tb-progress[hidden] { display: none; }
 .tb-progress {
   flex: 1;
