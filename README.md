@@ -74,6 +74,27 @@ of the tool's code downloaded. On the right, the same card after one click.
 </tr>
 </table>
 
+### A tool ships its own examples
+
+`samples` in the manifest becomes a row under the form. A click fills the inputs and stops there, because
+Run is the trigger and a sample is an input change like any other: the answer already on screen dims to
+say it belongs to the inputs that produced it, rather than being quietly replaced. Below, one click has
+loaded ten measurements and switched the definition, and the figures underneath are still the previous
+run's.
+
+The one worth shipping is the example whose input the tool rejects. It is the one a reader will never type,
+because nobody sits down to invent a broken input, and it is how a tool shows its failure path on purpose
+rather than at the least convenient moment.
+
+<table>
+<tr>
+<td><img src="assets/screenshots/samples-light.png" alt="A tool with a row of four example buttons labelled Try, under the form and above Run. The clicked example has filled the measurements box and switched the definition select, the status line reads that the form was filled and to press Run, and the result below it is dimmed"></td>
+</tr>
+<tr>
+<td align="center"><em>One click fills the form. The stale result stays put, so the old answer is still there to compare against</em></td>
+</tr>
+</table>
+
 ### Results are typed shapes, not HTML
 
 A tool returns one of a closed set of shapes and the runtime draws it. Below is `bytes`, for wire
