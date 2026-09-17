@@ -28,8 +28,14 @@ const BUDGETS = [
 	 * Raised from 18,000 by contract v2: the bytes renderer is about 1.5 KB gzipped, which is real
 	 * runtime code every consumer pays for. Recorded here rather than raised quietly, and the README's
 	 * size table moved with it.
+	 *
+	 * Raised again from 19,000 by contract v3, in the commit that spent it. The sample row is 907 bytes
+	 * of runtime code, and percentiles declaring its own samples added another 164, because
+	 * `bench/src/registry.ts` imports every `tool.json` and so manifest data lands in this chunk too.
+	 * That left 75 bytes under the old ceiling, which is not a ceiling with headroom: the next
+	 * unrelated change would have failed here for reasons that had nothing to do with it.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 19_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 19_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -93,8 +99,19 @@ console.log(`\n  ${"worst case for one reader".padEnd(width)}  ${kb(total).padSt
 if (process.argv.includes("--update")) {
 	const find = (label) => rows.find((r) => r.label === label)?.size ?? 0;
 	const edits = [
-		["README.md", /(\| Runtime, once per page that uses a tool \| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
-		["docs/architecture.md", /(\| Runtime plus the bench's own wiring \| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
+		/*
+		 * ⚠️ Anchored on the leading "| Runtime" and the trailing "| " only.
+		 *
+		 * These patterns quoted each table's whole row label, so editing the prose in a row silently
+		 * stopped it matching, and the README then published 17.8 KB while the chunk was really 18.9 KB.
+		 * Nothing failed: this script only exits non-zero on a budget overrun, so a figure it can no
+		 * longer find is a figure nobody checks. Matching the least text that still identifies the row is
+		 * what keeps it working when somebody rewords the label.
+		 */
+		["README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
+		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
+		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
+		["docs/architecture.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 	];
 	for (const [file, pattern, value] of edits) {
 		const path = join(import.meta.dirname, "..", file);
