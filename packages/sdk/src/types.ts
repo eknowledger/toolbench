@@ -185,7 +185,7 @@ export const CAPABILITIES: readonly Capability[] = ["pure"];
  * The author knows which input demonstrates a one-byte extension and which one is malformed; a host
  * does not, and a slot would make every host invent its own examples for every tool.
  *
- * ⚠️ The malformed example is the one that earns this field. It is the most useful thing a decoder can
+ * The malformed example is the one that earns this field. It is the most useful thing a decoder can
  * offer and the one a reader will never type by hand, and it is how a tool shows that its failure
  * paths were designed rather than discovered.
  */
@@ -249,9 +249,10 @@ export interface Manifest {
 	/**
 	 * Example inputs, rendered as a row of buttons under the form. Added in contract version 3.
 	 *
-	 * Clicking one fills the form. It does not run the tool, for the same reason typing does not: Run
-	 * is the only trigger. A compact card does not show them at all, because it has room for one input
-	 * and a Run button, and a row of buttons there would crowd out the result the card exists to show.
+	 * Clicking one fills the form. It is an input change like any other, so the result goes stale and
+	 * waits for Run, or re-runs if the tool set `autoRun`. A compact card does not show samples at all,
+	 * because it has room for one input and a Run button, and a row of buttons there would crowd out
+	 * the result the card exists to show.
 	 */
 	samples?: Sample[];
 }

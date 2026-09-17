@@ -16,5 +16,5 @@ export const SUPPORTED_SDK_VERSIONS: readonly number[] = [1, 2, 3];
 export const SDK_CHANGELOG: Record<number, string> = {
 	1: "computation and visualisation: fields, text, code, table, series, group, error outputs; text, textarea, number, select, toggle inputs; pure capability; main and worker threads.",
 	2: "byte-oriented output: the bytes kind, for wire formats and hex dumps, with named highlight ranges.",
-	3: "sample inputs: the samples manifest key, so a tool ships its own examples, including the malformed one, and every host renders them the same way.",
+	3: "sample inputs: the optional samples manifest key, a list of labelled example inputs a tool ships with and a host renders under its form.",
 };
