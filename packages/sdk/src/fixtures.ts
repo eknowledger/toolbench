@@ -8,11 +8,13 @@
  *
  * What lives here is the mechanism behind the compatibility promise in `docs/versioning.md`. It walks a
  * directory so a new tool is covered the moment it exists, with nobody having to remember to add a test,
- * and it enforces three things a tool cannot enforce about itself:
+ * and it enforces four things a tool cannot enforce about itself:
  *
  *  - the manifest is valid and its declared `sdk` is one this SDK can read;
  *  - `cases.json` exists and is not empty, because a tool with no fixtures is a tool nobody can refactor;
- *  - every case's `expect.kind` is declared in `kinds`, so `kinds` cannot drift into fiction.
+ *  - every case's `expect.kind` is declared in `kinds`, so `kinds` cannot drift into fiction;
+ *  - every sample in the manifest runs without throwing, because a sample is the first thing a reader
+ *    clicks and an example that crashes is invisible until one of them does.
  *
  * It was extracted because a host authoring its own tools would otherwise copy forty lines to get
  * guarantees this package already knows how to provide, and those copies then drift apart.
@@ -20,7 +22,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertCases } from "./testing.ts";
+import { defaultInputs } from "./seed.ts";
+import { assertCases, testCtx } from "./testing.ts";
 import type { Case, Manifest, Tool } from "./types.ts";
 import { upgradeManifest } from "./migrate.ts";
 import { validateManifest } from "./validate.ts";
@@ -150,6 +153,24 @@ export interface CheckToolDirectoryOptions {
 }
 
 /**
+ * Import a tool's entry module and check it looks like a tool.
+ *
+ * Shared by the fixture run and the samples check, which both need the module and would otherwise each
+ * carry their own copy of this error message.
+ */
+async function loadImpl(tool: ToolOnDisk): Promise<Tool> {
+	const module = (await import(tool.entry)) as { default?: Tool };
+	const impl = module.default;
+	if (typeof impl?.run !== "function") {
+		throw new ToolDirectoryError(
+			"does not default-export a tool. A tool module looks like: export default { run(input, ctx) { … } }",
+			tool.id,
+		);
+	}
+	return impl;
+}
+
+/**
  * Register a test suite per tool in a directory: manifest validity, fixture integrity, and every case.
  *
  *   import { describe, it } from "node:test";
@@ -199,18 +220,53 @@ export function checkToolDirectory(dir: string | URL, options: CheckToolDirector
 
 			it("passes its own fixtures", async () => {
 				tool ??= readTool(id, root);
-				const module = (await import(tool.entry)) as { default?: Tool };
-				const impl = module.default;
-				if (typeof impl?.run !== "function") {
-					throw new ToolDirectoryError(
-						"does not default-export a tool. A tool module looks like: export default { run(input, ctx) { … } }",
-						id,
-					);
-				}
+				const impl = await loadImpl(tool);
 				await assertCases(impl, tool.cases, {
 					timeoutMs,
 					...(tool.manifest.runtime.thread === "main" ? { maxMs } : {}),
 				});
+			});
+
+			it("ships samples that run", async () => {
+				tool ??= readTool(id, root);
+				const samples = tool.manifest.samples ?? [];
+				if (samples.length === 0) return; // samples are optional; most tools will not have any
+				const impl = await loadImpl(tool);
+				for (const sample of samples) {
+					/*
+					 * An error output is a pass. The malformed example is the most useful one a tool can
+					 * ship, and refusing bad input is the tool working correctly.
+					 *
+					 * A throw is not a pass. A sample is the first thing a reader clicks, so an example
+					 * that crashes is worse than no example, and it is invisible until someone clicks it.
+					 *
+					 * ⚠️ `timeoutMs` here is advisory, exactly as in `seed`: it aborts the signal, so a tool
+					 * that checks `ctx.signal` stops and gets reported, and one that ignores it cannot be
+					 * interrupted in-process because there is no thread to terminate. There is deliberately
+					 * no `maxMs` bound: the fixtures already hold a main-thread tool to one on
+					 * representative input, and a sample whose whole point is a large example would fail a
+					 * bound it was never written to meet.
+					 */
+					const controller = new AbortController();
+					const timer = setTimeout(() => controller.abort(), timeoutMs);
+					try {
+						await impl.run({ ...defaultInputs(tool), ...sample.input }, testCtx(controller.signal));
+					} catch (error) {
+						// An overrun is reported below, whether the tool answered the abort by throwing or by
+						// returning: either way what went wrong is the time, not the throw.
+						if (!controller.signal.aborted) {
+							throw new ToolDirectoryError(
+								`sample "${sample.label}" threw instead of returning a result: ${String(error)}`,
+								id,
+							);
+						}
+					} finally {
+						clearTimeout(timer);
+					}
+					if (controller.signal.aborted) {
+						throw new ToolDirectoryError(`sample "${sample.label}" did not finish within ${timeoutMs}ms`, id);
+					}
+				}
 			});
 		});
 	}
