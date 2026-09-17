@@ -293,6 +293,181 @@ describe("bytes output — contract version 2", () => {
 	});
 });
 
+describe("sample inputs — contract version 3", () => {
+	/*
+	 * A sample row is only visible here. Node can prove the manifest declares samples and that each one
+	 * runs, and nothing more: whether a click reaches the controls, whether focus survives it, whether the
+	 * row is drawn on a card, and whether the group has an accessible name are all browser facts.
+	 *
+	 * percentiles declares four samples and does not set autoRun, so a click must fill and stop. No tool
+	 * on the bench sets autoRun, so the autoRun branch of #applySample has no coverage at this layer: the
+	 * one where the sample re-runs and the run's own announcement stands instead of the "filled with" one.
+	 */
+	it("fills the form on a click and does not run the tool", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-samples");
+		const before = await page.locator("#host >> .tb-textarea").inputValue();
+
+		await page.locator('#host >> .tb-sample:text-is("Not a number")').click();
+		const after = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				values: (root?.querySelector(".tb-textarea") as HTMLTextAreaElement | null)?.value ?? "",
+				results: root?.querySelector(".tb-output")?.children.length ?? -1,
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+			};
+		});
+
+		assert.notEqual(after.values, before, "the click must reach the control, not only the values behind it");
+		// This is the sample whose input the tool rejects, so the non-numeric token proves which one landed.
+		assert.match(after.values, /18ms/, `expected the "Not a number" sample's values, got: ${after.values}`);
+		assert.equal(after.results, 0, "a sample fills the form; it must not run the tool");
+		assert.match(after.status, /Not a number/, `the status must name the sample that was applied: ${after.status}`);
+		assert.match(after.status, /press Run/, "and still say what to do next");
+		await page.close();
+	});
+
+	it("sets several inputs at once, and leaves the ones a sample does not name alone", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-samples");
+		const before = await page.locator("#host >> .tb-textarea").inputValue();
+
+		await page.locator('#host >> .tb-sample:text-is("Definitions disagree")').click();
+		const both = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				values: (root?.querySelector(".tb-textarea") as HTMLTextAreaElement | null)?.value ?? "",
+				method: (root?.querySelector(".tb-select") as HTMLSelectElement | null)?.value ?? "",
+			};
+		});
+		assert.notEqual(both.values, before, "the sample sets the measurements");
+		assert.equal(both.method, "linear", "and the definition, in the same click");
+
+		/*
+		 * "Two clusters" names `values` only. The partial-fill rule says `method` keeps what the reader
+		 * left in it, so the linear choice above must survive. A sample that reset every unnamed input to
+		 * its default would pass every other assertion here.
+		 */
+		await page.locator('#host >> .tb-sample:text-is("Two clusters")').click();
+		const partial = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				values: (root?.querySelector(".tb-textarea") as HTMLTextAreaElement | null)?.value ?? "",
+				method: (root?.querySelector(".tb-select") as HTMLSelectElement | null)?.value ?? "",
+			};
+		});
+		assert.notEqual(partial.values, both.values, "the second sample replaces the measurements");
+		assert.equal(partial.method, "linear", "an input the sample does not name keeps the reader's choice");
+		await page.close();
+	});
+
+	it("marks an existing result stale rather than leaving it looking current", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 15_000 });
+		const drawn = await page.locator("#host >> .tb-output").textContent();
+
+		await page.locator('#host >> .tb-sample:text-is("Definitions agree")').click();
+		assert.equal(await page.locator("#host >> .tb-output[data-stale]").count(), 1, "the old result belongs to the old inputs");
+		assert.equal(await page.locator("#host >> .tb-run[data-attention]").count(), 1, "and Run is where the reader has to go next");
+		assert.equal(
+			await page.locator("#host >> .tb-output").textContent(),
+			drawn,
+			"the previous result stays on screen: clearing it would lose the comparison the sample exists to make",
+		);
+		await page.close();
+	});
+
+	it("names the row from its visible label and works from the keyboard", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-samples");
+
+		const wiring = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const row = root?.querySelector(".tb-samples");
+			const labelId = row?.getAttribute("aria-labelledby") ?? "";
+			return {
+				role: row?.getAttribute("role"),
+				labelId,
+				// ⚠️ An aria-labelledby pointing outside the shadow root resolves to nothing, and the group
+				// then has no accessible name at all. This repo has shipped that mistake before.
+				labelText: labelId ? (root?.getElementById(labelId)?.textContent ?? null) : null,
+				pills: [...(row?.querySelectorAll(".tb-sample") ?? [])].map((b) => ({
+					tag: b.tagName,
+					type: b.getAttribute("type"),
+					label: b.textContent,
+				})),
+			};
+		});
+		assert.equal(wiring.role, "group", "a set of related controls announces itself as one");
+		assert.ok(wiring.labelId, "the group must point at a label");
+		assert.equal(wiring.labelText, "Try:", "and that label is the text on screen, not an invisible copy of it");
+		assert.equal(wiring.pills.length, 4, "percentiles declares four samples");
+		assert.ok(wiring.pills.every((p) => p.tag === "BUTTON"), `each sample must be a real button: ${wiring.pills.map((p) => p.tag).join(", ")}`);
+		assert.ok(wiring.pills.every((p) => p.type === "button"), "and not a submit button inside the fieldset");
+
+		// The row sits after the form, so a Tab out of the last control lands on the first pill.
+		await page.locator("#host >> .tb-select").focus();
+		await page.keyboard.press("Tab");
+		const focused = await page.evaluate(() => {
+			const active = document.querySelector("#host")?.shadowRoot?.activeElement;
+			return { cls: active?.className ?? "", label: active?.textContent ?? "" };
+		});
+		assert.equal(focused.cls, "tb-sample", `Tab should reach a sample pill, landed on ".${focused.cls}"`);
+
+		const before = await page.locator("#host >> .tb-textarea").inputValue();
+		await page.keyboard.press("Enter");
+		const afterEnter = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				values: (root?.querySelector(".tb-textarea") as HTMLTextAreaElement | null)?.value ?? "",
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+				focusedLabel: root?.activeElement?.textContent ?? "",
+				focusedClass: root?.activeElement?.className ?? "",
+			};
+		});
+		assert.notEqual(afterEnter.values, before, "Enter on a focused pill fills the form, exactly as a click does");
+		assert.match(afterEnter.status, new RegExp(String(focused.label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "and names the pill that was pressed");
+		/*
+		 * The runtime writes control values in place rather than rebuilding the form, specifically so that
+		 * the pill you just pressed still has focus. Re-rendering would drop a keyboard reader back to the
+		 * top of the document with no idea whether anything happened.
+		 */
+		assert.equal(afterEnter.focusedClass, "tb-sample", "focus must stay on the pill");
+		assert.equal(afterEnter.focusedLabel, focused.label, "and on the same pill");
+		await page.close();
+	});
+
+	it("draws no row on a card, where there is only room for one input and Run", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host[tool=percentiles]").first();
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		assert.equal(await card.locator(".tb-samples").count(), 0, "a row of buttons would crowd out the result a card exists to show");
+		assert.equal(await card.locator(".tb-sample").count(), 0, "including a stray pill outside the row");
+		await page.close();
+	});
+
+	it("draws the row in embed mode too", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		const embedded = page.locator("tool-host[tool=percentiles]");
+		await embedded.scrollIntoViewIfNeeded();
+		await embedded.locator(".tb-samples").waitFor();
+		assert.equal(await embedded.locator(".tb-sample").count(), 4, "an embedded tool has the full form, so it has the samples too");
+		await page.close();
+	});
+});
+
 describe("page mode", () => {
 	it("renders the chart and keeps it — a late progress frame must not overwrite the result", async () => {
 		const page = await browser.newPage();
