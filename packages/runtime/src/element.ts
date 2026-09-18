@@ -86,6 +86,7 @@ export class ToolHost extends HTMLElement {
 	#els: {
 		output?: HTMLElement;
 		status?: HTMLElement;
+		announce?: HTMLElement;
 		run?: HTMLButtonElement;
 		progress?: HTMLElement;
 	} = {};
@@ -305,7 +306,16 @@ export class ToolHost extends HTMLElement {
 			});
 			this.#setBusy(false);
 			this.#draw(output);
-			this.#say(summarise(output, this.mode === "card"));
+			/*
+			 * ⚠️ An error stays on the VISIBLE line; a result only gets announced.
+			 *
+			 * The split is between "here is what happened, and you can see it" and "here is what happened,
+			 * and you need to do something". A summary of a result that is already on screen is metadata and
+			 * reads as debug output; an error is the one outcome a reader has to act on, so it says so where
+			 * they are looking. Announcing it too would say it twice to a screen reader.
+			 */
+			if (output.kind === "error") this.#say(summarise(output, this.mode === "card"));
+			else this.#announce(summarise(output, this.mode === "card"));
 			this.#markInvalid(output.kind === "error" ? output.input : undefined);
 			if (options.focusResult) this.#els.output?.focus();
 		} catch (error) {
@@ -405,9 +415,19 @@ export class ToolHost extends HTMLElement {
 		// Hidden until a run outlasts SLOW_MS. A bar that flashes for 20 ms is noise.
 		const progress = el("div", { class: "tb-progress", "aria-hidden": "true", hidden: true }, el("i", { style: "width:0%" }));
 		const status = el("p", { class: "tb-status", role: "status", "aria-live": "polite" });
+		/*
+		 * ⚠️ A second live region, and this one is never seen.
+		 *
+		 * A result summary, "6 fields, chart, 2 series, table, 5 rows", is exactly what a screen reader needs
+		 * and exactly what a sighted reader does not: it rendered above the result as a line of metadata that
+		 * reads like debug output, describing something already on screen. Announcing it here and leaving the
+		 * visible line for what a reader can act on, "press Run", "inputs changed", an error, keeps both
+		 * audiences served without either paying for the other.
+		 */
+		const announce = el("p", { class: "tb-announce tb-sr", role: "status", "aria-live": "polite" });
 		const output = el("div", { class: "tb-output", tabindex: "-1" });
 
-		this.#els = { run, progress, status, output };
+		this.#els = { run, progress, status, announce, output };
 		body.append(form);
 		/*
 		 * Not on a card. A card has room for one input and a Run button, and a row of buttons would crowd
@@ -415,7 +435,7 @@ export class ToolHost extends HTMLElement {
 		 */
 		const samples = manifest.samples ?? [];
 		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
-		body.append(el("div", { class: "tb-actions" }, run, progress), status, output);
+		body.append(el("div", { class: "tb-actions" }, run, progress), status, announce, output);
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
@@ -686,9 +706,24 @@ export class ToolHost extends HTMLElement {
 		if (bar) bar.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
 	}
 
-	/** The short announcement. Deliberately not the whole result — see the note at the top. */
+	/**
+	 * The visible line: what a reader can act on. Prompts, and errors.
+	 *
+	 * Deliberately not the whole result — see the note at the top of this file.
+	 */
 	#say(message: string): void {
 		if (this.#els.status) this.#els.status.textContent = message;
+	}
+
+	/**
+	 * The unseen line: what a result was, for anyone who cannot see it.
+	 *
+	 * Also clears the visible line, because after a run the result itself is the feedback and a summary of
+	 * something on screen is noise.
+	 */
+	#announce(message: string): void {
+		if (this.#els.announce) this.#els.announce.textContent = message;
+		this.#say("");
 	}
 
 	#readInlineSeed(): void {

@@ -35,7 +35,14 @@ const BUDGETS = [
 	 * That left 75 bytes under the old ceiling, which is not a ceiling with headroom: the next
 	 * unrelated change would have failed here for reasons that had nothing to do with it.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 19_500 },
+	/*
+	 * Raised from 19_500 to 20_500 in the commit that spent it. What it bought: a second live region so a
+	 * result summary is announced without rendering as a line of metadata above the result; a query
+	 * container and three rules so a card's chart keeps legible labels when the card is narrower than the
+	 * chart's own viewBox; and the `parts` attribute plumbing. 19_500 left 46 bytes of headroom, which is
+	 * not headroom.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 20_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow

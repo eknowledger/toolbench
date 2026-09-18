@@ -305,7 +305,12 @@ describe("bytes output — contract version 2", () => {
 				// One <span data-tone> per highlighted byte, in BOTH the hex column and the gutter.
 				marked: root?.querySelectorAll(".tb-byte[data-tone]").length ?? 0,
 				legend: [...(root?.querySelectorAll(".tb-bytes-legend li") ?? [])].map((li) => li.textContent?.trim()),
-				status: root?.querySelector(".tb-status")?.textContent ?? "",
+				/*
+				 * ⚠️ `.tb-announce`, not `.tb-status`. A result summary is announced rather than displayed: it is
+				 * what a screen reader needs and what a sighted reader does not, since it describes something
+				 * already on screen. The visible line carries only what a reader can act on.
+				 */
+				status: root?.querySelector(".tb-announce")?.textContent ?? "",
 				/*
 				 * The columns must line up across rows. Each row was its own grid in the first version,
 				 * so a short final row sized its own hex column and pushed its gutter left of the row

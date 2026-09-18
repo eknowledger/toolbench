@@ -753,7 +753,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 18.9 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, and 0.9 KB with contract v3's sample row |
+| Runtime plus the bench's own wiring | 19.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, and 0.5 KB with richer cards |
 | Stylesheet | 0.9 KB | |
 | Worker entry | 3.3 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
@@ -765,9 +765,11 @@ Where the budget is spent: about half the runtime chunk is the chart renderer an
 that becomes a problem the chart is the obvious thing to split into its own lazily-imported chunk, since
 most tools never draw one.
 
-That chunk now measures 18,925 bytes against a 19,000 byte ceiling, so the next thing that costs real
+That chunk now measures 19,454 bytes against a 20,500 byte ceiling, so the next thing that costs real
 bytes either buys them explicitly, by raising the budget in the commit that spends it and moving this
-table with it, or takes the chart split above.
+table with it, or takes the chart split above. The ceiling was 19,500 until the richer-card work left 46
+bytes under it, which is not headroom; the reason is recorded beside the budget in `scripts/size-check.mjs`
+rather than only here.
 
 **One duplication to know about.** Vite builds a worker in a separate Rollup pass, so every tool
 reachable from the worker is emitted twice: `tool-<id>` for the main thread and `worker-tool-<id>` for

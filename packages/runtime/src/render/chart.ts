@@ -19,6 +19,23 @@ const H = 300;
 /** `right` grows when a second axis needs room for its labels — otherwise they clip at the edge. */
 const PAD = { top: 18, right: 20, rightWithAxis: 58, bottom: 44, left: 56 };
 
+/**
+ * A chart, and the same chart whether it is on a card or a page.
+ *
+ * ⚠️ There used to be a "compact" chart: half the height, no axis titles, no annotation labels. It was a
+ * bad trade in every direction. The plot area dropped from 238 units to 88, which squashes a curve that
+ * falls from 74% to nothing into an unreadable band; the axis titles are the only thing saying what the
+ * numbers are; and the annotation label is the "you are here" that gives the picture a point.
+ *
+ * None of it was needed, because the geometry is a viewBox scaled to the available width. A chart on a
+ * narrow card is already smaller than one on a page, proportionally, with its aspect ratio intact. Halving
+ * the height on top of that was solving a problem the SVG had already solved, and charging three
+ * legibility failures for it.
+ *
+ * What compact still changes is the SIZE, and only the size: the same drawing, capped narrower so a card
+ * does not hand most of a landing page to one chart. Capping the width and letting the height follow the
+ * viewBox is what keeps the aspect ratio, which is the part that was broken before.
+ */
 export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElement {
 	const compact = options.compact === true;
 	const left = chart.series.filter((s) => (s.axis ?? "left") === "left");
@@ -27,7 +44,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		x: PAD.left,
 		y: PAD.top,
 		w: W - PAD.left - (right.length > 0 ? PAD.rightWithAxis : PAD.right),
-		h: (compact ? 150 : H) - PAD.top - PAD.bottom,
+		h: H - PAD.top - PAD.bottom,
 	};
 
 	const leftScale = scaleFor(left);
@@ -66,18 +83,16 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	for (const annotation of chart.annotations ?? []) {
 		const x = px(annotation.x);
 		marks.push(svg("line", { class: "tb-annotation", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		if (!compact) {
-			// Flip the label inward near the right edge, or it runs off the chart — which is exactly
-			// where "you are here" lands when a system is nearly saturated.
-			const nearRight = x > plot.x + plot.w * 0.62;
-			marks.push(
-				svg(
-					"text",
-					{ class: "tb-annotation-label", x: nearRight ? x - 5 : x + 5, y: plot.y + 11, "text-anchor": nearRight ? "end" : "start" },
-					annotation.label,
-				),
-			);
-		}
+		// Flip the label inward near the right edge, or it runs off the chart — which is exactly
+		// where "you are here" lands when a system is nearly saturated.
+		const nearRight = x > plot.x + plot.w * 0.62;
+		marks.push(
+			svg(
+				"text",
+				{ class: "tb-annotation-label", x: nearRight ? x - 5 : x + 5, y: plot.y + 11, "text-anchor": nearRight ? "end" : "start" },
+				annotation.label,
+			),
+		);
 	}
 
 	chart.series.forEach((series, index) => {
@@ -89,23 +104,21 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	marks.push(svg("line", { class: "tb-axis", x1: plot.x, x2: plot.x, y1: plot.y, y2: plot.y + plot.h }));
 	marks.push(svg("line", { class: "tb-axis", x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h }));
 
-	const axisLabels = compact
-		? []
-		: [
-				svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: (compact ? 150 : H) - 6, "text-anchor": "middle" }, withUnit(chart.xLabel, chart.xUnit)),
-				svg(
-					"text",
-					{ class: "tb-axis-label", x: 12, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${plot.y + plot.h / 2})` },
-					withUnit(chart.yLabel, chart.yUnit),
-				),
-			];
+	const axisLabels = [
+		svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: H - 6, "text-anchor": "middle" }, withUnit(chart.xLabel, chart.xUnit)),
+		svg(
+			"text",
+			{ class: "tb-axis-label", x: 12, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${plot.y + plot.h / 2})` },
+			withUnit(chart.yLabel, chart.yUnit),
+		),
+	];
 
-	const figure = el("figure", { class: "tb-out-chart" });
+	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card" : "tb-out-chart" });
 	figure.append(
 		svg(
 			"svg",
 			{
-				viewBox: `0 0 ${W} ${compact ? 150 : H}`,
+				viewBox: `0 0 ${W} ${H}`,
 				role: "img",
 				"aria-label": describe(chart),
 				preserveAspectRatio: "none",
@@ -114,14 +127,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 			...axisLabels,
 		),
 	);
-	/*
-	 * ⚠️ The legend stays in compact mode, and only the axis titles go.
-	 *
-	 * Compact used to drop both, which is fine for one series and wrong for two: a card showing a chance of
-	 * waiting and a mean wait as two coloured lines with no key is decoration, and a reader cannot tell
-	 * which line is which or in what unit. The legend carries the label and the unit together, so it says
-	 * more per pixel than either axis title. It costs one line of text.
-	 */
+	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
 	// The same numbers, for anyone or anything that cannot see the picture.
 	figure.append(dataTable(chart));

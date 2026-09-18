@@ -70,6 +70,8 @@ export const STYLES = /* css */ `
   border: 1px solid var(--tb-border);
   border-radius: var(--tb-radius);
   overflow: hidden;
+  /* A query container, so a chart can size its labels against the CARD rather than the viewport. */
+  container-type: inline-size;
 }
 /* Embedded in prose: no frame competing with the surrounding text. */
 :host([mode="embed"]) .tb { border-radius: var(--tb-radius); background: var(--tb-surface); }
@@ -162,6 +164,9 @@ export const STYLES = /* css */ `
   font-family: var(--tb-mono);
   min-height: 1.2em;
 }
+/* An empty status must take no room: after a run it is cleared, and a blank line above a result reads
+   as a rendering bug. */
+.tb-status:empty { display: none; }
 .tb-output { display: grid; gap: 0.75rem; }
 .tb-output[data-state="running"] { opacity: 0.65; }
 /* The form no longer matches what is on screen. Dimmed rather than cleared: the previous answer is
@@ -223,6 +228,18 @@ export const STYLES = /* css */ `
 /* ── chart ────────────────────────────────────────────────────────────────────────────────── */
 .tb-out-chart { margin: 0; }
 .tb-out-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+/* On a card, the same chart drawn smaller. Capping the width lets the viewBox set the height, so the
+   aspect ratio is untouched: a chart that is half as wide is half as tall, not squashed. */
+.tb-out-chart-card svg { max-width: var(--tb-chart-card-max, 52rem); }
+/* ⚠️ Text inside a viewBox scales with the box, so the labels only need help when the box is SMALLER than
+   the 640-unit viewBox. Above that they scale up and are fine; below it a 10px label renders at 6px and is
+   past reading. 42rem is where a card's chart, minus the body's padding, crosses 640px. Gated on the card's
+   own width rather than the viewport, since the same card is a full-width lead and a third of a rail. */
+@container (max-width: 42rem) {
+  .tb-out-chart-card .tb-tick { font-size: 15px; }
+  .tb-out-chart-card .tb-axis-label { font-size: 16px; }
+  .tb-out-chart-card .tb-annotation-label { font-size: 15px; }
+}
 .tb-grid { stroke: var(--tb-border); stroke-width: 1; }
 .tb-axis { stroke: var(--tb-faint); stroke-width: 1; }
 .tb-tick, .tb-axis-label { fill: var(--tb-faint); font-family: var(--tb-mono); font-size: 10px; }
