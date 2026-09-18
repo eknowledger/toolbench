@@ -23,10 +23,18 @@ An attribute rather than a manifest key, deliberately: how much room a card has 
 it sits on, not of the tool, and the same tool is a one-part card in a sidebar and a two-part card leading
 a section.
 
-**A compact chart keeps its legend.** Compact mode dropped the axis titles and the legend together. That is
-fine for one series and wrong for two: a card showing two coloured lines with no key is decoration, and a
-reader cannot tell which line is which or in what unit. The legend carries both the label and the unit, so
-it says more per pixel than either axis title, and it costs one line of text.
+**A card's chart is drawn smaller, not shorter.** Compact mode halved the chart's viewBox height, which took
+the plot area from 238 units to 88 and compressed a curve falling from 74% to nothing into an unreadable
+band, and dropped the axis titles, the annotation label and the legend with it. None of that was needed: the
+geometry is a viewBox scaled to the available width, so a chart on a narrow card is already smaller than one
+on a page with its aspect ratio intact. The chart is now identical everywhere, and compact changes only the
+rendered size, capped at `--tb-chart-card-max` (52rem). Labels stay legible below that width via a container
+query, since text inside a viewBox otherwise shrinks with it.
+
+**A result summary is announced, not displayed.** "6 fields, chart, 2 series, table, 5 rows" rendered above
+the result as a line that reads like debug output, describing something already on screen. It is what a
+screen reader needs and what a sighted reader does not, so it moves to a visually hidden live region. The
+visible line keeps what a reader can act on: prompts, a sample's name, and errors.
 
 No contract version change. Nothing here adds or alters a manifest key, and the one rule that changed was
 removed rather than added.
