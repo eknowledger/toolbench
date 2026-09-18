@@ -165,7 +165,7 @@ tools/reverse/
 ```jsonc
 // tools/reverse/tool.json
 {
-  "sdk": 1,
+  "sdk": 1, // Contract version 1 (the current contract is 3; manifests remain backward-compatible)
   "id": "reverse",
   "name": "Reverse text",
   "blurb": "Reverses a string. Handles emoji correctly, which is most of the interest.",
@@ -429,7 +429,7 @@ execute with no build step. Any bundler for the host site; the examples use Vite
 |---|---|
 | `packages/sdk` | The contract: types, manifest validation, version migration, fixture runner. No dependencies, no DOM. |
 | `packages/runtime` | `<tool-host>`: the element, the form, the renderers, the runner, the worker protocol. |
-| `tools/` | Two example tools, with fixtures and help. |
+| `tools/` | Three example tools (`percentiles`, `queue-explorer`, `utf8-bytes`), with fixtures and help. |
 | `bench/` | The test bench: three display modes, both threading modes, host theming, and a tool that fails on purpose. |
 | `docs/` | Architecture, authoring, versioning. |
 

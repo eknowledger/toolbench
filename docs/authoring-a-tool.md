@@ -58,7 +58,7 @@ once.
 ```jsonc
 // tools/base64/tool.json
 {
-  "sdk": 1,
+  "sdk": 1, // Contract version 1 (the current contract version is 3; older manifests remain valid and compatible)
   "id": "base64",
   "name": "Base64 decoder",
   "blurb": "Decodes Base64 and shows what the bytes actually are, including where it breaks.",
