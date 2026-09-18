@@ -1,6 +1,6 @@
 {
   "name": "@toolbench/runtime",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Renders and runs a Toolbench tool in any web page: a <tool-host> custom element with three display modes, no framework required.",
   "license": "MIT",
   "author": "Ahmed Elmalt",
