@@ -27,6 +27,7 @@
     },
     {
       "id": "service",
+      "primary": true,
       "type": "number",
       "label": "Service time",
       "unit": "ms",

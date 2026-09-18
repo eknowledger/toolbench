@@ -44,13 +44,17 @@ function seedCards(): Plugin {
 	return {
 		name: "toolbench-seed-cards",
 		async transformIndexHtml(html) {
-			// Only the ids actually marked for seeding, so a page pays nothing for tools it does not seed.
-			const ids = [...html.matchAll(/<tool-host tool="([^"]+)"[^>]*data-seed\b/g)].map((m) => m[1]);
-			if (ids.length === 0) return html;
+			// Only the cards actually marked for seeding, so a page pays nothing for tools it does not seed.
+			const cards = [...html.matchAll(/<tool-host tool="([^"]+)"([^>]*data-seed\b[^>]*)>/g)].map((m) => ({
+				id: m[1] as string,
+				/* The card's own `parts` attribute, so a seed carries exactly what that card will draw. */
+				parts: Math.max(1, Number(/\bparts="(\d+)"/.exec(m[2] ?? "")?.[1] ?? 1)),
+			}));
+			if (cards.length === 0) return html;
 
 			const { seed, serialiseSeed, upgradeManifest, validateManifest } = await import("@toolbench/sdk");
 			let out = html;
-			for (const id of ids) {
+			for (const { id, parts } of cards) {
 				const manifest = validateManifest(
 					upgradeManifest((await import(`../tools/${id}/tool.json`, { with: { type: "json" } })).default),
 				);
@@ -62,11 +66,17 @@ function seedCards(): Plugin {
 				 */
 				const output = await seed({ manifest, tool });
 				/*
-				 * A card renders only the FIRST part of a group, so seeding the whole thing ships markup
-				 * no reader can see. Trimming is the host's call rather than the SDK's, because it
-				 * depends on the mode the card is in: a page-mode host would keep everything.
+				 * A card renders the first `parts` parts of a group, so seeding more ships markup no reader
+				 * can see. Trimming is the host's call rather than the SDK's, because it depends on how much
+				 * room this card has: a page-mode host would keep everything.
 				 */
-				const forCard = output.kind === "group" && output.parts.length > 0 ? output.parts[0] : output;
+				/*
+				 * One part is emitted bare rather than wrapped in a single-child group. Both render the same,
+				 * and the bare form is what a one-part card seeded before this took a `parts` count, so the
+				 * markup for every existing card is byte-for-byte unchanged.
+				 */
+				const kept = output.kind === "group" ? output.parts.slice(0, parts) : [output];
+				const forCard = kept.length === 1 ? kept[0] : { kind: "group" as const, parts: kept };
 				const json = serialiseSeed(forCard);
 				out = out.replace(
 					new RegExp(`(<tool-host tool="${id}"[^>]*data-seed\\b[^>]*>)`),

@@ -253,10 +253,18 @@ export function validateManifest(raw: unknown): Manifest {
 	const specs = inputs.map((input, i) => validateInput(input, `inputs[${i}]`));
 	const ids = specs.map((s) => s.id);
 	if (new Set(ids).size !== ids.length) fail("inputs", `input ids must be unique, got ${ids.join(", ")}`);
-	const primaries = specs.filter((s) => s.primary === true);
-	if (primaries.length > 1) {
-		fail("inputs", `only one input may be primary (a compact card shows exactly one), got ${primaries.map((p) => p.id).join(", ")}`);
-	}
+	/*
+	 * ⚠️ No cap on how many inputs may be primary, and there used to be one.
+	 *
+	 * The rule was "only one input may be primary (a compact card shows exactly one)", which encoded a
+	 * runtime decision as a contract rule. The runtime now shows every primary input, because a question
+	 * that needs two numbers cannot be asked with one: a capacity planner offering a rate without a duration
+	 * is not a smaller version of itself, it is a broken one.
+	 *
+	 * Loosening a rule is additive. Every manifest that validated before still validates, and no tool has to
+	 * change, so this needs no contract version. A tool that marks everything primary gets a card the size
+	 * of its form, which is its own decision to make and visible the moment it looks at one.
+	 */
 	if (o.samples !== undefined) validateSamples(o.samples, specs);
 
 	// --- output kinds -----------------------------------------------------------------------------

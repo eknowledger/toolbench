@@ -68,7 +68,7 @@ export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): 
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode"];
+	static readonly observedAttributes = ["tool", "mode", "parts"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -110,6 +110,19 @@ export class ToolHost extends HTMLElement {
 	get mode(): Mode {
 		const mode = this.getAttribute("mode");
 		return mode === "card" || mode === "embed" ? mode : "page";
+	}
+
+	/**
+	 * How many parts of a grouped result a compact card shows. Default 1.
+	 *
+	 * An attribute rather than a manifest key, and deliberately: how much room a card has is a property of
+	 * the page it is on, not of the tool. The same tool is a one-part card in a sidebar and a two-part card
+	 * leading a section, and a manifest cannot know which. Ignored outside `mode="card"`, where everything
+	 * is shown anyway.
+	 */
+	get cardParts(): number {
+		const raw = Number(this.getAttribute("parts"));
+		return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1;
 	}
 
 	get toolId(): string {
@@ -358,7 +371,13 @@ export class ToolHost extends HTMLElement {
 				"div",
 				{ class: "tb-body" },
 				mode === "page" ? null : el("p", { class: "tb-blurb" }, manifest.blurb),
-				this.#seed ? render(this.#seed, { compact, ...(manifest.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}) }) : null,
+				this.#seed
+					? render(this.#seed, {
+							compact,
+							cardParts: this.cardParts,
+							...(manifest.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}),
+						})
+					: null,
 				el("span", { class: "tb-facade-hint" }, this.#loading ? "loading…" : this.#seed ? "Try it" : "Open this tool"),
 			);
 			if (compact && !this.#loading) {
@@ -622,6 +641,7 @@ export class ToolHost extends HTMLElement {
 				target,
 				render(output, {
 					compact,
+					cardParts: this.cardParts,
 					...(manifest?.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}),
 				}),
 			);
@@ -688,9 +708,19 @@ export class ToolHost extends HTMLElement {
 	}
 }
 
+/**
+ * The inputs a compact card shows: every one marked `primary`, or the first if none is.
+ *
+ * ⚠️ This used to take exactly one, with `find` rather than `filter`, and that made `primary` a boolean
+ * whose second use was silently ignored. A manifest saying three inputs are primary got one, with nothing
+ * to say why. `primary` reads as "worth showing when space is short", and a tool whose question needs two
+ * numbers to be worth asking could not express it.
+ *
+ * Behaviour is unchanged for a manifest marking one input, or none, which is every tool that exists today.
+ */
 function primaryOnly(inputs: InputSpec[]): InputSpec[] {
-	const primary = inputs.find((input) => input.primary === true);
-	return primary ? [primary] : inputs.slice(0, 1);
+	const primary = inputs.filter((input) => input.primary === true);
+	return primary.length > 0 ? primary : inputs.slice(0, 1);
 }
 
 /**

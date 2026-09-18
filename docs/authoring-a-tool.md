@@ -291,8 +291,10 @@ Things the validator will hold you to, and why:
 * **`unit` on any number that has one.** `1000` alone is a riddle; `1000 samples` is not.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
-* **At most one input is `primary`.** A card shows exactly that one, so pick the one that makes the tool
-  worth opening.
+* **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and
+  nothing else, so mark as many as the question genuinely needs and no more: a capacity planner offering a
+  rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card
+  shows the first input. Every input is shown on the full tool either way.
 * **`dir: "ltr"`** on anything that is not prose: bytes, code, patterns, identifiers.
 
 ## 4b. Sample inputs

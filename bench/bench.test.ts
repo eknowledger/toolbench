@@ -129,7 +129,9 @@ describe("card mode — the facade", () => {
 		 */
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
-		const host = page.locator("tool-host[data-seed]");
+		// `[tool=percentiles]` as well as `[data-seed]`: a second seeded card arrived and this selector
+		// matched both, which is a strict-mode violation rather than a failure of the thing being tested.
+		const host = page.locator("tool-host[tool=percentiles][data-seed]");
 		await host.scrollIntoViewIfNeeded();
 
 		const raw = await host.locator("script[data-toolbench-seed]").textContent();
@@ -142,7 +144,7 @@ describe("card mode — the facade", () => {
 
 		// The same numbers must be on screen before anything is clicked, and before any form exists.
 		const shown = await page.evaluate(() => {
-			const card = document.querySelector("tool-host[data-seed]");
+			const card = document.querySelector("tool-host[tool=percentiles][data-seed]");
 			return {
 				fields: [...(card?.shadowRoot?.querySelectorAll(".tb-field") ?? [])].map((f) => f.textContent?.replace(/\s+/g, " ").trim()),
 				hint: card?.shadowRoot?.querySelector(".tb-facade-hint")?.textContent,
@@ -159,7 +161,7 @@ describe("card mode — the facade", () => {
 		const context = await browser.newContext({ javaScriptEnabled: false });
 		const page = await context.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
-		const raw = await page.locator("tool-host[data-seed] script[data-toolbench-seed]").textContent();
+		const raw = await page.locator("tool-host[tool=percentiles][data-seed] script[data-toolbench-seed]").textContent();
 		assert.match(String(raw), /"p50"/, "the result must be in the served markup, not produced by script");
 		await page.close();
 		await context.close();
@@ -213,6 +215,62 @@ describe("card mode — the facade", () => {
 		assert.match(String(errorText), /"nope" is not a number/);
 		assert.ok(!String(errorText).endsWith("…"), "an error must never be abbreviated");
 		assert.equal(await host.locator(".tb-output[data-stale]").count(), 0, "and running clears the stale mark");
+		await page.close();
+	});
+
+	it("shows every primary input, not just the first", async () => {
+		/*
+		 * ⚠️ This was `find` rather than `filter` in the runtime, so a manifest marking two inputs primary
+		 * got one and nothing said why. A question that needs two numbers cannot be asked with one: a queue
+		 * card offering an arrival rate without a service time sizes nothing.
+		 */
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator('tool-host[parts="2"]');
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		const ids = await card.evaluate((host) =>
+			[...(host as HTMLElement).shadowRoot!.querySelectorAll(".tb-form input, .tb-form select")].map((el) => el.id),
+		);
+		assert.deepEqual(ids, ["in-arrivals", "in-service"], "both primary inputs belong on the card");
+		await page.close();
+	});
+
+	it("renders as many parts as the host asked for, and says what it left out", async () => {
+		/*
+		 * A compact group used to render exactly one part. One is too few for a tool whose answer is a number
+		 * AND a curve: the number alone hides how steep the curve is, and the curve alone is anonymous lines.
+		 */
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator('tool-host[parts="2"]');
+		const shape = await card.evaluate((host) => {
+			const root = (host as HTMLElement).shadowRoot!;
+			return {
+				chart: root.querySelectorAll("svg").length,
+				fields: root.querySelectorAll(".tb-field").length,
+				more: root.querySelector(".tb-more")?.textContent ?? "",
+			};
+		});
+		assert.equal(shape.chart, 1, "the first part, a chart");
+		assert.ok(shape.fields > 0, "and the second part, its fields");
+		assert.match(shape.more, /more field/, "with an honest count of what did not fit");
+		await page.close();
+	});
+
+	it("keeps a chart's legend when compact, because two unnamed lines say nothing", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator('tool-host[parts="2"]');
+		const legend = await card.evaluate((host) =>
+			[...(host as HTMLElement).shadowRoot!.querySelectorAll(".tb-legend li")].map((li) => li.textContent?.trim()),
+		);
+		assert.equal(legend.length, 2, "one entry per series");
+		// The unit belongs in the key, since a compact chart has no axis titles to carry it.
+		assert.ok(
+			legend.every((entry) => /\(.+\)/.test(entry ?? "")),
+			`each entry should name its unit, got ${JSON.stringify(legend)}`,
+		);
 		await page.close();
 	});
 
@@ -491,7 +549,7 @@ describe("page mode", () => {
 		await page.close();
 	});
 
-	it("shows every input on a page and only the primary one on a card", async () => {
+	it("shows every input on a page and only the primary ones on a card", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=queue-explorer`, { waitUntil: "load" });
 		await page.locator("#host").scrollIntoViewIfNeeded();
@@ -507,7 +565,11 @@ describe("page mode", () => {
 		const card = page.locator("tool-host[tool=queue-explorer]").first();
 		await card.locator(".tb-facade").click();
 		await card.locator(".tb-form").waitFor();
-		assert.equal(await card.locator(".tb-field-row").count(), 1, "card mode shows only the primary input");
+		/*
+		 * Two, not one. This asserted 1 until the runtime started honouring every `primary` input rather than
+		 * the first, which is what lets a card ask a question that needs two numbers.
+		 */
+		assert.equal(await card.locator(".tb-field-row").count(), 2, "card mode shows the primary inputs only");
 		await page.close();
 	});
 });

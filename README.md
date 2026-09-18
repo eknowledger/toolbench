@@ -243,9 +243,22 @@ which is the difference between a page that stays fast and one that does not.
 
 | `mode` | Shows | Fetches the tool's code |
 |---|---|---|
-| `card` | Name, blurb, the input marked `primary`, the first few result fields | When the reader opens it. Until then the card is static markup. |
+| `card` | Name, blurb, the inputs marked `primary`, the first result part | When the reader opens it. Until then the card is static markup. |
 | `page` | Every input, the full result, the tool's links | When it scrolls within two viewports |
 | `embed` | Same as `page` without the title, sized for the middle of an article | When it scrolls within two viewports |
+
+A card shows one result part by default, which is too few for a tool whose answer is a number *and* a
+curve: the number alone hides how steep the curve is, and the curve alone is a set of unnamed lines. Give
+the card more room with `parts`:
+
+```html
+<tool-host tool="queue-explorer" mode="card" parts="2"></tool-host>
+```
+
+An attribute rather than a manifest key, deliberately. How much room a card has is a property of the page
+it sits on, not of the tool: the same tool is a one-part card in a sidebar and a two-part card leading a
+section, and a manifest cannot know which. Whatever does not fit is counted, not hidden, and a compact
+chart keeps its legend so its lines stay identifiable.
 
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card

@@ -114,7 +114,15 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 			...axisLabels,
 		),
 	);
-	if (!compact && chart.series.length > 1) figure.append(legend(chart.series));
+	/*
+	 * ⚠️ The legend stays in compact mode, and only the axis titles go.
+	 *
+	 * Compact used to drop both, which is fine for one series and wrong for two: a card showing a chance of
+	 * waiting and a mean wait as two coloured lines with no key is decoration, and a reader cannot tell
+	 * which line is which or in what unit. The legend carries the label and the unit together, so it says
+	 * more per pixel than either axis title. It costs one line of text.
+	 */
+	if (chart.series.length > 1) figure.append(legend(chart.series));
 	// The same numbers, for anyone or anything that cannot see the picture.
 	figure.append(dataTable(chart));
 	return figure;

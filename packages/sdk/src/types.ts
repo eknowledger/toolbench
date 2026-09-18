@@ -135,7 +135,13 @@ interface InputBase {
 	description?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
-	/** The one input a compact card shows. At most one per tool. */
+	/**
+	 * Show this input on a compact card, where there is only room for what matters.
+	 *
+	 * Mark as many as the question genuinely needs: a card asking "how many servers" is useless with only
+	 * one of a rate and a duration. Mark none and a card shows the first input. Every input is shown on the
+	 * full tool regardless.
+	 */
 	primary?: boolean;
 	/**
 	 * Force text direction. Bytes, code and identifiers are left-to-right even inside right-to-left

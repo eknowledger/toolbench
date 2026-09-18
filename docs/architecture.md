@@ -240,7 +240,7 @@ interface InputBase {
   label: string;
   description?: string;   // becomes aria-describedby, not a placeholder
   unit?: string;          // "ms", "req/s". A number without one is a riddle
-  primary?: boolean;      // the single input a card shows
+  primary?: boolean;      // show this input on a compact card; mark as many as the question needs
   dir?: "ltr" | "auto";   // bytes and code stay left to right inside right-to-left prose
 }
 ```
@@ -553,7 +553,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | `manifest.sdk` is a version this SDK can read | `migrate.ts`, `validate.ts` | A tool from the future renders half correctly |
 | `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the directory name | `validate.ts`, `tools/cases.test.ts` | Derived links and routes point at the wrong tool |
 | No two tools share an `id` | `RegistrySource` constructor | One silently shadows the other |
-| Input ids are unique; at most one is `primary` | `validate.ts` | A card would have to guess which input to show |
+| Input ids are unique | `validate.ts` | Two inputs answering to one id makes a form ambiguous and a fixture unreadable |
 | A number input declares `min` and `max` | `validate.ts` | An unbounded input turns a bounded computation into a hang |
 | A select has two or more options and its default is one of them | `validate.ts` | A control with one choice, or none selected |
 | `kinds` includes `"error"` | `validate.ts` | A tool with no way to reject bad input |

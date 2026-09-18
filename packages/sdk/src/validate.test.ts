@@ -59,13 +59,20 @@ describe("validateManifest", () => {
 		}, "inputs", "unique");
 	});
 
-	it("allows at most one primary input, because a card shows exactly one", () => {
-		failsWith((m) => {
-			m.inputs = [
+	it("allows several primary inputs, because some questions need more than one number", () => {
+		/*
+		 * This asserted the opposite until a real tool wanted both: a capacity planner offering a rate
+		 * without a duration is not a smaller version of itself. The rule encoded a runtime decision as a
+		 * contract rule, and the runtime now shows every primary input.
+		 */
+		const manifest = validateManifest({
+			...good(),
+			inputs: [
 				{ id: "a", type: "text", label: "A", default: "", primary: true },
 				{ id: "b", type: "text", label: "B", default: "", primary: true },
-			];
-		}, "inputs", "only one input may be primary");
+			],
+		});
+		assert.equal(manifest.inputs.filter((input) => input.primary === true).length, 2);
 	});
 
 	it("requires min and max on a number input", () => {

@@ -21,6 +21,13 @@ export interface RenderOptions {
 	compact?: boolean;
 	/** How many fields a compact render shows before stopping. */
 	cardFields?: number;
+	/**
+	 * How many parts of a group a compact render shows. Default 1.
+	 *
+	 * Set by the host, not the tool, because it is a question about the space on this page rather than
+	 * about the tool: the same tool is a small card in a sidebar and a large one leading a section.
+	 */
+	cardParts?: number;
 }
 
 export function render(output: Output, options: RenderOptions = {}): HTMLElement {
@@ -37,20 +44,27 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			return renderChart(output.chart, options);
 		case "group": {
 			/*
-			 * ⚠️ A compact slot renders the FIRST part only, plus a count of what it left out.
+			 * ⚠️ A compact slot renders the FIRST FEW parts, and says how many it left out.
 			 *
-			 * A group is how a tool answers in more than one shape — fields and a table and a chart — and
-			 * a card that rendered all of them would be a page. Truncating fields but not the table
-			 * beside them (the first version) produced a card that was somehow both abbreviated and
-			 * enormous.
+			 * A group is how a tool answers in more than one shape, and a card that rendered all of them
+			 * would be a page: truncating fields but not the table beside them, which the first version did,
+			 * produced a card that was somehow both abbreviated and enormous. So the count is capped.
+			 *
+			 * It used to be capped at one, which turned out to be too few for a real card. A tool whose answer
+			 * is a number AND a curve has to show both or show nothing worth looking at: the number alone
+			 * hides that the difference between six servers and seven is enormous, and the curve alone is two
+			 * anonymous lines. `cardParts` is the host's call, since it is a question about the space on the
+			 * page rather than about the tool.
 			 */
-			if (options.compact && output.parts.length > 1) {
-				const [first, ...rest] = output.parts;
+			const cap = Math.max(1, options.cardParts ?? 1);
+			if (options.compact && output.parts.length > cap) {
+				const shown = output.parts.slice(0, cap);
+				const hidden = output.parts.length - shown.length;
 				return el(
 					"div",
 					{ class: "tb-group" },
-					first ? render(first, options) : null,
-					el("p", { class: "tb-more" }, `+${rest.length} more result${rest.length === 1 ? "" : "s"} on the full tool`),
+					...shown.map((part) => render(part, options)),
+					el("p", { class: "tb-more" }, `+${hidden} more result${hidden === 1 ? "" : "s"} on the full tool`),
 				);
 			}
 			return el("div", { class: "tb-group" }, ...output.parts.map((part) => render(part, options)));
