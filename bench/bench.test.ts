@@ -18,13 +18,37 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { after, before, describe, it } from "node:test";
-import { type Browser, chromium } from "playwright";
+import { type Browser, type BrowserType, chromium, firefox, webkit } from "playwright";
 
 const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
 
+const ENGINES = { chromium, firefox, webkit } as const;
+type EngineName = keyof typeof ENGINES;
+
+/**
+ * Which engine the suite launches. CI sets this per matrix leg. Unset still means Chromium, so
+ * `pnpm test:bench` locally keeps working, and `CHROME_CHANNEL` still picks system Chrome vs the
+ * bundled Chromium.
+ */
+function requestedEngine(): EngineName {
+	const raw = (process.env.PLAYWRIGHT_BROWSER ?? "chromium").toLowerCase();
+	if (raw in ENGINES) return raw as EngineName;
+	throw new Error(`Unknown PLAYWRIGHT_BROWSER="${process.env.PLAYWRIGHT_BROWSER}". Use chromium, firefox, or webkit.`);
+}
+
+async function launchBrowser(): Promise<Browser> {
+	const name = requestedEngine();
+	const engine: BrowserType = ENGINES[name];
+	if (name === "chromium") {
+		return engine.launch({ channel: process.env.CHROME_CHANNEL ?? "chrome" });
+	}
+	return engine.launch();
+}
+
 let server: ChildProcess | undefined;
 let browser: Browser;
+let engineName: EngineName;
 
 before(async () => {
 	server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
@@ -44,12 +68,19 @@ before(async () => {
 		if (Date.now() > deadline) throw new Error("vite preview did not start");
 		await new Promise((r) => setTimeout(r, 150));
 	}
-	browser = await chromium.launch({ channel: process.env.CHROME_CHANNEL ?? "chrome" });
+	engineName = requestedEngine();
+	browser = await launchBrowser();
 });
 
 after(async () => {
 	await browser?.close();
 	server?.kill("SIGTERM");
+});
+
+describe("the engine under test", () => {
+	it("launched the browser PLAYWRIGHT_BROWSER asked for", () => {
+		assert.equal(browser.browserType().name(), engineName);
+	});
 });
 
 describe("card mode — the facade", () => {

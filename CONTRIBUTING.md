@@ -25,7 +25,7 @@ execute in a plain `node --test`. That floor is worth it.
 | `pnpm bench` | Whenever you touch the runtime. Look at the thing |
 | `pnpm bench:build && pnpm size` | Before a PR, if `packages/runtime` grew |
 | `pnpm test:counts --update` | After adding or removing tests. It rewrites the Count column in the testing table, so nobody types those numbers |
-| `pnpm test:bench` | Before a PR. Browser tests, against the **built** bundle |
+| `pnpm test:bench` | Before a PR. Browser tests, against the **built** bundle. `PLAYWRIGHT_BROWSER=firefox` or `webkit` for the other engines |
 | `pnpm coverage` | When you want the uncovered list. Node suite only, no threshold |
 | `pnpm changeset` | In the same PR as any change a consumer would notice |
 

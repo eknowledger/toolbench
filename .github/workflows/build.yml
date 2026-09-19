@@ -1,4 +1,4 @@
-# The slow half: real builds, real browser, real transfer sizes.
+# The slow half: real builds, real browsers, real transfer sizes.
 #
 # Separate from tests.yml so it gets its own badge and runs in parallel. It answers a different
 # question: not "is the logic right" but "does what we ship actually work and stay small".
@@ -21,6 +21,10 @@ jobs:
   build:
     name: packages, bench, browser
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4.3.0
@@ -51,17 +55,22 @@ jobs:
         run: node scripts/size-check.mjs
 
       - name: The runtime, in a real browser
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          # Bundled Chromium, not a system Chrome the runner does not have.
+          CHROME_CHANNEL: chromium
         run: |
-          pnpm exec playwright install --with-deps chromium
-          CHROME_CHANNEL=chromium pnpm test:bench
+          pnpm exec playwright install --with-deps "$PLAYWRIGHT_BROWSER"
+          pnpm test:bench
 
       - name: Keep the built bench
         # Useful on a failure: you can download it and open the exact build the browser tests ran
-        # against, rather than trying to reproduce the state locally.
+        # against, rather than trying to reproduce the state locally. One artifact per engine so a
+        # Firefox-only failure still has the build that failed, not Chromium's.
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: bench-dist
+          name: bench-dist-${{ matrix.browser }}
           path: bench/dist
           retention-days: 7
           if-no-files-found: error

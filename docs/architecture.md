@@ -721,7 +721,7 @@ build: {
 Three workflows, not one. `tests.yml` and `build.yml` run on push to `main` and on every pull request,
 and `release.yml` runs on push to `main` only. `tests.yml` installs with a frozen lockfile, typechecks
 and runs `pnpm test`; `build.yml` builds the packages, checks the published contents, builds the bench,
-checks the transfer budgets, installs Chromium and runs the browser suite. Both job names are required
+checks the transfer budgets, and runs the browser suite on Chromium, Firefox and WebKit. Both job names are required
 status checks on `main`, so renaming either one silently stops gating anything.
 
 The step that matters most is `pnpm test`, because it runs **every** tool's fixtures against the current
@@ -743,7 +743,7 @@ Six layers. Each catches something the others structurally cannot.
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 13 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
-| `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 42 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 42 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
