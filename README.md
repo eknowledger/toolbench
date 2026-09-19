@@ -450,6 +450,11 @@ PLAYWRIGHT_BROWSER=firefox pnpm test:bench
 Unset, `pnpm test:bench` still opens system Chrome (`CHROME_CHANNEL`, default `chrome`). CI sets
 `CHROME_CHANNEL=chromium` so the runner uses the browser Playwright just installed.
 
+No runtime gap turned up on those three engines. One test-harness difference did: Playwright's page
+request listener reports a worker's module `import()` as `script` on Chromium, `xhr` on WebKit, and
+not at all on Firefox. The suite reads the worker's own performance timeline for that allowlist, which
+is the observation that holds on every engine.
+
 Two newer features are used with plain fallbacks in front of them, so a browser without either gets
 light colours rather than a broken layout: `light-dark()` for automatic dark mode (Chrome 123+,
 Firefox 120+, Safari 17.5+) and `color-mix()` for one focus ring. Anything older than the baseline
