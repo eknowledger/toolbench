@@ -49,6 +49,14 @@ const BUDGETS = [
 	 * unnoticed either.
 	 */
 	{ label: "bench theme switch", pattern: /^bench-theme-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	/*
+	 * The fixture manifests, split out of `boot` for the same reason as the theme switch and measured for the
+	 * same one: a chunk nobody watches is a chunk that grows. 571 bytes for one fixture, and open pull
+	 * requests add three more, so the ceiling is set to leave room for those without leaving room for
+	 * everything.
+	 */
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },

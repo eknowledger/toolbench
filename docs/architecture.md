@@ -710,7 +710,7 @@ build: {
 | Command | Output |
 |---|---|
 | `pnpm build` | `packages/*/dist`: ESM plus `.d.ts` and source maps. No bundling; consumers bundle. |
-| `pnpm bench:build` | `bench/dist`: three HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk. Per-tool chunks are emitted twice, once for the worker pass, which §13 explains. |
+| `pnpm bench:build` | `bench/dist`: three HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk, and two bench-only chunks for the theme switch and the fixture manifests. Per-tool chunks and the fixture chunk are emitted twice, once for the worker pass, which §13 explains. |
 
 ### 11.5 CI
 
@@ -759,9 +759,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 19.6 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, and 0.5 KB with richer cards |
+| Runtime plus the bench's own wiring | 19.7 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, and 0.5 KB with richer cards |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 3.3 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 2.9 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | A page with no tool | 0 bytes | Nothing is imported |
@@ -771,11 +771,21 @@ Where the budget is spent: about half the runtime chunk is the chart renderer an
 that becomes a problem the chart is the obvious thing to split into its own lazily-imported chunk, since
 most tools never draw one.
 
-That chunk now measures 19,837 bytes against a 20,500 byte ceiling, so the next thing that costs real
+That chunk now measures 19,662 bytes against a 20,500 byte ceiling, so the next thing that costs real
 bytes either buys them explicitly, by raising the budget in the commit that spends it and moving this
 table with it, or takes the chart split above. The ceiling was 19,500 until the richer-card work left 46
 bytes under it, which is not headroom; the reason is recorded beside the budget in `scripts/size-check.mjs`
 rather than only here.
+
+**What the figure deliberately excludes.** A test instrument that no consumer ships does not belong in a
+number a consumer reads, so two of them are split into their own chunks with their own budget lines: the
+bench's theme switch, and the fixture manifests under `bench/fixtures`. The second was not obvious. Manifests
+are collected with an eager glob, which inlines each `tool.json` into whichever chunk imports it, and
+`registry.ts` is reachable from every entry, so a fixture whose whole purpose is to fail on purpose was
+compiling into both `boot` and the worker bundle: 340 and 334 bytes for one fixture, at a point when the
+ceiling had 498 bytes left and three more fixtures were queued in open pull requests. Splitting them did not
+make the bench download less. It made the published figure answer the question it claims to answer, because a
+consumer running the tool-directory harness over their own tools has no `bench/fixtures` at all.
 
 **One duplication to know about.** Vite builds a worker in a separate Rollup pass, so every tool
 reachable from the worker is emitted twice: `tool-<id>` for the main thread and `worker-tool-<id>` for

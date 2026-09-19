@@ -26,6 +26,22 @@ function toolChunk(id: string, prefix: string): string | null {
 	 * all three entries import it statically.
 	 */
 	if (/\/bench\/src\/theme\.ts$/.test(id)) return "bench-theme";
+	/*
+	 * ⚠️ And the fixture manifests, for the same reason and by the same mechanism.
+	 *
+	 * `registry.ts` collects manifests with an eager glob, which inlines each `tool.json` into whichever
+	 * chunk imports it. `registry.ts` is reachable from every entry, so a fixture that exists only to fail
+	 * on purpose was compiling into `boot` and into the worker bundle: 340 and 334 bytes for one fixture,
+	 * against 498 bytes of headroom at the time, and three more fixtures were queued in open pull requests.
+	 *
+	 * The bench still downloads these. The point is that the figure answers a question about consumers, and
+	 * a consumer running the tool-directory harness over their own tools has no `bench/fixtures` at all.
+	 */
+	if (/\/bench\/fixtures\/[^/]+\/tool\.json$/.test(id)) {
+		// The worker is built in a separate pass, so both passes reach this rule and a single name would
+		// emit two files with it. Prefixed the way the tool chunks already are, for the same reason.
+		return prefix.startsWith("worker") ? "worker-bench-fixtures" : "bench-fixtures";
+	}
 	return null;
 }
 
