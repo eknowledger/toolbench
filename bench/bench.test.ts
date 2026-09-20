@@ -32,7 +32,21 @@ type EngineName = keyof typeof ENGINES;
  * bundled Chromium.
  */
 function requestedEngine(): EngineName {
-	const raw = (process.env.PLAYWRIGHT_BROWSER ?? "chromium").toLowerCase();
+	/*
+	 * ⚠️ Required under CI, defaulted only locally.
+	 *
+	 * Defaulting everywhere hides the failure that matters: drop `PLAYWRIGHT_BROWSER` from the workflow and
+	 * all three legs quietly run Chromium, three green checks report cross-engine coverage that does not
+	 * exist, and the assertion below still passes because both the default and the expectation collapse to
+	 * the same value. Under CI an unset variable is a configuration bug, so it is loud.
+	 */
+	const raw = process.env.PLAYWRIGHT_BROWSER?.toLowerCase();
+	if (raw === undefined) {
+		if (process.env.CI) {
+			throw new Error("PLAYWRIGHT_BROWSER is unset under CI. Every leg would run Chromium and report as if it had not.");
+		}
+		return "chromium";
+	}
 	if (raw in ENGINES) return raw as EngineName;
 	throw new Error(`Unknown PLAYWRIGHT_BROWSER="${process.env.PLAYWRIGHT_BROWSER}". Use chromium, firefox, or webkit.`);
 }

@@ -18,13 +18,13 @@ permissions:
   contents: read
 
 jobs:
+  # Build and measure once. Three engines running three identical builds proved nothing three times,
+  # and the transfer budget in particular is a property of the bundle rather than of the browser
+  # reading it, so measuring it per engine invites three answers to a one-answer question.
   build:
-    name: packages, bench, browser
+    name: build and measure
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox, webkit]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4.3.0
@@ -54,6 +54,52 @@ jobs:
         # small. Also catches a chunk vanishing or stopping being split.
         run: node scripts/size-check.mjs
 
+      - name: Keep the built bench
+        # Useful on a failure: you can download it and open the exact build the browser tests ran
+        # against, rather than trying to reproduce the state locally. Also what the browser jobs
+        # below consume, so every engine reads the same bytes rather than its own rebuild.
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: bench-dist
+          path: bench/dist
+          retention-days: 7
+          if-no-files-found: error
+
+  # One job per engine, reading the build above. fail-fast is off because "Firefox is broken" and
+  # "WebKit is broken" are different findings and cancelling the second to report the first hides one.
+  browser:
+    name: browser (${{ matrix.browser }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Take the bench that was built and measured
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: bench-dist
+          path: bench/dist
+
+      - name: Cache the browser binaries
+        # A --with-deps install is most of this job's wall clock. Keyed on the Playwright version,
+        # because that is what decides which browser builds are wanted.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ matrix.browser }}
+
       - name: The runtime, in a real browser
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
@@ -63,14 +109,26 @@ jobs:
           pnpm exec playwright install --with-deps "$PLAYWRIGHT_BROWSER"
           pnpm test:bench
 
-      - name: Keep the built bench
-        # Useful on a failure: you can download it and open the exact build the browser tests ran
-        # against, rather than trying to reproduce the state locally. One artifact per engine so a
-        # Firefox-only failure still has the build that failed, not Chromium's.
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
-        with:
-          name: bench-dist-${{ matrix.browser }}
-          path: bench/dist
-          retention-days: 7
-          if-no-files-found: error
+  # ⚠️ This job exists for branch protection, and its name must not change.
+  #
+  # `main` requires a status check called "packages, bench, browser". GitHub appends matrix values to a
+  # job's name, so making the browser job a matrix would have reported "packages, bench, browser
+  # (chromium)" and friends, the required context would never have appeared again, and every merge would
+  # have blocked indefinitely. Keeping one unmatrixed job that waits on the others means the required
+  # context keeps existing, adding a fourth engine needs no change to repository settings, and there is
+  # no window where main is unmergeable.
+  required:
+    name: packages, bench, browser
+    needs: [build, browser]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless the build and every engine passed
+        # `needs` alone does not do this: with `if: always()` this job runs even when a dependency
+        # failed, so the result has to be asserted rather than assumed.
+        run: |
+          echo "build:   ${{ needs.build.result }}"
+          echo "browser: ${{ needs.browser.result }}"
+          test "${{ needs.build.result }}" = "success" || exit 1
+          test "${{ needs.browser.result }}" = "success" || exit 1

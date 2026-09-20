@@ -439,8 +439,10 @@ budget, so these numbers cannot rot.
 In the browser the runtime needs custom elements, shadow DOM, `IntersectionObserver`, module workers
 and CSS container queries: Chrome 105+, Firefox 114+, Safari 16.4+.
 
-CI runs the bench suite against Playwright's Chromium, Firefox, and WebKit. That is how the list above
-is a guarantee rather than a claim. Locally, after `pnpm bench:build`:
+CI runs the bench suite against Playwright's Chromium, Firefox and WebKit, on every pull request. That
+turns "it works in three engines" from a claim into something checked. Note what it does not establish: those
+are the engines Playwright ships today, not the version floors above, so the floors remain the oldest engines
+the code is written against rather than the oldest ones tested. Locally, after `pnpm bench:build`:
 
 ```sh
 pnpm exec playwright install firefox   # or webkit, or chromium
