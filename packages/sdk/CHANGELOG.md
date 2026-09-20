@@ -1,5 +1,43 @@
 # @toolbench/sdk
 
+## 0.6.0
+
+### Minor Changes
+
+- [#63](https://github.com/eknowledger/toolbench/pull/63) [`08febf0`](https://github.com/eknowledger/toolbench/commit/08febf06db3c312115bca2c6ac9c1e2d9441c7ff) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: paint `code` results with your own highlighter.** Pass `highlight` to `defineToolHost` and it is called with `(source, lang)` for every `code` result. ([#9](https://github.com/eknowledger/toolbench/issues/9))
+
+  It must return a DOM `Node`, not a string, so the runtime never assigns `innerHTML`. Omit it and you still get readable preformatted text, and no highlighter is bundled.
+
+- [#61](https://github.com/eknowledger/toolbench/pull/61) [`f0cfb36`](https://github.com/eknowledger/toolbench/commit/f0cfb36044b52a168073c22ad9577b6dd5aadf00) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: fill in a tool's form from your page.** `<tool-host>` gains a `values` setter and a `run()` method, so "try this example" buttons live in your own markup instead of inside every tool. ([#38](https://github.com/eknowledger/toolbench/issues/38))
+
+  - `values` accepts a partial set and validates it the way typing does; it does not run the tool.
+  - `run()` runs it. It leaves focus alone by default; `run({ focus: true })` moves focus to the result.
+  - The matching `values` getter reads back what is in the form, for building a shareable URL.
+
+- [#54](https://github.com/eknowledger/toolbench/pull/54) [`68d037a`](https://github.com/eknowledger/toolbench/commit/68d037ae544827966766707031689bfdbb32e1fd) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: retire a tool without breaking its URL.** `status: "retired"` or `"deprecated"` in a manifest is now honoured. ([#16](https://github.com/eknowledger/toolbench/issues/16))
+
+  - **Retired** does not run. The page explains, and renders `links` as the way onward, so a bookmark is neither a 404 nor a silent run.
+  - **Deprecated** still runs, with a marker you can style via `data-status` on `<tool-host>` and the `--tb-mark-*` tokens. It is not offered as a live card.
+
+  ⚠️ **Heads-up:** a manifest combining `card: "live"` with a `status` of `deprecated` or `retired` is now refused at load. That pairing says two contradictory things, so this can only catch a mistake, but it is a rule an existing manifest could trip.
+
+- [#59](https://github.com/eknowledger/toolbench/pull/59) [`1b526d2`](https://github.com/eknowledger/toolbench/commit/1b526d2d34ecd20a5008bb869be5b2ba83720d94) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Better errors for broken `samples`.** Two samples that fill the same values are now refused even when their labels differ, and duplicate-label and duplicate-id errors name both colliding entries instead of only one. ([#41](https://github.com/eknowledger/toolbench/issues/41))
+
+  ⚠️ **Heads-up:** a manifest with two identical samples loaded before and now fails at load.
+
+- [#85](https://github.com/eknowledger/toolbench/pull/85) [`fdd87df`](https://github.com/eknowledger/toolbench/commit/fdd87df85a9789c9e300f2df1205ac89cb65f408) Thanks [@eknowledger](https://github.com/eknowledger)! - **Smaller download for pages without charts.** The `series` chart renderer is now its own chunk, worth about 1.4 KB gzipped off the main runtime. ([#12](https://github.com/eknowledger/toolbench/issues/12))
+
+  A page whose tool declares `series` in `kinds` fetches it before the first result, so nothing changes for you. A page with no chart tool never downloads it.
+
+### Patch Changes
+
+- [#65](https://github.com/eknowledger/toolbench/pull/65) [`2e93266`](https://github.com/eknowledger/toolbench/commit/2e932660a52d305d6af8781cba49132dfc878f06) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: two accessibility defects on cards.** ([#64](https://github.com/eknowledger/toolbench/issues/64))
+
+  - A closed card's accessible name now includes its visible "Try it" / "Open this tool" hint, so speech input matching what is on screen works (WCAG 2.5.3).
+  - The title link's hit target is at least 24px tall rather than the height of the text (WCAG 2.5.8).
+
+- [#55](https://github.com/eknowledger/toolbench/pull/55) [`8631f93`](https://github.com/eknowledger/toolbench/commit/8631f938338410e21b03beead95765f0a30d8144) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: the "inputs changed" cue on Run no longer looks like keyboard focus.** It was a ring, which is the visual language of `:focus-visible`; it is now a darker fill. ([#43](https://github.com/eknowledger/toolbench/issues/43))
+
 ## 0.5.0
 
 ### Minor Changes
