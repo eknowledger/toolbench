@@ -1420,20 +1420,27 @@ describe("bar chart geometry", () => {
 
 		const geometry = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
-			const axis = svg?.querySelector(".tb-axis");
 			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])];
 			const num = (el: Element | null | undefined, name: string) => Number(el?.getAttribute(name));
+			/*
+			 * ⚠️ There are TWO `.tb-axis` lines, the vertical one first. Reading the plot's right edge from
+			 * `querySelector(".tb-axis")` picks the y axis, whose x2 is the LEFT edge, and the test then
+			 * failed claiming a bar at 572 was past an edge at 56. Taking the extremes across both lines is
+			 * the reading that cannot pick the wrong one.
+			 */
+			const axes = [...(svg?.querySelectorAll("line.tb-axis") ?? [])];
 			return {
 				count: bars.length,
-				// The axis line spans the plot, so its ends are the plot's left and right edges.
-				left: num(axis, "x1"),
-				right: num(axis, "x2"),
+				axes: axes.length,
+				left: Math.min(...axes.map((line) => num(line, "x1"))),
+				right: Math.max(...axes.map((line) => num(line, "x2"))),
 				first: num(bars[0], "x"),
 				lastEnd: num(bars.at(-1), "x") + num(bars.at(-1), "width"),
 			};
 		});
 
 		assert.ok(geometry.count > 1, `expected a bar chart, got ${geometry.count} bars`);
+		assert.equal(geometry.axes, 2, "one vertical axis and one horizontal, which is what makes the bounds below meaningful");
 		assert.ok(
 			geometry.first >= geometry.left,
 			`the first bar starts at ${geometry.first}, left of the axis at ${geometry.left}: it is drawn over the axis`,
@@ -1458,7 +1465,9 @@ describe("bar chart geometry", () => {
 
 		const flush = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
-			const axisLeft = Number(svg?.querySelector(".tb-axis")?.getAttribute("x1"));
+			// Same hazard as above: both axes share the class, and both have x1 at the left edge, so this one
+			// is safe either way. Spelled out so nobody "tidies" it into reading x2.
+			const axisLeft = Number(svg?.querySelector("line.tb-axis")?.getAttribute("x1"));
 			const path = svg?.querySelector("path.tb-line, path[class*=tb-line]")?.getAttribute("d") ?? "";
 			const firstX = Number(/^M\s*([\d.-]+)/.exec(path)?.[1]);
 			return { axisLeft, firstX, path: path.slice(0, 40) };
