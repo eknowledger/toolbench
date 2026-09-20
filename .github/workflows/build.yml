@@ -54,15 +54,24 @@ jobs:
         # small. Also catches a chunk vanishing or stopping being split.
         run: node scripts/size-check.mjs
 
-      - name: Keep the built bench
-        # Useful on a failure: you can download it and open the exact build the browser tests ran
-        # against, rather than trying to reproduce the state locally. Also what the browser jobs
-        # below consume, so every engine reads the same bytes rather than its own rebuild.
+      - name: Keep what was built
+        # Useful on a failure: download it and open the exact build the browser tests ran against,
+        # rather than trying to reproduce the state locally. Also what the browser jobs below consume,
+        # so every engine reads the same bytes rather than its own rebuild.
+        #
+        # ⚠️ The packages' dist is in here too, and not for symmetry. `pnpm test:bench` starts
+        # `vite preview`, which loads `bench/vite.config.ts`, whose seed plugin imports
+        # `@toolbench/sdk`, which resolves to `packages/sdk/dist`. Shipping only `bench/dist` gave three
+        # engine legs failing with "vite preview did not start", which names the symptom and not the
+        # cause. A built bench is not self-sufficient: serving it needs the workspace built too.
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: bench-dist
-          path: bench/dist
+          name: built
+          path: |
+            bench/dist
+            packages/sdk/dist
+            packages/runtime/dist
           retention-days: 7
           if-no-files-found: error
 
@@ -86,11 +95,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - name: Take the bench that was built and measured
+      - name: Take what was built and measured
+        # Into the repository root, because the artifact holds bench/dist and both packages' dist and
+        # its paths are relative to that root.
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
-          name: bench-dist
-          path: bench/dist
+          name: built
+          path: .
 
       - name: Cache the browser binaries
         # A --with-deps install is most of this job's wall clock. Keyed on the Playwright version,
