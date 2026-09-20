@@ -2,4 +2,6 @@
 "@toolbench/runtime": patch
 ---
 
-A repaint redraws the result that was on screen instead of discarding it. Setting an observed attribute such as `parts` or `mode` after a run used to empty the output, and on a seeded host it silently reverted to the seed, showing the defaults' result under the reader's own inputs. The seed is now only the starting point for a host that has never produced a result, a partial or an error.
+**Fixed: changing an attribute no longer wipes the result.** Setting `parts` or `mode` after a run used to empty the output. On a card with a seed it was worse: it silently reverted to the seeded default while the reader's own inputs stayed in the form. ([#79](https://github.com/eknowledger/toolbench/issues/79))
+
+A repaint now redraws whatever was on screen, including an error or a partial result. The seed is only used for a tool that has not produced anything yet.

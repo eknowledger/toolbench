@@ -3,6 +3,9 @@
 "@toolbench/runtime": minor
 ---
 
-Honour manifest `status`. A retired tool no longer activates: the element explains and renders `links` as the way onward, so a bookmarked URL is not a 404 and is not a silent run. A deprecated tool still runs, with a visible marker a host can style via `data-status` on `<tool-host>` and the `--tb-mark-*` tokens, and it is refused as a live card.
+**New: retire a tool without breaking its URL.** `status: "retired"` or `"deprecated"` in a manifest is now honoured. ([#16](https://github.com/eknowledger/toolbench/issues/16))
 
-Minor rather than patch, because a manifest that loaded before this can now fail to load: `card: "live"` together with a `status` of `deprecated` or `retired` is refused. That combination states two contradictory things, so refusing it can only catch a mistake, but it is still a rule an existing manifest could trip, and at 0.x a minor bump is the only signal available for that.
+- **Retired** does not run. The page explains, and renders `links` as the way onward, so a bookmark is neither a 404 nor a silent run.
+- **Deprecated** still runs, with a marker you can style via `data-status` on `<tool-host>` and the `--tb-mark-*` tokens. It is not offered as a live card.
+
+⚠️ **Heads-up:** a manifest combining `card: "live"` with a `status` of `deprecated` or `retired` is now refused at load. That pairing says two contradictory things, so this can only catch a mistake, but it is a rule an existing manifest could trip.
