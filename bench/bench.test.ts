@@ -1260,6 +1260,74 @@ describe("expanding a truncated result in place", () => {
 		await page.close();
 	});
 
+	/*
+	 * The same control in the other two modes, because "works in every mode" was a decision rather than an
+	 * accident and each mode reaches the renderer by a different route: page mode from a URL, card mode only
+	 * after activation.
+	 */
+	it("works in page mode, driven from the URL", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles&parts=1&more=expand`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-disclose").waitFor({ timeout: 15_000 });
+
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Show 2 more results");
+		assert.equal(await page.locator("#host >> .tb-rest").isVisible(), false);
+		await page.locator("#host >> .tb-disclose").click();
+		assert.equal(await page.locator("#host >> .tb-rest").isVisible(), true, "page mode expands like any other");
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Hide 2 results");
+		await page.close();
+	});
+
+	it("works in card mode once the card is open, and never on the closed facade", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host#expandable-card");
+		await card.scrollIntoViewIfNeeded();
+
+		/*
+		 * ⚠️ A closed card must not carry the button, and this is the assertion that keeps that true. The
+		 * facade is itself one button, so a disclosure nested inside it could not be pressed without opening
+		 * the card. `#paint` omits `more` on that path on purpose.
+		 */
+		await card.locator(".tb-facade").waitFor();
+		assert.equal(await card.locator(".tb-disclose").count(), 0, "no disclosure inside the facade button");
+
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		await card.locator(".tb-run").click();
+		await card.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+
+		assert.equal(await card.locator(".tb-rest").isVisible(), false);
+		await card.locator(".tb-disclose").click();
+		assert.equal(await card.locator(".tb-rest").isVisible(), true, "an open card is just a small page");
+		assert.equal(await card.locator(".tb-disclose").getAttribute("aria-expanded"), "true");
+		await page.close();
+	});
+
+	it("leaves a card that does not opt in saying on the full tool", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		/*
+		 * The backward-compatibility half for cards, which is where the default matters most: every existing
+		 * consumer's cards go through this path. It has to be run first, not just looked at: this card's seed
+		 * is a single `fields` output, so nothing is truncated until the tool produces its actual group of
+		 * three. Then the cap of one bites and the notice must still be the old sentence, as text.
+		 */
+		const seeded = page.locator("tool-host[tool=percentiles][data-seed]");
+		await seeded.scrollIntoViewIfNeeded();
+		await seeded.locator(".tb-facade").click();
+		await seeded.locator(".tb-form").waitFor();
+		await seeded.locator(".tb-run").click();
+		await seeded.locator(".tb-more").waitFor({ timeout: 15_000 });
+
+		assert.match((await seeded.locator(".tb-more").textContent()) ?? "", /more results? on the full tool/);
+		assert.equal(await seeded.locator(".tb-disclose").count(), 0, "no opt-in, no button");
+		assert.equal(await seeded.locator(".tb-rest").count(), 0, "and nothing hidden in the DOM either");
+		await page.close();
+	});
+
 	it("leaves an embedded tool with no parts attribute showing everything", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
