@@ -716,7 +716,8 @@ describe("sample inputs — contract version 3", () => {
 	it("draws the row in embed mode too", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
-		const embedded = page.locator("tool-host[tool=percentiles]");
+		// article.html carries two percentiles hosts now; this one is about the plain embed, not the capped one.
+		const embedded = page.locator("tool-host[tool=percentiles]:not(#expandable)");
 		await embedded.scrollIntoViewIfNeeded();
 		await embedded.locator(".tb-samples").waitFor();
 		assert.equal(await embedded.locator(".tb-sample").count(), 4, "an embedded tool has the full form, so it has the samples too");
@@ -1040,7 +1041,14 @@ describe("a repaint keeps what was on screen", () => {
 		const before = await shown(page);
 		assert.ok(before.fields > 0, `expected a result to compare against, got: ${JSON.stringify(before)}`);
 
-		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		/*
+		 * ⚠️ `more`, not `parts`. This test used `parts="2"`, which was a no-op outside card mode when it was
+		 * written and is not any more: the cap works in every mode now, so setting it legitimately truncates
+		 * a page-mode result and the output is SUPPOSED to change. `more="link"` is the default, so setting
+		 * it explicitly triggers `attributeChangedCallback` and a full repaint while changing nothing that
+		 * is drawn, which is exactly the event this test is about.
+		 */
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("more", "link"));
 		const after = await shown(page);
 
 		assert.equal(after.text, before.text, "the reader's result must survive a repaint unchanged");
@@ -1059,7 +1067,7 @@ describe("a repaint keeps what was on screen", () => {
 		await page.waitForSelector("#host >> .tb-out-error");
 
 		const before = await page.locator("#host >> .tb-error-message").textContent();
-		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("more", "link"));
 		await page.waitForSelector("#host >> .tb-out-error");
 		assert.equal(await page.locator("#host >> .tb-error-message").textContent(), before, "an error is also what was on screen");
 		await page.close();
@@ -1388,12 +1396,13 @@ describe("embed mode", () => {
 		page.on("pageerror", (error) => errors.push(String(error)));
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
 		for (const id of ["percentiles", "queue-explorer"]) {
-			const embedded = page.locator(`tool-host[tool=${id}]`);
+			// `:not(#expandable)` because the capped demo host is also a percentiles embed on this page.
+			const embedded = page.locator(`tool-host[tool=${id}]:not(#expandable)`);
 			await embedded.scrollIntoViewIfNeeded();
 			await embedded.locator(".tb-run").waitFor();
 			await embedded.locator(".tb-run").click();
 			await page.waitForFunction(
-				(toolId) => document.querySelector(`tool-host[tool=${toolId}]`)?.shadowRoot?.querySelector(".tb-output")?.children.length,
+				(toolId) => document.querySelector(`tool-host[tool=${toolId}]:not(#expandable)`)?.shadowRoot?.querySelector(".tb-output")?.children.length,
 				id,
 				{ timeout: 15_000 },
 			);
@@ -2001,9 +2010,11 @@ describe("live demo", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
 		const hrefs = await page.$$eval(".source a", (anchors) => anchors.map((a) => a.getAttribute("href")));
+		// Three hosts on this page now: the plain embed, queue-explorer, and the parts/more demo.
 		assert.deepEqual(hrefs, [
 			"https://github.com/eknowledger/toolbench/tree/main/tools/percentiles/",
 			"https://github.com/eknowledger/toolbench/tree/main/tools/queue-explorer/",
+			"https://github.com/eknowledger/toolbench/tree/main/tools/percentiles/",
 		]);
 		await page.close();
 	});
