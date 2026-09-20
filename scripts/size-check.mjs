@@ -138,8 +138,26 @@ if (process.argv.includes("--update")) {
 	for (const [file, pattern, value] of edits) {
 		const path = join(import.meta.dirname, "..", file);
 		const before = readFileSync(path, "utf8");
-		// `$2` is empty for the single-group table patterns and carries the badge suffix for the badge one.
-		const after = before.replace(pattern, `$1${value}$2`);
+		/*
+		 * ⚠️ A function, not a `$1${value}$2` string.
+		 *
+		 * The badge pattern has a trailing group and the table patterns do not, and `$2` in a replacement
+		 * string is left LITERALLY when the pattern has no second group. That shipped: four published
+		 * figures read "20.2 KB$2" until somebody looked. A function receives the groups as arguments, so a
+		 * missing one is `undefined` and defaults away instead of printing itself.
+		 */
+		const after = before.replace(pattern, (...args) => {
+			/*
+			 * `replace` calls this with (match, ...groups, offset, string), so the groups are everything
+			 * between the first argument and the last two. Naming them positionally is how the first
+			 * attempt at this went wrong twice: `$2` in a replacement STRING printed itself literally when
+			 * the pattern had one group, and a named second parameter then picked up the offset and
+			 * published "20.2 KB18571". Slicing is the only form that does not depend on how many groups a
+			 * particular pattern happens to have.
+			 */
+			const groups = args.slice(1, -2);
+			return `${groups[0] ?? ""}${value}${groups[1] ?? ""}`;
+		});
 		if (after !== before) {
 			const { writeFileSync } = await import("node:fs");
 			writeFileSync(path, after);

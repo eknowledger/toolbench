@@ -785,9 +785,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 20.2 KB$2 | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, and 0.6 KB with the host `values` and `run()` API |
+| Runtime plus the bench's own wiring | 20.2 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, and 0.6 KB with the host `values` and `run()` API |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 3.0 KB$2 | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 3.0 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | A page with no tool | 0 bytes | Nothing is imported |
