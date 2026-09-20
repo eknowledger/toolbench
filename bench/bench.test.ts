@@ -18,7 +18,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { after, before, describe, it } from "node:test";
-import { type Browser, type BrowserType, chromium, firefox, webkit } from "playwright";
+import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
 
 const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
@@ -999,6 +999,129 @@ describe("host values and run — runtime API", () => {
 		const text = await page.locator("#host >> .tb-textarea").inputValue();
 		assert.equal(text, "A");
 		assert.ok((await page.locator("#host >> .tb-output > *").count()) > 0, "run() after values still produces a result");
+		await page.close();
+	});
+});
+
+describe("a repaint keeps what was on screen", () => {
+	/*
+	 * `#paint` rebuilds the shadow tree, and `mode` and `parts` are both in `observedAttributes`, so a
+	 * host is invited to set them from page context. Doing that after a run used to empty the output.
+	 *
+	 * ⚠️ The seeded case was the worse one, and it is why this is a defect rather than a rough edge.
+	 * `#paint` ends by drawing the seed, so a seeded host did not go blank: it silently reverted to the
+	 * defaults' result while the reader's own inputs sat in the form above it, with nothing saying the
+	 * two no longer matched. Blank is recoverable by pressing Run. Plausible and wrong is not.
+	 *
+	 * Browser-only. The bug is in the interaction between attribute changes, a rebuilt shadow tree and
+	 * the seed, and none of those exist in Node.
+	 */
+	type HostApi = HTMLElement & { values: Record<string, string | number | boolean>; run: () => Promise<void> };
+
+	/** What the reader can actually see, as text, so a comparison does not depend on element identity. */
+	const shown = (page: Page) =>
+		page.locator("#host").evaluate((el) => {
+			const output = (el as HTMLElement & { shadowRoot: ShadowRoot }).shadowRoot.querySelector(".tb-output");
+			return {
+				fields: output?.querySelectorAll(".tb-field").length ?? 0,
+				text: (output?.textContent ?? "").replace(/\s+/g, " ").trim(),
+				stale: output?.hasAttribute("data-stale") ?? false,
+			};
+		});
+
+	it("redraws the result after an observed attribute changes, rather than emptying it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output > *").first().waitFor({ timeout: 15_000 });
+
+		const before = await shown(page);
+		assert.ok(before.fields > 0, `expected a result to compare against, got: ${JSON.stringify(before)}`);
+
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		const after = await shown(page);
+
+		assert.equal(after.text, before.text, "the reader's result must survive a repaint unchanged");
+		assert.equal(after.fields, before.fields, "and with the same fields");
+		await page.close();
+	});
+
+	it("redraws an error, not just a result", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		// A refusal this tool documents: grouped thousands are ambiguous, so it declines rather than guessing.
+		await page.locator("#host >> .tb-textarea").fill("1,204 2,000");
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForSelector("#host >> .tb-out-error");
+
+		const before = await page.locator("#host >> .tb-error-message").textContent();
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		await page.waitForSelector("#host >> .tb-out-error");
+		assert.equal(await page.locator("#host >> .tb-error-message").textContent(), before, "an error is also what was on screen");
+		await page.close();
+	});
+
+	/*
+	 * ⚠️ Two things about this test took a failed CI run each, and both are about picking the right host.
+	 *
+	 * It has to be an ACTIVATED card. A closed card renders its seed straight into `.tb-body` inside the
+	 * facade button and never calls `#draw`, so it cannot exercise this path and has no `.tb-output` to
+	 * read. The seed reaches `#draw` only once the card is open: the one state where "has never run" and
+	 * "has an output area" are both true, which is exactly the fallback being asserted.
+	 *
+	 * And it has to be the SEEDED card. `tool-host[tool=percentiles]` matches several hosts on this page,
+	 * because `gallery.ts` appends one per live example into `#cards` and `#themed`, both of which sit
+	 * above the hand-written seeded card in the markup. `.first()` therefore picked a card with no seed,
+	 * which activates perfectly happily and draws nothing, so the failure looked like the fix not working.
+	 * `[data-seed]` is the attribute the page uses to ask for one, so it is the honest selector.
+	 */
+	it("still falls back to the seed for an activated host that has never run", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host[tool=percentiles][data-seed]");
+		await card.scrollIntoViewIfNeeded();
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		await card.locator(".tb-output .tb-value").first().waitFor();
+
+		const before = await card.locator(".tb-output .tb-value").first().textContent();
+		const status = await card.locator(".tb-status").textContent();
+		assert.match(String(status), /default result/, "this must be the seed, not something that was run");
+
+		await page.evaluate(() => document.querySelector("tool-host[tool=percentiles][data-seed]")?.setAttribute("parts", "2"));
+		/*
+		 * This card's seed is a `fields` output, not a group, so `parts` changes nothing a reader can see:
+		 * the whole event is a repaint. That is the point. Before this change the repaint emptied it.
+		 */
+		await card.locator(".tb-output .tb-value").first().waitFor();
+		assert.equal(await card.locator(".tb-output .tb-value").first().textContent(), before, "the seed must still be there");
+		assert.match(String(await card.locator(".tb-status").textContent()), /default result/, "and still be described as the seed");
+		await page.close();
+	});
+
+	it("does not mark a real result stale just because an attribute changed", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		/*
+		 * Via the host API, so `#hostWroteValues` is set. That flag is what asks `#paint` to mark the seed
+		 * stale, and before this change it fired on every later repaint too, dimming an answer that was
+		 * still correct for the inputs on screen.
+		 */
+		await page.locator("#host").evaluate(async (el) => {
+			const host = el as HostApi;
+			host.values = { values: "1 2 3 4 5 6 7 8 9 10" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-output > *").first().waitFor({ timeout: 15_000 });
+
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		assert.equal((await shown(page)).stale, false, "the form and the result still agree, so nothing should be marked stale");
 		await page.close();
 	});
 });
