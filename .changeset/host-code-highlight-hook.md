@@ -3,4 +3,6 @@
 "@toolbench/sdk": minor
 ---
 
-Add an optional `highlight` hook on `defineToolHost` so a host can paint `code` results with its own highlighter. The hook returns a `Node`, not a string, so the runtime never assigns `innerHTML`. A host that omits it still gets readable preformatted text. Runtime API only: `SDK_VERSION` stays.
+**New: paint `code` results with your own highlighter.** Pass `highlight` to `defineToolHost` and it is called with `(source, lang)` for every `code` result. ([#9](https://github.com/eknowledger/toolbench/issues/9))
+
+It must return a DOM `Node`, not a string, so the runtime never assigns `innerHTML`. Omit it and you still get readable preformatted text, and no highlighter is bundled.

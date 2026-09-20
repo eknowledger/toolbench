@@ -37,6 +37,36 @@ execute in a plain `node --test`. That floor is worth it.
 looking at the page, not by reasoning about the code, and the
 [defect register](docs/architecture.md#14-defect-register) is the evidence.
 
+### Writing a changeset
+
+⚠️ **A changeset is release notes, not a commit message.** It is published verbatim to the GitHub
+release and the changelog, where it is read by somebody deciding whether to upgrade. They did not write
+the code and do not want the reasoning. The first release notes here were essays, several hundred words
+each, explaining *why* a change was made, and nobody could scan them for what shipped.
+
+So: **lead with a bold one-line summary that says what a consumer can now do, or what stopped being
+broken.** Then, only if needed, two or three bullets of detail. Link the issue.
+
+```markdown
+---
+"@toolbench/runtime": minor
+---
+
+**New: expand a long result in place.** `more="expand"` turns the "+2 more results" notice into a
+button that reveals the rest without leaving the page. ([#79](https://github.com/…/issues/79))
+
+`more` defaults to `link`, so nothing changes unless you opt in.
+```
+
+* Prefix with **New:** or **Fixed:** so the intent is plain. Changesets groups by version bump, and
+  "Minor Changes" is not the same sentence as "here is a new feature".
+* Say what a reader can do differently. `values` and `run()` are the names of things; "fill in a tool's
+  form from your page" is what they are for.
+* Mark anything that can break an existing consumer with **⚠️ Heads-up**, and say what trips it. At 0.x
+  a minor bump is the only other signal available.
+* The reasoning goes in the commit message and the pull request, which is where somebody debugging this
+  in a year will look. It does not go here.
+
 ## Where things live
 
 Read [docs/architecture.md](docs/architecture.md) first. The short version:
