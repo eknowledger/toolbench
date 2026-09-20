@@ -1,0 +1,72 @@
+{
+  "sdk": 3,
+  "id": "regex-explainer",
+  "name": "Regex explainer",
+  "blurb": "Walks a JavaScript regular expression, shows what each piece means, and tests it against a subject.",
+  "version": "1.0.0",
+  "capabilities": ["pure"],
+  "runtime": { "entry": "index.ts", "thread": "worker" },
+  "kinds": ["group", "text", "code", "error"],
+  "card": "live",
+  "timeoutMs": 2000,
+  "inputs": [
+    {
+      "id": "pattern",
+      "type": "text",
+      "label": "Pattern",
+      "description": "A JavaScript regular expression, without the surrounding slashes.",
+      "primary": true,
+      "dir": "ltr",
+      "maxLength": 80,
+      "default": "(\\w+)\\s+(\\d+)"
+    },
+    {
+      "id": "subject",
+      "type": "textarea",
+      "label": "Subject",
+      "description": "The string to test the pattern against.",
+      "dir": "ltr",
+      "rows": 3,
+      "maxLength": 200,
+      "default": "user 42 ready"
+    },
+    {
+      "id": "flags",
+      "type": "select",
+      "label": "Flags",
+      "description": "JavaScript flags only. g returns every match; without it, only the first.",
+      "default": "none",
+      "options": [
+        { "value": "none", "label": "None" },
+        { "value": "i", "label": "Ignore case (i)" },
+        { "value": "m", "label": "Multiline (m)" },
+        { "value": "g", "label": "All matches (g)" },
+        { "value": "gi", "label": "All, ignore case (gi)" },
+        { "value": "s", "label": "Dotall (s)" }
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "label": "Word and number",
+      "input": { "pattern": "(\\w+)\\s+(\\d+)", "subject": "user 42 ready", "flags": "none" }
+    },
+    {
+      "label": "Ignore case",
+      "input": { "pattern": "hello", "subject": "Hello there", "flags": "i" }
+    },
+    {
+      "label": "All matches",
+      "input": { "pattern": "\\d+", "subject": "a1 b22 c333", "flags": "g" }
+    },
+    {
+      "label": "Unclosed group",
+      "input": { "pattern": "(\\w+" }
+    }
+  ],
+  "help": "README.md",
+  "tags": ["regex", "text", "code"],
+  "links": [
+    { "label": "MDN: Regular expressions", "href": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions" }
+  ]
+}

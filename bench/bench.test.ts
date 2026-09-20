@@ -420,9 +420,13 @@ describe("sample inputs — contract version 3", () => {
 	 * runs, and nothing more: whether a click reaches the controls, whether focus survives it, whether the
 	 * row is drawn on a card, and whether the group has an accessible name are all browser facts.
 	 *
-	 * percentiles declares four samples and does not set autoRun, so a click must fill and stop. No tool
-	 * on the bench sets autoRun, so the autoRun branch of #applySample has no coverage at this layer: the
-	 * one where the sample re-runs and the run's own announcement stands instead of the "filled with" one.
+	 * percentiles declares four samples and does not set autoRun, so a click must fill and stop. histogram
+	 * declares four and does set it, so a click there must fill *and* run, and the run's own announcement
+	 * must stand instead of the "filled with" one. Both branches of #applySample are covered below.
+	 *
+	 * ⚠️ This comment previously said no tool on the bench sets autoRun. The json-code fixture always did;
+	 * what it lacked was samples, which is what the branch needs. Close enough to true to survive review,
+	 * and wrong in the way that matters.
 	 */
 	it("fills the form on a click and does not run the tool", async () => {
 		const page = await browser.newPage();
@@ -716,6 +720,46 @@ describe("sample inputs — contract version 3", () => {
 		await embedded.scrollIntoViewIfNeeded();
 		await embedded.locator(".tb-samples").waitFor();
 		assert.equal(await embedded.locator(".tb-sample").count(), 4, "an embedded tool has the full form, so it has the samples too");
+		await page.close();
+	});
+
+	/*
+	 * The other branch of #applySample. percentiles above proves a sample fills and stops; histogram sets
+	 * `autoRun`, so the same click must also produce a result, and the status must be the run's own rather
+	 * than the "filled with, press Run" one, which would now be telling the reader to do something already
+	 * done.
+	 */
+	it("runs the tool as well, for a tool that sets autoRun", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-samples");
+
+		/*
+		 * ⚠️ `autoRun` fires from #inputChanged only, never on load, so there is no result on the page yet.
+		 * Asserting that first is what stops "a result exists afterwards" from being true either way.
+		 */
+		const before = await page.locator("#host >> .tb-textarea").inputValue();
+		assert.equal(
+			await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.children.length ?? -1),
+			0,
+			"autoRun means as the reader types, not on arrival: a fresh page must show no result",
+		);
+
+		await page.locator('#host >> .tb-sample:text-is("One spike")').click();
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const after = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				values: (root?.querySelector(".tb-textarea") as HTMLTextAreaElement | null)?.value ?? "",
+				results: root?.querySelector(".tb-output")?.children.length ?? -1,
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+			};
+		});
+
+		assert.notEqual(after.values, before, "the click must reach the control");
+		assert.ok(after.results > 0, "an autoRun tool must draw a result from the click, not wait for Run");
+		assert.doesNotMatch(after.status, /press Run/, `the run already happened, so the status must not ask for it: ${after.status}`);
 		await page.close();
 	});
 });
@@ -1151,6 +1195,55 @@ describe("failure paths", () => {
 			document.querySelector('tool-host[tool=stress][mode="page"]')?.shadowRoot?.querySelector('[aria-invalid="true"]')?.id,
 		);
 		assert.equal(invalid, "in-mode", "an error naming an input should mark that control invalid");
+		await page.close();
+	});
+
+	/*
+	 * The reason regex-explainer is a worker at all, asserted against the shape its own guard does not
+	 * catch. `(a|aa)+$` nests no repeat, so the nested-repeat refusal in the walk passes it through to the
+	 * engine, and against 45 characters it takes 28 s in Node. The manifest allows 2 s.
+	 *
+	 * ⚠️ This test first asserted the timeout message, and it was engine-specific. Measured in CI:
+	 * Chromium and Firefox grind and hit the 2 s timeout; **WebKit returns quickly**, because
+	 * JavaScriptCore gives up on a runaway backtrack instead of running it out. No error ever appeared
+	 * there, and it was not a race: the 2 s timer lives on the main thread and fires whatever the worker
+	 * is doing, so if it had not fired the match had already finished.
+	 *
+	 * That difference is an argument for this change rather than a complication of it. One engine in
+	 * three declines to hang, which is exactly the sort of thing a tool must not depend on. So the
+	 * assertion is the property that holds on all three: the reader gets an answer or a timeout, quickly,
+	 * and the page keeps answering throughout. The timeout bound is still checked, but only on the
+	 * engines that reach it.
+	 */
+	it("either answers or times out on a catastrophic regex, and never freezes the page", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=regex-explainer`, { waitUntil: "load" });
+		const host = page.locator("#host");
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-form").waitFor();
+
+		// A text input is `.tb-input`; the pattern is the only one here, since subject is a textarea.
+		await host.locator(".tb-input").fill("(a|aa)+$");
+		await host.locator(".tb-textarea").fill(`${"a".repeat(45)}b`);
+		await host.locator(".tb-run").click();
+
+		/*
+		 * 8 s against a 2 s timeout: long enough that a slow runner is not called a hang, short enough
+		 * that an actual hang still fails here rather than waiting for the suite's own limit.
+		 */
+		await page.waitForFunction(
+			() => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.children.length ?? 0) > 0,
+			null,
+			{ timeout: 8_000 },
+		);
+		const timedOut = await page.evaluate(() => {
+			const error = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-error");
+			return error ? (error.querySelector(".tb-error-message")?.textContent ?? "") : null;
+		});
+		if (timedOut !== null) assert.match(timedOut, /did not finish within 2000ms/, "a timeout must report the bound the manifest declared");
+
+		// The whole claim of worker mode: whichever way it went, the page was never blocked.
+		assert.equal(await page.evaluate(() => 1 + 1), 2, "the page must still be answering, which is what the worker buys");
 		await page.close();
 	});
 

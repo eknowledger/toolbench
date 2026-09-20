@@ -161,7 +161,10 @@ toolbench/
 │   ├── cases.test.ts               runs every tool's manifest and fixtures
 │   ├── tsconfig.json               tools compile with no DOM and no path aliases
 │   ├── percentiles/                pure, main thread, group of fields and table
-│   └── queue-explorer/             pure, worker, group of series and fields, plus convergence tests
+│   ├── queue-explorer/             pure, worker, group of series and fields, plus convergence tests
+│   ├── utf8-bytes/                 pure, main thread, group of fields and bytes
+│   ├── regex-explainer/            pure, worker with a 2 s timeout, text and code
+│   └── histogram/                  pure, main thread, bare series, bar shape, no primary input
 ├── bench/
 │   ├── index.html                  card mode, theming, lifecycle status
 │   ├── failure.html                the failing tool, off the landing page
@@ -820,11 +823,13 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 19.6 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 20.9 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 3.1 KB | Only on pages with a worker-mode tool, and only after activation |
-| `percentiles` chunk | 1.2 KB | |
+| Worker entry | 4.1 KB | Only on pages with a worker-mode tool, and only after activation |
+| `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
+| `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |
+| `histogram` chunk | 0.8 KB | |
 | A page with no tool | 0 bytes | Nothing is imported |
 | A card nobody opens | 0 bytes of tool code | The facade is markup |
 

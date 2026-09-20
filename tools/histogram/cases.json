@@ -1,0 +1,219 @@
+[
+  {
+    "name": "twenty integers into eight bins \u2014 midpoints, counts and cumulative percents worked out by hand",
+    "input": {
+      "values": "2 3 3 4 4 4 5 5 5 5 6 6 6 7 7 8 9 11 14 18",
+      "bins": 8
+    },
+    "expect": {
+      "kind": "series",
+      "chart": {
+        "xLabel": "Bin midpoint",
+        "yLabel": "Count",
+        "yLabelRight": "Cumulative",
+        "x": [
+          3,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          17
+        ],
+        "series": [
+          {
+            "label": "Count",
+            "points": [
+              3,
+              7,
+              5,
+              2,
+              1,
+              0,
+              1,
+              1
+            ],
+            "shape": "bar"
+          },
+          {
+            "label": "Cumulative",
+            "points": [
+              15,
+              50,
+              75,
+              85,
+              90,
+              90,
+              95,
+              100
+            ],
+            "unit": "%",
+            "shape": "line",
+            "axis": "right"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "nine values into four bins, including a one-decimal cumulative",
+    "input": {
+      "values": "1 2 2 3 3 3 4 4 5",
+      "bins": 4
+    },
+    "expect": {
+      "kind": "series",
+      "chart": {
+        "xLabel": "Bin midpoint",
+        "yLabel": "Count",
+        "yLabelRight": "Cumulative",
+        "x": [
+          1.5,
+          2.5,
+          3.5,
+          4.5
+        ],
+        "series": [
+          {
+            "label": "Count",
+            "points": [
+              1,
+              2,
+              3,
+              3
+            ],
+            "shape": "bar"
+          },
+          {
+            "label": "Cumulative",
+            "points": [
+              11.1,
+              33.3,
+              66.7,
+              100
+            ],
+            "unit": "%",
+            "shape": "line",
+            "axis": "right"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "every value the same is one bar, even when the reader asked for more bins",
+    "input": {
+      "values": "7 7 7",
+      "bins": 8
+    },
+    "expect": {
+      "kind": "series",
+      "chart": {
+        "xLabel": "Bin midpoint",
+        "yLabel": "Count",
+        "yLabelRight": "Cumulative",
+        "x": [
+          7
+        ],
+        "series": [
+          {
+            "label": "Count",
+            "points": [
+              3
+            ],
+            "shape": "bar"
+          },
+          {
+            "label": "Cumulative",
+            "points": [
+              100
+            ],
+            "unit": "%",
+            "shape": "line",
+            "axis": "right"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "two values spanning a clean range, two bins",
+    "input": {
+      "values": "0 10",
+      "bins": 2
+    },
+    "expect": {
+      "kind": "series",
+      "chart": {
+        "xLabel": "Bin midpoint",
+        "yLabel": "Count",
+        "yLabelRight": "Cumulative",
+        "x": [
+          2.5,
+          7.5
+        ],
+        "series": [
+          {
+            "label": "Count",
+            "points": [
+              1,
+              1
+            ],
+            "shape": "bar"
+          },
+          {
+            "label": "Cumulative",
+            "points": [
+              50,
+              100
+            ],
+            "unit": "%",
+            "shape": "line",
+            "axis": "right"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "empty input is an error, not an empty chart",
+    "input": {
+      "values": "   ",
+      "bins": 8
+    },
+    "expect": {
+      "kind": "error",
+      "message": "No numbers yet. Paste measurements separated by spaces, commas or newlines.",
+      "input": "values"
+    }
+  },
+  {
+    "name": "a token that is not a number is reported where it starts",
+    "input": {
+      "values": "2 3 4 nope 6",
+      "bins": 8
+    },
+    "expect": {
+      "kind": "error",
+      "message": "\"nope\" is not a number.",
+      "input": "values",
+      "at": 6,
+      "len": 4
+    }
+  },
+  {
+    "name": "a comma between digits is refused, so 1,204 cannot become 1 and 204",
+    "input": {
+      "values": "1,204 980",
+      "bins": 8
+    },
+    "expect": {
+      "kind": "error",
+      "message": "A comma between digits is not a thousands separator. Separate numbers with spaces, or with a comma and a space.",
+      "input": "values",
+      "at": 1,
+      "len": 1
+    }
+  }
+]

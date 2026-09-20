@@ -1,0 +1,122 @@
+[
+  {
+    "name": "default pattern against its subject: walk, caret and JSON derived by hand from the tokens and the match",
+    "input": {
+      "pattern": "(\\w+)\\s+(\\d+)",
+      "subject": "user 42 ready",
+      "flags": "none"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Matched once, at 0-6."
+        },
+        {
+          "kind": "text",
+          "text": "(    start capture 1\n\\w+  a word character, one or more\n)    end capture 1\n\\s+  a whitespace character, one or more\n(    start capture 2\n\\d+  a digit, one or more\n)    end capture 2\n\nuser 42 ready\n^^^^^^^",
+          "mono": true
+        },
+        {
+          "kind": "code",
+          "lang": "json",
+          "source": "{\n  \"matchCount\": 1,\n  \"matches\": [\n    {\n      \"text\": \"user 42\",\n      \"index\": 0,\n      \"groups\": [\n        \"user\",\n        \"42\"\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a subject that does not match still explains the pattern",
+    "input": {
+      "pattern": "(\\w+)\\s+(\\d+)",
+      "subject": "dog",
+      "flags": "none"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Did not match."
+        },
+        {
+          "kind": "text",
+          "text": "(    start capture 1\n\\w+  a word character, one or more\n)    end capture 1\n\\s+  a whitespace character, one or more\n(    start capture 2\n\\d+  a digit, one or more\n)    end capture 2\n\ndog",
+          "mono": true
+        },
+        {
+          "kind": "code",
+          "lang": "json",
+          "source": "{\n  \"matchCount\": 0,\n  \"matches\": []\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "g returns every match, and the caret marks each one",
+    "input": {
+      "pattern": "\\d+",
+      "subject": "a1 b22",
+      "flags": "g"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Matched 2 times, at 1-1 and 4-5. Flags: g."
+        },
+        {
+          "kind": "text",
+          "text": "\\d+  a digit, one or more\n\na1 b22\n ^  ^^",
+          "mono": true
+        },
+        {
+          "kind": "code",
+          "lang": "json",
+          "source": "{\n  \"matchCount\": 2,\n  \"matches\": [\n    {\n      \"text\": \"1\",\n      \"index\": 1,\n      \"groups\": []\n    },\n    {\n      \"text\": \"22\",\n      \"index\": 4,\n      \"groups\": []\n    }\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty pattern is an error, not an empty walk",
+    "input": {
+      "pattern": "",
+      "subject": "user 42 ready",
+      "flags": "none"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "Nothing to explain. Type a pattern.",
+      "input": "pattern"
+    }
+  },
+  {
+    "name": "an unclosed group is reported with the engine's message, against the pattern",
+    "input": {
+      "pattern": "(\\w+",
+      "subject": "user 42 ready",
+      "flags": "none"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "Invalid regular expression: /(\\w+/: Unterminated group",
+      "input": "pattern"
+    }
+  },
+  {
+    "name": "a nested unbounded repeat is refused before it can run",
+    "input": {
+      "pattern": "(a+)+",
+      "subject": "aaaaaaaa",
+      "flags": "none"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "This pattern nests a repeat inside another repeat, for example (a+)+. That can run for a very long time. Rewrite it without the outer repeat.",
+      "input": "pattern"
+    }
+  }
+]

@@ -1,0 +1,55 @@
+{
+  "sdk": 3,
+  "id": "histogram",
+  "name": "Histogram",
+  "blurb": "Bins a list of numbers and draws the counts as bars, with the running total on a second axis.",
+  "version": "1.0.0",
+  "capabilities": ["pure"],
+  "runtime": { "entry": "index.ts", "thread": "main" },
+  "kinds": ["series", "error"],
+  "card": "live",
+  "autoRun": true,
+  "inputs": [
+    {
+      "id": "values",
+      "type": "textarea",
+      "label": "Measurements",
+      "description": "Numbers separated by spaces, commas or newlines. Units are yours; the tool does not care.",
+      "dir": "ltr",
+      "rows": 4,
+      "maxLength": 20000,
+      "default": "2 3 3 4 4 4 5 5 5 5 6 6 6 7 7 8 9 11 14 18"
+    },
+    {
+      "id": "bins",
+      "type": "number",
+      "label": "Bins",
+      "description": "Equal-width buckets between the smallest and largest value. More bins show finer shape and more empty buckets.",
+      "unit": "bins",
+      "default": 8,
+      "min": 2,
+      "max": 30,
+      "step": 1
+    }
+  ],
+  "samples": [
+    {
+      "label": "Even spread",
+      "input": { "values": "1 2 2 3 3 3 4 4 5", "bins": 4 }
+    },
+    {
+      "label": "One spike",
+      "input": { "values": "1 1 1 1 1 1 1 1 1 20" }
+    },
+    {
+      "label": "All the same",
+      "input": { "values": "7 7 7 7 7" }
+    },
+    {
+      "label": "Not a number",
+      "input": { "values": "2 3 4 nope 6" }
+    }
+  ],
+  "help": "README.md",
+  "tags": ["statistics", "chart"]
+}

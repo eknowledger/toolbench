@@ -52,13 +52,25 @@ const BUDGETS = [
 	 * chart's own viewBox; and the `parts` attribute plumbing. 19_500 left 46 bytes of headroom, which is
 	 * not headroom.
 	 *
-	 * Raised from 20_500 to 21_500 in the commit that spent it. What it bought: the element honouring
-	 * `status` (retired refuses to activate and paints an explanation plus links; deprecated paints a
-	 * host-stylable marker and is not a live card), plus two bench fixture manifests. Those JSON files
-	 * land in this chunk because `registry.ts` imports every `tool.json` eagerly, the same way
-	 * percentiles' samples did. 20_500 left 21 bytes of headroom (20,521 measured), which is not headroom.
+	 * Raised from 20_000 to 21_250 in the commit that spent it, and this one is worth reading twice
+	 * because almost none of it is runtime code.
+	 *
+	 * 19,782 measured on the commit before, 20,832 after: 1,050 bytes for two `tool.json` files. The
+	 * tools' *code* is not here, it is in tool-regex-explainer and tool-histogram. What lands here is
+	 * manifest data, because `bench/src/registry.ts` imports every `tool.json` eagerly, which is the
+	 * third time that mechanism has moved this number (percentiles' samples, then the bench fixtures,
+	 * which is why those now live in their own chunk).
+	 *
+	 * ⚠️ 0.2 KB of the gap between this figure and the published one predates this change. The tables
+	 * said 19.6 KB while the commit before measured 19.8: the Pages demo added host wiring and the
+	 * published figures were not re-run. `--update` in this commit corrects both, so do not read the
+	 * 19.6 to 20.9 move as all belonging here.
+	 *
+	 * ⚠️ And a stale paragraph removed from this block: it recorded a raise to 21_500 for the `status`
+	 * work that was never taken, because that change landed at 20_000 instead. A budget history that
+	 * describes a ceiling the file does not have is worse than no history.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 20_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 21_250 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -85,9 +97,29 @@ const BUDGETS = [
 	 */
 	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 2_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_000 },
+	/*
+	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
+	 * `tool.json` glob as the page, so two new manifests (regex-explainer, histogram) land in this
+	 * chunk. Tool *code* stays in worker-tool-* copies; this is the registry plus the protocol.
+	 * 4_000 left the chunk 237 bytes over after those manifests, which is not a ceiling.
+	 */
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_500 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
+	/*
+	 * ⚠️ These four lines arrived after the tools did, and that is the finding rather than the sizes.
+	 *
+	 * Nothing in this file fails on a chunk no entry matches, so regex-explainer shipped 2,791 gzipped
+	 * bytes, plus its worker copy, entirely unmeasured: the run was green and the largest tool in the
+	 * repository was invisible to it. Same denylist-shaped mistake this project has now made three
+	 * times. Tracked in the backlog as a guard, because remembering to add a line is not a mechanism.
+	 *
+	 * regex-explainer gets 3_000 where every other tool gets 2_000, and the extra is not slack: a regex
+	 * walker is a parser, and 2,791 of parser does not fit in a budget set for tools that compute. A
+	 * uniform number here would be a number chosen for tidiness over truth.
+	 */
+	{ label: "tool: regex-explainer", pattern: /^tool-regex-explainer-[^/]+\.js$/, budget: 3_000 },
+	{ label: "tool: histogram", pattern: /^tool-histogram-[^/]+\.js$/, budget: 1_500 },
 	/*
 	 * ⚠️ The two bench FIXTURES, measured but deployOnly, and labelled so nobody mistakes them for shipped
 	 * tools. `json-code` arrived counted as reader cost, which would have put a chunk only the bench
@@ -104,6 +136,8 @@ const BUDGETS = [
 	 */
 	{ label: "worker copy: percentiles", pattern: /^worker-tool-percentiles-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	{ label: "worker copy: queue-explorer", pattern: /^worker-tool-queue-explorer-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	{ label: "worker copy: regex-explainer", pattern: /^worker-tool-regex-explainer-[^/]+\.js$/, budget: 3_000, deployOnly: true },
+	{ label: "worker copy: histogram", pattern: /^worker-tool-histogram-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: json-code", pattern: /^worker-tool-json-code-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	{ label: "worker copy: bench fixture stress", pattern: /^worker-tool-stress-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 ];
@@ -171,6 +205,18 @@ if (process.argv.includes("--update")) {
 		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
 		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 		["docs/architecture.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
+		/*
+		 * ⚠️ The per-tool rows, which this block did not own until a tool was added and somebody checked.
+		 *
+		 * They were typed by hand, so they drifted exactly as you would expect: both tables published
+		 * `percentiles` at 1.2 KB while the chunk measured 1.3. Nobody noticed, because nothing fails on a
+		 * stale figure. Generated from the same rows as everything else here, so adding a tool means adding
+		 * one line below and one row to each table, and never a number.
+		 */
+		...["percentiles", "queue-explorer", "regex-explainer", "histogram"].flatMap((id) => [
+			["README.md", new RegExp(`(\\| \`${id}\` tool chunk[^|]*\\| )[\\d.]+ KB`), kb(find(`tool: ${id}`))],
+			["docs/architecture.md", new RegExp(`(\\| \`${id}\` chunk[^|]*\\| )[\\d.]+ KB`), kb(find(`tool: ${id}`))],
+		]),
 	];
 	for (const [file, pattern, value] of edits) {
 		const path = join(import.meta.dirname, "..", file);
