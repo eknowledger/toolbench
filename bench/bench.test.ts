@@ -1407,8 +1407,9 @@ describe("embed mode", () => {
 				{ timeout: 15_000 },
 			);
 		}
+		// Still exactly these two: the parts/more demo is a third host on this page and has its own tests.
 		const both = await page.evaluate(() =>
-			[...document.querySelectorAll("tool-host")].map((host) => ({
+			[...document.querySelectorAll("tool-host:not(#expandable)")].map((host) => ({
 				id: host.getAttribute("tool"),
 				hasOutput: Boolean(host.shadowRoot?.querySelector(".tb-output")?.children.length),
 				hasTitle: Boolean(host.shadowRoot?.querySelector(".tb-name")),
