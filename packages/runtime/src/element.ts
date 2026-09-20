@@ -102,6 +102,18 @@ export class ToolHost extends HTMLElement {
 	/** True between "the reader asked for this" and "the tool's code is here". */
 	#loading = false;
 	#seed: Output | undefined;
+	/**
+	 * The last thing actually drawn: a result, a `progress` partial, or an error.
+	 *
+	 * ⚠️ This exists because `#paint` rebuilds the shadow tree, and without it a repaint threw the
+	 * reader's answer away. Any observed attribute does that: `host.setAttribute("parts", "2")` after a
+	 * run left the output empty, and on a seeded host it was worse than empty, because `#paint` ends by
+	 * drawing the seed and the reader was then looking at the defaults' result under their own inputs
+	 * with nothing saying so.
+	 */
+	#shown: Output | undefined;
+	/** The last visible status line, for the same reason as `#shown`: a repaint builds a fresh, empty one. */
+	#status = "";
 	#controls = new Map<string, HTMLElement>();
 	#els: {
 		output?: HTMLElement;
@@ -229,6 +241,10 @@ export class ToolHost extends HTMLElement {
 			this.#loaded = undefined;
 			this.#activation = undefined;
 			this.#hostWroteValues = false;
+			// A different tool. Keeping the old one's output would show one tool's answer under another's
+			// name, which is the one thing worse than showing nothing. The status line goes with it.
+			this.#shown = undefined;
+			this.#status = "";
 			this.#ready = this.#prepare();
 		} else {
 			this.#paint();
@@ -559,7 +575,16 @@ export class ToolHost extends HTMLElement {
 		run.addEventListener("click", () => void this.#run({ focusResult: true }));
 		// Hidden until a run outlasts SLOW_MS. A bar that flashes for 20 ms is noise.
 		const progress = el("div", { class: "tb-progress", "aria-hidden": "true", hidden: true }, el("i", { style: "width:0%" }));
-		const status = el("p", { class: "tb-status", role: "status", "aria-live": "polite" });
+		/*
+		 * Seeded with the last line, so a repaint keeps its explanation. Without it, a redrawn seed loses
+		 * the "showing the default result" label and becomes the silent revert this was meant to fix.
+		 *
+		 * ⚠️ Set here, at creation, and not after `fill`. A live region announces when its content changes
+		 * while it is in the document, so assigning the same text afterwards would have a screen reader
+		 * re-read the line every time a host touched an attribute. Content present before insertion is not
+		 * announced, which is the behaviour wanted: restore it silently, announce only what is new.
+		 */
+		const status = el("p", { class: "tb-status", role: "status", "aria-live": "polite" }, this.#status);
 		/*
 		 * ⚠️ A second live region, and this one is never seen.
 		 *
@@ -600,13 +625,29 @@ export class ToolHost extends HTMLElement {
 
 		fill(this.#root, frame);
 		this.#reapplyStyles();
-		if (this.#seed) this.#draw(this.#seed);
+		/*
+		 * Whatever was on screen goes back on screen. The seed is only the starting point for a host that
+		 * has never run: once there is a real result, a partial or an error, redrawing the seed instead
+		 * would replace the reader's answer with the defaults' and say nothing about it.
+		 */
+		const fromSeed = this.#shown === undefined;
+		const redraw = this.#shown ?? this.#seed;
+		if (redraw) this.#draw(redraw);
+		/*
+		 * `#draw` records what it drew, and the seed must not count. Otherwise the first paint of a seeded
+		 * host makes `#shown` non-empty, and every later check of "has this host ever produced a result"
+		 * answers yes when the reader has not pressed anything.
+		 */
+		if (fromSeed) this.#shown = undefined;
 		/*
 		 * A host that prefilled before the form existed has just had that seed drawn. The seed is
 		 * the defaults' result, not the prefilled inputs', so it is already stale. Mark it the
 		 * same way a keystroke would, now that the result area exists to carry the mark.
+		 *
+		 * Only for the seed. A result the reader ran is not stale just because the element repainted,
+		 * and marking it would claim the form had changed when only an attribute did.
 		 */
-		if (this.#hostWroteValues) this.#markStale();
+		if (this.#hostWroteValues && fromSeed) this.#markStale();
 	}
 
 	#reapplyStyles(): void {
@@ -869,6 +910,9 @@ export class ToolHost extends HTMLElement {
 	#draw(output: Output): void {
 		const target = this.#els.output;
 		if (!target) return;
+		// Recorded before the render, so a kind this build cannot draw still survives a repaint as the
+		// same "this build cannot draw it" message rather than silently becoming the seed.
+		this.#shown = output;
 		const manifest = this.#manifest;
 		const compact = this.mode === "card";
 		try {
@@ -939,6 +983,9 @@ export class ToolHost extends HTMLElement {
 	 * Deliberately not the whole result — see the note at the top of this file.
 	 */
 	#say(message: string): void {
+		// Kept so `#paint` can put it back. The status is what stops a redrawn seed being silent: without
+		// it a repainted seeded host shows the defaults' answer with nothing saying whose inputs it is.
+		this.#status = message;
 		if (this.#els.status) this.#els.status.textContent = message;
 	}
 
