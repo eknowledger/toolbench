@@ -18,6 +18,18 @@ const manifest = manifests.find((m) => m.id === requested) ?? manifests[0];
 const host = document.getElementById("host");
 if (host && manifest) {
 	host.setAttribute("tool", manifest.id);
+	/*
+	 * `?parts=` and `?more=` so page mode is reachable from a URL.
+	 *
+	 * These are host attributes, not manifest keys: how much room a result gets is a property of the page.
+	 * A real host writes them into its template, which a bench with one generic route cannot do, so the
+	 * query string stands in. Without this, `parts` and `more` were only ever exercisable on the two pages
+	 * that hard-code them, and page mode had no way to show either at all.
+	 */
+	for (const name of ["parts", "more"] as const) {
+		const value = params.get(name);
+		if (value !== null) host.setAttribute(name, value);
+	}
 	const dir = toolSourceDir[manifest.id];
 	if (dir) appendSource(host, dir);
 }

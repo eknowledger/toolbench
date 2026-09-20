@@ -716,7 +716,8 @@ describe("sample inputs — contract version 3", () => {
 	it("draws the row in embed mode too", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
-		const embedded = page.locator("tool-host[tool=percentiles]");
+		// article.html carries two percentiles hosts now; this one is about the plain embed, not the capped one.
+		const embedded = page.locator("tool-host[tool=percentiles]:not(#expandable)");
 		await embedded.scrollIntoViewIfNeeded();
 		await embedded.locator(".tb-samples").waitFor();
 		assert.equal(await embedded.locator(".tb-sample").count(), 4, "an embedded tool has the full form, so it has the samples too");
@@ -1040,7 +1041,14 @@ describe("a repaint keeps what was on screen", () => {
 		const before = await shown(page);
 		assert.ok(before.fields > 0, `expected a result to compare against, got: ${JSON.stringify(before)}`);
 
-		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		/*
+		 * ⚠️ `more`, not `parts`. This test used `parts="2"`, which was a no-op outside card mode when it was
+		 * written and is not any more: the cap works in every mode now, so setting it legitimately truncates
+		 * a page-mode result and the output is SUPPOSED to change. `more="link"` is the default, so setting
+		 * it explicitly triggers `attributeChangedCallback` and a full repaint while changing nothing that
+		 * is drawn, which is exactly the event this test is about.
+		 */
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("more", "link"));
 		const after = await shown(page);
 
 		assert.equal(after.text, before.text, "the reader's result must survive a repaint unchanged");
@@ -1059,7 +1067,7 @@ describe("a repaint keeps what was on screen", () => {
 		await page.waitForSelector("#host >> .tb-out-error");
 
 		const before = await page.locator("#host >> .tb-error-message").textContent();
-		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
+		await page.evaluate(() => document.querySelector("#host")?.setAttribute("more", "link"));
 		await page.waitForSelector("#host >> .tb-out-error");
 		assert.equal(await page.locator("#host >> .tb-error-message").textContent(), before, "an error is also what was on screen");
 		await page.close();
@@ -1122,6 +1130,275 @@ describe("a repaint keeps what was on screen", () => {
 
 		await page.evaluate(() => document.querySelector("#host")?.setAttribute("parts", "2"));
 		assert.equal((await shown(page)).stale, false, "the form and the result still agree, so nothing should be marked stale");
+		await page.close();
+	});
+});
+
+describe("expanding a truncated result in place", () => {
+	/*
+	 * The surface is prose: `article.html` carries a third host, `parts="1" more="expand"`, next to the
+	 * uncapped one so the difference is visible on the page rather than only in a test.
+	 *
+	 * All of this is browser-only. Node can prove the renderer emits a button; whether pressing it reveals
+	 * the parts, whether focus survives, and above all whether the tool runs a second time are facts about
+	 * a live document.
+	 */
+	const host = (page: Page) => page.locator("tool-host#expandable");
+
+	/** Runs it once and waits for the capped result. */
+	async function runIt(page: Page) {
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		const h = host(page);
+		await h.scrollIntoViewIfNeeded();
+		await h.locator(".tb-form").waitFor();
+		await h.locator(".tb-run").click();
+		await h.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+		return h;
+	}
+
+	it("caps a group in embed mode and offers a button, not a line pointing elsewhere", async () => {
+		const page = await browser.newPage();
+		const h = await runIt(page);
+
+		// percentiles returns a group of three, so one shown and two hidden.
+		assert.equal(await h.locator(".tb-disclose").textContent(), "Show 2 more results");
+		assert.equal(await h.locator(".tb-disclose").getAttribute("aria-expanded"), "false");
+		assert.equal(await h.locator(".tb-rest").count(), 1, "the hidden parts must already be in the DOM");
+		assert.equal(await h.locator(".tb-rest").isVisible(), false, "and hidden");
+		// The wording that was wrong for prose must be gone, not merely supplemented.
+		assert.equal(await h.locator(".tb-more").count(), 0, "no static notice when the host asked for a control");
+		assert.doesNotMatch((await h.locator(".tb-output").textContent()) ?? "", /on the full tool/);
+		await page.close();
+	});
+
+	it("reveals exactly the hidden parts, and collapses again", async () => {
+		const page = await browser.newPage();
+		const h = await runIt(page);
+		const partsWhenOpen = await page.evaluate(
+			() => document.querySelector("tool-host#expandable")?.shadowRoot?.querySelectorAll(".tb-rest > *").length ?? -1,
+		);
+		assert.equal(partsWhenOpen, 2, "two parts were hidden, so two must be revealed");
+
+		await h.locator(".tb-disclose").click();
+		assert.equal(await h.locator(".tb-rest").isVisible(), true);
+		assert.equal(await h.locator(".tb-disclose").getAttribute("aria-expanded"), "true");
+		assert.equal(await h.locator(".tb-disclose").textContent(), "Hide 2 results", "the label has to say what it will do next");
+
+		await h.locator(".tb-disclose").click();
+		assert.equal(await h.locator(".tb-rest").isVisible(), false, "two-way: the reader can have their paragraph back");
+		assert.equal(await h.locator(".tb-disclose").textContent(), "Show 2 more results");
+		await page.close();
+	});
+
+	/*
+	 * Focus across a REDRAW, which is the version that can actually break. Expanding rebuilds the output,
+	 * so the button the reader pressed no longer exists and focus has to be put back by hand.
+	 */
+	it("keeps focus on the button across the toggle", async () => {
+		const page = await browser.newPage();
+		const h = await runIt(page);
+		await h.locator(".tb-disclose").focus();
+		await page.keyboard.press("Enter");
+		assert.equal(await h.locator(".tb-rest").isVisible(), true, "keyboard operable, because it is a real button");
+		/*
+		 * Focus is inside a shadow root, so document.activeElement is the host. Asking the root for its own
+		 * activeElement is the only way to see which control actually holds it.
+		 */
+		const focused = await page.evaluate(
+			() => document.querySelector("tool-host#expandable")?.shadowRoot?.activeElement?.className ?? "",
+		);
+		assert.match(focused, /tb-disclose/, "focus must not fall back to the root, or the reader loses their place");
+		await page.close();
+	});
+
+	it("expands without running the tool again, proven on a worker tool", async () => {
+		const page = await browser.newPage();
+		/*
+		 * ⚠️ This is the assertion the whole design rests on, and it needs a WORKER tool to be worth
+		 * anything. queue-explorer declares thread: "worker" and returns a group of two, so one part is
+		 * hidden.
+		 *
+		 * The first version of this test watched for element identity on the main-thread tool, which broke
+		 * as soon as expanding started redrawing, and would have proved little anyway: a main-thread re-run
+		 * is synchronous too, so "the result is there immediately" is not evidence against one.
+		 *
+		 * Across a worker it is decisive. The click is dispatched and the result read inside ONE evaluate,
+		 * so nothing can have crossed the message boundary and come back in between. If revealing needed the
+		 * tool, there would be nothing to see yet.
+		 */
+		await page.goto(`${BASE}/tool.html?id=queue-explorer&parts=1&more=expand`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-disclose").waitFor({ timeout: 15_000 });
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Show 1 more result", "singular, with one part hidden");
+
+		const sameTask = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			(root?.querySelector(".tb-disclose") as HTMLButtonElement | null)?.click();
+			const rest = root?.querySelector(".tb-rest") as HTMLElement | null;
+			return {
+				revealed: rest !== null && rest !== undefined && !rest.hidden,
+				parts: rest?.children.length ?? -1,
+				expanded: root?.querySelector(".tb-disclose")?.getAttribute("aria-expanded") ?? null,
+			};
+		});
+
+		assert.equal(sameTask.revealed, true, "revealed in the same task: a worker round trip could not have happened");
+		assert.equal(sameTask.parts, 1, "and it is the part that was hidden");
+		assert.equal(sameTask.expanded, "true");
+		await page.close();
+	});
+
+	it("stays expanded across a re-run", async () => {
+		const page = await browser.newPage();
+		const h = await runIt(page);
+		await h.locator(".tb-disclose").click();
+		assert.equal(await h.locator(".tb-rest").isVisible(), true);
+
+		await h.locator(".tb-textarea").fill("1 2 3 4 5 6 7 8 9 10");
+		await h.locator(".tb-run").click();
+		await h.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+		assert.equal(await h.locator(".tb-rest").isVisible(), true, "the reader asked for the whole answer, not for one answer");
+		assert.equal(await h.locator(".tb-disclose").getAttribute("aria-expanded"), "true");
+		await page.close();
+	});
+
+	it("offers no control when nothing is hidden", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		const h = host(page);
+		await h.scrollIntoViewIfNeeded();
+		await h.locator(".tb-form").waitFor();
+		// Three parts and a cap of three: an empty disclosure is worse than no disclosure.
+		await page.evaluate(() => document.querySelector("tool-host#expandable")?.setAttribute("parts", "3"));
+		await h.locator(".tb-run").click();
+		await h.locator(".tb-output > *").first().waitFor({ timeout: 15_000 });
+		assert.equal(await h.locator(".tb-disclose").count(), 0, "nothing hidden, so nothing to press");
+		assert.equal(await h.locator(".tb-more").count(), 0);
+		await page.close();
+	});
+
+	/*
+	 * The same control in the other two modes, because "works in every mode" was a decision rather than an
+	 * accident and each mode reaches the renderer by a different route: page mode from a URL, card mode only
+	 * after activation.
+	 */
+	it("shows one notice, not two, and reveals the capped fields when opened", async () => {
+		const page = await browser.newPage();
+		/*
+		 * Found on the bench rather than by a test: a card showed "+2 more fields" directly above
+		 * "Show 2 more results", and the fields line survived expanding, so pressing the control that
+		 * promised more still withheld some. The disclosure owns the whole truncation now.
+		 *
+		 * A card is the surface that shows it, because the field cap only applies in compact mode.
+		 */
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host#expandable-card");
+		await card.scrollIntoViewIfNeeded();
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		await card.locator(".tb-run").click();
+		await card.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+
+		const collapsed = ((await card.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.doesNotMatch(collapsed, /more fields/, `the button is the only notice. Card drew: ${collapsed}`);
+		const fieldsCollapsed = await card.locator(".tb-field").count();
+
+		await card.locator(".tb-disclose").click();
+		const opened = ((await card.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.doesNotMatch(opened, /more fields/, "and still the only notice once open");
+		assert.ok(
+			(await card.locator(".tb-field").count()) > fieldsCollapsed,
+			"opening it must reveal the capped fields too, not just the other parts",
+		);
+		await page.close();
+	});
+
+	it("works in page mode, driven from the URL", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles&parts=1&more=expand`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-disclose").waitFor({ timeout: 15_000 });
+
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Show 2 more results");
+		assert.equal(await page.locator("#host >> .tb-rest").isVisible(), false);
+		await page.locator("#host >> .tb-disclose").click();
+		assert.equal(await page.locator("#host >> .tb-rest").isVisible(), true, "page mode expands like any other");
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Hide 2 results");
+		await page.close();
+	});
+
+	it("works in card mode once the card is open, and never on the closed facade", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host#expandable-card");
+		await card.scrollIntoViewIfNeeded();
+
+		/*
+		 * ⚠️ A closed card must not carry the button, and this is the assertion that keeps that true. The
+		 * facade is itself one button, so a disclosure nested inside it could not be pressed without opening
+		 * the card. `#paint` omits `more` on that path on purpose.
+		 */
+		await card.locator(".tb-facade").waitFor();
+		assert.equal(await card.locator(".tb-disclose").count(), 0, "no disclosure inside the facade button");
+
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		await card.locator(".tb-run").click();
+		await card.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+
+		assert.equal(await card.locator(".tb-rest").isVisible(), false);
+		await card.locator(".tb-disclose").click();
+		assert.equal(await card.locator(".tb-rest").isVisible(), true, "an open card is just a small page");
+		assert.equal(await card.locator(".tb-disclose").getAttribute("aria-expanded"), "true");
+		await page.close();
+	});
+
+	it("leaves a card that does not opt in saying on the full tool", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		/*
+		 * The backward-compatibility half for cards, which is where the default matters most: every existing
+		 * consumer's cards go through this path. It has to be run first, not just looked at: this card's seed
+		 * is a single `fields` output, so nothing is truncated until the tool produces its actual group of
+		 * three. Then the cap of one bites and the notice must still be the old sentence, as text.
+		 */
+		const seeded = page.locator("tool-host[tool=percentiles][data-seed]");
+		await seeded.scrollIntoViewIfNeeded();
+		await seeded.locator(".tb-facade").click();
+		await seeded.locator(".tb-form").waitFor();
+		await seeded.locator(".tb-run").click();
+		await seeded.locator(".tb-output > *").first().waitFor({ timeout: 15_000 });
+
+		/*
+		 * Asserted on the output's text rather than by waiting for `.tb-more` to appear. A missing element
+		 * times out after 30 s and reports only which selector it wanted, which says nothing about what the
+		 * card actually drew; this way a failure prints the DOM that exists.
+		 */
+		const text = ((await seeded.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.match(text, /on the full tool/, `a card that did not opt in must keep the old notice. Card drew: ${text}`);
+		assert.equal(await seeded.locator(".tb-disclose").count(), 0, "no opt-in, no button");
+		assert.equal(await seeded.locator(".tb-rest").count(), 0, "and nothing hidden in the DOM either");
+		await page.close();
+	});
+
+	it("leaves an embedded tool with no parts attribute showing everything", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		/*
+		 * Backward compatibility, asserted on the host that was already on this page. Making the cap work
+		 * outside card mode must not start truncating embeds that never asked for it, which is the one way
+		 * this change could reach an existing consumer.
+		 */
+		const plain = page.locator("tool-host[tool=percentiles]:not(#expandable)").first();
+		await plain.scrollIntoViewIfNeeded();
+		await plain.locator(".tb-form").waitFor();
+		await plain.locator(".tb-run").click();
+		await plain.locator(".tb-group > *").first().waitFor({ timeout: 15_000 });
+		assert.equal(await plain.locator(".tb-group > *").count(), 3, "an uncapped embed still shows every part");
+		assert.equal(await plain.locator(".tb-disclose").count(), 0);
+		assert.equal(await plain.locator(".tb-more").count(), 0);
 		await page.close();
 	});
 });
@@ -1242,18 +1519,20 @@ describe("embed mode", () => {
 		page.on("pageerror", (error) => errors.push(String(error)));
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
 		for (const id of ["percentiles", "queue-explorer"]) {
-			const embedded = page.locator(`tool-host[tool=${id}]`);
+			// `:not(#expandable)` because the capped demo host is also a percentiles embed on this page.
+			const embedded = page.locator(`tool-host[tool=${id}]:not(#expandable)`);
 			await embedded.scrollIntoViewIfNeeded();
 			await embedded.locator(".tb-run").waitFor();
 			await embedded.locator(".tb-run").click();
 			await page.waitForFunction(
-				(toolId) => document.querySelector(`tool-host[tool=${toolId}]`)?.shadowRoot?.querySelector(".tb-output")?.children.length,
+				(toolId) => document.querySelector(`tool-host[tool=${toolId}]:not(#expandable)`)?.shadowRoot?.querySelector(".tb-output")?.children.length,
 				id,
 				{ timeout: 15_000 },
 			);
 		}
+		// Still exactly these two: the parts/more demo is a third host on this page and has its own tests.
 		const both = await page.evaluate(() =>
-			[...document.querySelectorAll("tool-host")].map((host) => ({
+			[...document.querySelectorAll("tool-host:not(#expandable)")].map((host) => ({
 				id: host.getAttribute("tool"),
 				hasOutput: Boolean(host.shadowRoot?.querySelector(".tb-output")?.children.length),
 				hasTitle: Boolean(host.shadowRoot?.querySelector(".tb-name")),
@@ -1855,9 +2134,11 @@ describe("live demo", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
 		const hrefs = await page.$$eval(".source a", (anchors) => anchors.map((a) => a.getAttribute("href")));
+		// Three hosts on this page now: the plain embed, queue-explorer, and the parts/more demo.
 		assert.deepEqual(hrefs, [
 			"https://github.com/eknowledger/toolbench/tree/main/tools/percentiles/",
 			"https://github.com/eknowledger/toolbench/tree/main/tools/queue-explorer/",
+			"https://github.com/eknowledger/toolbench/tree/main/tools/percentiles/",
 		]);
 		await page.close();
 	});

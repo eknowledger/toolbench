@@ -226,6 +226,32 @@ export const STYLES = /* css */ `
 .tb-field-group h4 { margin: 0.5rem 0 0.25rem; font-size: 0.75rem; text-transform: none; color: var(--tb-faint); font-weight: 600; }
 .tb-more { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
 
+/* The disclosure that replaces .tb-more when a host asks for more="expand".
+   Matched to .tb-more's size and colour on purpose: it sits where that line sat, and a truncation
+   notice that suddenly became a loud button would redraw the reader's eye to the least interesting
+   part of the result.
+   min-height is 24px for WCAG 2.5.8, and it is the reason for the padding rather than the text
+   metrics: at 0.78rem the label alone is about 15px tall, which is the same miss #64 fixed on the
+   card title link. */
+.tb-disclose {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  min-height: 24px; padding: 0.15rem 0.5rem 0.15rem 0.35rem;
+  font: inherit; font-size: 0.78rem; color: var(--tb-faint);
+  background: none; border: 1px solid transparent; border-radius: 999px; cursor: pointer;
+}
+.tb-disclose::before {
+  content: ""; width: 0; height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.tb-disclose[aria-expanded="true"]::before { transform: rotate(90deg); }
+.tb-disclose:hover { color: var(--tb-fg); border-color: var(--tb-border); }
+.tb-disclose:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+/* The marker is decoration. A reader who has asked for less motion gets the state from the label
+   and from aria-expanded, both of which say it outright. */
+@media (prefers-reduced-motion: reduce) { .tb-disclose::before { transition: none; } }
+
 .tb-out-text p { margin: 0; }
 .tb-mono, .tb-out-text pre, .tb-out-code pre { font-family: var(--tb-mono); font-size: 0.82rem; }
 .tb-out-text pre, .tb-out-code pre {

@@ -56,17 +56,50 @@ export interface RenderOptions {
 	/** How many fields a compact render shows before stopping. */
 	cardFields?: number;
 	/**
-	 * How many parts of a group a compact render shows. Default 1.
+	 * How many parts of a group to show before stopping. Omit it for no cap.
 	 *
 	 * Set by the host, not the tool, because it is a question about the space on this page rather than
 	 * about the tool: the same tool is a small card in a sidebar and a large one leading a section.
+	 *
+	 * ⚠️ The cap is no longer tied to `compact`. Prose needs a middle setting between "one part" and
+	 * "everything", and tying it to card mode meant the only way to get one was `mode="card"`, which also
+	 * caps fields and drops captions. Those are about fitting a small box; an embedded tool is not in a
+	 * small box. So the trigger is this value being present, and a caller that wants today's behaviour
+	 * outside a card simply omits it. The name is unchanged because it is public API.
 	 */
 	cardParts?: number;
+	/**
+	 * What the truncation notice is when parts are hidden.
+	 *
+	 * `link` is the default and the existing behaviour: a static line pointing at the full tool, which is
+	 * right for a card whose job is to send the reader somewhere better. `expand` makes it a button that
+	 * reveals the rest in place, which is what a tool in the middle of an article needs, because there is
+	 * nowhere better to send the reader: they are already reading.
+	 */
+	more?: "link" | "expand";
+	/** Whether an `expand` disclosure starts open. The host owns this, so it survives a re-run. */
+	expanded?: boolean;
 	/**
 	 * Host-supplied highlighter for `code` results. Must return a `Node`: a string would tempt
 	 * `innerHTML`, which this package does not use. Omit it and the source stays readable plain text.
 	 */
 	highlight?: (source: string, lang: string) => Node;
+}
+
+/** One output area per host, so a fixed id is enough for `aria-controls` inside a shadow root. */
+const REST_ID = "tb-rest";
+
+/**
+ * Both labels for the disclosure, in one place because they have to agree.
+ *
+ * Quantified in both directions. "Show more" with no number gives a reader nothing to judge whether it
+ * is worth pressing, and "Show less" after they have pressed it describes the control rather than what
+ * it will do. Neither string mentions another page: after expanding there is nowhere else to go, which
+ * is the difference between this and the `link` notice.
+ */
+export function discloseLabel(hidden: number, expanded: boolean): string {
+	const noun = `result${hidden === 1 ? "" : "s"}`;
+	return expanded ? `Hide ${hidden} ${noun}` : `Show ${hidden} more ${noun}`;
 }
 
 export function render(output: Output, options: RenderOptions = {}): HTMLElement {
@@ -97,15 +130,54 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			 * anonymous lines. `cardParts` is the host's call, since it is a question about the space on the
 			 * page rather than about the tool.
 			 */
-			const cap = Math.max(1, options.cardParts ?? 1);
-			if (options.compact && output.parts.length > cap) {
+			const cap = options.cardParts === undefined ? undefined : Math.max(1, options.cardParts);
+			if (cap !== undefined && output.parts.length > cap) {
 				const shown = output.parts.slice(0, cap);
-				const hidden = output.parts.length - shown.length;
+				const rest = output.parts.slice(cap);
+				if (options.more !== "expand") {
+					return el(
+						"div",
+						{ class: "tb-group" },
+						...shown.map((part) => render(part, options)),
+						el("p", { class: "tb-more" }, `+${rest.length} more result${rest.length === 1 ? "" : "s"} on the full tool`),
+					);
+				}
+				/*
+				 * The rest is rendered now, not on first press. Revealing it must not run the tool again: the
+				 * reader has already waited for this answer once, and for a worker-mode tool a round trip
+				 * would make a disclosure feel like a second computation. `hidden` is the whole mechanism.
+				 */
+				const expanded = options.expanded === true;
+				/*
+				 * ⚠️ Expanding renders the parts UNCOMPACTED, and while collapsed they are told to stay quiet.
+				 *
+				 * Without this the reader gets two truncation notices stacked, which a maintainer spotted on
+				 * the bench immediately: "+2 more fields" from the field cap inside the first part, directly
+				 * above "Show 2 more results" from the group cap. One is dead text and one is a control, and
+				 * the dead one survived expanding, so pressing the thing that promised more still withheld
+				 * some. The disclosure now owns the whole truncation: it is the only notice while collapsed,
+				 * and opening it means everything, not everything except the fields nobody mentioned.
+				 *
+				 * `compact: false` rather than lifting the field cap alone, because "show me the rest" should
+				 * not still be hiding a table caption or byte rows for the same reason.
+				 */
+				const inner: RenderOptions = expanded ? { ...options, compact: false } : options;
 				return el(
 					"div",
 					{ class: "tb-group" },
-					...shown.map((part) => render(part, options)),
-					el("p", { class: "tb-more" }, `+${hidden} more result${hidden === 1 ? "" : "s"} on the full tool`),
+					...shown.map((part) => render(part, inner)),
+					el(
+						"button",
+						{
+							type: "button",
+							class: "tb-disclose",
+							"aria-expanded": String(expanded),
+							"aria-controls": REST_ID,
+							"data-hidden": String(rest.length),
+						},
+						discloseLabel(rest.length, expanded),
+					),
+					el("div", { class: "tb-rest", id: REST_ID, ...(expanded ? {} : { hidden: true }) }, ...rest.map((part) => render(part, inner))),
 				);
 			}
 			return el("div", { class: "tb-group" }, ...output.parts.map((part) => render(part, options)));
@@ -170,7 +242,13 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 		);
 	}
 
-	if (hidden > 0) {
+	/*
+	 * ⚠️ Silent when a disclosure is in charge. Labelling this "fields" was the original answer to two
+	 * "+2 more" lines colliding, and it is not enough once the other one is a button: a reader sees a
+	 * control and a dead sentence, presses the control, and the sentence is still there. The group's
+	 * disclosure covers this part too, and renders it in full when opened.
+	 */
+	if (hidden > 0 && options.more !== "expand") {
 		// "fields" rather than a bare count: a group can also be truncated in a card, and two
 		// unlabelled "+2 more" lines next to each other are a puzzle rather than information.
 		sections.push(el("p", { class: "tb-more" }, `+${hidden} more field${hidden === 1 ? "" : "s"}`));
@@ -328,7 +406,8 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 		{ class: "tb-out-bytes" },
 		output.caption ? el("figcaption", { class: "tb-bytes-caption" }, output.caption) : null,
 		el("div", { class: "tb-bytes-grid" }, el("div", { class: "tb-bytes-grid-inner" }, ...lines)),
-		hidden > 0
+		// Stands down for a disclosure, for the same reason the field notice does.
+		hidden > 0 && options.more !== "expand"
 			? el("p", { class: "tb-more" }, `+${hidden * BYTES_PER_ROW} more bytes on the full tool`)
 			: null,
 		/*

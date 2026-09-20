@@ -59,6 +59,21 @@
 		<tool-host tool="queue-explorer" mode="card" parts="2" data-seed></tool-host>
 		<p class="source" data-tool="queue-explorer"><a href="https://github.com/eknowledger/toolbench/tree/main/tools/queue-explorer/" rel="noopener">Source: tools/queue-explorer/</a></p>
 
+		<h3>A card that can open the rest in place</h3>
+		<p>
+			The same tool again with <code>parts="1" more="expand"</code>. Click the card to open it, press Run,
+			and the notice under the first result is a button rather than a line of text: it reveals the other
+			two parts here instead of sending you to the tool's own page.
+		</p>
+		<p class="note">
+			⚠️ A <strong>closed</strong> card never shows the button, and that is deliberate rather than
+			missing: the whole facade is one big button, and a second button nested inside it could not be
+			pressed without opening the card. A closed card's job is to open. Compare with the seeded card
+			above, which still says <em>on the full tool</em> because it does not opt in.
+		</p>
+		<tool-host tool="percentiles" mode="card" parts="1" more="expand" id="expandable-card"></tool-host>
+		<p class="source" data-tool="percentiles"><a href="https://github.com/eknowledger/toolbench/tree/main/tools/percentiles/" rel="noopener">Source: tools/percentiles/</a></p>
+
 		<h2>Bytes — contract version 2</h2>
 		<p class="note">
 			The <code>bytes</code> kind, added in contract version 2. Offsets, hex, printable gutter, and
