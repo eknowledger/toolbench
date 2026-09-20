@@ -49,7 +49,29 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 
 	const leftScale = scaleFor(left);
 	const rightScale = right.length > 0 ? scaleFor(right) : undefined;
-	const xScale = { min: Math.min(...chart.x), max: Math.max(...chart.x) };
+	/*
+	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
+	 * across the y axis.
+	 *
+	 * Bars are centred on their x position (`px(x) - width / 2` in `drawSeries`), and an unpadded domain
+	 * maps the first x to exactly `plot.x`. So half of the first bar lands left of the axis and half of
+	 * the last one hangs off the right edge. It is visible rather than clipped because the stylesheet sets
+	 * `overflow: visible` on the svg, which it needs for labels.
+	 *
+	 * A histogram makes it unmissable, since its x values are bin CENTRES rather than edges: the first
+	 * centre is `min + binWidth / 2` and it still landed on the axis. Reported against the histogram tool,
+	 * but it is the renderer: any `bar` series had it.
+	 *
+	 * Padding by half the spacing between positions makes each bar's slot exactly `plot.w / n`, so bars
+	 * sit inside their own share of the plot. Line and area series keep the tight domain, because a line
+	 * genuinely starts at its first point and padding it would put a gap before the data.
+	 */
+	const xMin = Math.min(...chart.x);
+	const xMax = Math.max(...chart.x);
+	const bars = chart.series.some((series) => series.shape === "bar");
+	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
+	const slot = chart.x.length > 1 ? (xMax - xMin) / (chart.x.length - 1) : Math.abs(xMax) || 1;
+	const xScale = bars ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
 
 	const px = (value: number) => plot.x + ((value - xScale.min) / span(xScale)) * plot.w;
 	const py = (value: number, scale: Scale) => plot.y + plot.h - ((value - scale.min) / span(scale)) * plot.h;

@@ -1403,6 +1403,83 @@ describe("expanding a truncated result in place", () => {
 	});
 });
 
+describe("bar chart geometry", () => {
+	/*
+	 * Reported by looking at the histogram tool: the first bar was drawn across the y axis. The cause is in
+	 * the renderer rather than the tool, so it is asserted on geometry rather than on the tool's numbers.
+	 *
+	 * Browser-only, and not because of convenience: the chart is SVG produced from a layout computed at
+	 * render time, so the only place the coordinates exist is a document.
+	 */
+	it("keeps every bar inside the plot area, not over the axis", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+
+		const geometry = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])];
+			const num = (el: Element | null | undefined, name: string) => Number(el?.getAttribute(name));
+			/*
+			 * ⚠️ There are TWO `.tb-axis` lines, the vertical one first. Reading the plot's right edge from
+			 * `querySelector(".tb-axis")` picks the y axis, whose x2 is the LEFT edge, and the test then
+			 * failed claiming a bar at 572 was past an edge at 56. Taking the extremes across both lines is
+			 * the reading that cannot pick the wrong one.
+			 */
+			const axes = [...(svg?.querySelectorAll("line.tb-axis") ?? [])];
+			return {
+				count: bars.length,
+				axes: axes.length,
+				left: Math.min(...axes.map((line) => num(line, "x1"))),
+				right: Math.max(...axes.map((line) => num(line, "x2"))),
+				first: num(bars[0], "x"),
+				lastEnd: num(bars.at(-1), "x") + num(bars.at(-1), "width"),
+			};
+		});
+
+		assert.ok(geometry.count > 1, `expected a bar chart, got ${geometry.count} bars`);
+		assert.equal(geometry.axes, 2, "one vertical axis and one horizontal, which is what makes the bounds below meaningful");
+		assert.ok(
+			geometry.first >= geometry.left,
+			`the first bar starts at ${geometry.first}, left of the axis at ${geometry.left}: it is drawn over the axis`,
+		);
+		assert.ok(
+			geometry.lastEnd <= geometry.right,
+			`the last bar ends at ${geometry.lastEnd}, past the plot's right edge at ${geometry.right}`,
+		);
+		await page.close();
+	});
+
+	it("still starts a line series at its first point", async () => {
+		const page = await browser.newPage();
+		/*
+		 * The other half of the fix: only a bar chart gets the padding. A line genuinely begins at its first
+		 * point, and padding its domain would open a gap before the data. queue-explorer draws lines only.
+		 */
+		await page.goto(`${BASE}/tool.html?id=queue-explorer`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+
+		const flush = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			// Same hazard as above: both axes share the class, and both have x1 at the left edge, so this one
+			// is safe either way. Spelled out so nobody "tidies" it into reading x2.
+			const axisLeft = Number(svg?.querySelector("line.tb-axis")?.getAttribute("x1"));
+			const path = svg?.querySelector("path.tb-line, path[class*=tb-line]")?.getAttribute("d") ?? "";
+			const firstX = Number(/^M\s*([\d.-]+)/.exec(path)?.[1]);
+			return { axisLeft, firstX, path: path.slice(0, 40) };
+		});
+		assert.ok(
+			Math.abs(flush.firstX - flush.axisLeft) < 1,
+			`a line should start on the axis at ${flush.axisLeft}, started at ${flush.firstX} (d="${flush.path}")`,
+		);
+		await page.close();
+	});
+});
+
 describe("the chart renderer is its own chunk", () => {
 	/*
 	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the
