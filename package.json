@@ -17,6 +17,7 @@
     "coverage": "node scripts/coverage.mjs",
     "test:bench": "node --test bench/*.test.ts",
     "size": "node scripts/size-check.mjs",
+    "test:counts": "node scripts/test-counts.mjs",
     "release": "pnpm build && changeset publish",
     "changeset": "changeset"
   },

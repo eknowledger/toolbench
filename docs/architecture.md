@@ -734,15 +734,24 @@ numbers, and the report says which files it never loaded for that reason.
 
 ## 12. Testing strategy
 
-Five layers. Each catches something the others structurally cannot.
+Six layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 79 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 84 |
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 9 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 13 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
+| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 13 |
 | `bench/bench.test.ts` | Chrome, against the **built** bench | Everything a unit test cannot see | 42 |
+
+The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
+says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
+almost every pull request and collided in four consecutive rebases, five pull requests in one batch each
+correcting the browser count to a different value that was right against the `main` it was written on. It also
+sums the Node rows and compares them against `pnpm test`: if tests live somewhere no row covers, the table is
+describing a subset and the script says so rather than letting a number be corrected. That is how the missing
+`scripts/*.test.ts` row was found.
 
 `pnpm coverage` runs the Node rows of that table with Node's built-in test coverage (the same
 collector as `--experimental-test-coverage`) and prints the uncovered lines and branches. It does not
