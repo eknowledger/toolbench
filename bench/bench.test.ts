@@ -1320,9 +1320,15 @@ describe("expanding a truncated result in place", () => {
 		await seeded.locator(".tb-facade").click();
 		await seeded.locator(".tb-form").waitFor();
 		await seeded.locator(".tb-run").click();
-		await seeded.locator(".tb-more").waitFor({ timeout: 15_000 });
+		await seeded.locator(".tb-output > *").first().waitFor({ timeout: 15_000 });
 
-		assert.match((await seeded.locator(".tb-more").textContent()) ?? "", /more results? on the full tool/);
+		/*
+		 * Asserted on the output's text rather than by waiting for `.tb-more` to appear. A missing element
+		 * times out after 30 s and reports only which selector it wanted, which says nothing about what the
+		 * card actually drew; this way a failure prints the DOM that exists.
+		 */
+		const text = ((await seeded.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.match(text, /on the full tool/, `a card that did not opt in must keep the old notice. Card drew: ${text}`);
 		assert.equal(await seeded.locator(".tb-disclose").count(), 0, "no opt-in, no button");
 		assert.equal(await seeded.locator(".tb-rest").count(), 0, "and nothing hidden in the DOM either");
 		await page.close();
