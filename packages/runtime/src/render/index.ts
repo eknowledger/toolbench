@@ -134,10 +134,13 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			if (cap !== undefined && output.parts.length > cap) {
 				const shown = output.parts.slice(0, cap);
 				const rest = output.parts.slice(cap);
-				const group = el("div", { class: "tb-group" }, ...shown.map((part) => render(part, options)));
 				if (options.more !== "expand") {
-					group.append(el("p", { class: "tb-more" }, `+${rest.length} more result${rest.length === 1 ? "" : "s"} on the full tool`));
-					return group;
+					return el(
+						"div",
+						{ class: "tb-group" },
+						...shown.map((part) => render(part, options)),
+						el("p", { class: "tb-more" }, `+${rest.length} more result${rest.length === 1 ? "" : "s"} on the full tool`),
+					);
 				}
 				/*
 				 * The rest is rendered now, not on first press. Revealing it must not run the tool again: the
@@ -145,7 +148,24 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 				 * would make a disclosure feel like a second computation. `hidden` is the whole mechanism.
 				 */
 				const expanded = options.expanded === true;
-				group.append(
+				/*
+				 * ⚠️ Expanding renders the parts UNCOMPACTED, and while collapsed they are told to stay quiet.
+				 *
+				 * Without this the reader gets two truncation notices stacked, which a maintainer spotted on
+				 * the bench immediately: "+2 more fields" from the field cap inside the first part, directly
+				 * above "Show 2 more results" from the group cap. One is dead text and one is a control, and
+				 * the dead one survived expanding, so pressing the thing that promised more still withheld
+				 * some. The disclosure now owns the whole truncation: it is the only notice while collapsed,
+				 * and opening it means everything, not everything except the fields nobody mentioned.
+				 *
+				 * `compact: false` rather than lifting the field cap alone, because "show me the rest" should
+				 * not still be hiding a table caption or byte rows for the same reason.
+				 */
+				const inner: RenderOptions = expanded ? { ...options, compact: false } : options;
+				return el(
+					"div",
+					{ class: "tb-group" },
+					...shown.map((part) => render(part, inner)),
 					el(
 						"button",
 						{
@@ -157,9 +177,8 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 						},
 						discloseLabel(rest.length, expanded),
 					),
-					el("div", { class: "tb-rest", id: REST_ID, ...(expanded ? {} : { hidden: true }) }, ...rest.map((part) => render(part, options))),
+					el("div", { class: "tb-rest", id: REST_ID, ...(expanded ? {} : { hidden: true }) }, ...rest.map((part) => render(part, inner))),
 				);
-				return group;
 			}
 			return el("div", { class: "tb-group" }, ...output.parts.map((part) => render(part, options)));
 		}
@@ -223,7 +242,13 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 		);
 	}
 
-	if (hidden > 0) {
+	/*
+	 * ⚠️ Silent when a disclosure is in charge. Labelling this "fields" was the original answer to two
+	 * "+2 more" lines colliding, and it is not enough once the other one is a button: a reader sees a
+	 * control and a dead sentence, presses the control, and the sentence is still there. The group's
+	 * disclosure covers this part too, and renders it in full when opened.
+	 */
+	if (hidden > 0 && options.more !== "expand") {
 		// "fields" rather than a bare count: a group can also be truncated in a card, and two
 		// unlabelled "+2 more" lines next to each other are a puzzle rather than information.
 		sections.push(el("p", { class: "tb-more" }, `+${hidden} more field${hidden === 1 ? "" : "s"}`));
@@ -381,7 +406,8 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 		{ class: "tb-out-bytes" },
 		output.caption ? el("figcaption", { class: "tb-bytes-caption" }, output.caption) : null,
 		el("div", { class: "tb-bytes-grid" }, el("div", { class: "tb-bytes-grid-inner" }, ...lines)),
-		hidden > 0
+		// Stands down for a disclosure, for the same reason the field notice does.
+		hidden > 0 && options.more !== "expand"
 			? el("p", { class: "tb-more" }, `+${hidden * BYTES_PER_ROW} more bytes on the full tool`)
 			: null,
 		/*

@@ -330,8 +330,9 @@ opt-in and has to justify itself:
 * reading `tool`, `mode`, `parts` and `more` attributes, and the inline seed;
 * capping a grouped result at `parts` in **any** mode, and, when `more="expand"`, rendering the hidden
   parts up front behind a disclosure button instead of a line of text. The cap is the host's, not the
-  tool's: it is a question about the room on this page. Expanding is a DOM toggle, never a re-run, which
-  is what makes it usable for a worker-mode tool;
+  tool's: it is a question about the room on this page. Expanding redraws from the output already held,
+  never re-runs, which is what makes it usable for a worker-mode tool, and it takes over the inner field
+  and byte notices so a reader is never shown a truncation they cannot act on;
 * a `values` setter and `run()` method, so a host can prefill the form and opt into running without
   reaching into the shadow root;
 * deciding when to activate (click for a card, intersection for a page or embed);

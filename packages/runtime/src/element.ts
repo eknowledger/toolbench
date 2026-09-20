@@ -34,7 +34,7 @@
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { ChartRendererMissing, discloseLabel, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -638,19 +638,25 @@ export class ToolHost extends HTMLElement {
 		 * The button is rebuilt by every draw, so wiring it per render would mean re-attaching on every run;
 		 * the container outlives them all.
 		 *
-		 * ⚠️ The toggle is done in place and NOT by redrawing. Two reasons, and the second is the important
-		 * one. Re-rendering would replace the button the reader just pressed, so focus would land on the
-		 * shadow root and they would lose their place in the article. And it would be work for nothing: the
-		 * hidden parts are already in the DOM, because revealing them must never re-run the tool.
+		 * ⚠️ The guarantee is "never re-RUN", not "never re-render", and the first version confused the two.
+		 *
+		 * It toggled `hidden` in place, to keep focus on the button. That stopped working the moment the
+		 * disclosure took over the whole truncation: expanding now also renders the visible parts
+		 * uncompacted, so their markup genuinely differs between the two states and cannot be reached by
+		 * flipping an attribute. Redrawing from `#shown` costs nothing that matters, because `#shown` is an
+		 * output already in hand: the tool is not consulted.
+		 *
+		 * Focus is then restored by hand. That is the part a reader would notice if it were forgotten: press
+		 * the button, and without this the redraw drops focus to the shadow root and their place in the
+		 * article with it.
 		 */
 		output.addEventListener("click", (event) => {
 			const button = (event.target as Element | null)?.closest?.(".tb-disclose");
-			if (!(button instanceof HTMLButtonElement)) return;
+			if (!(button instanceof HTMLButtonElement) || this.#shown === undefined) return;
 			this.#expanded = button.getAttribute("aria-expanded") !== "true";
-			const rest = output.querySelector(".tb-rest");
-			if (rest instanceof HTMLElement) rest.hidden = !this.#expanded;
-			button.setAttribute("aria-expanded", String(this.#expanded));
-			button.textContent = discloseLabel(Number(button.dataset.hidden), this.#expanded);
+			this.#draw(this.#shown);
+			const next = output.querySelector(".tb-disclose");
+			if (next instanceof HTMLButtonElement) next.focus();
 		});
 
 		this.#els = { run, progress, status, announce, output };

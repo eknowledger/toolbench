@@ -1190,6 +1190,10 @@ describe("expanding a truncated result in place", () => {
 		await page.close();
 	});
 
+	/*
+	 * Focus across a REDRAW, which is the version that can actually break. Expanding rebuilds the output,
+	 * so the button the reader pressed no longer exists and focus has to be put back by hand.
+	 */
 	it("keeps focus on the button across the toggle", async () => {
 		const page = await browser.newPage();
 		const h = await runIt(page);
@@ -1207,27 +1211,41 @@ describe("expanding a truncated result in place", () => {
 		await page.close();
 	});
 
-	it("expands without running the tool again", async () => {
+	it("expands without running the tool again, proven on a worker tool", async () => {
 		const page = await browser.newPage();
 		/*
-		 * ⚠️ This is the assertion the whole design rests on, so it is measured rather than reasoned about.
-		 * percentiles runs on the main thread, so there is no request to count: the tool's chunk is fetched
-		 * once and `run` is called in-page. Counting calls means patching the module, which the bench cannot
-		 * reach. What it can do is watch for the work: a re-run repaints the output, so the element identity
-		 * of the first part changes. A pure reveal leaves it untouched.
+		 * ⚠️ This is the assertion the whole design rests on, and it needs a WORKER tool to be worth
+		 * anything. queue-explorer declares thread: "worker" and returns a group of two, so one part is
+		 * hidden.
+		 *
+		 * The first version of this test watched for element identity on the main-thread tool, which broke
+		 * as soon as expanding started redrawing, and would have proved little anyway: a main-thread re-run
+		 * is synchronous too, so "the result is there immediately" is not evidence against one.
+		 *
+		 * Across a worker it is decisive. The click is dispatched and the result read inside ONE evaluate,
+		 * so nothing can have crossed the message boundary and come back in between. If revealing needed the
+		 * tool, there would be nothing to see yet.
 		 */
-		const h = await runIt(page);
-		await page.evaluate(() => {
-			const root = document.querySelector("tool-host#expandable")?.shadowRoot;
-			const first = root?.querySelector(".tb-group > *");
-			if (first) (first as HTMLElement & { dataset: DOMStringMap }).dataset.witness = "1";
+		await page.goto(`${BASE}/tool.html?id=queue-explorer&parts=1&more=expand`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-disclose").waitFor({ timeout: 15_000 });
+		assert.equal(await page.locator("#host >> .tb-disclose").textContent(), "Show 1 more result", "singular, with one part hidden");
+
+		const sameTask = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			(root?.querySelector(".tb-disclose") as HTMLButtonElement | null)?.click();
+			const rest = root?.querySelector(".tb-rest") as HTMLElement | null;
+			return {
+				revealed: rest !== null && rest !== undefined && !rest.hidden,
+				parts: rest?.children.length ?? -1,
+				expanded: root?.querySelector(".tb-disclose")?.getAttribute("aria-expanded") ?? null,
+			};
 		});
 
-		await h.locator(".tb-disclose").click();
-		const survived = await page.evaluate(
-			() => (document.querySelector("tool-host#expandable")?.shadowRoot?.querySelector(".tb-group > *") as HTMLElement | null)?.dataset.witness ?? null,
-		);
-		assert.equal(survived, "1", "the already-drawn part must be the same element: a re-render would have replaced it");
+		assert.equal(sameTask.revealed, true, "revealed in the same task: a worker round trip could not have happened");
+		assert.equal(sameTask.parts, 1, "and it is the part that was hidden");
+		assert.equal(sameTask.expanded, "true");
 		await page.close();
 	});
 
@@ -1265,6 +1283,37 @@ describe("expanding a truncated result in place", () => {
 	 * accident and each mode reaches the renderer by a different route: page mode from a URL, card mode only
 	 * after activation.
 	 */
+	it("shows one notice, not two, and reveals the capped fields when opened", async () => {
+		const page = await browser.newPage();
+		/*
+		 * Found on the bench rather than by a test: a card showed "+2 more fields" directly above
+		 * "Show 2 more results", and the fields line survived expanding, so pressing the control that
+		 * promised more still withheld some. The disclosure owns the whole truncation now.
+		 *
+		 * A card is the surface that shows it, because the field cap only applies in compact mode.
+		 */
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host#expandable-card");
+		await card.scrollIntoViewIfNeeded();
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		await card.locator(".tb-run").click();
+		await card.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+
+		const collapsed = ((await card.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.doesNotMatch(collapsed, /more fields/, `the button is the only notice. Card drew: ${collapsed}`);
+		const fieldsCollapsed = await card.locator(".tb-field").count();
+
+		await card.locator(".tb-disclose").click();
+		const opened = ((await card.locator(".tb-output").textContent()) ?? "").replace(/\s+/g, " ").trim();
+		assert.doesNotMatch(opened, /more fields/, "and still the only notice once open");
+		assert.ok(
+			(await card.locator(".tb-field").count()) > fieldsCollapsed,
+			"opening it must reveal the capped fields too, not just the other parts",
+		);
+		await page.close();
+	});
+
 	it("works in page mode, driven from the URL", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=percentiles&parts=1&more=expand`, { waitUntil: "load" });

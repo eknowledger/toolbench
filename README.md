@@ -314,11 +314,15 @@ where they want to be. `more="expand"` turns that line into a button that reveal
 | `link` (default) | `+2 more results on the full tool`, as plain text. Right for a card, whose job is to send the reader to the page |
 | `expand` | `Show 2 more results`, as a button. Pressing it reveals them here and changes the label to `Hide 2 results` |
 
-Expanding **does not run the tool again**: the hidden parts were rendered with the rest and are revealed,
-so it costs nothing even for a worker-mode tool. It is a real `<button>` with `aria-expanded`, keyboard
+Expanding **does not run the tool again**: the result is redrawn from the answer already in hand, so it
+costs nothing even for a worker-mode tool, where a re-run would mean a round trip. It is a real `<button>` with `aria-expanded`, keyboard
 operable, keeping focus across the toggle, and it appears only when something is actually hidden. Whether
 it is open survives a re-run, because it is the reader saying what they want to see rather than a property
 of one answer.
+
+Opening it reveals the whole result, not only the extra parts. Inside a card, where fields are capped too,
+the disclosure is the single notice: the reader is not told about "2 more fields" they have no control
+over, and opening it shows those as well.
 
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
