@@ -15,7 +15,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-20.4%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-19.0%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -424,7 +424,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 20.4 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 19.0 KB |
 | Worker entry, only for pages with a worker-mode tool | 3.0 KB |
 | `percentiles` tool chunk | 1.2 KB |
 | `queue-explorer` tool chunk | 1.2 KB |

@@ -959,6 +959,67 @@ describe("host values and run — runtime API", () => {
 	});
 });
 
+describe("the chart renderer is its own chunk", () => {
+	/*
+	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the
+	 * feature only works if it is fetched before one is drawn. Both halves are browser facts: a Node test
+	 * cannot see a network request, and the whole point of the split is what does not arrive.
+	 */
+	const chartChunk = /\/assets\/chart-[^/]+\.js$/;
+
+	it("is not fetched by a tool that draws no chart", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		// percentiles returns fields and a table. Its manifest does not list `series`, so nothing should
+		// pull the chart renderer in, before or after a run.
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 15_000 });
+
+		assert.deepEqual(
+			scripts.filter((url) => chartChunk.test(url)),
+			[],
+			"a page with no chart must not download the chart renderer",
+		);
+		await page.close();
+	});
+
+	it("is fetched before a chart tool paints, so the draw stays synchronous", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/tool.html?id=queue-explorer`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+
+		// Fetched on preparation, before anything is run: the manifest declares `series`, and `#prepare`
+		// awaits the chunk so `render` never has to be asynchronous.
+		assert.equal(
+			scripts.filter((url) => chartChunk.test(url)).length,
+			1,
+			`the chart chunk should arrive once, before the first run: ${scripts.join(", ")}`,
+		);
+
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg"), null, {
+			timeout: 15_000,
+		});
+		assert.equal(
+			scripts.filter((url) => chartChunk.test(url)).length,
+			1,
+			"and exactly once: the module is cached, not re-imported per draw",
+		);
+		await page.close();
+	});
+});
+
 describe("page mode", () => {
 	it("renders the chart and keeps it — a late progress frame must not overwrite the result", async () => {
 		const page = await browser.newPage();

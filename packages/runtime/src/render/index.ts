@@ -14,7 +14,41 @@
  */
 import type { ByteRange, Cell, Field, Output } from "@toolbench/sdk";
 import { el } from "../dom.ts";
-import { renderChart } from "./chart.ts";
+
+/*
+ * ⚠️ The chart renderer is the one renderer this module does not import.
+ *
+ * It is about 1.5 KB gzipped, measured, and most tools never return a `series`. Importing it here put
+ * that cost in the chunk every page pays, which issue #12 asked about and #76 measured at 1,521 bytes.
+ *
+ * `render` stays SYNCHRONOUS, which is the property that made this worth doing at all: making it async
+ * would have rippled into the facade path, the seed path and every caller. Instead the module is loaded
+ * before anything can need it. `<tool-host>` awaits `loadChartRenderer()` during `#prepare` when the
+ * manifest declares `series` in `kinds`, so by the time any result is drawn the function is already here.
+ *
+ * The fallback matters because `kinds` is a declaration a tool can get wrong. If a series arrives without
+ * the module, `render` throws `ChartRendererMissing`, which `#draw` catches, loads, and redraws. One frame
+ * later rather than never.
+ */
+let renderChart: typeof import("./chart.ts").renderChart | undefined;
+
+/** Thrown when a `series` reaches `render` before the chart chunk has loaded. Caught by `#draw`. */
+export class ChartRendererMissing extends Error {
+	constructor() {
+		super("the chart renderer has not loaded yet");
+		this.name = "ChartRendererMissing";
+	}
+}
+
+/** Loads the chart chunk. Idempotent, and awaited by `<tool-host>` for tools that declare `series`. */
+export async function loadChartRenderer(): Promise<void> {
+	renderChart ??= (await import("./chart.ts")).renderChart;
+}
+
+/** Whether a `series` can be drawn right now, without loading anything. */
+export function chartRendererReady(): boolean {
+	return renderChart !== undefined;
+}
 
 export interface RenderOptions {
 	/** Compact mode: fewer fields, no captions, no chart legend. */
@@ -45,8 +79,10 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			return renderCode(output.lang, output.source, options.highlight);
 		case "table":
 			return renderTable(output, options);
-		case "series":
+		case "series": {
+			if (renderChart === undefined) throw new ChartRendererMissing();
 			return renderChart(output.chart, options);
+		}
 		case "group": {
 			/*
 			 * ⚠️ A compact slot renders the FIRST FEW parts, and says how many it left out.

@@ -743,7 +743,7 @@ Six layers. Each catches something the others structurally cannot.
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 13 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 7 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 43 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 45 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -798,7 +798,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 20.4 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 19.0 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
 | Stylesheet | 0.9 KB | |
 | Worker entry | 3.0 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.2 KB | |
@@ -806,11 +806,17 @@ table cannot quietly stop being true.
 | A page with no tool | 0 bytes | Nothing is imported |
 | A card nobody opens | 0 bytes of tool code | The facade is markup |
 
-Where the budget is spent: this chunk is the runtime (element, runner, every renderer, and `styles.ts`)
-plus the bench's page wiring. Issue #12 asked whether `render/chart.ts` should move behind a dynamic
-import. Most tools never return `series`, the manifest already declares `kinds`, and the shape that
-would keep `render` synchronous is a pre-load of the chart chunk on activation for tools that list
-`series`.
+Where the budget is spent: this chunk is the runtime (element, runner, every renderer except the chart,
+and `styles.ts`) plus the bench's page wiring.
+
+**The chart renderer is split out**, which issue #12 asked about and #76 measured before it was taken. The
+shape is the one that keeps `render` synchronous, and that property is what made it worth doing: `<tool-host>`
+awaits the chunk inside `#prepare` when the manifest declares `series` in `kinds`, so a seeded card can paint
+a chart with no chance to await and every later draw is synchronous too. A tool that returns a `series` without
+declaring it gets a redraw one frame later rather than a wrong answer, because `render` throws a specific error
+that `#draw` catches. Measured: `boot` 20,360 to 18,988, a saving of 1,372 bytes, against a 1,970 byte chart
+chunk that only a page with a chart tool downloads. The ceiling came down from 20,500 to 19,500 with it,
+because a ceiling that only ever rises stops being a constraint.
 
 That chunk now measures 20,360 bytes against a 20,500 byte ceiling, leaving 140 bytes. So the next thing
 that costs real bytes either buys them explicitly, by raising the budget in the commit that spends it and
@@ -901,10 +907,10 @@ Known and accepted, with what each costs.
   same 500. Two machines an order of magnitude apart in this figure both land well under the bar, which
   is what makes the conclusion safe to rest on rather than a property of one laptop. The script times `new RegistrySource` only. Generation sits outside the
   timed region, and so does JSON.parse: a host already has objects when it constructs the source.
-* **The `series` renderer stays in the boot chunk, for now.** A dynamic import of `render/chart.ts` saves
-  1,521 bytes gzip against the roughly 3 KB bar issue #12 set, so the complexity is not yet worth it. The
-  condition is load bearing: at the time of writing the chunk has 140 bytes of headroom, so this is the lever
-  that gets pulled if the next change needs room rather than a raise. See §13.
+* **A page whose tool draws a chart downloads one extra chunk.** The `series` renderer is no longer in
+  `boot`: it is about 2.0 KB fetched only when a manifest declares `series`. `render` stays synchronous,
+  because `<tool-host>` awaits the chunk during `#prepare` rather than at first use. The cost is one request
+  for chart tools; the saving is 1,372 bytes for every page without one. See §13.
 * **Node 24 or newer for development.** Tools and tests run as TypeScript with no build step, which is
   worth the floor.
 

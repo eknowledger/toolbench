@@ -36,13 +36,17 @@ const BUDGETS = [
 	 * unrelated change would have failed here for reasons that had nothing to do with it.
 	 */
 	/*
+	 * ⚠️ Lowered from 20_500 to 19_500 by splitting the chart renderer out, measured at 1,372 bytes.
+	 * A ceiling that only ever rises stops being a constraint, so when a change genuinely removes weight
+	 * the number should follow it down. 18,988 measured, leaving 512.
+	 *
 	 * Raised from 19_500 to 20_500 in the commit that spent it. What it bought: a second live region so a
 	 * result summary is announced without rendering as a line of metadata above the result; a query
 	 * container and three rules so a card's chart keeps legible labels when the card is narrower than the
 	 * chart's own viewBox; and the `parts` attribute plumbing. 19_500 left 46 bytes of headroom, which is
 	 * not headroom.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 20_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 19_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -62,6 +66,12 @@ const BUDGETS = [
 	 * the same reason as the theme switch: a consumer does not download it.
 	 */
 	{ label: "bench highlighter", pattern: /^bench-highlight-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	/*
+	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
+	 * rather than deployOnly, because a reader of a chart tool genuinely downloads it: the saving is that
+	 * everybody else does not.
+	 */
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 2_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },

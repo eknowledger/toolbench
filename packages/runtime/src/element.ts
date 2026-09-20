@@ -34,7 +34,7 @@
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { render, unknownOutput, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -263,6 +263,16 @@ export class ToolHost extends HTMLElement {
 			if (this.#hostWroteValues) Object.assign(overlay, this.#values);
 			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
+			/*
+			 * ⚠️ Before the first paint, not on first use, and only for tools that say they draw one.
+			 *
+			 * The chart renderer is its own chunk, about 1.5 KB gzipped that most pages never need. Awaiting
+			 * it here is what lets `render` stay synchronous: a seeded card paints a chart in `#paint` with
+			 * no chance to await, and every later draw is synchronous too. `kinds` is the manifest's own
+			 * declaration of what `run` can return, so it is the right thing to ask, and a tool that gets it
+			 * wrong is covered by the redraw in `#draw`.
+			 */
+			if (manifest.kinds.includes("series")) await loadChartRenderer();
 			this.#paint();
 
 			if (this.mode === "card") return; // waits for a click
@@ -798,7 +808,16 @@ export class ToolHost extends HTMLElement {
 					}),
 				),
 			);
-		} catch {
+		} catch (error) {
+			if (error instanceof ChartRendererMissing) {
+				/*
+				 * A `series` from a tool that did not declare it in `kinds`, so `#prepare` had no reason to
+				 * preload. Load and draw again rather than telling a reader the shape cannot be drawn, which
+				 * would be false. One frame late is the cost of a manifest that understated itself.
+				 */
+				void loadChartRenderer().then(() => this.#draw(output));
+				return;
+			}
 			// A kind this build cannot draw: an old runtime meeting a newer tool.
 			fill(target, unknownOutput(output.kind));
 		}

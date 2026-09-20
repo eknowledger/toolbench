@@ -60,14 +60,12 @@ A `file` input is filed as a spike rather than a feature, because it is the firs
 "a tool is a function of its declared inputs" property that fixtures and seeding both rest on. Four
 questions need answering before any code.
 
-Splitting the chart renderer was measured and not taken. A dynamic import of `render/chart.ts` drops the
-boot chunk by 1,521 bytes gzip, from 20,360 to 18,839, emitting a 1,972 byte chart chunk. The bar was about
-3 KB, so it stays where it is for now.
-
-⚠️ Not taken is not the same as closed, and the difference matters here. The bar was set when the boot chunk
-had room; it now has 140 bytes. This is the largest single lever available, so the measurement is on record
-precisely so the choice between pulling it and raising the ceiling can be made in minutes rather than
-re-argued. The numbers are in [architecture.md §13](docs/architecture.md#13-performance-budget).
+Splitting the chart renderer was measured, and then taken. #76 put it at 1,521 bytes against a bar of about
+3 KB and recorded it as not worth the complexity; the ceiling then reached 140 bytes of headroom and the
+calculation changed. Done in a separate change with its own tests: `boot` fell from 20,360 to 18,988, the
+ceiling came down from 20,500 to 19,500 with it, and a page whose tool declares `series` fetches a 1,970 byte
+chunk that nobody else pays for. The numbers are in
+[architecture.md §13](docs/architecture.md#13-performance-budget).
 
 ## [1.0.0 - stable API](https://github.com/eknowledger/toolbench/milestone/4)
 
