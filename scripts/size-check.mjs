@@ -70,7 +70,20 @@ const BUDGETS = [
 	 * work that was never taken, because that change landed at 20_000 instead. A budget history that
 	 * describes a ceiling the file does not have is worse than no history.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 21_250 },
+	/*
+	 * Raised from 21_250 to 22_000 in the commit that spent it: 20,898 to 21,691 measured, 793 bytes for
+	 * the in-place disclosure. What it bought, and this one is runtime code rather than manifest data:
+	 * the group cap working in every mode instead of card mode only, the button with its two labels and
+	 * `aria-expanded`, the delegated toggle, and the styles for a 24px target.
+	 *
+	 * Worth recording why it is not cheaper. The hidden parts are rendered up front and hidden with the
+	 * `hidden` attribute, rather than rendered on first press. Rendering lazily would save nothing here,
+	 * because the renderers are already in this chunk, and it would cost the guarantee that matters: that
+	 * expanding never re-runs the tool. For a worker-mode tool, a lazy version would be a round trip.
+	 *
+	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow

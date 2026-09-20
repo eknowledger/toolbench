@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-20.9%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-21.7%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -296,6 +296,30 @@ it sits on, not of the tool: the same tool is a one-part card in a sidebar and a
 section, and a manifest cannot know which. Whatever does not fit is counted, not hidden, and a compact
 chart keeps its legend so its lines stay identifiable.
 
+`parts` works in any mode, not only on a card. An embedded tool with no `parts` still shows everything,
+because that is what it has always done and a cap nobody asked for would truncate existing pages on
+upgrade.
+
+### Letting the reader open the rest
+
+In prose, "the first part, then a line pointing somewhere else" is the wrong offer: the reader is already
+where they want to be. `more="expand"` turns that line into a button that reveals the rest **in place**.
+
+```html
+<tool-host tool="percentiles" mode="embed" parts="1" more="expand"></tool-host>
+```
+
+| `more` | The notice under a truncated result |
+|---|---|
+| `link` (default) | `+2 more results on the full tool`, as plain text. Right for a card, whose job is to send the reader to the page |
+| `expand` | `Show 2 more results`, as a button. Pressing it reveals them here and changes the label to `Hide 2 results` |
+
+Expanding **does not run the tool again**: the hidden parts were rendered with the rest and are revealed,
+so it costs nothing even for a worker-mode tool. It is a real `<button>` with `aria-expanded`, keyboard
+operable, keeping focus across the toggle, and it appears only when something is actually hidden. Whether
+it is open survives a re-run, because it is the reader saying what they want to see rather than a property
+of one answer.
+
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
 then shows a real result with no JavaScript at all.
@@ -454,7 +478,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 20.9 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 21.7 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.1 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |

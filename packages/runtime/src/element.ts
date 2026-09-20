@@ -34,7 +34,7 @@
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { ChartRendererMissing, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, discloseLabel, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -77,7 +77,7 @@ export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): 
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -114,6 +114,15 @@ export class ToolHost extends HTMLElement {
 	#shown: Output | undefined;
 	/** The last visible status line, for the same reason as `#shown`: a repaint builds a fresh, empty one. */
 	#status = "";
+	/**
+	 * Whether the reader has opened the disclosure.
+	 *
+	 * Deliberately survives a re-run. Expanding is the reader saying "show me the whole answer", which is a
+	 * statement about what they want to see rather than about one particular output. Collapsing it on every
+	 * run would make anyone iterating on inputs press it again each time, which reads as the control not
+	 * working. Cleared only when the tool itself changes.
+	 */
+	#expanded = false;
 	#controls = new Map<string, HTMLElement>();
 	#els: {
 		output?: HTMLElement;
@@ -197,12 +206,34 @@ export class ToolHost extends HTMLElement {
 	 *
 	 * An attribute rather than a manifest key, and deliberately: how much room a card has is a property of
 	 * the page it is on, not of the tool. The same tool is a one-part card in a sidebar and a two-part card
-	 * leading a section, and a manifest cannot know which. Ignored outside `mode="card"`, where everything
-	 * is shown anyway.
+	 * leading a section, and a manifest cannot know which.
 	 */
 	get cardParts(): number {
 		const raw = Number(this.getAttribute("parts"));
 		return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1;
+	}
+
+	/**
+	 * The cap to hand the renderer, or `undefined` for none.
+	 *
+	 * ⚠️ The absence of `parts` and `parts="1"` have to mean different things outside a card, which is why
+	 * this is not just `cardParts`. A card caps at 1 by default and always has. An embedded tool showed
+	 * everything, so defaulting it to 1 the moment the cap stopped being card-only would silently truncate
+	 * every existing embed on upgrade. So: a card always gets a cap, and anything else gets one only
+	 * because the page asked for it by name.
+	 */
+	get #partsCap(): number | undefined {
+		if (this.mode === "card") return this.cardParts;
+		return this.hasAttribute("parts") ? this.cardParts : undefined;
+	}
+
+	/**
+	 * `link` (default) or `expand`: what the truncation notice does.
+	 *
+	 * Anything unrecognised is `link`, so a typo degrades to today's behaviour rather than to no notice.
+	 */
+	get more(): "link" | "expand" {
+		return this.getAttribute("more") === "expand" ? "expand" : "link";
 	}
 
 	get toolId(): string {
@@ -245,6 +276,7 @@ export class ToolHost extends HTMLElement {
 			// name, which is the one thing worse than showing nothing. The status line goes with it.
 			this.#shown = undefined;
 			this.#status = "";
+			this.#expanded = false;
 			this.#ready = this.#prepare();
 		} else {
 			this.#paint();
@@ -536,7 +568,12 @@ export class ToolHost extends HTMLElement {
 							this.#seed,
 							withHostHighlight({
 								compact,
-								cardParts: this.cardParts,
+								/*
+								 * No `more` here on purpose. This is the facade, and in card mode the whole preview
+								 * is inside a button: a disclosure button nested in it would be invalid and would
+								 * activate the card instead of expanding. A closed card's job is to open.
+								 */
+								...(this.#partsCap !== undefined ? { cardParts: this.#partsCap } : {}),
 								...(manifest.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}),
 							}),
 						)
@@ -596,6 +633,25 @@ export class ToolHost extends HTMLElement {
 		 */
 		const announce = el("p", { class: "tb-announce tb-sr", role: "status", "aria-live": "polite" });
 		const output = el("div", { class: "tb-output", tabindex: "-1" });
+		/*
+		 * One delegated listener for the disclosure, attached to the output area rather than to the button.
+		 * The button is rebuilt by every draw, so wiring it per render would mean re-attaching on every run;
+		 * the container outlives them all.
+		 *
+		 * ⚠️ The toggle is done in place and NOT by redrawing. Two reasons, and the second is the important
+		 * one. Re-rendering would replace the button the reader just pressed, so focus would land on the
+		 * shadow root and they would lose their place in the article. And it would be work for nothing: the
+		 * hidden parts are already in the DOM, because revealing them must never re-run the tool.
+		 */
+		output.addEventListener("click", (event) => {
+			const button = (event.target as Element | null)?.closest?.(".tb-disclose");
+			if (!(button instanceof HTMLButtonElement)) return;
+			this.#expanded = button.getAttribute("aria-expanded") !== "true";
+			const rest = output.querySelector(".tb-rest");
+			if (rest instanceof HTMLElement) rest.hidden = !this.#expanded;
+			button.setAttribute("aria-expanded", String(this.#expanded));
+			button.textContent = discloseLabel(Number(button.dataset.hidden), this.#expanded);
+		});
 
 		this.#els = { run, progress, status, announce, output };
 		const embedMark = mode === "embed" ? lifecycleMark(lifecycleStatus(manifest)) : null;
@@ -922,7 +978,8 @@ export class ToolHost extends HTMLElement {
 					output,
 					withHostHighlight({
 						compact,
-						cardParts: this.cardParts,
+						...(this.#partsCap !== undefined ? { cardParts: this.#partsCap } : {}),
+						...(this.more === "expand" ? { more: "expand" as const, expanded: this.#expanded } : {}),
 						...(manifest?.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}),
 					}),
 				),

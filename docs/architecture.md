@@ -327,7 +327,11 @@ opt-in and has to justify itself:
 
 **`element.ts`** is `<tool-host>`, and it is the only public surface most hosts touch. It owns:
 
-* reading `tool` and `mode` attributes, and the inline seed;
+* reading `tool`, `mode`, `parts` and `more` attributes, and the inline seed;
+* capping a grouped result at `parts` in **any** mode, and, when `more="expand"`, rendering the hidden
+  parts up front behind a disclosure button instead of a line of text. The cap is the host's, not the
+  tool's: it is a question about the room on this page. Expanding is a DOM toggle, never a re-run, which
+  is what makes it usable for a worker-mode tool;
 * a `values` setter and `run()` method, so a host can prefill the form and opt into running without
   reaching into the shadow root;
 * deciding when to activate (click for a card, intersection for a page or embed);
@@ -823,7 +827,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 20.9 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 21.7 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
 | Stylesheet | 0.9 KB | |
 | Worker entry | 4.1 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.3 KB | |
