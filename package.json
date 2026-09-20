@@ -27,6 +27,6 @@
     "@changesets/cli": "2.29.8",
     "@types/node": "24.10.1",
     "playwright": "1.63.0",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
