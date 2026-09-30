@@ -402,9 +402,18 @@ export class ToolHost extends HTMLElement {
 			 * Skip the prompt when a host already prefilled: `#paint` has just marked the seed stale,
 			 * and overwriting that with "showing the default result" would lie about whose inputs these
 			 * are.
+			 *
+			 * ⚠️ No prompt at all for a host with nothing on screen. "press Run" sat directly above a button
+			 * labelled Run, restating it, and it was the first line every reader met (#99).
+			 *
+			 * ⚠️ The one exception to "activation does not run": an `autoRun` tool. It has declared itself
+			 * instant and has no Run button (#104), so waiting for the reader to touch an input meant an empty
+			 * output under a form, with nothing saying why. Its default answer is computed once, here.
 			 */
-			if (!this.#hostWroteValues) {
-				this.#say(this.#seed ? "showing the default result — press Run to try your own" : "press Run");
+			if (this.#manifest?.autoRun === true) {
+				void this.#run({ focusResult: false });
+			} else if (!this.#hostWroteValues && this.#seed) {
+				this.#say("showing the default result — press Run to try your own");
 			}
 		} catch (error) {
 			this.#activated = false;
@@ -451,7 +460,8 @@ export class ToolHost extends HTMLElement {
 		const hasResult = output.children.length > 0;
 		output.toggleAttribute("data-stale", hasResult);
 		this.#els.run?.toggleAttribute("data-attention", true);
-		this.#say(hasResult ? "inputs changed — press Run" : "press Run");
+		// Nothing on screen means nothing is stale, and "press Run" would only restate the button (#99).
+		this.#say(hasResult ? "inputs changed — press Run" : "");
 	}
 
 	async #run(options: { focusResult: boolean }): Promise<void> {
@@ -609,7 +619,13 @@ export class ToolHost extends HTMLElement {
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
-		run.addEventListener("click", () => void this.#run({ focusResult: true }));
+		/*
+		 * ⚠️ Focus moves to the answer only for a keyboard press. Focusing the output scrolls it into view,
+		 * and a reader who clicked Run is looking at the button: the page jumped 773px on every click,
+		 * including clicks that recomputed the same answer (#101). A click produced by Enter or Space on a
+		 * button has `detail` 0, which is how the two are told apart.
+		 */
+		run.addEventListener("click", (event) => void this.#run({ focusResult: event.detail === 0 }));
 		// Hidden until a run outlasts SLOW_MS. A bar that flashes for 20 ms is noise.
 		const progress = el("div", { class: "tb-progress", "aria-hidden": "true", hidden: true }, el("i", { style: "width:0%" }));
 		/*
@@ -669,7 +685,13 @@ export class ToolHost extends HTMLElement {
 		 */
 		const samples = manifest.samples ?? [];
 		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
-		body.append(el("div", { class: "tb-actions" }, run, progress), status, announce, output);
+		/*
+		 * No Run button for an `autoRun` tool: every change already recomputes, so the button could only
+		 * re-run unchanged inputs, and "press Run" described a mode the tool is not in (#104). The progress
+		 * bar stays, for the rare slow run.
+		 */
+		const autoRun = manifest.autoRun === true;
+		body.append(autoRun ? progress : el("div", { class: "tb-actions" }, run, progress), status, announce, output);
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
