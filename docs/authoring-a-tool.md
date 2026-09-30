@@ -330,6 +330,10 @@ Things the validator will hold you to, and why:
   its range and skip the defensive check.
 * **A select needs two or more options**, and the default must be one of them. One option is a constant.
 * **`unit` on any number that has one.** `1000` alone is a riddle; `1000 samples` is not.
+* **`"control": "slider"` on a number the reader explores by dragging** (contract version 5, `"sdk": 5`).
+  A native range control appears beside the number box, which stays editable for exact values. It uses
+  `min`, `max` and `step`, so a slider can never produce a value the manifest calls invalid. Pair it with
+  `autoRun` when the tool is instant, or the answer will not follow the thumb.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and

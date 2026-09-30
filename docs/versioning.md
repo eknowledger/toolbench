@@ -234,10 +234,11 @@ See [authoring-a-tool.md §3b](authoring-a-tool.md#3b-retiring-a-tool).
 | 2 | 0.2.0 | The `bytes` output kind, for wire formats and hex dumps, with named highlight ranges. Both migration halves are the identity function, and every v1 tool's fixtures passed unedited. |
 | 3 | 0.4.0 | The optional `samples` manifest key: labelled example inputs a tool ships with, which the runtime draws as a row of buttons under the form. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 | 4 | 0.7.0 | Chart markers: `markers: true` on a line or area series, and the `points` shape, each series in its own marker shape. For an x of separate items, where a line between two of them invents a value. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
+| 5 | 0.7.0 | The optional `control: "slider"` hint on a number input: a native range control beside the number box, for a value read by dragging. A hint, so a runtime without it renders the box alone. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 
 Planned, in likely order. Nothing here is committed, and each would follow §5:
 
 | Version | Adds | Why it is not in the contract yet |
 |---|---|---|
-| 5 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
-| 6 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |
+| 6 | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
+| 7 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |

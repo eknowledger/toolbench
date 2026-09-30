@@ -2089,6 +2089,66 @@ describe("lifecycle status", () => {
 	});
 });
 
+describe("a slider on a number input (contract 5, #102)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=slider`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-slider").waitFor({ timeout: 15_000 });
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				const slider = root?.querySelector(".tb-slider") as HTMLInputElement | null;
+				const box = root?.querySelector(".tb-slider-row .tb-input") as HTMLInputElement | null;
+				const labelId = slider?.getAttribute("aria-labelledby") ?? "";
+				return {
+					slider: slider?.value,
+					box: box?.value,
+					min: slider?.min,
+					max: slider?.max,
+					step: slider?.step,
+					name: labelId ? root?.getElementById(labelId)?.textContent ?? "" : "",
+					answer: root?.querySelector(".tb-out-fields")?.textContent ?? "",
+				};
+			});
+		return { page, read };
+	}
+
+	it("draws a native range beside the number box, bounded by the manifest and named by its label", async () => {
+		const { page, read } = await open();
+		const state = await read();
+		assert.deepEqual([state.min, state.max, state.step, state.slider, state.box], ["10", "500", "10", "80", "80"]);
+		assert.match(state.name, /Round-trip time/);
+		await page.close();
+	});
+
+	it("moves the value from the keyboard, keeps the box beside it in step, and re-runs", async () => {
+		const { page, read } = await open();
+		await page.locator("#host >> .tb-slider").focus();
+		await page.keyboard.press("ArrowRight");
+		await page.keyboard.press("ArrowRight");
+		// Two steps of 10 from 80. The answer is the value the run received, not what the slider shows.
+		await page.waitForFunction(() => /100 ms/.test(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-fields")?.textContent ?? ""), null, {
+			timeout: 10_000,
+		});
+		const state = await read();
+		assert.equal(state.slider, "100");
+		assert.equal(state.box, "100");
+		await page.close();
+	});
+
+	it("follows the number box, and a host writing values, so the two never disagree", async () => {
+		const { page, read } = await open();
+		await page.locator("#host >> .tb-slider-row .tb-input").fill("250");
+		assert.equal((await read()).slider, "250", "typing an exact value moves the thumb");
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { rtt: 400 };
+		});
+		const state = await read();
+		assert.deepEqual([state.slider, state.box], ["400", "400"]);
+		await page.close();
+	});
+});
+
 describe("accessibility wiring", () => {
 	it("moves focus to the answer for a keyboard Run, not for a mouse click (#101)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
