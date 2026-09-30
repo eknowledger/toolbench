@@ -1419,6 +1419,28 @@ describe("expanding a truncated result in place", () => {
 		assert.equal(await plain.locator(".tb-more").count(), 0);
 		await page.close();
 	});
+
+	it("keeps a card's chart the same size when the rest is expanded (#100)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const h = page.locator("#expandable-chart-card");
+		await h.scrollIntoViewIfNeeded();
+		await h.locator(".tb-facade").click();
+		await h.locator(".tb-run").click();
+		await h.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+		const size = () =>
+			h.locator(".tb-out-chart svg").first().evaluate((svg) => {
+				const box = svg.getBoundingClientRect();
+				return { width: Math.round(box.width), height: Math.round(box.height), card: svg.closest(".tb-out-chart")?.classList.contains("tb-out-chart-card") };
+			});
+		const before = await size();
+		assert.equal(before.card, true, "a card draws its chart at card size");
+		await h.locator(".tb-disclose").click();
+		await h.locator(".tb-disclose[aria-expanded=true]").waitFor();
+		const after = await size();
+		assert.deepEqual(after, before, "expanding shows more parts; it does not redraw the chart already on screen at another size");
+		await page.close();
+	});
 });
 
 describe("bar chart geometry", () => {
