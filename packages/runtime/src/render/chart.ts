@@ -310,6 +310,7 @@ function drawSeries(
 	if (current.length > 1) segments.push(current.join(" "));
 
 	const marks: SVGElement[] = [];
+	const dots = shape === "points" || series.markers === true;
 	if (shape === "area" && segments.length > 0) {
 		const first = xs[0];
 		const last = xs[xs.length - 1];
@@ -322,8 +323,44 @@ function drawSeries(
 			);
 		}
 	}
-	for (const d of segments) marks.push(svg("path", { class: `tb-line ${cls}`, d }));
+	if (shape !== "points") for (const d of segments) marks.push(svg("path", { class: `tb-line ${cls}`, d }));
+	/*
+	 * A marker per value, for an x of separate items. Each series gets its own SHAPE as well as its
+	 * colour, so two series with equal values are still two things on screen: with lines alone the later
+	 * one covered the earlier completely, and a legend entry pointed at nothing (#111).
+	 *
+	 * ⚠️ Hollow, not filled. Solid shapes at the same point cover each other just as lines did: three
+	 * series agreeing on frames 1 to 4 showed only the last one's triangles. Outlines nest instead, so a
+	 * circle inside a diamond inside a triangle reads as three series that agree.
+	 */
+	if (dots) {
+		series.points.forEach((point, i) => {
+			const x = xs[i];
+			if (point === null || x === undefined) return;
+			marks.push(svg("path", { class: `tb-marker ${cls}`, d: markerPath(index, px(x), py(point)) }));
+		});
+	}
 	return marks;
+}
+
+/** Six marker shapes, in series order, each about 8 units across: circle, diamond, triangle, square, down-triangle, cross. */
+function markerPath(index: number, x: number, y: number): string {
+	const r = 4;
+	const at = (dx: number, dy: number) => `${(x + dx).toFixed(2)},${(y + dy).toFixed(2)}`;
+	switch (index % 6) {
+		case 0:
+			return `M${at(-r, 0)}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`;
+		case 1:
+			return `M${at(0, -r - 1)}L${at(r + 1, 0)}L${at(0, r + 1)}L${at(-r - 1, 0)}Z`;
+		case 2:
+			return `M${at(0, -r - 1)}L${at(r + 1, r)}L${at(-r - 1, r)}Z`;
+		case 3:
+			return `M${at(-r + 0.5, -r + 0.5)}h${2 * r - 1}v${2 * r - 1}h${-2 * r + 1}Z`;
+		case 4:
+			return `M${at(0, r + 1)}L${at(r + 1, -r)}L${at(-r - 1, -r)}Z`;
+		default:
+			return `M${at(-1.5, -r - 0.5)}h3v${r - 1}h${r - 1}v3h${1 - r}v${r - 1}h-3v${1 - r}h${1 - r}v-3h${r - 1}Z`;
+	}
 }
 
 function legend(series: Series[]): HTMLElement {
@@ -334,7 +371,10 @@ function legend(series: Series[]): HTMLElement {
 			el(
 				"li",
 				{},
-				el("span", { class: `tb-swatch tb-s${(i % 6) + 1}`, "aria-hidden": "true" }),
+				// A series drawn with markers is keyed by its marker, since the shape is what tells it apart.
+				s.shape === "points" || s.markers === true
+					? el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": String(i % 6), "aria-hidden": "true" })
+					: el("span", { class: `tb-swatch tb-s${(i % 6) + 1}`, "aria-hidden": "true" }),
 				withUnit(s.label, s.unit),
 			),
 		),

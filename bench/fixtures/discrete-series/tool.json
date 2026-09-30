@@ -1,5 +1,5 @@
 {
-	"sdk": 1,
+	"sdk": 4,
 	"id": "discrete-series",
 	"name": "Discrete series",
 	"blurb": "Draws each chart shape that once misled over whole-number x values, so the renderer's answer to each is on screen.",
@@ -22,7 +22,9 @@
 				{ "value": "lines", "label": "Lines over frames 1 to 20" },
 				{ "value": "two-bars", "label": "Two bar series" },
 				{ "value": "zero-bars", "label": "A bar series of zeros" },
-				{ "value": "signed-bars", "label": "Bars either side of zero" }
+				{ "value": "signed-bars", "label": "Bars either side of zero" },
+				{ "value": "markers", "label": "Lines with markers" },
+				{ "value": "points", "label": "Points, no lines" }
 			]
 		}
 	]

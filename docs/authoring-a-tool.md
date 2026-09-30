@@ -633,7 +633,12 @@ finds it. See §4b for what counts as running.
 }}
 ```
 
-* `shape` is `"line"`, `"area"` or `"bar"`.
+* `shape` is `"line"`, `"area"`, `"bar"` or, from contract version 4, `"points"`.
+* When x is a set of separate items (frames, requests, runs) rather than a continuous quantity, a line
+  between two of them invents a value that does not exist. Use `markers: true` on a line or area to draw
+  every real point, or `shape: "points"` to draw only the points. Each series gets its own marker shape,
+  so series with equal values stay distinguishable, and the legend keys each one by its marker. Both need
+  `"sdk": 4`.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and
