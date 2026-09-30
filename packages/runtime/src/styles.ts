@@ -52,6 +52,10 @@ export const STYLES = /* css */ `
      an amber no single value is both: #d97706 is 3.19:1 on white. Defaults to the accent, so a host that
      sets only --tb-accent sees no change. */
   --tb-accent-text: var(--tb-accent);
+  /* Text ON an accent fill: the Run button's label, a marked byte. It was the surface colour, white on a
+     light page, which is 3.18:1 on #d97706; a bright accent wants dark text instead, black being 9.78:1
+     on #f59e0b. Defaults to the surface, so nothing changes unless a host sets it. */
+  --tb-accent-ink: var(--tb-bg);
 
   /* Series colours. Six, then they repeat — a chart needing seven is a chart needing a rethink. */
   --tb-s1: #8a5a00; --tb-s2: #5b3fa8; --tb-s3: #0f6e6e;
@@ -144,7 +148,7 @@ export const STYLES = /* css */ `
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--tb-bg);
+  color: var(--tb-accent-ink);
   background: var(--tb-accent);
   border: 0;
   border-radius: 8px;
@@ -361,7 +365,7 @@ export const STYLES = /* css */ `
    it is nearly the surface colour: every two and three-byte highlight was invisible, and only the one
    range that happened to carry a tone showed up at all. */
 .tb-byte[data-tone] { border-radius: 2px; }
-.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-bg); }
+.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-accent-ink); }
 .tb-byte[data-tone="good"]   { background: var(--tb-good); color: var(--tb-bg); }
 .tb-byte[data-tone="warn"]   { background: var(--tb-warn); color: var(--tb-bg); }
 .tb-byte[data-tone="bad"]    { background: var(--tb-bad); color: var(--tb-bg); }

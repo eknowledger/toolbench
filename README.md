@@ -473,11 +473,12 @@ tool-host {
 ```
 
 `--tb-accent` is a fill colour. Accent-coloured text (links, the card's hint, annotation labels) reads
-`--tb-accent-text`, which defaults to the accent. Set both when the accent is bright, since a bright
-amber that works as a button cannot be small text on white:
+`--tb-accent-text`, and text on an accent fill (the Run button's label) reads `--tb-accent-ink`. They
+default to the accent and to the surface colour. Set them when the accent is bright, since a bright
+amber that works as a button cannot be small text on white, and white text on it is unreadable:
 
 ```css
-tool-host { --tb-accent: #f59e0b; --tb-accent-text: #a46805; }
+tool-host { --tb-accent: #f59e0b; --tb-accent-text: #a46805; --tb-accent-ink: #000; }
 ```
 
 Defaults use `light-dark()`, so a tool follows the page's colour scheme before anyone configures

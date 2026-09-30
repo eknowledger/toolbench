@@ -1047,6 +1047,7 @@ declaration, so browsers without that function get the light palette rather than
 | `--tb-surface` | `#f7f8fa` | Input backgrounds, preformatted blocks |
 | `--tb-accent` | `#8a5a00` | Fills: the Run button, progress, marked bytes, focus outlines |
 | `--tb-accent-text` | `--tb-accent` | Accent-coloured text: links, the card's hint, a hovered sample, annotation labels. Set it when the accent is too bright to be text on your surface |
+| `--tb-accent-ink` | `--tb-bg` | Text on an accent fill: the Run button's label, a marked byte. Set it dark when the accent is bright |
 | `--tb-bad`, `--tb-warn`, `--tb-good` | `#a3242c`, `#8a5a00`, `#1c6b3c` | Result tones and errors |
 | `--tb-s1` to `--tb-s6` | see `styles.ts` | Chart series |
 | `--tb-radius` | `10px` | Corner radius |
