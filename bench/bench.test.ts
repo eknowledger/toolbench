@@ -2145,6 +2145,10 @@ describe("a slider on a number input (contract 5, #102)", () => {
 		});
 		const state = await read();
 		assert.deepEqual([state.slider, state.box], ["400", "400"]);
+		await page.close();
+	});
+});
+
 describe("layout and page-owned controls (#103)", () => {
 	const order = (page: import("playwright").Page) =>
 		page.evaluate(() =>
