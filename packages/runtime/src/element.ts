@@ -581,6 +581,25 @@ export class ToolHost extends HTMLElement {
 			const deprecatedCard = compact && life === "deprecated";
 			// One string for the visible hint and the accessible name, so they cannot drift apart.
 			const hint = this.#seed ? "Try it" : "Open this tool";
+			const liveCard = compact && !this.#loading && !deprecatedCard;
+			/*
+			 * ⚠️ On a live card the hint IS the control, and the card around it is ordinary content (#98, #105).
+			 *
+			 * The whole card used to be one <button> named with aria-label. aria-label replaces an element's
+			 * contents as its accessible name, so a screen reader heard "Try it: Queue explorer, button" and
+			 * never reached the blurb or the seeded answer, the part of a closed card worth hearing. The same
+			 * shape failed three axe rules: the name could never contain all the visible text inside it
+			 * (2.5.3), the seeded chart's "Show the data as a table" <summary> was a focusable control nested
+			 * in a button (4.1.2), and that summary was 19px tall (2.5.8). No wording fixes a button that
+			 * wraps a paragraph; not wrapping it does.
+			 *
+			 * The name starts with the visible text, "Try it", so a speech-input user saying it still matches,
+			 * which was the point of the previous fix. A click anywhere else on the card still opens it: see
+			 * the handler below.
+			 */
+			const hintEl = liveCard
+				? el("button", { class: "tb-facade-hint", type: "button", "aria-label": `${hint}: ${manifest.name}` }, hint)
+				: el("span", { class: "tb-facade-hint" }, this.#loading ? "loading…" : hint);
 			const preview = el(
 				"div",
 				{ class: "tb-body" },
@@ -601,19 +620,23 @@ export class ToolHost extends HTMLElement {
 							}),
 						)
 					: null,
-				deprecatedCard ? null : el("span", { class: "tb-facade-hint" }, this.#loading ? "loading…" : hint),
+				deprecatedCard ? null : hintEl,
 			);
-			if (compact && !this.#loading && !deprecatedCard) {
-				const button = el("button", { class: "tb-facade", type: "button" });
+			if (liveCard) {
+				const card = el("div", { class: "tb-facade" });
+				card.append(preview);
 				/*
-				 * ⚠️ "Open ${name}" failed WCAG 2.5.3. The button's visible affordance is the hint,
-				 * so a speech-input user saying "click Try it" matched nothing. Naming it by the
-				 * whole card would announce the blurb and the seed as a paragraph.
+				 * A click anywhere on the card opens it, as it always has, except one that lands on a control
+				 * of its own: the seeded chart's data-table disclosure, a link in a result. Those do what they
+				 * say. The hint button's own click bubbles here, which is how it opens the card too.
 				 */
-				button.setAttribute("aria-label", `${hint}: ${manifest.name}`);
-				button.append(preview);
-				button.addEventListener("click", () => void this.#activate());
-				frame.append(button);
+				card.addEventListener("click", (event) => {
+					const target = event.target as Element | null;
+					const control = target?.closest?.("a, button, summary, input, select, textarea, label");
+					if (control && !control.classList.contains("tb-facade-hint")) return;
+					void this.#activate();
+				});
+				frame.append(card);
 			} else {
 				frame.append(preview);
 				if (deprecatedCard && pageUrl) {
