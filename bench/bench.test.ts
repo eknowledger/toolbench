@@ -2343,6 +2343,20 @@ describe("accessibility wiring", () => {
 		const both = await read();
 		assert.equal(both.run, "rgb(245, 158, 11)", "the fill does not move");
 		assert.equal(both.link, "rgb(164, 104, 5)", "the link takes the text token");
+
+		// And the label ON the fill has its own token, since white on a bright amber is 3.18:1 at best.
+		const ink = () => page.evaluate(() => getComputedStyle(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-run") as Element).color);
+		const surface = await page.evaluate(() => {
+			const probe = document.createElement("span");
+			probe.style.color = getComputedStyle(document.querySelector("#host") as Element).getPropertyValue("--tb-bg");
+			document.body.append(probe);
+			const c = getComputedStyle(probe).color;
+			probe.remove();
+			return c;
+		});
+		assert.equal(await ink(), surface, "by default the label is the surface colour, as before");
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent-ink", "rgb(0, 0, 0)"));
+		assert.equal(await ink(), "rgb(0, 0, 0)");
 		await page.close();
 	});
 });
