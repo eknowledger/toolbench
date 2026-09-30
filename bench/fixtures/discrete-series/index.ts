@@ -55,6 +55,31 @@ export default {
 					},
 				};
 			}
+			case "readout": {
+				// The tool says what each point means: a heading per frame, and a note on every late one.
+				const deadline = frames.map((n) => 20 * n + 70);
+				const released = held(250);
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Frame",
+						yLabel: "Time",
+						yUnit: "ms",
+						x: frames,
+						readout: { crosshair: "both", titles: frames.map((n) => (n === 5 ? "Frame 5, lost and resent" : null)) },
+						series: [
+							{ label: "Deadline", unit: "ms", points: deadline },
+							{
+								label: "Released",
+								unit: "ms",
+								markers: true,
+								points: released,
+								notes: released.map((t, i) => (t > (deadline[i] as number) ? `${t} ms, ${t - (deadline[i] as number)} ms late` : null)),
+							},
+						],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

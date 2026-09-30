@@ -24,7 +24,8 @@
 				{ "value": "zero-bars", "label": "A bar series of zeros" },
 				{ "value": "signed-bars", "label": "Bars either side of zero" },
 				{ "value": "markers", "label": "Lines with markers" },
-				{ "value": "points", "label": "Points, no lines" }
+				{ "value": "points", "label": "Points, no lines" },
+				{ "value": "readout", "label": "A readout the tool writes" }
 			]
 		}
 	]

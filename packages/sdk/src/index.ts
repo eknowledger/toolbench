@@ -32,6 +32,7 @@ export {
 	type Output,
 	type OutputKind,
 	type Sample,
+	type Readout,
 	type Series,
 	type Tone,
 	type Tool,

@@ -55,6 +55,24 @@ export interface Series {
 	 */
 	markers?: boolean;
 	axis?: "left" | "right";
+	/**
+	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,
+	 * 60 ms late". `null` keeps the default for that point. Same length as `points`. Contract version 4.
+	 */
+	notes?: (string | null)[];
+}
+
+/**
+ * How a chart answers a pointer or keyboard focus. Omit it for the default: a crosshair at the nearest x
+ * and a card listing every series there. Contract version 4.
+ */
+export interface Readout {
+	/** `x`: every series at the nearest x (default). `point`: only the nearest point. `none`: no readout. */
+	mode?: "x" | "point" | "none";
+	/** Which crosshair lines to draw. Default `x`. */
+	crosshair?: "x" | "y" | "both" | "none";
+	/** A heading per x, replacing "<xLabel> <x>": "Frame 6 (lost)". `null` keeps the default. Same length as `x`. */
+	titles?: (string | null)[];
 }
 
 export interface Chart {
@@ -68,6 +86,7 @@ export interface Chart {
 	annotations?: { x: number; label: string }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
+	readout?: Readout;
 }
 
 /**

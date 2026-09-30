@@ -21,6 +21,11 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 		],
 	},
 	{
+		heading: "Reading a value",
+		note: "Every chart answers a pointer, and a keyboard: tab to a chart and the arrow keys step through it. What the card says can be the tool's.",
+		cases: [{ id: "readout", caption: "A readout the tool writes: a heading for frame 5, and how late each held frame was" }],
+	},
+	{
 		heading: "Bars",
 		note: "Bars grow from zero, sit side by side when there are several series, and take their labels from the bars themselves.",
 		cases: [

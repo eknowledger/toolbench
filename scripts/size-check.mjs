@@ -87,7 +87,14 @@ const BUDGETS = [
 	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured with
 	 * #111's tick and bar fixes beneath it, 242 bytes of that the markers' own.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
+	/*
+	 * Raised from 22_500 to 24_000 in 0.7.0, measured change by change against main at 21,709: the
+	 * slider +303, #106's accent tokens +268, #98/#105's card structure +244, contract v4's markers +242,
+	 * #97's chart loading +202, #103's layout and controls +134, #99/#101/#104's Run area +76, #111's
+	 * ticks and bars +59, #100 +16, and the chart readout's styles +351 (#112), which is the commit that
+	 * crossed it. 23,628 measured, all of it fixes and requested features, none of it a dependency.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 24_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -119,7 +126,12 @@ const BUDGETS = [
 	 * Raised from 2_500 to 3_000 by contract v4's markers and points (#111), which spent it: six marker
 	 * shapes and their placement, on top of #111's readable ticks and grouped bars. 2,738 measured.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 3_000 },
+	/*
+	 * Raised again, from 3_000 to 4_500, by the chart readout (#112): the crosshair, the card, pointer,
+	 * touch and key handling and the nearest-x arithmetic, 1,510 bytes. 4,257 measured. Only a page that
+	 * draws a chart downloads it.
+	 */
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 4_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

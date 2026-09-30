@@ -12,6 +12,7 @@
  */
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
+import { attachReadout } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
 const W = 640;
@@ -144,23 +145,35 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	];
 
 	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card" : "tb-out-chart" });
-	figure.append(
-		svg(
-			"svg",
-			{
-				viewBox: `0 0 ${W} ${H}`,
-				role: "img",
-				"aria-label": describe(chart),
-				preserveAspectRatio: "none",
-			},
-			...marks,
-			...axisLabels,
-		),
-	);
+	const picture = svg(
+		"svg",
+		{
+			viewBox: `0 0 ${W} ${H}`,
+			role: "img",
+			"aria-label": describe(chart),
+			preserveAspectRatio: "none",
+		},
+		...marks,
+		...axisLabels,
+	) as SVGSVGElement;
+	// Its own box, so the readout's focus and keys belong to the picture and not to the legend or the table.
+	figure.append(el("div", { class: "tb-plot" }, picture));
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
 	// The same numbers, for anyone or anything that cannot see the picture.
 	figure.append(dataTable(chart));
+	attachReadout(figure, picture, chart, {
+		px,
+		py: (s, v) => {
+			const series = chart.series[s];
+			return py(v, series?.axis === "right" && rightScale ? rightScale : leftScale);
+		},
+		plot,
+		width: W,
+		height: H,
+		format,
+		key: (s) => keyFor(chart.series[s] as Series, s),
+	});
 	return figure;
 }
 
@@ -283,6 +296,7 @@ function drawSeries(
 			return [
 				svg("rect", {
 					class: `tb-bar ${cls}`,
+					"data-i": i,
 					x: px(x) + offset,
 					y: Math.min(y, zero),
 					width,
@@ -337,7 +351,7 @@ function drawSeries(
 		series.points.forEach((point, i) => {
 			const x = xs[i];
 			if (point === null || x === undefined) return;
-			marks.push(svg("path", { class: `tb-marker ${cls}`, d: markerPath(index, px(x), py(point)) }));
+			marks.push(svg("path", { class: `tb-marker ${cls}`, "data-i": i, d: markerPath(index, px(x), py(point)) }));
 		});
 	}
 	return marks;
@@ -363,6 +377,13 @@ function markerPath(index: number, x: number, y: number): string {
 	}
 }
 
+/** A series' key: its marker where it has markers, otherwise a stroke of its colour. Shared by the legend and the readout. */
+function keyFor(s: Series, i: number): HTMLElement {
+	return s.shape === "points" || s.markers === true
+		? el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": String(i % 6), "aria-hidden": "true" })
+		: el("span", { class: `tb-swatch tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
+}
+
 function legend(series: Series[]): HTMLElement {
 	return el(
 		"ul",
@@ -372,9 +393,7 @@ function legend(series: Series[]): HTMLElement {
 				"li",
 				{},
 				// A series drawn with markers is keyed by its marker, since the shape is what tells it apart.
-				s.shape === "points" || s.markers === true
-					? el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": String(i % 6), "aria-hidden": "true" })
-					: el("span", { class: `tb-swatch tb-s${(i % 6) + 1}`, "aria-hidden": "true" }),
+				keyFor(s, i),
 				withUnit(s.label, s.unit),
 			),
 		),
@@ -436,6 +455,8 @@ function formatterFor(values: number[]): (value: number) => string {
 function format(value: number): string {
 	if (!Number.isFinite(value)) return "—";
 	const abs = Math.abs(value);
+	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
+	if (Number.isInteger(value) && abs < 1000) return String(value);
 	if (abs >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 	if (abs >= 10) return value.toFixed(abs % 1 === 0 ? 0 : 1);
 	if (abs >= 1) return value.toFixed(2);

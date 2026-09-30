@@ -643,6 +643,11 @@ finds it. See §4b for what counts as running.
   every real point, or `shape: "points"` to draw only the points. Each series gets its own marker shape,
   so series with equal values stay distinguishable, and the legend keys each one by its marker. Both need
   `"sdk": 4`.
+* Every chart answers a pointer and the keyboard with a **readout**: a crosshair at the nearest x and a
+  card of every series' value there. You get it for free. To say what a point means, set
+  `readout.titles` (a heading per x) and `series.notes` (the text for one series at one point, instead of
+  its value), `null` wherever the default is right. `readout.mode: "point"` shows only the nearest
+  series, and `"none"` turns it off. Contract version 4.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

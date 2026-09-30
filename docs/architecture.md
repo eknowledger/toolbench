@@ -828,9 +828,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 22.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 23.6 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 4.2 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 4.1 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |

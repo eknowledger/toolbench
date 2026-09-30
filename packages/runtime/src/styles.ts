@@ -348,6 +348,25 @@ export const STYLES = /* css */ `
 .tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
 /* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
 .tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
+/* The readout (#112): a dashed crosshair under the data, the lifted marks, and a card beside the line. */
+.tb-out-chart { position: relative; }
+.tb-plot { outline: none; border-radius: 4px; }
+.tb-plot:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 4px; }
+.tb-crosshair { stroke: var(--tb-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.tb-marker.tb-hot { stroke-width: 3; }
+.tb-bar.tb-hot { stroke: var(--tb-fg); stroke-width: 1.5; }
+.tb-readout {
+  position: absolute; z-index: 2; pointer-events: none; transform: translate(12px, -50%);
+  min-width: 9rem; max-width: 16rem; padding: 0.5rem 0.625rem;
+  background: var(--tb-bg); color: var(--tb-fg); border: 1px solid var(--tb-border); border-radius: 8px;
+  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.35); font-size: 0.78rem; line-height: 1.35;
+}
+.tb-readout[data-flip] { transform: translate(calc(-100% - 12px), -50%); }
+.tb-readout-title { margin: 0 0 0.25rem; color: var(--tb-muted); font-weight: 600; }
+.tb-readout-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+.tb-readout-rows li { display: flex; align-items: center; gap: 0.4rem; }
+.tb-readout-rows strong { font-family: var(--tb-mono); font-weight: 600; }
+.tb-readout-rows span:last-child { color: var(--tb-muted); }
 .tb-swatch-marker[data-marker="0"] { clip-path: circle(50%); }
 .tb-swatch-marker[data-marker="1"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .tb-swatch-marker[data-marker="2"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
