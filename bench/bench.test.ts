@@ -2132,6 +2132,30 @@ describe("accessibility wiring", () => {
 		assert.equal(accents.themed, "#0b6b5f");
 		await page.close();
 	});
+
+	it("lets a host give accent text its own colour, while fills keep the accent (#106)", async () => {
+		// An amber bright enough for a button is not readable as small text on white, so the two can differ.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=queue-explorer`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-foot a").first().waitFor({ timeout: 15_000 });
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				const link = root?.querySelector(".tb-foot a");
+				const run = root?.querySelector(".tb-run");
+				return { link: link ? getComputedStyle(link).color : "", run: run ? getComputedStyle(run).backgroundColor : "" };
+			});
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent", "rgb(245, 158, 11)"));
+		const accentOnly = await read();
+		assert.equal(accentOnly.run, "rgb(245, 158, 11)", "Run is filled with the accent");
+		assert.equal(accentOnly.link, "rgb(245, 158, 11)", "with no text token set, text follows the accent, as before");
+
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent-text", "rgb(164, 104, 5)"));
+		const both = await read();
+		assert.equal(both.run, "rgb(245, 158, 11)", "the fill does not move");
+		assert.equal(both.link, "rgb(164, 104, 5)", "the link takes the text token");
+		await page.close();
+	});
 });
 
 describe("host code highlight hook", () => {

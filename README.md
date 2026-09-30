@@ -472,6 +472,14 @@ tool-host {
 }
 ```
 
+`--tb-accent` is a fill colour. Accent-coloured text (links, the card's hint, annotation labels) reads
+`--tb-accent-text`, which defaults to the accent. Set both when the accent is bright, since a bright
+amber that works as a button cannot be small text on white:
+
+```css
+tool-host { --tb-accent: #f59e0b; --tb-accent-text: #a46805; }
+```
+
 Defaults use `light-dark()`, so a tool follows the page's colour scheme before anyone configures
 anything. The full list is at the top of
 [`packages/runtime/src/styles.ts`](packages/runtime/src/styles.ts).
