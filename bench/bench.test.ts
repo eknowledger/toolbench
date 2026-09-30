@@ -1488,7 +1488,16 @@ describe("charts over whole-number x values (#111)", () => {
 	async function chartFor(value: string) {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
-		await page.locator("#host >> select").first().selectOption(value);
+		/*
+		 * Through the host API, and waiting on the run itself. Selecting the option and waiting for "a chart"
+		 * reads whichever chart is on screen first, which for an autoRun tool can be the default case.
+		 */
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
 		const read = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
@@ -1567,7 +1576,8 @@ describe("charts over whole-number x values (#111)", () => {
 		// The histogram's bins are two apart; any label must name one of them.
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
-		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement & { run(): Promise<void> }).run());
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
 		const geometry = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
