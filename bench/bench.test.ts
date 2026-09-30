@@ -1480,6 +1480,109 @@ describe("bar chart geometry", () => {
 	});
 });
 
+describe("charts over whole-number x values (#111)", () => {
+	/*
+	 * Every expectation here is worked out from the data in `bench/fixtures/discrete-series`, not read off
+	 * the renderer: frames 1 to 20, a deadline of 20n + 70 ms, arrivals of 20n + 30, and frame 5 lost.
+	 */
+	async function chartFor(value: string) {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> select").first().selectOption(value);
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			const num = (el: Element, name: string) => Number(el.getAttribute(name));
+			const ticks = [...(svg?.querySelectorAll("text.tb-tick") ?? [])].map((t) => ({
+				text: t.textContent ?? "",
+				x: num(t, "x"),
+				y: num(t, "y"),
+				anchor: t.getAttribute("text-anchor"),
+			}));
+			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => ({
+				x: num(r, "x"),
+				y: num(r, "y"),
+				width: num(r, "width"),
+				height: num(r, "height"),
+				series: [...r.classList].find((c) => /^tb-s\d$/.test(c)) ?? "",
+			}));
+			const grid = [...(svg?.querySelectorAll("line.tb-grid") ?? [])].map((l) => num(l, "y1"));
+			return { ticks, bars, grid };
+		});
+		await page.close();
+		// y labels are right-anchored at the axis, x labels centred under the plot.
+		return {
+			...read,
+			yLabels: read.ticks.filter((t) => t.anchor === "end").map((t) => t.text),
+			xLabels: read.ticks.filter((t) => t.anchor === "middle").map((t) => t.text),
+		};
+	}
+
+	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
+		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
+		const chart = await chartFor("lines");
+		assert.deepEqual(chart.yLabels, ["0", "100", "200", "300", "400", "500"]);
+		assert.deepEqual(chart.xLabels, ["5", "10", "15", "20"]);
+	});
+
+	it("puts two bar series side by side, never on top of each other", async () => {
+		const chart = await chartFor("two-bars");
+		const first = chart.bars.filter((b) => b.series === "tb-s1");
+		const second = chart.bars.filter((b) => b.series === "tb-s2");
+		assert.equal(first.length, 20);
+		assert.equal(second.length, 20);
+		first.forEach((a, i) => {
+			const b = second[i];
+			assert.ok(b, `frame ${i + 1} has a bar in each series`);
+			assert.ok(a.x + a.width <= b.x + 1e-6, `frame ${i + 1}: the first series ends at ${a.x + a.width}, the second starts at ${b.x}`);
+		});
+		// Repair at 330 leaves frames 5 to 12 late by 160, 140 ... 20, so the tallest second-series bar is frame 5.
+		const tallest = second.reduce((best, bar, i) => (bar.height > (second[best]?.height ?? 0) ? i : best), 0);
+		assert.equal(tallest, 4);
+	});
+
+	it("draws nothing for a series of zeros, on an axis that does not go below zero", async () => {
+		const chart = await chartFor("zero-bars");
+		assert.ok(chart.bars.every((b) => b.height === 0), `bar heights: ${chart.bars.map((b) => b.height).join(",")}`);
+		assert.ok(chart.yLabels.every((label) => !label.startsWith("-") && !label.startsWith("−")), `y labels: ${chart.yLabels.join(", ")}`);
+		// The value, not its spelling: a 0.2-step axis prints two decimals, which is the formatter's rule and not this fix.
+		assert.equal(Number(chart.yLabels[0]), 0);
+	});
+
+	it("grows bars up and down from zero, not from the floor of the plot", async () => {
+		// Values -10, 10, -30, 40: the scale is -40 to 40, and every bar has one edge on the zero gridline.
+		const chart = await chartFor("signed-bars");
+		const zeroTick = chart.ticks.find((t) => t.anchor === "end" && t.text === "0");
+		assert.ok(zeroTick, `a 0 on the y axis, got ${chart.yLabels.join(", ")}`);
+		const zeroY = zeroTick.y - 4; // the label sits 4 units below its gridline
+		const [minus10, plus10, minus30, plus40] = chart.bars;
+		assert.ok(minus10 && plus10 && minus30 && plus40, "four bars");
+		assert.ok(Math.abs(plus10.y + plus10.height - zeroY) < 0.5, "a positive bar ends on zero");
+		assert.ok(Math.abs(minus10.y - zeroY) < 0.5, "a negative bar starts on zero");
+		assert.ok(Math.abs(plus40.height - 4 * plus10.height) < 0.5, "40 is four times as tall as 10");
+		assert.ok(Math.abs(minus30.height - 3 * minus10.height) < 0.5, "-30 is three times as tall as -10");
+	});
+
+	it("puts a bar chart's x labels on bars, not between them", async () => {
+		// The histogram's bins are two apart; any label must name one of them.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const geometry = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			const centres = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => Number(r.getAttribute("x")) + Number(r.getAttribute("width")) / 2);
+			const labels = [...(svg?.querySelectorAll("text.tb-tick[text-anchor=middle]") ?? [])].map((t) => Number(t.getAttribute("x")));
+			return { centres, labels };
+		});
+		await page.close();
+		assert.ok(geometry.labels.length > 1, "more than one x label");
+		for (const x of geometry.labels) {
+			assert.ok(geometry.centres.some((c) => Math.abs(c - x) < 0.5), `x label at ${x} is not on any bar (${geometry.centres.join(", ")})`);
+		}
+	});
+});
+
 describe("the chart renderer is its own chunk", () => {
 	/*
 	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the
