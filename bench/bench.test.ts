@@ -234,7 +234,8 @@ describe("card mode — the facade", () => {
 		await host.locator(".tb-form").waitFor();
 
 		assert.equal(await host.locator(".tb-output > *").count(), 0, "activation must not run the tool");
-		assert.match(String(await host.locator(".tb-status").textContent()), /press Run/);
+		// Nothing is on screen, so there is nothing to say: "press Run" only restated the button below it (#99).
+		assert.equal(String(await host.locator(".tb-status").textContent()).trim(), "");
 
 		await host.locator(".tb-run").click();
 		/*
@@ -724,6 +725,19 @@ describe("sample inputs — contract version 3", () => {
 		await page.close();
 	});
 
+	it("gives an autoRun tool no Run button and no instruction to press one (#104)", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const state = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return { run: root?.querySelectorAll(".tb-run").length ?? -1, status: root?.querySelector(".tb-status")?.textContent ?? "" };
+		});
+		assert.equal(state.run, 0);
+		assert.doesNotMatch(state.status, /press Run/);
+		await page.close();
+	});
+
 	/*
 	 * The other branch of #applySample. percentiles above proves a sample fills and stops; histogram sets
 	 * `autoRun`, so the same click must also produce a result, and the status must be the run's own rather
@@ -737,18 +751,22 @@ describe("sample inputs — contract version 3", () => {
 		await page.waitForSelector("#host >> .tb-samples");
 
 		/*
-		 * ⚠️ `autoRun` fires from #inputChanged only, never on load, so there is no result on the page yet.
-		 * Asserting that first is what stops "a result exists afterwards" from being true either way.
+		 * ⚠️ An `autoRun` tool computes its default answer on arrival (#104), so a result is already on the
+		 * page. What the sample has to prove is that it produces a DIFFERENT one, so the data table's text is
+		 * compared before and after rather than asking whether any result exists.
 		 */
 		const before = await page.locator("#host >> .tb-textarea").inputValue();
-		assert.equal(
-			await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.children.length ?? -1),
-			0,
-			"autoRun means as the reader types, not on arrival: a fresh page must show no result",
-		);
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const tableOf = () => page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? "");
+		const firstTable = await tableOf();
+		assert.ok(firstTable.length > 0, "an autoRun tool shows its default result on arrival, with no Run button to press");
 
 		await page.locator('#host >> .tb-sample:text-is("One spike")').click();
-		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		await page.waitForFunction(
+			(previous) => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? previous) !== previous,
+			firstTable,
+			{ timeout: 10_000 },
+		);
 		const after = await page.evaluate(() => {
 			const root = document.querySelector("#host")?.shadowRoot;
 			return {
@@ -1415,7 +1433,7 @@ describe("bar chart geometry", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
 		await page.locator("#host").scrollIntoViewIfNeeded();
-		await page.locator("#host >> .tb-run").click();
+		// histogram is `autoRun`, so its default chart is drawn on arrival and there is no Run to press.
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
 
 		const geometry = await page.evaluate(() => {
@@ -1852,6 +1870,47 @@ describe("lifecycle status", () => {
 });
 
 describe("accessibility wiring", () => {
+	it("moves focus to the answer for a keyboard Run, not for a mouse click (#101)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		const run = page.locator("#host >> .tb-run");
+		await run.waitFor();
+		const where = () =>
+			page.evaluate(() => ({
+				scrollY: window.scrollY,
+				onOutput: document.querySelector("#host")?.shadowRoot?.activeElement?.classList.contains("tb-output") === true,
+			}));
+
+		await run.scrollIntoViewIfNeeded();
+		const before = await where();
+		await run.click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
+		const afterClick = await where();
+		assert.equal(afterClick.onOutput, false, "a pointer press leaves focus where the reader is");
+		assert.equal(afterClick.scrollY, before.scrollY, "and does not scroll the page to the result");
+
+		await run.focus();
+		await page.keyboard.press("Enter");
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.activeElement?.classList.contains("tb-output") === true, null, {
+			timeout: 10_000,
+		});
+		// The ring it then wears is the theme's accent outline, not the browser's default (#99).
+		const ring = await page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement;
+			const output = host.shadowRoot?.querySelector(".tb-output") as HTMLElement;
+			const probe = document.createElement("span");
+			probe.style.color = getComputedStyle(host).getPropertyValue("--tb-accent");
+			document.body.append(probe);
+			const accent = getComputedStyle(probe).color;
+			probe.remove();
+			const style = getComputedStyle(output);
+			return { style: style.outlineStyle, color: style.outlineColor, accent };
+		});
+		assert.equal(ring.style, "solid");
+		assert.equal(ring.color, ring.accent);
+		await page.close();
+	});
+
 	it("names the facade button with the visible try/open hint, not just Open plus the tool name", async () => {
 		/*
 		 * WCAG 2.5.3 (Label in Name). The facade is one button wrapping the card body. Its visible
@@ -2043,8 +2102,7 @@ describe("host code highlight hook", () => {
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
 		const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 		await host.scrollIntoViewIfNeeded();
-		await host.locator(".tb-run").waitFor();
-		await host.locator(".tb-run").click();
+		// json-code is `autoRun`: its default result arrives without a Run button to press.
 		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 		const painted = await page.evaluate(() => {
@@ -2087,8 +2145,7 @@ describe("host code highlight hook", () => {
 		await page.goto(`${BASE}/index.html?code=plain`, { waitUntil: "load" });
 		const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 		await host.scrollIntoViewIfNeeded();
-		await host.locator(".tb-run").waitFor();
-		await host.locator(".tb-run").click();
+		// json-code is `autoRun`: its default result arrives without a Run button to press.
 		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 		const plain = await page.evaluate(() => {
@@ -2126,7 +2183,6 @@ describe("host code highlight hook", () => {
 			await page.goto(`${BASE}/index.html?code=${mode}`, { waitUntil: "load" });
 			const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 			await host.scrollIntoViewIfNeeded();
-			await host.locator(".tb-run").click();
 			await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 			const shown = await page.evaluate(() => {

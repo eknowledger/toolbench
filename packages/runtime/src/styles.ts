@@ -129,7 +129,8 @@ export const STYLES = /* css */ `
 }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible, .tb-sample:focus-visible {
+/* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
