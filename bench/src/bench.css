@@ -58,3 +58,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   --tb-border: light-dark(#b9dbd4, #1d3a35);
   --tb-font: Georgia, "Times New Roman", serif;
 }
+
+/* The chart gallery: one figure per case, captioned underneath like a figure in prose. */
+.chart-case { margin: 0 0 2rem; }
+.chart-case figcaption { margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted, #5c6270); }
