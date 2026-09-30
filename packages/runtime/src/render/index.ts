@@ -53,6 +53,16 @@ export function chartRendererReady(): boolean {
 export interface RenderOptions {
 	/** Compact mode: fewer fields, no captions, no chart legend. */
 	compact?: boolean;
+	/**
+	 * Draw charts at card size. Defaults to `compact`.
+	 *
+	 * ⚠️ Separate from `compact` because the two answer different questions. `compact` is how much to
+	 * show, and expanding a truncated result rightly lifts it. Chart size is a statement about the
+	 * container, and expanding does not change the container: when size followed `compact`, pressing
+	 * "Show 1 more result" on a card grew the chart the reader was already looking at from 832x390 to
+	 * 1190x558 and pushed the page down (#100).
+	 */
+	cardChart?: boolean;
 	/** How many fields a compact render shows before stopping. */
 	cardFields?: number;
 	/**
@@ -161,7 +171,7 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 				 * `compact: false` rather than lifting the field cap alone, because "show me the rest" should
 				 * not still be hiding a table caption or byte rows for the same reason.
 				 */
-				const inner: RenderOptions = expanded ? { ...options, compact: false } : options;
+				const inner: RenderOptions = expanded ? { ...options, compact: false, cardChart: (options.cardChart ?? options.compact) === true } : options;
 				return el(
 					"div",
 					{ class: "tb-group" },

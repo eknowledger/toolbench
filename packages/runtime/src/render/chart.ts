@@ -37,7 +37,7 @@ const PAD = { top: 18, right: 20, rightWithAxis: 58, bottom: 44, left: 56 };
  * viewBox is what keeps the aspect ratio, which is the part that was broken before.
  */
 export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElement {
-	const compact = options.compact === true;
+	const compact = (options.cardChart ?? options.compact) === true;
 	const left = chart.series.filter((s) => (s.axis ?? "left") === "left");
 	const right = chart.series.filter((s) => s.axis === "right");
 	const plot = {
