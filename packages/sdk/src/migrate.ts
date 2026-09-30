@@ -86,6 +86,17 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 4,
+		/*
+		 * 4 → 5 added the optional `control` hint on a number input.
+		 *
+		 * Identity on both halves. A v4 manifest cannot carry it, and a number input without it renders
+		 * the box it always did. Defaulting to a slider would be a presentation choice the author never made.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {

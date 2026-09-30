@@ -100,8 +100,12 @@ const BUDGETS = [
 	 * same one: a chunk nobody watches is a chunk that grows. 571 bytes for one fixture, and open pull
 	 * requests add three more, so the ceiling is set to leave room for those without leaving room for
 	 * everything.
+	 *
+	 * Raised from 2_000 to 2_500 by the slider fixture (#102), the one that crossed it, after the
+	 * discrete-series fixture (#111). Both exist so browser tests can put a contract feature on screen; no
+	 * reader downloads this chunk.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_500, deployOnly: true },
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for

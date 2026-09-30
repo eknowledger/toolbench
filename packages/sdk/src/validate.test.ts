@@ -83,6 +83,13 @@ describe("validateManifest", () => {
 		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 99, min: 0, max: 10 }]; }, "inputs[0].default", "outside");
 	});
 
+	it("accepts control: slider on a number input, and nothing else there (contract 5)", () => {
+		const m = { ...good(), inputs: [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 10, control: "slider" }] };
+		const input = validateManifest(m).inputs[0];
+		assert.ok(input?.type === "number" && input.control === "slider");
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 10, control: "dial" }]; }, "inputs[0].control", "slider");
+	});
+
 	it("requires two options on a select", () => {
 		failsWith((m) => {
 			m.inputs = [{ id: "s", type: "select", label: "S", default: "a", options: [{ value: "a", label: "A" }] }];

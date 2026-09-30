@@ -124,6 +124,8 @@ export class ToolHost extends HTMLElement {
 	 */
 	#expanded = false;
 	#controls = new Map<string, HTMLElement>();
+	/** The range control beside a number box that asked for `control: "slider"`, kept in step with it. */
+	#sliders = new Map<string, HTMLInputElement>();
 	#els: {
 		output?: HTMLElement;
 		status?: HTMLElement;
@@ -606,6 +608,7 @@ export class ToolHost extends HTMLElement {
 		const inputs = compact ? primaryOnly(manifest.inputs) : manifest.inputs;
 		const form = el("fieldset", { class: "tb-form" });
 		this.#controls.clear();
+		this.#sliders.clear();
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
@@ -767,7 +770,7 @@ export class ToolHost extends HTMLElement {
 	#control(spec: InputSpec): HTMLElement {
 		const id = `in-${spec.id}`;
 		const describedBy: string[] = [];
-		const label = el("label", { class: "tb-label", for: id }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
+		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		const row = el("div", { class: "tb-field-row" });
 		const desc = spec.description ? el("p", { class: "tb-desc", id: `${id}-desc` }, spec.description) : null;
 		if (desc) describedBy.push(`${id}-desc`);
@@ -834,9 +837,35 @@ export class ToolHost extends HTMLElement {
 					// Clamped here, not in the tool: min and max are the only guard against an input
 					// that turns a bounded computation into an unbounded one.
 					this.#values[spec.id] = coerce(spec, input.value);
+					const slider = this.#sliders.get(spec.id);
+					if (slider) slider.value = String(this.#values[spec.id]);
 					this.#inputChanged();
 				});
 				control = input;
+				/*
+				 * A slider for a value read by sweeping it (#102), and a native one: `<input type="range">` is
+				 * arrow-key operable and announces its value, which a custom track would have to rebuild. The
+				 * number box stays, editable and registered as THE control, so exact entry, Enter to run,
+				 * samples and error marking all work exactly as they do without a slider. The two share a
+				 * label and follow each other; the box is the visible value, so a reader can always report it.
+				 */
+				if (spec.control === "slider") {
+					const slider = el("input", {
+						class: "tb-slider",
+						type: "range",
+						min: spec.min,
+						max: spec.max,
+						...(spec.step !== undefined ? { step: spec.step } : {}),
+						"aria-labelledby": `${id}-label`,
+					});
+					slider.value = input.value;
+					slider.addEventListener("input", () => {
+						this.#values[spec.id] = coerce(spec, slider.value);
+						input.value = String(this.#values[spec.id]);
+						this.#inputChanged();
+					});
+					this.#sliders.set(spec.id, slider);
+				}
 				break;
 			}
 			default: {
@@ -880,7 +909,8 @@ export class ToolHost extends HTMLElement {
 			row.append(el("div", { class: "tb-toggle-row" }, control, label));
 			if (desc) row.append(desc);
 		} else {
-			row.append(label, control);
+			const slider = this.#sliders.get(spec.id);
+			row.append(label, slider ? el("div", { class: "tb-slider-row" }, slider, control) : control);
 			if (desc) row.append(desc);
 		}
 		// The per-input error slot: empty until a result names this input.
@@ -964,6 +994,8 @@ export class ToolHost extends HTMLElement {
 			const next = this.#values[spec.id];
 			if (spec.type === "toggle") (control as HTMLInputElement).checked = Boolean(next);
 			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next ?? "");
+			const slider = this.#sliders.get(spec.id);
+			if (slider) slider.value = String(next ?? "");
 		}
 	}
 

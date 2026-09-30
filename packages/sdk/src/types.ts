@@ -163,7 +163,19 @@ interface InputBase {
 export type InputSpec =
 	| (InputBase & { type: "text"; default: string; maxLength?: number })
 	| (InputBase & { type: "textarea"; default: string; rows?: number; maxLength?: number })
-	| (InputBase & { type: "number"; default: number; min: number; max: number; step?: number })
+	| (InputBase & {
+			type: "number";
+			default: number;
+			min: number;
+			max: number;
+			step?: number;
+			/**
+			 * `slider` asks for a range control beside the number box, for a tool read by sweeping a value
+			 * rather than by typing one. A hint, not a type: a runtime that does not know it renders the box
+			 * alone. Contract version 5.
+			 */
+			control?: "slider";
+	  })
 	| (InputBase & { type: "select"; default: string; options: { value: string; label: string }[] })
 	| (InputBase & { type: "toggle"; default: boolean });
 
