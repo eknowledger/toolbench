@@ -84,9 +84,8 @@ const BUDGETS = [
 	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
 	 *
 	 * Raised from 22_000 to 22_500 by contract v4's chart markers, the change that crossed it: the marker
-	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured on
-	 * that branch alone. The rest of the headroom is for the fixes released with it, #97, #98/#105,
-	 * #99/#101/#104, #100 and #106, which together add about 300 bytes and no feature.
+	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured with
+	 * #111's tick and bar fixes beneath it, 242 bytes of that the markers' own.
 	 */
 	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
 	/*
