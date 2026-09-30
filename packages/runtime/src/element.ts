@@ -312,15 +312,25 @@ export class ToolHost extends HTMLElement {
 			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
 			/*
-			 * ⚠️ Before the first paint, not on first use, and only for tools that say they draw one.
+			 * ⚠️ Before the first paint, and only when this paint is going to draw a chart.
 			 *
 			 * The chart renderer is its own chunk, about 1.5 KB gzipped that most pages never need. Awaiting
 			 * it here is what lets `render` stay synchronous: a seeded card paints a chart in `#paint` with
-			 * no chance to await, and every later draw is synchronous too. `kinds` is the manifest's own
-			 * declaration of what `run` can return, so it is the right thing to ask, and a tool that gets it
-			 * wrong is covered by the redraw in `#draw`.
+			 * no chance to await, and every later draw is synchronous too.
+			 *
+			 * The trigger used to be `kinds`, which says what `run` CAN return. A closed card has not run and
+			 * may never run, so every card declaring `series` fetched the chunk for a chart it would not draw
+			 * unless opened (#97). A card now asks what its seed contains; activation loads it for everything
+			 * else. Embed and page hosts activate as soon as they are visible, so they keep the early start.
+			 *
+			 * ⚠️ And the load is not fatal. It sat inside this `try`, whose `catch` is `#fatal`, so one missed
+			 * request (a purge mid-deploy, an offline reload, a strict CSP) replaced every series-declaring
+			 * card on the page with a bundler error before a facade had painted. A card that cannot fetch a
+			 * renderer it does not yet need is still a working card; a seed that needed it degrades in
+			 * `#paint` to the parts that can be drawn.
 			 */
-			if (manifest.kinds.includes("series")) await loadChartRenderer();
+			const drawsNow = this.mode !== "card" || containsSeries(this.#seed);
+			if (manifest.kinds.includes("series") && drawsNow) await loadChartRenderer().catch(() => undefined);
 			this.#paint();
 
 			/*
@@ -383,7 +393,10 @@ export class ToolHost extends HTMLElement {
 		this.#loading = true;
 		this.#paint();
 		try {
+			// Not fatal, for the same reason as in `#prepare`: `#draw` retries if a chart turns up without it.
+			const chart = this.#manifest?.kinds.includes("series") ? loadChartRenderer().catch(() => undefined) : undefined;
 			this.#loaded = await this.#resolve(cfg);
+			await chart;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -574,7 +587,7 @@ export class ToolHost extends HTMLElement {
 				mode === "page" ? null : el("p", { class: "tb-blurb" }, manifest.blurb),
 				mode === "embed" ? lifecycleMark(life) : null,
 				this.#seed
-					? render(
+					? renderOrDegrade(
 							this.#seed,
 							withHostHighlight({
 								compact,
@@ -1019,7 +1032,10 @@ export class ToolHost extends HTMLElement {
 				 * preload. Load and draw again rather than telling a reader the shape cannot be drawn, which
 				 * would be false. One frame late is the cost of a manifest that understated itself.
 				 */
-				void loadChartRenderer().then(() => this.#draw(output));
+				void loadChartRenderer().then(
+					() => this.#draw(output),
+					() => fill(target, degraded(output, (rest) => render(rest, { compact }))),
+				);
 				return;
 			}
 			// A kind this build cannot draw: an old runtime meeting a newer tool.
@@ -1111,6 +1127,36 @@ function lifecycleMark(status: NonNullable<Manifest["status"]>): HTMLElement | n
 	if (status === "deprecated") return el("span", { class: "tb-mark", "data-status": "deprecated" }, "Deprecated");
 	if (status === "retired") return el("span", { class: "tb-mark", "data-status": "retired" }, "Retired");
 	return null;
+}
+
+/** Whether an output has a chart anywhere in it. */
+function containsSeries(output: Output | undefined): boolean {
+	if (!output) return false;
+	if (output.kind === "series") return true;
+	return output.kind === "group" && output.parts.some((part) => containsSeries(part));
+}
+
+/**
+ * Render, and if the chart renderer is not loaded, render everything that is not a chart.
+ *
+ * Only reached when the chart chunk could not be fetched. The reader gets the fields and tables and a
+ * line saying the chart is missing, instead of an error in place of the whole result.
+ */
+function renderOrDegrade(output: Output, options: RenderOptions): HTMLElement {
+	try {
+		return render(output, options);
+	} catch (error) {
+		if (!(error instanceof ChartRendererMissing)) throw error;
+		return degraded(output, (rest) => render(rest, options));
+	}
+}
+
+function degraded(output: Output, draw: (rest: Output) => HTMLElement): HTMLElement {
+	const note = el("p", { class: "tb-status" }, "The chart could not be loaded.");
+	const rest = output.kind === "group" ? output.parts.filter((part) => !containsSeries(part)) : [];
+	if (rest.length === 0) return note;
+	const body = draw(rest.length === 1 ? (rest[0] as Output) : { kind: "group", parts: rest });
+	return el("div", {}, body, note);
 }
 
 function titleRow(manifest: Manifest, compact: boolean, pageUrl: string | undefined): HTMLElement {

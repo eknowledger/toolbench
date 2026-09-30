@@ -1682,6 +1682,48 @@ describe("the chart renderer is its own chunk", () => {
 		);
 		await page.close();
 	});
+
+	it("is not fetched by a closed card that has no chart to draw yet (#97)", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/failure.html`, { waitUntil: "load" });
+		const card = page.locator("#chartless-card");
+		await card.locator(".tb-facade").waitFor({ timeout: 10_000 });
+		assert.equal(scripts.filter((url) => chartChunk.test(url)).length, 0, "histogram declares series, but a closed unseeded card draws none");
+
+		await card.locator(".tb-facade").click();
+		// Through the host API rather than the Run button, which an autoRun tool may not have.
+		await card.evaluate((host) => (host as HTMLElement & { run(): Promise<void> }).run());
+		await card.locator(".tb-out-chart svg").waitFor({ timeout: 15_000 });
+		assert.equal(scripts.filter((url) => chartChunk.test(url)).length, 1, "opening it is what fetches the renderer");
+		await page.close();
+	});
+
+	it("leaves every card working when the chart renderer cannot be fetched (#97)", async () => {
+		const page = await browser.newPage();
+		await page.route(chartChunk, (route) => route.abort());
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		// The seeded queue-explorer card needs the chart to paint its seed: it paints the rest instead.
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-facade").waitFor({ timeout: 10_000 });
+		assert.equal(await seeded.locator(".tb-out-error").count(), 0, "no error box in place of the card");
+		assert.match(String(await seeded.locator(".tb-facade").textContent()), /The chart could not be loaded/);
+		await page.close();
+
+		// An unseeded card opens and runs, and says the chart is missing rather than failing.
+		const other = await browser.newPage();
+		await other.route(chartChunk, (route) => route.abort());
+		await other.goto(`${BASE}/failure.html`, { waitUntil: "load" });
+		const card = other.locator("#chartless-card");
+		await card.locator(".tb-facade").click();
+		await card.evaluate((host) => (host as HTMLElement & { run(): Promise<void> }).run());
+		await card.locator(".tb-output").getByText("The chart could not be loaded.").waitFor({ timeout: 15_000 });
+		assert.equal(await card.locator(".tb-out-error").count(), 0);
+		await other.close();
+	});
 });
 
 describe("page mode", () => {
