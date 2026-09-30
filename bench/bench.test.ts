@@ -1870,7 +1870,8 @@ describe("accessibility wiring", () => {
 			const read = (host: Element | null) => {
 				const root = host?.shadowRoot;
 				const hint = root?.querySelector(".tb-facade-hint")?.textContent ?? "";
-				const name = root?.querySelector(".tb-facade")?.getAttribute("aria-label") ?? "";
+				// The hint itself is the button now (#98, #105), so it carries the name.
+				const name = root?.querySelector("button.tb-facade-hint")?.getAttribute("aria-label") ?? "";
 				return { hint, name };
 			};
 			return {
@@ -1892,6 +1893,61 @@ describe("accessibility wiring", () => {
 			`unseeded facade name "${names.unseeded.name}" must contain the visible hint "${names.unseeded.hint}"`,
 		);
 		assert.match(names.unseeded.name, /Percentiles/);
+		await page.close();
+	});
+
+	it("keeps a card's contents out of its button, so they are announced and nothing is nested (#98, #105)", async () => {
+		/*
+		 * The three axe failures had one cause: the whole card inside a <button>. Asserted structurally, since
+		 * axe is not a dependency here and two of the three rules are skipped by its default tags anyway.
+		 */
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-facade .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const shape = await seeded.evaluate((host) => {
+			const root = host.shadowRoot as ShadowRoot;
+			const buttons = [...root.querySelectorAll("button")];
+			const summary = root.querySelector(".tb-chart-data summary");
+			return {
+				buttons: buttons.map((b) => ({ cls: b.className, text: b.textContent?.trim() ?? "", name: b.getAttribute("aria-label") ?? "" })),
+				blurbInButton: Boolean(root.querySelector(".tb-blurb")?.closest("button")),
+				seedInButton: Boolean(root.querySelector(".tb-out-chart")?.closest("button")),
+				summaryInButton: Boolean(summary?.closest("button")),
+				summaryHeight: summary?.getBoundingClientRect().height ?? 0,
+			};
+		});
+		assert.deepEqual(
+			shape.buttons.map((b) => b.cls),
+			["tb-facade-hint"],
+			"a closed card has exactly one button, the hint",
+		);
+		assert.ok(shape.buttons[0]?.name.startsWith(shape.buttons[0]?.text ?? "?"), "its name starts with its visible text (WCAG 2.5.3)");
+		assert.equal(shape.blurbInButton, false, "the blurb is content, reachable by a screen reader");
+		assert.equal(shape.seedInButton, false, "and so is the seeded answer");
+		assert.equal(shape.summaryInButton, false, "the data-table disclosure is not nested in a button (WCAG 4.1.2)");
+		assert.ok(shape.summaryHeight >= 24, `the disclosure is a 24px target (WCAG 2.5.8), measured ${shape.summaryHeight}px`);
+		await page.close();
+	});
+
+	it("opens a card from anywhere on it, and from the keyboard, but not from a control inside it (#98)", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		// A click on the blurb opens the card, as it always did.
+		const byClick = page.locator("tool-host[tool=percentiles]").first();
+		await byClick.locator(".tb-blurb").click();
+		await byClick.locator(".tb-form").waitFor({ timeout: 10_000 });
+
+		// Opening the seeded chart's data table does not open the card.
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-chart-data summary").click();
+		assert.equal(await seeded.locator(".tb-chart-data").getAttribute("open"), "", "the table opened");
+		assert.equal(await seeded.locator(".tb-form").count(), 0, "and the card stayed closed");
+
+		// Enter on the hint opens it.
+		await seeded.locator("button.tb-facade-hint").focus();
+		await page.keyboard.press("Enter");
+		await seeded.locator(".tb-form").waitFor({ timeout: 10_000 });
 		await page.close();
 	});
 

@@ -129,7 +129,7 @@ export const STYLES = /* css */ `
 }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible, .tb-sample:focus-visible {
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
@@ -330,7 +330,8 @@ export const STYLES = /* css */ `
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
 .tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
-.tb-chart-data summary { color: var(--tb-faint); cursor: pointer; }
+/* 24px tall, the minimum target size (WCAG 2.5.8): at the text's own height it was 19px. */
+.tb-chart-data summary { color: var(--tb-faint); cursor: pointer; min-height: 24px; line-height: 24px; }
 .tb-chart-data table { margin-top: 0.5rem; }
 
 /* ── bytes ────────────────────────────────────────────────────────────────────────────────── */
@@ -373,14 +374,18 @@ export const STYLES = /* css */ `
 .tb-bytes-legend li[data-tone="bad"]  .tb-bytes-swatch { background: var(--tb-bad); }
 
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
-.tb-facade {
-  display: block; width: 100%; text-align: start;
-  font: inherit; color: inherit; background: none; border: 0; padding: 0;
-  cursor: pointer;
-}
+/* Ordinary content, clickable as a whole; the hint inside it is the button (#98, #105). */
+.tb-facade { cursor: pointer; }
 .tb-facade-hint {
   display: inline-flex; align-items: center; gap: 0.375rem;
   font-size: 0.8rem; font-weight: 600; color: var(--tb-accent);
+}
+/* The hint as a button: no button chrome, and a 24px target (WCAG 2.5.8). */
+button.tb-facade-hint {
+  font-family: inherit; background: none; border: 0; padding: 0; margin: 0;
+  min-height: 24px; cursor: pointer;
+  /* The card body is a grid, which would stretch the button, and its focus ring, across the card. */
+  justify-self: start;
 }
 .tb-facade-hint::before {
   content: ""; width: 0; height: 0;
