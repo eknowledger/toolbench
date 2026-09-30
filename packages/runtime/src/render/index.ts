@@ -41,6 +41,12 @@ export class ChartRendererMissing extends Error {
 }
 
 /** Loads the chart chunk. Idempotent, and awaited by `<tool-host>` for tools that declare `series`. */
+/*
+ * ⚠️ A failed load is final for the page. Browsers keep a failed dynamic import in the module map and
+ * hand back the same rejection to every later `import()` of that URL: measured in Chrome, one refused
+ * request and no second one, however often this is called. So a caller must treat failure as "draw
+ * without charts until reload", which is what the host does, rather than expect a retry to help.
+ */
 export async function loadChartRenderer(): Promise<void> {
 	renderChart ??= (await import("./chart.ts")).renderChart;
 }
