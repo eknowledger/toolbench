@@ -82,8 +82,13 @@ const BUDGETS = [
 	 * expanding never re-runs the tool. For a worker-mode tool, a lazy version would be a round trip.
 	 *
 	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
+	 *
+	 * Raised from 22_000 to 22_500 by contract v4's chart markers, the change that crossed it: the marker
+	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured on
+	 * that branch alone. The rest of the headroom is for the fixes released with it, #97, #98/#105,
+	 * #99/#101/#104, #100 and #106, which together add about 300 bytes and no feature.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -107,8 +112,11 @@ const BUDGETS = [
 	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
 	 * rather than deployOnly, because a reader of a chart tool genuinely downloads it: the saving is that
 	 * everybody else does not.
+	 *
+	 * Raised from 2_500 to 3_000 by contract v4's markers and points (#111), which spent it: six marker
+	 * shapes and their placement, on top of #111's readable ticks and grouped bars. 2,738 measured.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 2_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 3_000 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

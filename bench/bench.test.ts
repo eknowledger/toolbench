@@ -1527,6 +1527,49 @@ describe("charts over whole-number x values (#111)", () => {
 		};
 	}
 
+	async function marksFor(value: string) {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-out-chart svg .tb-marker").first().waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
+			const markers = [...(figure?.querySelectorAll("svg path.tb-marker") ?? [])];
+			const bySeries = (cls: string) => markers.filter((m) => m.classList.contains(cls));
+			const shapeOf = (cls: string) => (bySeries(cls)[0]?.getAttribute("d") ?? "").replace(/[\d.,-]+/g, "#");
+			return {
+				lines: figure?.querySelectorAll("svg path.tb-line").length ?? -1,
+				counts: ["tb-s1", "tb-s2", "tb-s3"].map((c) => bySeries(c).length),
+				shapes: ["tb-s1", "tb-s2", "tb-s3"].map(shapeOf),
+				keys: [...(figure?.querySelectorAll(".tb-legend .tb-swatch-marker") ?? [])].map((k) => k.getAttribute("data-marker")),
+				svgs: figure?.querySelectorAll("svg").length ?? -1,
+			};
+		});
+		await page.close();
+		return read;
+	}
+
+	it("draws a marker at every value, one shape per series, and keys the legend by it (contract 4)", async () => {
+		// "Arrives" has 19 values (frame 5 is lost), the two "Released" series 20 each.
+		const marks = await marksFor("markers");
+		assert.deepEqual(marks.counts, [19, 20, 20]);
+		assert.equal(new Set(marks.shapes).size, 3, `three different marker shapes: ${marks.shapes.join(" | ")}`);
+		assert.ok(marks.lines > 0, "markers: true keeps the line");
+		assert.deepEqual(marks.keys, ["0", "1", "2"], "each legend key names its series' marker");
+		assert.equal(marks.svgs, 1, "the keys are not extra SVGs: a chart is still one picture");
+	});
+
+	it("draws points alone, with no line to suggest a value between two frames (contract 4)", async () => {
+		const marks = await marksFor("points");
+		assert.equal(marks.lines, 0);
+		assert.deepEqual(marks.counts, [19, 20, 20]);
+	});
+
 	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
 		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
 		const chart = await chartFor("lines");

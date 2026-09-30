@@ -36,6 +36,25 @@ export default {
 						],
 					},
 				};
+			case "markers":
+			case "points": {
+				// Three series that coincide on frames 1 to 4: the case where lines alone hid two of them.
+				const shape = input.case === "points" ? { shape: "points" as const } : { markers: true };
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Frame",
+						yLabel: "Time",
+						yUnit: "ms",
+						x: frames,
+						series: [
+							{ label: "Arrives", unit: "ms", ...shape, points: frames.map((n) => (n === 5 ? null : 20 * n + 30)) },
+							{ label: "Released, fast", unit: "ms", ...shape, points: held(250) },
+							{ label: "Released, timeout", unit: "ms", ...shape, points: held(330) },
+						],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

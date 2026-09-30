@@ -330,6 +330,15 @@ export const STYLES = /* css */ `
 .tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
+/* Hollow, so markers at the same point nest rather than cover each other. */
+.tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
+/* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
+.tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
+.tb-swatch-marker[data-marker="0"] { clip-path: circle(50%); }
+.tb-swatch-marker[data-marker="1"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.tb-swatch-marker[data-marker="2"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.tb-swatch-marker[data-marker="4"] { clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.tb-swatch-marker[data-marker="5"] { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
 .tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
 .tb-chart-data summary { color: var(--tb-faint); cursor: pointer; }
 .tb-chart-data table { margin-top: 0.5rem; }
