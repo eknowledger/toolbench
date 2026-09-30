@@ -1869,6 +1869,59 @@ describe("lifecycle status", () => {
 	});
 });
 
+describe("layout and page-owned controls (#103)", () => {
+	const order = (page: import("playwright").Page) =>
+		page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-body")?.children ?? [])]
+				.map((c) => c.className.split(" ")[0])
+				.filter((c) => ["tb-form", "tb-actions", "tb-status", "tb-output"].includes(c ?? "")),
+		);
+
+	it("puts the answer above the form with layout=answer-first, and leaves the default alone", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-form", "tb-actions", "tb-status", "tb-output"]);
+		await page.goto(`${BASE}/tool.html?id=percentiles&layout=answer-first`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-status", "tb-output", "tb-form", "tb-actions"]);
+		await page.close();
+	});
+
+	it("draws only the result with controls=none, and runs when the page asks", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles&controls=none`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-output").waitFor({ state: "attached", timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-output"], "no form, no Run, no status line");
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { values: "1 2 3 4 100" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
+		// Writing values again does not dim the answer or claim it is stale: the page owns that.
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { values: "5 6 7" };
+		});
+		assert.equal(await page.locator("#host >> .tb-output[data-stale]").count(), 0);
+		await page.close();
+	});
+
+	it("does not change a card", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host[tool=percentiles]").first();
+		await card.evaluate((host) => {
+			host.setAttribute("layout", "answer-first");
+			host.setAttribute("controls", "none");
+		});
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor({ timeout: 10_000 });
+		assert.equal(await card.locator(".tb-run").count(), 1, "an opened card keeps its form and Run");
+		await page.close();
+	});
+});
+
 describe("accessibility wiring", () => {
 	it("moves focus to the answer for a keyboard Run, not for a mouse click (#101)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
