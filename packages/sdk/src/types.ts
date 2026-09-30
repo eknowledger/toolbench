@@ -172,7 +172,7 @@ export type InputSpec =
 			/**
 			 * `slider` asks for a range control beside the number box, for a tool read by sweeping a value
 			 * rather than by typing one. A hint, not a type: a runtime that does not know it renders the box
-			 * alone. Contract version 5.
+			 * alone. Contract version 4.
 			 */
 			control?: "slider";
 	  })

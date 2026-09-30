@@ -1,5 +1,5 @@
 /**
- * A number input that asks for a slider (contract version 5).
+ * A number input that asks for a slider (contract version 4).
  *
  * It lives in the bench rather than in `tools/` because it exists to put the `slider` control on screen
  * for the browser tests, not as an example of a tool. It answers with the value it was given, so a test

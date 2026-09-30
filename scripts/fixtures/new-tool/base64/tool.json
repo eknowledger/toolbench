@@ -1,5 +1,5 @@
 {
-  "sdk": 5,
+  "sdk": 4,
   "id": "base64",
   "name": "Base64",
   "blurb": "A starter tool that counts characters in its input. Replace the function, the fixtures, and this sentence.",

@@ -1,5 +1,5 @@
 {
-	"sdk": 5,
+	"sdk": 4,
 	"id": "slider",
 	"name": "Slider",
 	"blurb": "A number read by dragging it: the result follows the thumb, and the box beside it takes exact values.",

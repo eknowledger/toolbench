@@ -2089,7 +2089,7 @@ describe("lifecycle status", () => {
 	});
 });
 
-describe("a slider on a number input (contract 5, #102)", () => {
+describe("a slider on a number input (contract 4, #102)", () => {
 	async function open() {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=slider`, { waitUntil: "load" });
