@@ -7,4 +7,4 @@
 
 `"control": "slider"` on a number input draws a range control beside its number box, so a reader can sweep a value and watch the answer follow (with `autoRun`). The box stays editable for exact values, and the slider honours `min`, `max` and `step`.
 
-Contract version 5. A tool uses it with `"sdk": 5`; a runtime that predates it shows the number box alone.
+Contract version 4. A tool uses it with `"sdk": 4`; a runtime that predates it shows the number box alone.

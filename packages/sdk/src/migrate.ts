@@ -78,21 +78,11 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		from: 3,
 		/*
-		 * 3 → 4 added two optional series fields: `markers`, and the `points` shape.
+		 * 3 → 4 added optional fields only: `markers` and the `points` shape on a series, `control` on a
+		 * number input, and the other additions of the same release (docs/versioning.md §9).
 		 *
 		 * Identity on both halves. A v3 tool cannot have returned either, and a series without them is
 		 * drawn exactly as before, so there is nothing to fill in and nothing to take away.
-		 */
-		manifest: (m) => m,
-		output: (o) => o,
-	},
-	{
-		from: 4,
-		/*
-		 * 4 → 5 added the optional `control` hint on a number input.
-		 *
-		 * Identity on both halves. A v4 manifest cannot carry it, and a number input without it renders
-		 * the box it always did. Defaulting to a slider would be a presentation choice the author never made.
 		 */
 		manifest: (m) => m,
 		output: (o) => o,
