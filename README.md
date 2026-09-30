@@ -324,6 +324,29 @@ Opening it reveals the whole result, not only the extra parts. Inside a card, wh
 the disclosure is the single notice: the reader is not told about "2 more fields" they have no control
 over, and opening it shows those as well.
 
+### The answer first, or the page's own controls
+
+A tool used as the opening figure of a page about something else should lead with its answer, with the
+controls underneath for a reader who wants to check it:
+
+```html
+<tool-host tool="percentiles" mode="embed" layout="answer-first"></tool-host>
+```
+
+Or the page can own the controls entirely. `controls="none"` draws the result and nothing else (no form,
+no Run, no status line) and the page drives it with the `values` setter and `run()`:
+
+```html
+<tool-host tool="percentiles" mode="embed" controls="none" id="figure"></tool-host>
+<script type="module">
+  const figure = document.querySelector("#figure");
+  mySlider.addEventListener("input", () => { figure.values = { values: mySlider.value }; figure.run(); });
+</script>
+```
+
+With `controls="none"` the host does not mark a result stale when values change either: whoever owns the
+control that changed it owns saying so. Neither attribute changes a card.
+
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
 then shows a real result with no JavaScript at all.

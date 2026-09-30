@@ -77,7 +77,7 @@ export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): 
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -236,6 +236,26 @@ export class ToolHost extends HTMLElement {
 	 */
 	get more(): "link" | "expand" {
 		return this.getAttribute("more") === "expand" ? "expand" : "link";
+	}
+
+	/**
+	 * `answer-first` puts the result above the form (#103). For a tool used as the opening figure of a page
+	 * about something else, where the result is the argument and the controls are how a sceptic checks it:
+	 * a three-input tool used that way put 480px of fields above an answer below the fold.
+	 *
+	 * Anything else is the default, form first. Ignored by a card, which is already answer-forward.
+	 */
+	get layout(): "default" | "answer-first" {
+		return this.getAttribute("layout") === "answer-first" ? "answer-first" : "default";
+	}
+
+	/**
+	 * `none`: draw the result and nothing else, for a page that owns the controls and drives the tool with
+	 * `values` and `run()` (#103). Without it, any controls a page built were duplicated by the ones inside
+	 * the shadow root. Ignored by a card.
+	 */
+	get controls(): "default" | "none" {
+		return this.getAttribute("controls") === "none" ? "none" : "default";
 	}
 
 	get toolId(): string {
@@ -473,6 +493,8 @@ export class ToolHost extends HTMLElement {
 		if (!output) return;
 		// Nothing to go stale before the first run.
 		const hasResult = output.children.length > 0;
+		// A page that owns the controls owns staleness too (#103): nothing here can say what changed or why.
+		if (this.controls === "none" && this.mode !== "card") return;
 		output.toggleAttribute("data-stale", hasResult);
 		this.#els.run?.toggleAttribute("data-attention", true);
 		// Nothing on screen means nothing is stale, and "press Run" would only restate the button (#99).
@@ -717,20 +739,31 @@ export class ToolHost extends HTMLElement {
 		this.#els = { run, progress, status, announce, output };
 		const embedMark = mode === "embed" ? lifecycleMark(lifecycleStatus(manifest)) : null;
 		if (embedMark) body.append(embedMark);
-		body.append(form);
 		/*
-		 * Not on a card. A card has room for one input and a Run button, and a row of buttons would crowd
-		 * out the result the card exists to show.
+		 * Samples are not on a card. A card has room for one input and a Run button, and a row of buttons
+		 * would crowd out the result the card exists to show.
 		 */
 		const samples = manifest.samples ?? [];
-		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
 		/*
 		 * No Run button for an `autoRun` tool: every change already recomputes, so the button could only
 		 * re-run unchanged inputs, and "press Run" described a mode the tool is not in (#104). The progress
 		 * bar stays, for the rare slow run.
 		 */
 		const autoRun = manifest.autoRun === true;
-		body.append(autoRun ? progress : el("div", { class: "tb-actions" }, run, progress), status, announce, output);
+		const actions = autoRun ? progress : el("div", { class: "tb-actions" }, run, progress);
+		/*
+		 * `controls="none"` and `layout="answer-first"` (#103), neither of which a card honours: a card has
+		 * not been opened, and is answer-forward already.
+		 *
+		 * With no controls there is no actions row and no status line either: the page owns when a run
+		 * happens, and "inputs changed" belongs to whoever owns the control that made the answer stale.
+		 * The announcer stays, since a screen reader still needs to hear that a result arrived.
+		 */
+		const owned = !compact && this.controls === "none";
+		const answerFirst = !compact && this.layout === "answer-first";
+		const controlParts: HTMLElement[] = owned ? [progress] : [form, ...(samples.length > 0 && !compact ? [this.#sampleRow(samples)] : []), actions];
+		const answerParts: HTMLElement[] = owned ? [announce, output] : [status, announce, output];
+		body.append(...(answerFirst ? [...answerParts, ...controlParts] : [...controlParts, ...answerParts]));
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
