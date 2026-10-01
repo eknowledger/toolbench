@@ -144,6 +144,11 @@ export const STYLES = /* css */ `
 }
 .tb-input[aria-invalid="true"], .tb-textarea[aria-invalid="true"] { border-color: var(--tb-bad); }
 .tb-toggle-row { display: flex; align-items: center; gap: 0.5rem; }
+/* A slider takes the width and the number box keeps its own, so the value always shows beside the track. */
+.tb-slider-row { display: flex; align-items: center; gap: 0.75rem; }
+.tb-slider-row .tb-input { width: 7rem; flex: none; }
+.tb-slider { flex: 1; min-width: 0; min-height: 24px; accent-color: var(--tb-accent); }
+.tb-slider:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-actions { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
 .tb-run {
   font: inherit;
@@ -339,6 +344,15 @@ export const STYLES = /* css */ `
 .tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
+/* Hollow, so markers at the same point nest rather than cover each other. */
+.tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
+/* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
+.tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
+.tb-swatch-marker[data-marker="0"] { clip-path: circle(50%); }
+.tb-swatch-marker[data-marker="1"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.tb-swatch-marker[data-marker="2"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.tb-swatch-marker[data-marker="4"] { clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.tb-swatch-marker[data-marker="5"] { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
 .tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
 /* 24px tall, the minimum target size (WCAG 2.5.8): at the text's own height it was 19px. */
 .tb-chart-data summary { color: var(--tb-faint); cursor: pointer; min-height: 24px; line-height: 24px; }

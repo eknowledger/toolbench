@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v3-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-22.6%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v4-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-23.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -324,6 +324,29 @@ Opening it reveals the whole result, not only the extra parts. Inside a card, wh
 the disclosure is the single notice: the reader is not told about "2 more fields" they have no control
 over, and opening it shows those as well.
 
+### The answer first, or the page's own controls
+
+A tool used as the opening figure of a page about something else should lead with its answer, with the
+controls underneath for a reader who wants to check it:
+
+```html
+<tool-host tool="percentiles" mode="embed" layout="answer-first"></tool-host>
+```
+
+Or the page can own the controls entirely. `controls="none"` draws the result and nothing else (no form,
+no Run, no status line) and the page drives it with the `values` setter and `run()`:
+
+```html
+<tool-host tool="percentiles" mode="embed" controls="none" id="figure"></tool-host>
+<script type="module">
+  const figure = document.querySelector("#figure");
+  mySlider.addEventListener("input", () => { figure.values = { values: mySlider.value }; figure.run(); });
+</script>
+```
+
+With `controls="none"` the host does not mark a result stale when values change either: whoever owns the
+control that changed it owns saying so. Neither attribute changes a card.
+
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
 then shows a real result with no JavaScript at all.
@@ -491,7 +514,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 22.6 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 23.3 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.1 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
@@ -542,7 +565,7 @@ execute with no build step. Any bundler for the host site; the examples use Vite
 * **Not a sandbox.** A tool is code you wrote and bundled. Worker mode is a stability boundary that
   lets a slow run be stopped; it is not a security boundary, and the docs never pretend otherwise. Code
   you did not write needs a different design.
-* **The contract is pure functions only.** No file input, no network access, at contract version 3.
+* **The contract is pure functions only.** No file input, no network access, at contract version 4.
   Both are planned as additive versions, which is the case the versioning policy exists to handle.
 
 ## Repository layout

@@ -1567,6 +1567,49 @@ describe("charts over whole-number x values (#111)", () => {
 		};
 	}
 
+	async function marksFor(value: string) {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-out-chart svg .tb-marker").first().waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
+			const markers = [...(figure?.querySelectorAll("svg path.tb-marker") ?? [])];
+			const bySeries = (cls: string) => markers.filter((m) => m.classList.contains(cls));
+			const shapeOf = (cls: string) => (bySeries(cls)[0]?.getAttribute("d") ?? "").replace(/[\d.,-]+/g, "#");
+			return {
+				lines: figure?.querySelectorAll("svg path.tb-line").length ?? -1,
+				counts: ["tb-s1", "tb-s2", "tb-s3"].map((c) => bySeries(c).length),
+				shapes: ["tb-s1", "tb-s2", "tb-s3"].map(shapeOf),
+				keys: [...(figure?.querySelectorAll(".tb-legend .tb-swatch-marker") ?? [])].map((k) => k.getAttribute("data-marker")),
+				svgs: figure?.querySelectorAll("svg").length ?? -1,
+			};
+		});
+		await page.close();
+		return read;
+	}
+
+	it("draws a marker at every value, one shape per series, and keys the legend by it (contract 4)", async () => {
+		// "Arrives" has 19 values (frame 5 is lost), the two "Released" series 20 each.
+		const marks = await marksFor("markers");
+		assert.deepEqual(marks.counts, [19, 20, 20]);
+		assert.equal(new Set(marks.shapes).size, 3, `three different marker shapes: ${marks.shapes.join(" | ")}`);
+		assert.ok(marks.lines > 0, "markers: true keeps the line");
+		assert.deepEqual(marks.keys, ["0", "1", "2"], "each legend key names its series' marker");
+		assert.equal(marks.svgs, 1, "the keys are not extra SVGs: a chart is still one picture");
+	});
+
+	it("draws points alone, with no line to suggest a value between two frames (contract 4)", async () => {
+		const marks = await marksFor("points");
+		assert.equal(marks.lines, 0);
+		assert.deepEqual(marks.counts, [19, 20, 20]);
+	});
+
 	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
 		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
 		const chart = await chartFor("lines");
@@ -2042,6 +2085,119 @@ describe("lifecycle status", () => {
 			1,
 			"the way to run it is the full page",
 		);
+		await page.close();
+	});
+});
+
+describe("a slider on a number input (contract 4, #102)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=slider`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-slider").waitFor({ timeout: 15_000 });
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				const slider = root?.querySelector(".tb-slider") as HTMLInputElement | null;
+				const box = root?.querySelector(".tb-slider-row .tb-input") as HTMLInputElement | null;
+				const labelId = slider?.getAttribute("aria-labelledby") ?? "";
+				return {
+					slider: slider?.value,
+					box: box?.value,
+					min: slider?.min,
+					max: slider?.max,
+					step: slider?.step,
+					name: labelId ? root?.getElementById(labelId)?.textContent ?? "" : "",
+					answer: root?.querySelector(".tb-out-fields")?.textContent ?? "",
+				};
+			});
+		return { page, read };
+	}
+
+	it("draws a native range beside the number box, bounded by the manifest and named by its label", async () => {
+		const { page, read } = await open();
+		const state = await read();
+		assert.deepEqual([state.min, state.max, state.step, state.slider, state.box], ["10", "500", "10", "80", "80"]);
+		assert.match(state.name, /Round-trip time/);
+		await page.close();
+	});
+
+	it("moves the value from the keyboard, keeps the box beside it in step, and re-runs", async () => {
+		const { page, read } = await open();
+		await page.locator("#host >> .tb-slider").focus();
+		await page.keyboard.press("ArrowRight");
+		await page.keyboard.press("ArrowRight");
+		// Two steps of 10 from 80. The answer is the value the run received, not what the slider shows.
+		await page.waitForFunction(() => /100 ms/.test(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-fields")?.textContent ?? ""), null, {
+			timeout: 10_000,
+		});
+		const state = await read();
+		assert.equal(state.slider, "100");
+		assert.equal(state.box, "100");
+		await page.close();
+	});
+
+	it("follows the number box, and a host writing values, so the two never disagree", async () => {
+		const { page, read } = await open();
+		await page.locator("#host >> .tb-slider-row .tb-input").fill("250");
+		assert.equal((await read()).slider, "250", "typing an exact value moves the thumb");
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { rtt: 400 };
+		});
+		const state = await read();
+		assert.deepEqual([state.slider, state.box], ["400", "400"]);
+		await page.close();
+	});
+});
+
+describe("layout and page-owned controls (#103)", () => {
+	const order = (page: import("playwright").Page) =>
+		page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-body")?.children ?? [])]
+				.map((c) => c.className.split(" ")[0])
+				.filter((c) => ["tb-form", "tb-actions", "tb-status", "tb-output"].includes(c ?? "")),
+		);
+
+	it("puts the answer above the form with layout=answer-first, and leaves the default alone", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-form", "tb-actions", "tb-status", "tb-output"]);
+		await page.goto(`${BASE}/tool.html?id=percentiles&layout=answer-first`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-status", "tb-output", "tb-form", "tb-actions"]);
+		await page.close();
+	});
+
+	it("draws only the result with controls=none, and runs when the page asks", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles&controls=none`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-output").waitFor({ state: "attached", timeout: 15_000 });
+		assert.deepEqual(await order(page), ["tb-output"], "no form, no Run, no status line");
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { values: "1 2 3 4 100" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
+		// Writing values again does not dim the answer or claim it is stale: the page owns that.
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { values: "5 6 7" };
+		});
+		assert.equal(await page.locator("#host >> .tb-output[data-stale]").count(), 0);
+		await page.close();
+	});
+
+	it("does not change a card", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const card = page.locator("tool-host[tool=percentiles]").first();
+		await card.evaluate((host) => {
+			host.setAttribute("layout", "answer-first");
+			host.setAttribute("controls", "none");
+		});
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor({ timeout: 10_000 });
+		assert.equal(await card.locator(".tb-run").count(), 1, "an opened card keeps its form and Run");
 		await page.close();
 	});
 });

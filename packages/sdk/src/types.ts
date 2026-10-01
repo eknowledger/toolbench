@@ -43,7 +43,17 @@ export interface Series {
 	/** One value per x. A `null` is a gap, not a zero — the distinction matters on a chart. */
 	points: (number | null)[];
 	unit?: string;
-	shape?: "line" | "area" | "bar";
+	/**
+	 * `points` draws a marker at each value and no line between them: for an x of separate items (frames,
+	 * requests, runs) where nothing exists between two of them, so a joining line would invent a slope.
+	 * Contract version 4.
+	 */
+	shape?: "line" | "area" | "bar" | "points";
+	/**
+	 * Draw a marker at each value of a `line` or `area`, so every real point is visible and a series under
+	 * an identical one can still be found. Each series gets its own marker shape. Contract version 4.
+	 */
+	markers?: boolean;
 	axis?: "left" | "right";
 }
 
@@ -153,7 +163,19 @@ interface InputBase {
 export type InputSpec =
 	| (InputBase & { type: "text"; default: string; maxLength?: number })
 	| (InputBase & { type: "textarea"; default: string; rows?: number; maxLength?: number })
-	| (InputBase & { type: "number"; default: number; min: number; max: number; step?: number })
+	| (InputBase & {
+			type: "number";
+			default: number;
+			min: number;
+			max: number;
+			step?: number;
+			/**
+			 * `slider` asks for a range control beside the number box, for a tool read by sweeping a value
+			 * rather than by typing one. A hint, not a type: a runtime that does not know it renders the box
+			 * alone. Contract version 4.
+			 */
+			control?: "slider";
+	  })
 	| (InputBase & { type: "select"; default: string; options: { value: string; label: string }[] })
 	| (InputBase & { type: "toggle"; default: boolean });
 

@@ -77,7 +77,7 @@ export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): 
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -124,6 +124,8 @@ export class ToolHost extends HTMLElement {
 	 */
 	#expanded = false;
 	#controls = new Map<string, HTMLElement>();
+	/** The range control beside a number box that asked for `control: "slider"`, kept in step with it. */
+	#sliders = new Map<string, HTMLInputElement>();
 	#els: {
 		output?: HTMLElement;
 		status?: HTMLElement;
@@ -234,6 +236,26 @@ export class ToolHost extends HTMLElement {
 	 */
 	get more(): "link" | "expand" {
 		return this.getAttribute("more") === "expand" ? "expand" : "link";
+	}
+
+	/**
+	 * `answer-first` puts the result above the form (#103). For a tool used as the opening figure of a page
+	 * about something else, where the result is the argument and the controls are how a sceptic checks it:
+	 * a three-input tool used that way put 480px of fields above an answer below the fold.
+	 *
+	 * Anything else is the default, form first. Ignored by a card, which is already answer-forward.
+	 */
+	get layout(): "default" | "answer-first" {
+		return this.getAttribute("layout") === "answer-first" ? "answer-first" : "default";
+	}
+
+	/**
+	 * `none`: draw the result and nothing else, for a page that owns the controls and drives the tool with
+	 * `values` and `run()` (#103). Without it, any controls a page built were duplicated by the ones inside
+	 * the shadow root. Ignored by a card.
+	 */
+	get controls(): "default" | "none" {
+		return this.getAttribute("controls") === "none" ? "none" : "default";
 	}
 
 	get toolId(): string {
@@ -471,6 +493,8 @@ export class ToolHost extends HTMLElement {
 		if (!output) return;
 		// Nothing to go stale before the first run.
 		const hasResult = output.children.length > 0;
+		// A page that owns the controls owns staleness too (#103): nothing here can say what changed or why.
+		if (this.controls === "none" && this.mode !== "card") return;
 		output.toggleAttribute("data-stale", hasResult);
 		this.#els.run?.toggleAttribute("data-attention", true);
 		// Nothing on screen means nothing is stale, and "press Run" would only restate the button (#99).
@@ -652,6 +676,7 @@ export class ToolHost extends HTMLElement {
 		const inputs = compact ? primaryOnly(manifest.inputs) : manifest.inputs;
 		const form = el("fieldset", { class: "tb-form" });
 		this.#controls.clear();
+		this.#sliders.clear();
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
@@ -714,20 +739,31 @@ export class ToolHost extends HTMLElement {
 		this.#els = { run, progress, status, announce, output };
 		const embedMark = mode === "embed" ? lifecycleMark(lifecycleStatus(manifest)) : null;
 		if (embedMark) body.append(embedMark);
-		body.append(form);
 		/*
-		 * Not on a card. A card has room for one input and a Run button, and a row of buttons would crowd
-		 * out the result the card exists to show.
+		 * Samples are not on a card. A card has room for one input and a Run button, and a row of buttons
+		 * would crowd out the result the card exists to show.
 		 */
 		const samples = manifest.samples ?? [];
-		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
 		/*
 		 * No Run button for an `autoRun` tool: every change already recomputes, so the button could only
 		 * re-run unchanged inputs, and "press Run" described a mode the tool is not in (#104). The progress
 		 * bar stays, for the rare slow run.
 		 */
 		const autoRun = manifest.autoRun === true;
-		body.append(autoRun ? progress : el("div", { class: "tb-actions" }, run, progress), status, announce, output);
+		const actions = autoRun ? progress : el("div", { class: "tb-actions" }, run, progress);
+		/*
+		 * `controls="none"` and `layout="answer-first"` (#103), neither of which a card honours: a card has
+		 * not been opened, and is answer-forward already.
+		 *
+		 * With no controls there is no actions row and no status line either: the page owns when a run
+		 * happens, and "inputs changed" belongs to whoever owns the control that made the answer stale.
+		 * The announcer stays, since a screen reader still needs to hear that a result arrived.
+		 */
+		const owned = !compact && this.controls === "none";
+		const answerFirst = !compact && this.layout === "answer-first";
+		const controlParts: HTMLElement[] = owned ? [progress] : [form, ...(samples.length > 0 && !compact ? [this.#sampleRow(samples)] : []), actions];
+		const answerParts: HTMLElement[] = owned ? [announce, output] : [status, announce, output];
+		body.append(...(answerFirst ? [...answerParts, ...controlParts] : [...controlParts, ...answerParts]));
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
@@ -825,7 +861,7 @@ export class ToolHost extends HTMLElement {
 	#control(spec: InputSpec): HTMLElement {
 		const id = `in-${spec.id}`;
 		const describedBy: string[] = [];
-		const label = el("label", { class: "tb-label", for: id }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
+		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		const row = el("div", { class: "tb-field-row" });
 		const desc = spec.description ? el("p", { class: "tb-desc", id: `${id}-desc` }, spec.description) : null;
 		if (desc) describedBy.push(`${id}-desc`);
@@ -892,9 +928,35 @@ export class ToolHost extends HTMLElement {
 					// Clamped here, not in the tool: min and max are the only guard against an input
 					// that turns a bounded computation into an unbounded one.
 					this.#values[spec.id] = coerce(spec, input.value);
+					const slider = this.#sliders.get(spec.id);
+					if (slider) slider.value = String(this.#values[spec.id]);
 					this.#inputChanged();
 				});
 				control = input;
+				/*
+				 * A slider for a value read by sweeping it (#102), and a native one: `<input type="range">` is
+				 * arrow-key operable and announces its value, which a custom track would have to rebuild. The
+				 * number box stays, editable and registered as THE control, so exact entry, Enter to run,
+				 * samples and error marking all work exactly as they do without a slider. The two share a
+				 * label and follow each other; the box is the visible value, so a reader can always report it.
+				 */
+				if (spec.control === "slider") {
+					const slider = el("input", {
+						class: "tb-slider",
+						type: "range",
+						min: spec.min,
+						max: spec.max,
+						...(spec.step !== undefined ? { step: spec.step } : {}),
+						"aria-labelledby": `${id}-label`,
+					});
+					slider.value = input.value;
+					slider.addEventListener("input", () => {
+						this.#values[spec.id] = coerce(spec, slider.value);
+						input.value = String(this.#values[spec.id]);
+						this.#inputChanged();
+					});
+					this.#sliders.set(spec.id, slider);
+				}
 				break;
 			}
 			default: {
@@ -938,7 +1000,8 @@ export class ToolHost extends HTMLElement {
 			row.append(el("div", { class: "tb-toggle-row" }, control, label));
 			if (desc) row.append(desc);
 		} else {
-			row.append(label, control);
+			const slider = this.#sliders.get(spec.id);
+			row.append(label, slider ? el("div", { class: "tb-slider-row" }, slider, control) : control);
 			if (desc) row.append(desc);
 		}
 		// The per-input error slot: empty until a result names this input.
@@ -1022,6 +1085,8 @@ export class ToolHost extends HTMLElement {
 			const next = this.#values[spec.id];
 			if (spec.type === "toggle") (control as HTMLInputElement).checked = Boolean(next);
 			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next ?? "");
+			const slider = this.#sliders.get(spec.id);
+			if (slider) slider.value = String(next ?? "");
 		}
 	}
 

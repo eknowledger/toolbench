@@ -102,6 +102,9 @@ function validateInput(raw: unknown, path: string): InputSpec {
 			if (o.default < o.min || o.default > o.max) {
 				fail(`${path}.default`, `default ${o.default} is outside min..max (${o.min}..${o.max})`);
 			}
+			if (o.control !== undefined && o.control !== "slider") {
+				fail(`${path}.control`, `control must be "slider" when present, got ${JSON.stringify(o.control)}`);
+			}
 			break;
 		}
 		case "select": {

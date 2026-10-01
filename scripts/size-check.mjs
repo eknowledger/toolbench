@@ -94,7 +94,12 @@ const BUDGETS = [
 	 * did. Measure the combination before stacking branches, not only the tip: the tip of this release sits
 	 * lower again once the chart styles leave this chunk, which hid the overshoot here.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_000 },
+	/*
+	 * Raised from 23_000 to 23_500 by contract v4's first features: 22,573 to 23,249 measured, 676 bytes.
+	 * The chart markers' and legend keys' styles, 242 bytes of it, live in the runtime's stylesheet, which
+	 * is in this chunk; the rest is the slider control and the host's `layout` and `controls` attributes.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -106,8 +111,12 @@ const BUDGETS = [
 	 * same one: a chunk nobody watches is a chunk that grows. 571 bytes for one fixture, and open pull
 	 * requests add three more, so the ceiling is set to leave room for those without leaving room for
 	 * everything.
+	 *
+	 * Raised from 2_000 to 2_500 by the slider fixture (#102), the one that crossed it, after the
+	 * discrete-series fixture (#111). Both exist so browser tests can put a contract feature on screen; no
+	 * reader downloads this chunk.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_500, deployOnly: true },
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
@@ -118,8 +127,11 @@ const BUDGETS = [
 	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
 	 * rather than deployOnly, because a reader of a chart tool genuinely downloads it: the saving is that
 	 * everybody else does not.
+	 *
+	 * Raised from 2_500 to 3_000 by contract v4's markers and points (#111), which spent it: six marker
+	 * shapes and their placement, on top of #111's readable ticks and grouped bars. 2,738 measured.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 2_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 3_000 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

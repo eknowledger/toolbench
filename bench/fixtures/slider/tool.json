@@ -1,0 +1,28 @@
+{
+	"sdk": 4,
+	"id": "slider",
+	"name": "Slider",
+	"blurb": "A number read by dragging it: the result follows the thumb, and the box beside it takes exact values.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"autoRun": true,
+	"card": "live",
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "rtt",
+			"type": "number",
+			"label": "Round-trip time",
+			"unit": "ms",
+			"description": "Drag, use the arrow keys, or type an exact value.",
+			"primary": true,
+			"default": 80,
+			"min": 10,
+			"max": 500,
+			"step": 10,
+			"control": "slider"
+		}
+	]
+}

@@ -75,6 +75,18 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 3,
+		/*
+		 * 3 → 4 added optional fields only: `markers` and the `points` shape on a series, `control` on a
+		 * number input, and the other additions of the same release (docs/versioning.md §9).
+		 *
+		 * Identity on both halves. A v3 tool cannot have returned either, and a series without them is
+		 * drawn exactly as before, so there is nothing to fill in and nothing to take away.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {
