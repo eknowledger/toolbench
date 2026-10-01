@@ -321,6 +321,8 @@ describe("card mode — the facade", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
 		const card = page.locator('tool-host[parts="2"]');
+		// The chart renderer is fetched when a chart is drawn (#97), so wait for its legend rather than read at load.
+		await card.locator(".tb-legend li").first().waitFor();
 		const legend = await card.evaluate((host) =>
 			[...(host as HTMLElement).shadowRoot!.querySelectorAll(".tb-legend li")].map((li) => li.textContent?.trim()),
 		);
