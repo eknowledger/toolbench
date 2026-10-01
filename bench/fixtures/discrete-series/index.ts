@@ -243,6 +243,39 @@ export default {
 					},
 				};
 			}
+			case "log": {
+				/*
+				 * The Mathis et al. ceiling on one TCP flow, throughput = (MSS / RTT) x 1.22 / sqrt(p), for a
+				 * 1460-byte MSS at 50 ms, across loss rates from 0.01% to 10%: four orders of magnitude of loss,
+				 * two of throughput, which only a log scale shows as the straight line it is.
+				 */
+				const loss = [0.01, 0.03, 0.1, 0.3, 1, 3, 10];
+				const mbps = loss.map((pct) => Number((((1460 * 8) / 0.05) * (1.22 / Math.sqrt(pct / 100)) / 1e6).toPrecision(3)));
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Loss",
+						xUnit: "%",
+						yLabel: "Throughput ceiling",
+						yUnit: "Mb/s",
+						xScale: "log",
+						yScale: "log",
+						x: loss,
+						series: [{ label: "One TCP flow, 50 ms", unit: "Mb/s", markers: true, points: mbps }],
+					},
+				};
+			}
+			case "log-zero":
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Run",
+						yLabel: "Errors",
+						yScale: "log",
+						x: [1, 2, 3, 4, 5],
+						series: [{ label: "Errors", markers: true, points: [12, 0, 150, 1200, 40] }],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

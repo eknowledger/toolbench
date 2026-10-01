@@ -34,7 +34,9 @@
 				{ "value": "stacked-signed", "label": "A stack either side of zero, beside a plain bar" },
 				{ "value": "horizontal", "label": "Horizontal stacked bars" },
 				{ "value": "horizontal-grouped", "label": "Horizontal grouped bars, long names" },
-				{ "value": "step", "label": "A step line beside a sloped one" }
+				{ "value": "step", "label": "A step line beside a sloped one" },
+				{ "value": "log", "label": "Both axes on a log scale" },
+				{ "value": "log-zero", "label": "A log axis given a zero" }
 			]
 		}
 	]

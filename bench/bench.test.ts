@@ -1683,6 +1683,34 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("puts powers of ten evenly apart on a log axis, and leaves out what it cannot show (#118)", async () => {
+		const chart = await chartFor("log");
+		assert.deepEqual(chart.yLabels, ["0.1", "1", "10", "100"]);
+		assert.deepEqual(chart.xLabels, ["0.01", "0.1", "1", "10"]);
+		const ys = chart.ticks.filter((t) => t.anchor === "end").map((t) => t.y);
+		const gaps = ys.slice(1).map((y, i) => Math.abs(y - (ys[i] as number)));
+		assert.ok(gaps.every((g) => Math.abs(g - (gaps[0] as number)) < 0.5), `decades equally spaced: ${gaps.join(", ")}`);
+
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "log-zero" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				markers: root?.querySelectorAll(".tb-plot .tb-marker").length,
+				caption: root?.querySelector(".tb-chart-data caption")?.textContent ?? "",
+				cells: [...(root?.querySelectorAll(".tb-chart-data tbody td") ?? [])].map((td) => td.textContent),
+			};
+		});
+		assert.equal(read.markers, 4, "five values, one of them zero: four are drawn");
+		assert.match(read.caption, /1 value at or below zero not drawn on a log axis/);
+		assert.deepEqual(read.cells, ["12", "0", "150", "1,200", "40"], "the table still has every value");
+		await page.close();
+	});
+
 	it("draws a step as runs and risers, rising only where the value changes (#117)", async () => {
 		// Depths 40 40 40 60 60 60 60 80 80 60 60 40: four changes, so four risers, and never a slope.
 		const page = await browser.newPage();

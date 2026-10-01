@@ -117,8 +117,13 @@ const BUDGETS = [
 	 * discrete-series fixture (#111). Both exist so browser tests can put a contract feature on screen; no
 	 * reader downloads this chunk.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_500, deployOnly: true },
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	/*
+	 * Both raised to 4_000 in 0.7.0: the discrete-series fixture grows a case for each chart feature (#111
+	 * to #124), so the charts page and the browser tests can put every one on screen. Bench-only; no reader
+	 * downloads either chunk.
+	 */
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.

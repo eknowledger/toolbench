@@ -117,6 +117,14 @@ export interface Chart {
 	 * and the data table's caption says so.
 	 */
 	orientation?: "vertical" | "horizontal";
+	/**
+	 * `log` draws an axis in powers of ten, for values spanning orders of magnitude: latency distributions,
+	 * loss from 0.01% to 10% (#118, contract version 4). A log axis cannot show zero or a negative, so those
+	 * points are left out and the data table's caption says so; bars are not drawn on a log y axis, because
+	 * a bar's length means nothing there.
+	 */
+	yScale?: "linear" | "log";
+	xScale?: "linear" | "log";
 }
 
 /**

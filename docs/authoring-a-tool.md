@@ -669,6 +669,9 @@ finds it. See §4b for what counts as running.
 * `shape: "step"` holds each value until the next x and then moves straight to the next one: for state
   sampled on events, a buffer depth or a configured rate, where a sloped line invents a gradual change.
   `markers: true` marks the start of each run.
+* `yScale: "log"` or `xScale: "log"` draws that axis in powers of ten, for values across orders of
+  magnitude. A log axis cannot show zero or a negative, so such points are left out and the data
+  table says how many; bars are not drawn on a log y axis.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

@@ -66,8 +66,18 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		stackTotals.length === 0 || !series.some((s) => s.stack !== undefined)
 			? scale
 			: { min: Math.min(scale.min, ...stackTotals), max: Math.max(scale.max, ...stackTotals) };
-	const leftScale = niceScale(reach(withStacks(withZero(scaleFor(left), left), left), "left"));
-	const rightScale = right.length > 0 ? niceScale(reach(withStacks(withZero(scaleFor(right), right), right), "right")) : undefined;
+	const yLog = chart.yScale === "log";
+	const valuesOf = (series: Series[], axis: "left" | "right") => [
+		...series.flatMap((s) => s.points.filter((p): p is number => p !== null)),
+		...(chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y),
+	];
+	const leftScale = yLog ? logScale(valuesOf(left, "left")) : niceScale(reach(withStacks(withZero(scaleFor(left), left), left), "left"));
+	const rightScale =
+		right.length === 0
+			? undefined
+			: yLog
+				? logScale(valuesOf(right, "right"))
+				: niceScale(reach(withStacks(withZero(scaleFor(right), right), right), "right"));
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -99,18 +109,20 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	const bars = chart.series.some((series) => series.shape === "bar");
 	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
 	const slot = xs.length > 1 ? (xMax - xMin) / (xs.length - 1) : Math.abs(xMax) || 1;
-	const xScale = bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
+	const xLog = chart.xScale === "log" && !categories;
+	const xScale: Scale = xLog ? logScale(xs) : bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
 
-	const px = (value: number) => plot.x + ((value - xScale.min) / span(xScale)) * plot.w;
-	const py = (value: number, scale: Scale) => plot.y + plot.h - ((value - scale.min) / span(scale)) * plot.h;
+	const px = (value: number) => plot.x + along(value, xScale) * plot.w;
+	const py = (value: number, scale: Scale) => plot.y + plot.h - along(value, scale) * plot.h;
 
 	const marks: SVGElement[] = [];
 	// Labels that must stay readable over the data, appended after every series.
 	const labelsOnTop: SVGElement[] = [];
 
 	// Gridlines and y labels, from the left scale — a second axis gets ticks but not its own grid.
-	const leftTicks = ticks(leftScale);
-	const axisFormat = formatterFor(leftTicks);
+	const powers = (scale: Scale) => Array.from({ length: scale.max - scale.min + 1 }, (_, k) => 10 ** (scale.min + k));
+	const leftTicks = leftScale.log ? powers(leftScale) : ticks(leftScale);
+	const axisFormat = leftScale.log ? powerLabel : formatterFor(leftTicks);
 	for (const tick of leftTicks) {
 		const y = py(tick, leftScale);
 		marks.push(svg("line", { class: "tb-grid", x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
@@ -121,8 +133,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * so labels never collide. A numeric axis keeps its round-value ticks.
 	 */
 	const every = categories ? Math.max(1, Math.ceil(36 / (plot.w / Math.max(1, xs.length)))) : 1;
-	const xTicks = categories ? xs.filter((i) => i % every === 0) : xTicksFor(xs, xScale, bars);
-	const xFormat = formatterFor(xTicks);
+	const xTicks = categories ? xs.filter((i) => i % every === 0) : xLog ? powers(xScale) : xTicksFor(xs, xScale, bars);
+	const xFormat = xLog ? powerLabel : formatterFor(xTicks);
 	/*
 	 * A category label is cut to the room its slot has, about six viewBox units a character at this size,
 	 * with the whole text kept in the data table and the readout. Rotated labels were the alternative, and
@@ -135,8 +147,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + 20, "text-anchor": "middle" }, label));
 	}
 	if (rightScale) {
-		const rightTicks = ticks(rightScale);
-		const rightFormat = formatterFor(rightTicks);
+		const rightTicks = rightScale.log ? powers(rightScale) : ticks(rightScale);
+		const rightFormat = rightScale.log ? powerLabel : formatterFor(rightTicks);
 		for (const tick of rightTicks) {
 			marks.push(
 				svg("text", { class: "tb-tick", x: plot.x + plot.w + 8, y: py(tick, rightScale) + 4, "text-anchor": "start" }, rightFormat(tick)),
@@ -189,10 +201,31 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * puts series i of k in the i-th of k sub-slots.
 	 */
 	const slots = barSlots(chart);
+	/*
+	 * What a log axis cannot show (#118): a value at or below zero is left out of the drawing, a bar is not
+	 * drawn at all, and the data table's caption counts both. The values stay in the table.
+	 */
+	let dropped = 0;
+	let unbarred = 0;
 	chart.series.forEach((series, index) => {
 		const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
 		const group = { index: slots.indexOf(series.stack ?? series), count: slots.length };
-		marks.push(...drawSeries(series, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
+		if (yLog && series.shape === "bar") {
+			unbarred++;
+			return;
+		}
+		const drawn =
+			yLog || xLog
+				? {
+						...series,
+						points: series.points.map((p, i) => {
+							const outside = (yLog && p !== null && p <= 0) || (xLog && (xs[i] as number) <= 0);
+							if (outside && p !== null) dropped++;
+							return outside ? null : p;
+						}),
+					}
+				: series;
+		marks.push(...drawSeries(drawn, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
 	});
 
 	marks.push(...labelsOnTop);
@@ -230,7 +263,11 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
 	// The same numbers, for anyone or anything that cannot see the picture.
-	figure.append(dataTable(chart, xText));
+	const notes = [
+		dropped > 0 ? `${dropped} value${dropped === 1 ? "" : "s"} at or below zero not drawn on a log axis` : "",
+		unbarred > 0 ? `${unbarred} bar series not drawn: a bar's length means nothing on a log axis` : "",
+	].filter(Boolean);
+	figure.append(dataTable(chart, xText, notes.length > 0 ? notes.join(". ") : undefined));
 	attachReadout(figure, picture, chart, {
 		xs,
 		xText,
@@ -372,6 +409,30 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 interface Scale {
 	min: number;
 	max: number;
+	/** A log axis: `min` and `max` are then powers of ten's exponents, and positions are taken from log10 (#118). */
+	log?: boolean;
+}
+
+/** A log scale reaching whole powers of ten either side of the positive values. */
+function logScale(values: number[]): Scale {
+	const positive = values.filter((v) => v > 0);
+	if (positive.length === 0) return { min: 0, max: 1, log: true };
+	const lo = Math.floor(Math.log10(Math.min(...positive)));
+	const hi = Math.ceil(Math.log10(Math.max(...positive)));
+	return { min: lo, max: hi === lo ? hi + 1 : hi, log: true };
+}
+
+/** Where a value sits on a scale, 0 to 1. NaN on a log scale for a value it cannot show. */
+function along(value: number, scale: Scale): number {
+	if (!scale.log) return (value - scale.min) / span(scale);
+	return value > 0 ? (Math.log10(value) - scale.min) / span(scale) : Number.NaN;
+}
+
+/** 1, 10, 100, 1k, 10k, 1M: a power of ten written the way it is read. */
+function powerLabel(value: number): string {
+	if (value >= 1e6) return `${value / 1e6}M`;
+	if (value >= 1e3) return `${value / 1e3}k`;
+	return String(Number(value.toPrecision(3)));
 }
 
 const span = (scale: Scale) => (scale.max - scale.min === 0 ? 1 : scale.max - scale.min);

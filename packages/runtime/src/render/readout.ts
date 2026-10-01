@@ -114,7 +114,8 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		const rows: { series: number; y: number }[] = [];
 		chart.series.forEach((series, s) => {
 			const value = series.points[index];
-			if (value !== null && value !== undefined) rows.push({ series: s, y: g.py(s, value, index) });
+			// A value the axis cannot show, zero on a log scale, has no position: it is in the table, not here.
+			if (value !== null && value !== undefined && Number.isFinite(g.py(s, value, index))) rows.push({ series: s, y: g.py(s, value, index) });
 		});
 		/*
 		 * `point` mode keeps only the series nearest the pointer. From the keyboard there is no pointer, so
