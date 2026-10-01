@@ -1683,6 +1683,38 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("draws a box from q1 to q3 with its median, whiskers and outliers, and reads all five numbers (#122)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "box" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg") as SVGSVGElement;
+			const n = (el: Element | null, a: string) => Number(el?.getAttribute(a));
+			const boxes = [...svg.querySelectorAll("rect.tb-box")];
+			const medians = [...svg.querySelectorAll("line.tb-median")];
+			return {
+				boxes: boxes.length,
+				outliers: svg.querySelectorAll("circle.tb-outlier").length,
+				// Mobile, morning: q1 8, median 12, q3 18. The box is 10 units of value tall, the median 6 above q1... below q3.
+				mobile: { top: n(boxes[2] ?? null, "y"), height: n(boxes[2] ?? null, "height"), median: n(medians[2] ?? null, "y1") },
+				heads: host.shadowRoot?.querySelectorAll(".tb-chart-data thead th").length,
+			};
+		});
+		assert.equal(read.boxes, 6, "three networks, two series");
+		assert.equal(read.outliers, 5, "22, 41 and 47 in the morning; 31 and 55 in the evening");
+		// (q3 - median) / (q3 - q1) = (18 - 12) / (18 - 8) = 0.6 of the box, measured from its top.
+		assert.ok(Math.abs((read.mobile.median - read.mobile.top) / read.mobile.height - 0.6) < 0.02, JSON.stringify(read.mobile));
+		assert.equal(read.heads, 1 + 2 * 5, "the x, then low, q1, median, q3 and high for each series");
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("End");
+		const row = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout li")?.textContent);
+		assert.equal(row, "median 12 ms (q1 8, q3 18; 4 to 30)Morning");
+		await page.close();
+	});
+
 	it("draws series at their own x, lists every point, and reads out the nearest one (#120)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });

@@ -318,6 +318,31 @@ export default {
 						],
 					},
 				};
+			case "box": {
+				// Illustrative jitter per network, morning and evening; whiskers are p5 to p95, outliers beyond.
+				type Box = { low: number; q1: number; median: number; q3: number; high: number; outliers?: number[] };
+				const morning: Box[] = [
+					{ low: 1, q1: 2, median: 3, q3: 4, high: 6 },
+					{ low: 2, q1: 4, median: 6, q3: 9, high: 14, outliers: [22] },
+					{ low: 4, q1: 8, median: 12, q3: 18, high: 30, outliers: [41, 47] },
+				];
+				const evening: Box[] = [
+					{ low: 1, q1: 2, median: 3, q3: 5, high: 7 },
+					{ low: 3, q1: 6, median: 9, q3: 14, high: 22, outliers: [31] },
+					{ low: 6, q1: 12, median: 19, q3: 27, high: 40, outliers: [55] },
+				];
+				const series = (label: string, boxes: Box[]): Series => ({ label, unit: "ms", shape: "box", boxes, points: boxes.map((b) => b.median) });
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Network",
+						yLabel: "Jitter, p5 to p95",
+						yUnit: "ms",
+						x: ["Fibre", "Broadband", "Mobile"],
+						series: [series("Morning", morning), series("Evening", evening)],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

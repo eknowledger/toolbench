@@ -49,6 +49,13 @@ export const CHART_STYLES = /* css */ `
 .tb-s6 { --c: var(--tb-s6); }
 .tb-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
+/* A box plot (#122): a pale box with an outline, the median in full colour, whiskers in the same ink. */
+.tb-box { fill: var(--c); fill-opacity: 0.18; stroke: var(--c); stroke-width: 1.5; }
+.tb-box.tb-hot { fill-opacity: 0.32; }
+.tb-median { stroke: var(--c); stroke-width: 2.5; }
+.tb-whisker { stroke: var(--c); stroke-width: 1.25; }
+.tb-outlier { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.5; }
+.tb-swatch-box { width: 0.75rem; height: 0.6rem; border-radius: 2px; flex: none; border: 1.5px solid var(--c, currentColor); background: color-mix(in oklab, var(--c, currentColor) 18%, transparent); }
 /* A band (#119): a quiet fill, drawn first, so the lines over it carry the emphasis. */
 .tb-band { stroke: none; fill: var(--c); opacity: 0.22; }
 .tb-swatch-band { width: 0.75rem; height: 0.6rem; border-radius: 2px; flex: none; background: var(--c, currentColor); opacity: 0.45; }

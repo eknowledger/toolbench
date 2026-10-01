@@ -51,7 +51,14 @@ export interface Series {
 	 * `step` holds each value until the next x, then rises or falls straight to the next: for state sampled
 	 * on events (a buffer's depth, a configured rate), where a sloped line invents a gradual change (#117).
 	 */
-	shape?: "line" | "area" | "bar" | "points" | "step" | "band";
+	shape?: "line" | "area" | "bar" | "points" | "step" | "band" | "box";
+	/**
+	 * The summary each `box` draws, one per x (#122, contract version 4): whiskers from `low` to `high`, a box
+	 * from `q1` to `q3`, a rule at `median`, and `outliers` as points. The tool computes it, so what the
+	 * whiskers mean (1.5 IQR, min to max, p5 to p95) is the tool's and belongs in the chart's labels. Set
+	 * `points` to the medians, which is what the readout, links and scale read where they read one value.
+	 */
+	boxes?: ({ low: number; q1: number; median: number; q3: number; high: number; outliers?: number[] } | null)[];
 	/**
 	 * The lower edge of a `band`, one per x, with `points` as the upper edge: a spread such as p5 to p95,
 	 * or a min-to-max envelope, filled between the two under every other series (#119, contract version 4).

@@ -38,7 +38,8 @@
 				{ "value": "log", "label": "Both axes on a log scale" },
 				{ "value": "log-zero", "label": "A log axis given a zero" },
 				{ "value": "band", "label": "A median inside a p5 to p95 band" },
-				{ "value": "scatter", "label": "Two series with their own x" }
+				{ "value": "scatter", "label": "Two series with their own x" },
+				{ "value": "box", "label": "Box plots per network, two series" }
 			]
 		}
 	]

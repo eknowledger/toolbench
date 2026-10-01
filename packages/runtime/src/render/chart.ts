@@ -512,7 +512,8 @@ function stackRanges(chart: Chart): { ranges: Map<Series, ({ from: number; to: n
 function barSlots(chart: Chart): (string | Series)[] {
 	const slots: (string | Series)[] = [];
 	for (const series of chart.series) {
-		if (series.shape !== "bar") continue;
+		// Boxes take a slot as bars do, so box series group side by side at an x (#122).
+		if (series.shape !== "bar" && series.shape !== "box") continue;
 		const key = series.stack ?? series;
 		if (!slots.includes(key)) slots.push(key);
 	}
@@ -520,7 +521,11 @@ function barSlots(chart: Chart): (string | Series)[] {
 }
 
 function scaleFor(series: Series[]): Scale {
-	const values = series.flatMap((s) => [...s.points, ...(s.lower ?? [])].filter((p): p is number => p !== null && p !== undefined));
+	const values = series.flatMap((s) =>
+		[...s.points, ...(s.lower ?? []), ...(s.boxes ?? []).flatMap((b) => (b ? [b.low, b.high, ...(b.outliers ?? [])] : []))].filter(
+			(p): p is number => p !== null && p !== undefined,
+		),
+	);
 	if (values.length === 0) return { min: 0, max: 1 };
 	const min = Math.min(...values);
 	const max = Math.max(...values);
@@ -645,6 +650,34 @@ function drawSeries(
 		return runs.map((d) => svg("path", { class: `tb-band ${cls}`, d }));
 	}
 
+	/*
+	 * A box plot (#122), drawn per x in its slot like a bar: whiskers low to high with caps, the box from q1
+	 * to q3, a rule at the median, and each outlier as a small hollow mark.
+	 */
+	if (shape === "box") {
+		const count = Math.max(1, group.count);
+		const width = Math.max(4, Math.min(((plot.w / Math.max(1, xs.length)) * 0.7) / count, 32));
+		const offset = -(width * count) / 2 + Math.max(0, group.index) * width;
+		return (series.boxes ?? []).flatMap((b, i) => {
+			const x = xs[i];
+			if (!b || x === undefined) return [];
+			const left = px(x) + offset + width * 0.1;
+			const w = width * 0.8;
+			const mid = left + w / 2;
+			const cap = w * 0.3;
+			const parts: SVGElement[] = [
+				svg("line", { class: `tb-whisker ${cls}`, x1: mid, x2: mid, y1: py(b.high), y2: py(b.q3) }),
+				svg("line", { class: `tb-whisker ${cls}`, x1: mid, x2: mid, y1: py(b.q1), y2: py(b.low) }),
+				svg("line", { class: `tb-whisker ${cls}`, x1: mid - cap, x2: mid + cap, y1: py(b.high), y2: py(b.high) }),
+				svg("line", { class: `tb-whisker ${cls}`, x1: mid - cap, x2: mid + cap, y1: py(b.low), y2: py(b.low) }),
+				svg("rect", { class: `tb-box ${cls}`, "data-i": i, x: left, y: py(b.q3), width: w, height: Math.abs(py(b.q1) - py(b.q3)) }),
+				svg("line", { class: `tb-median ${cls}`, x1: left, x2: left + w, y1: py(b.median), y2: py(b.median) }),
+			];
+			for (const o of b.outliers ?? []) parts.push(svg("circle", { class: `tb-outlier ${cls}`, cx: mid, cy: py(o), r: 2.5 }));
+			return parts;
+		});
+	}
+
 	if (shape === "bar") {
 		/*
 		 * Thin bars, with the rest of the slot left as air: each bar is capped at 32 viewBox units, about
@@ -758,6 +791,7 @@ function markerPath(index: number, x: number, y: number): string {
 
 /** A series' key: its marker where it has markers, otherwise a stroke of its colour. Shared by the legend and the readout. */
 function keyFor(s: Series, i: number): HTMLElement {
+	if (s.shape === "box") return el("span", { class: `tb-swatch-box tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	if (s.shape === "band") return el("span", { class: `tb-swatch-band tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	return s.shape === "points" || s.markers === true
 		? el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": String(i % 6), "aria-hidden": "true" })
@@ -792,7 +826,9 @@ function dataTable(chart: Chart, xText: (i: number) => string, note?: string): H
 		...chart.series.flatMap((s) =>
 			s.shape === "band"
 				? [el("th", { scope: "col" }, withUnit(`${s.label}, low`, s.unit)), el("th", { scope: "col" }, withUnit(`${s.label}, high`, s.unit))]
-				: [el("th", { scope: "col" }, withUnit(s.label, s.unit))],
+				: s.shape === "box"
+					? ["low", "q1", "median", "q3", "high"].map((part) => el("th", { scope: "col" }, withUnit(`${s.label}, ${part}`, s.unit)))
+					: [el("th", { scope: "col" }, withUnit(s.label, s.unit))],
 		),
 		...stacks.map((id) => el("th", { scope: "col" }, stacks.length > 1 ? `Total, ${id}` : "Total")),
 	);
@@ -803,6 +839,10 @@ function dataTable(chart: Chart, xText: (i: number) => string, note?: string): H
 			el("th", { scope: "row" }, xText(i)),
 			...chart.series.flatMap((s) => {
 				const cell = (v: number | null | undefined) => el("td", {}, v === null || v === undefined ? "—" : format(v));
+				if (s.shape === "box") {
+					const b = s.boxes?.[i];
+					return [b?.low, b?.q1, b?.median, b?.q3, b?.high].map(cell);
+				}
 				return s.shape === "band" ? [cell(s.lower?.[i]), cell(s.points[i])] : [cell(s.points[i])];
 			}),
 			...stacks.map((id) => el("td", {}, format(totalOf(id, i)))),
