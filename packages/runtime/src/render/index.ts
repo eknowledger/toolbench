@@ -34,7 +34,7 @@ import { el } from "../dom.ts";
  * The kinds drawn by code of their own, fetched only when one is drawn: the series chart, the heatmap and
  * the pie (#121, #123), each its own chunk, so a page pays for the kinds it draws and no others.
  */
-export const LAZY_KINDS = ["series", "heatmap", "pie"] as const;
+export const LAZY_KINDS = ["series", "heatmap", "pie", "radar", "treemap", "venn"] as const;
 export type LazyKind = (typeof LAZY_KINDS)[number];
 
 type Drawer = (output: Output, options: RenderOptions) => HTMLElement;
@@ -51,6 +51,18 @@ const loaders: Record<LazyKind, () => Promise<Drawer>> = {
 	pie: async () => {
 		const { renderPie } = await import("./pie.ts");
 		return (output, options) => renderPie((output as Extract<Output, { kind: "pie" }>).pie, options);
+	},
+	radar: async () => {
+		const { renderRadar } = await import("./radar.ts");
+		return (output, options) => renderRadar((output as Extract<Output, { kind: "radar" }>).radar, options);
+	},
+	treemap: async () => {
+		const { renderTreemap } = await import("./treemap.ts");
+		return (output, options) => renderTreemap((output as Extract<Output, { kind: "treemap" }>).treemap, options);
+	},
+	venn: async () => {
+		const { renderVenn } = await import("./venn.ts");
+		return (output, options) => renderVenn((output as Extract<Output, { kind: "venn" }>).venn, options);
 	},
 };
 
@@ -167,6 +179,9 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 		case "series":
 		case "heatmap":
 		case "pie":
+		case "radar":
+		case "treemap":
+		case "venn":
 			return lazy(output.kind, output, options);
 		case "group": {
 			/*

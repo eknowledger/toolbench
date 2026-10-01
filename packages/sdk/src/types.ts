@@ -202,6 +202,47 @@ export interface Pie {
 }
 
 /**
+ * A profile across several measures (#128): one spoke per axis, clockwise from 12 o'clock, each series a
+ * closed shape. All spokes share one scale from zero unless an axis gives its own `max`. At most four series
+ * are drawn, since more overlap past reading.
+ */
+export interface Radar {
+	label: string;
+	unit?: string;
+	axes: { label: string; max?: number }[];
+	/** One value per axis; a `null` breaks the shape at that spoke rather than drawing it at the centre. */
+	series: { label: string; values: (number | null)[] }[];
+}
+
+/** One node of a treemap: a leaf has a `value`, a branch has `children` (and a value only to override their sum). */
+export interface TreemapNode {
+	label: string;
+	value?: number;
+	children?: TreemapNode[];
+	tone?: Tone;
+}
+
+/** A hierarchy of sizes (#129): areas proportional to values, at most three levels drawn. */
+export interface Treemap {
+	label: string;
+	unit?: string;
+	root: TreemapNode;
+}
+
+/**
+ * The overlap of two or three sets (#130). Two sets are drawn with exact areas. Three cannot in general be,
+ * so every region is labelled with its count and the caption says the areas are approximate. More than three
+ * sets, or an overlap larger than a set, draws a message instead.
+ */
+export interface Venn {
+	label: string;
+	unit?: string;
+	sets: { label: string; size: number }[];
+	/** `sets` are indices into `sets`: [0, 1], or [0, 1, 2] for the middle of three. */
+	overlaps: { sets: number[]; size: number }[];
+}
+
+/**
  * A run of bytes worth calling out inside a `bytes` output: a header field, a length prefix, the
  * region an error points at.
  *
@@ -244,6 +285,12 @@ export type Output =
 	| { kind: "heatmap"; heatmap: Heatmap }
 	/** Parts of a whole, every slice labelled with its name and share (#123, contract version 4). */
 	| { kind: "pie"; pie: Pie }
+	/** A profile across several measures, one spoke each (#128, contract version 4). */
+	| { kind: "radar"; radar: Radar }
+	/** A hierarchy of sizes as nested rectangles (#129, contract version 4). */
+	| { kind: "treemap"; treemap: Treemap }
+	/** The overlap of two or three sets (#130, contract version 4). */
+	| { kind: "venn"; venn: Venn }
 	| { kind: "group"; parts: Output[] }
 	/**
 	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
@@ -280,6 +327,9 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 	"bytes",
 	"heatmap",
 	"pie",
+	"radar",
+	"treemap",
+	"venn",
 ];
 
 // ---------------------------------------------------------------------------

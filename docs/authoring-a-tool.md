@@ -728,6 +728,24 @@ so a page fetches the code for the kinds it draws and no others. Declare them in
 * `explode: true` on a slice pulls it out a little, to point at the part your text is about. A slice
   pulled out looks bigger than it is, so use it on one slice, not for decoration.
 
+### Radar charts, treemaps and Venn diagrams
+
+Three more kinds, each its own output and its own chunk, from contract version 4:
+
+```ts
+{ kind: "radar", radar: { label, axes: [{ label: "Latency" }, /* ... */], series: [{ label: "Fibre", values: [9, /* ... */] }] } }
+{ kind: "treemap", treemap: { label, unit, root: { label: "All", children: [{ label: "Media", children: [/* ... */] }] } } }
+{ kind: "venn", venn: { label, sets: [{ label: "Web", size: 100 }, { label: "Mobile", size: 100 }], overlaps: [{ sets: [0, 1], size: 50 }] } }
+```
+
+* **Radar:** one spoke per axis, clockwise from 12 o'clock, on one scale from zero unless an axis gives its
+  own `max`. At most four series are drawn; a `null` breaks a shape rather than pulling it to the centre.
+* **Treemap:** each rectangle's area is its value; a branch's value is the sum of its children. Labels draw
+  where they fit, and every node is in the readout and the data table. Three levels are drawn at most.
+* **Venn:** two or three sets. Two are drawn exactly. Three cannot in general be drawn exactly with
+  circles, so every region carries its count and the caption says the areas are approximate. Give each
+  overlap as the full intersection: `[0, 1]` includes what is also in set 2.
+
 ## 10. Help text
 
 `README.md` in the tool directory, referenced by `help`. The host renders it beside or below the tool.

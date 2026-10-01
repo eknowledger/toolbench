@@ -8,7 +8,7 @@
 	"runtime": { "entry": "index.ts", "thread": "main" },
 	"autoRun": true,
 	"card": "live",
-	"kinds": ["series", "group", "table", "heatmap", "pie", "error"],
+	"kinds": ["series", "group", "table", "heatmap", "pie", "radar", "treemap", "venn", "error"],
 	"tags": ["bench"],
 	"inputs": [
 		{
@@ -51,7 +51,12 @@
 				{ "value": "donut", "label": "A donut with its total" },
 				{ "value": "pie-many", "label": "A pie of eight parts, folded to six" },
 				{ "value": "donut-exploded", "label": "A donut with one slice pulled out" },
-				{ "value": "pie-negative", "label": "A pie given a negative value" }
+				{ "value": "pie-negative", "label": "A pie given a negative value" },
+				{ "value": "radar", "label": "A radar of three networks" },
+				{ "value": "treemap", "label": "A treemap of costs" },
+				{ "value": "venn-two", "label": "A Venn of two sets" },
+				{ "value": "venn-three", "label": "A Venn of three sets" },
+				{ "value": "venn-impossible", "label": "A Venn whose numbers cannot be true" }
 			]
 		}
 	]

@@ -107,8 +107,12 @@ const BUDGETS = [
 	 *
 	 * Raised from 22_500 to 23_000 by linked table rows (#124): a linked table finds its chart and moves its
 	 * readout, and its highlight is styled here because a table is not chart code.
+	 *
+	 * Raised from 23_000 to 23_500 by the radar, treemap and Venn kinds (#128 to #130): a loader each, their
+	 * cases in the two exhaustive switches, and a screen-reader summary each. 23,079 measured. The renderers
+	 * themselves are chunks of their own, below.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -182,6 +186,14 @@ const BUDGETS = [
 	 * slice-by-slice readout. 2,731 measured.
 	 */
 	{ label: "pie renderer", pattern: /^pie-[^/]+\.js$/, budget: 3_500 },
+	/*
+	 * Three more chart kinds, each its own chunk so only a page drawing one fetches it: radar (#128, 2,805
+	 * measured), treemap with its squarified layout (#129, 2,955) and Venn with its exact two-set geometry
+	 * and three-set placement (#130, 3,256).
+	 */
+	{ label: "radar renderer", pattern: /^radar-[^/]+\.js$/, budget: 3_500 },
+	{ label: "treemap renderer", pattern: /^treemap-[^/]+\.js$/, budget: 3_500 },
+	{ label: "venn renderer", pattern: /^venn-[^/]+\.js$/, budget: 4_000 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
