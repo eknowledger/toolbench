@@ -681,6 +681,12 @@ finds it. See §4b for what counts as running.
 * `shape: "box"` with `boxes` draws a box plot per x: whiskers `low` to `high`, a box `q1` to `q3`, the
   `median`, and `outliers`. You compute the summary, so the whiskers mean what you say they mean; put it
   in the axis label. Set `points` to the medians. The readout and the data table show all five numbers.
+* `mirror: true` on a horizontal bar chart draws series given as negative values to the left and writes
+  every number as its magnitude: back-to-back comparisons and pyramids. Put both halves in one `stack` so
+  they share a row.
+* `sizes` on a `points` series draws each point as a bubble whose area is its size, scaled across the whole
+  chart, with a key of reference sizes underneath. `sizeLabel` names the measure. By area, not radius, so a
+  value twice as large looks twice as large.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and
@@ -689,6 +695,38 @@ finds it. See §4b for what counts as running.
 * Every chart also renders as a table inside a `<details>`, automatically. A chart is an image, and a
   screen reader gets nothing from an image. You do not have to do anything to get this, but it is worth
   knowing that your axis labels and series names are read aloud.
+
+### Heatmaps and pies
+
+Two more chart kinds, from contract version 4, each its own output kind and its own lazily loaded chunk,
+so a page fetches the code for the kinds it draws and no others. Declare them in `kinds`.
+
+```ts
+{ kind: "heatmap", heatmap: {
+    xLabel: "Hour", yLabel: "Day", label: "Packet loss", unit: "%",
+    x: ["00:00", "02:00", /* ... */], y: ["Mon", "Tue", /* ... */],
+    values: [[0.2, 0.3, /* ... */], /* one row per y */],   // null for a cell with no value
+    scale: "sequential",                                   // or "diverging", with midpoint
+}}
+
+{ kind: "pie", pie: {
+    label: "One voice stream, 48 kb/s", unit: "kb/s",
+    slices: [{ label: "Opus audio", value: 32 }, { label: "Headers", value: 16 }],
+    donut: true, total: "48 kb/s",
+}}
+```
+
+* A heatmap's colour is its encoding, so it is never the only channel: a key shows the scale, every cell
+  answers the readout and the arrow keys, and the data table has every value. `null` cells are hatched.
+  `sequential` is one hue for "how much"; `diverging` is two hues either side of `midpoint`, for "which
+  side of a baseline". Hosts theme the ramps with `--tb-heat-lo`, `--tb-heat-hi`, `--tb-heat-neg`,
+  `--tb-heat-mid` and `--tb-heat-pos`.
+* A pie is drawn the way pies are hard to misread: in the order you give the slices, from 12 o'clock
+  clockwise, every slice labelled with its share. More than six fold into "Other" and the data table says
+  so; a negative value or a zero total draws a message instead of a chart. If your parts are many, or close
+  in size, a bar chart reads better.
+* `explode: true` on a slice pulls it out a little, to point at the part your text is about. A slice
+  pulled out looks bigger than it is, so use it on one slice, not for decoration.
 
 ## 10. Help text
 

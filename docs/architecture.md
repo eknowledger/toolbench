@@ -217,8 +217,10 @@ export type Output =
   | { kind: "fields";   fields: Field[] }
   | { kind: "text";     text: string; mono?: boolean }
   | { kind: "code";     lang: string; source: string }
-  | { kind: "table";    columns: Column[]; rows: Cell[][]; caption?: string }
+  | { kind: "table";    columns: Column[]; rows: Cell[][]; caption?: string; link?: { chart: string; keys: (number | string | null)[] } }
   | { kind: "series";   chart: Chart }
+  | { kind: "heatmap";  heatmap: Heatmap }
+  | { kind: "pie";      pie: Pie }
   | { kind: "group";    parts: Output[] }
   | { kind: "bytes";    bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
   | { kind: "error";    message: string; input?: string; at?: number; len?: number };
@@ -828,7 +830,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 22.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 22.8 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
 | Stylesheet | 0.9 KB | |
 | Worker entry | 4.2 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.3 KB | |

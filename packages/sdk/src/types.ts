@@ -82,6 +82,13 @@ export interface Series {
 	 * covers every series. Usually with `shape: "points"`.
 	 */
 	x?: number[];
+	/**
+	 * A third measure per point, drawn as the AREA of a bubble on a `points` series (#127, contract version 4).
+	 * By area, not radius, so a value twice as large looks twice as large. `sizeLabel` names it in the key
+	 * and the readout: "Calls".
+	 */
+	sizes?: (number | null)[];
+	sizeLabel?: string;
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,
@@ -137,6 +144,12 @@ export interface Chart {
 	 */
 	orientation?: "vertical" | "horizontal";
 	/**
+	 * On a horizontal bar chart: series the tool gives as negative values are drawn to the left, and every
+	 * label (ticks, readout, data table) shows the magnitude. For back-to-back comparisons and pyramids,
+	 * where both sides are quantities and neither is negative (#125, contract version 4).
+	 */
+	mirror?: boolean;
+	/**
 	 * `log` draws an axis in powers of ten, for values spanning orders of magnitude: latency distributions,
 	 * loss from 0.01% to 10% (#118, contract version 4). A log axis cannot show zero or a negative, so those
 	 * points are left out and the data table's caption says so; bars are not drawn on a log y axis, because
@@ -144,6 +157,48 @@ export interface Chart {
 	 */
 	yScale?: "linear" | "log";
 	xScale?: "linear" | "log";
+}
+
+/**
+ * A value over two dimensions: latency by hour and weekday, loss by bitrate and delay (#121).
+ *
+ * `values[row][column]`, one row per `y` and one column per `x`. A `null` cell has no value and is drawn
+ * hatched, never as zero. Colour alone never carries a value: every cell is in the readout and the data
+ * table, and a key shows the scale.
+ */
+export interface Heatmap {
+	xLabel: string;
+	yLabel: string;
+	/** What a cell's value is, for the key and the readout: "p95 latency". */
+	label: string;
+	unit?: string;
+	x: (number | string)[];
+	y: (number | string)[];
+	values: (number | null)[][];
+	/** `sequential` (default) is one hue, light to dark: how much. `diverging` is two hues either side of `midpoint`. */
+	scale?: "sequential" | "diverging";
+	/** The neutral value of a diverging scale. Default 0. */
+	midpoint?: number;
+}
+
+/**
+ * Parts of a whole (#123). Built so the known ways a pie misleads cannot happen: every slice is labelled
+ * with its share, slices are drawn in the order given from 12 o'clock clockwise, more than six fold into
+ * "Other", and a negative or zero total draws a message rather than a chart.
+ */
+export interface Pie {
+	/** What the whole is: "Traffic by codec". */
+	label: string;
+	unit?: string;
+	/**
+	 * `explode` pulls a slice out a little to point at it (#126). A slice pulled out looks bigger than it is,
+	 * so use it for the one part the surrounding text is about, not for decoration.
+	 */
+	slices: { label: string; value: number; tone?: Tone; explode?: boolean }[];
+	/** A ring rather than a disc, with `total` in its centre. */
+	donut?: boolean;
+	/** The donut's centre text: "48 kb/s". */
+	total?: string;
 }
 
 /**
@@ -185,6 +240,10 @@ export type Output =
 			link?: { chart: string; keys: (number | string | null)[] };
 	  }
 	| { kind: "series"; chart: Chart }
+	/** A value over two dimensions, one coloured cell each (#121, contract version 4). */
+	| { kind: "heatmap"; heatmap: Heatmap }
+	/** Parts of a whole, every slice labelled with its name and share (#123, contract version 4). */
+	| { kind: "pie"; pie: Pie }
 	| { kind: "group"; parts: Output[] }
 	/**
 	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
@@ -219,6 +278,8 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 	"group",
 	"error",
 	"bytes",
+	"heatmap",
+	"pie",
 ];
 
 // ---------------------------------------------------------------------------

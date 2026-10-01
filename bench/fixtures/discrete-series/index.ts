@@ -343,6 +343,171 @@ export default {
 					},
 				};
 			}
+			case "heatmap": {
+				// Illustrative: packet loss by hour and weekday, busiest in the evenings. Saturday 03:00 was not measured.
+				const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+				const hours = Array.from({ length: 12 }, (_, h) => `${String(h * 2).padStart(2, "0")}:00`);
+				const values = days.map((_, d) =>
+					hours.map((_, h) => (d === 5 && h === 1 ? null : Number((0.2 + 1.6 * Math.max(0, Math.sin(((h - 3) / 12) * Math.PI)) * (d >= 5 ? 0.7 : 1)).toFixed(2)))),
+				);
+				return { kind: "heatmap", heatmap: { xLabel: "Hour", yLabel: "Day", label: "Packet loss", unit: "%", x: hours, y: days, values } };
+			}
+			case "heatmap-diverging":
+				// Illustrative: change in p95 latency against last week, by region and service; negative is faster.
+				return {
+					kind: "heatmap",
+					heatmap: {
+						xLabel: "Service",
+						yLabel: "Region",
+						label: "Change in p95 latency",
+						unit: "ms",
+						scale: "diverging",
+						midpoint: 0,
+						x: ["Signalling", "Media relay", "Transcription", "Synthesis"],
+						y: ["Europe", "North America", "Asia Pacific"],
+						values: [
+							[-4, 2, 18, -9],
+							[1, -12, 6, 0],
+							[7, 25, -3, 11],
+						],
+					},
+				};
+			case "pie":
+				// Illustrative: where 48 kb/s of one voice stream goes, in the order a packet is built.
+				return {
+					kind: "pie",
+					pie: {
+						label: "One voice stream, 48 kb/s",
+						unit: "kb/s",
+						slices: [
+							{ label: "Opus audio", value: 32 },
+							{ label: "RTP headers", value: 4.8 },
+							{ label: "UDP headers", value: 3.2 },
+							{ label: "IPv4 headers", value: 8 },
+						],
+					},
+				};
+			case "donut":
+				return {
+					kind: "pie",
+					pie: {
+						label: "Time to first audio",
+						unit: "ms",
+						donut: true,
+						total: "620 ms",
+						slices: [
+							{ label: "Speech recognition", value: 180 },
+							{ label: "Language model", value: 310 },
+							{ label: "Speech synthesis", value: 130 },
+						],
+					},
+				};
+			case "donut-exploded":
+				// The same time to first audio, with the part the text is about, the language model, pulled out.
+				return {
+					kind: "pie",
+					pie: {
+						label: "Time to first audio",
+						unit: "ms",
+						donut: true,
+						total: "620 ms",
+						slices: [
+							{ label: "Speech recognition", value: 180 },
+							{ label: "Language model", value: 310, explode: true },
+							{ label: "Speech synthesis", value: 130 },
+						],
+					},
+				};
+			case "pie-many":
+				return {
+					kind: "pie",
+					pie: {
+						label: "Calls by codec",
+						slices: [
+							{ label: "Opus", value: 640 },
+							{ label: "G.711", value: 180 },
+							{ label: "G.722", value: 90 },
+							{ label: "AMR-WB", value: 40 },
+							{ label: "iLBC", value: 20 },
+							{ label: "Speex", value: 12 },
+							{ label: "G.729", value: 10 },
+							{ label: "GSM", value: 8 },
+						],
+					},
+				};
+			case "pie-negative":
+				return { kind: "pie", pie: { label: "Change by region", slices: [{ label: "Up", value: 5 }, { label: "Down", value: -3 }] } };
+			case "area":
+				// Illustrative: one call's send rate over a minute, as the area under it.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Send rate",
+						yUnit: "kb/s",
+						x: Array.from({ length: 13 }, (_, i) => i * 5),
+						series: [{ label: "Send rate", unit: "kb/s", shape: "area", points: [32, 34, 40, 48, 48, 46, 30, 24, 28, 40, 48, 48, 44] }],
+					},
+				};
+			case "histogram": {
+				// A histogram is bars over bins: here, 200 inter-arrival gaps around 20 ms, binned 2 ms wide.
+				const bins = [12, 14, 16, 18, 20, 22, 24, 26, 28];
+				return {
+					kind: "series",
+					chart: { xLabel: "Gap between packets", xUnit: "ms", yLabel: "Packets", x: bins, series: [{ label: "Packets", shape: "bar", points: [2, 6, 19, 42, 64, 38, 17, 9, 3] }] },
+				};
+			}
+			case "combo":
+				// Bars for the count, a line with markers for the rate, each on its own axis.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Hour",
+						yLabel: "Calls",
+						yLabelRight: "Dropped",
+						x: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"],
+						series: [
+							{ label: "Calls", shape: "bar", points: [120, 340, 410, 380, 450, 300] },
+							{ label: "Dropped", unit: "%", axis: "right", markers: true, points: [0.8, 1.1, 1.6, 1.3, 2.4, 1.2] },
+						],
+					},
+				};
+			case "pyramid":
+				// Illustrative: upload against download per kind of client, back to back. Upload is given negative,
+				// and shared stack id puts both halves on one row; mirror writes every number as a magnitude.
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						mirror: true,
+						xLabel: "Client",
+						yLabel: "Bitrate",
+						yUnit: "kb/s",
+						x: ["Desktop browser", "Phone app", "Desk phone", "Smart speaker", "Car"],
+						series: [
+							{ label: "Upload", unit: "kb/s", shape: "bar", stack: "rate", points: [-48, -32, -64, -24, -32] },
+							{ label: "Download", unit: "kb/s", shape: "bar", stack: "rate", points: [96, 64, 64, 48, 32] },
+						],
+					},
+				};
+			case "bubble":
+				// Illustrative: loss against p95 delay per region, each bubble's area its share of calls.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Loss",
+						xUnit: "%",
+						yLabel: "p95 delay",
+						yUnit: "ms",
+						x: [],
+						series: [
+							{ label: "Europe", unit: "ms", shape: "points", sizeLabel: "Calls", x: [0.4], points: [120], sizes: [4000] },
+							{ label: "Americas", unit: "ms", shape: "points", sizeLabel: "Calls", x: [0.7], points: [160], sizes: [9000] },
+							{ label: "Asia Pacific", unit: "ms", shape: "points", sizeLabel: "Calls", x: [1.6], points: [210], sizes: [6000] },
+							{ label: "Africa", unit: "ms", shape: "points", sizeLabel: "Calls", x: [2.4], points: [260], sizes: [1000] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

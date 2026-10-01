@@ -1612,6 +1612,23 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.deepEqual(marks.counts, [19, 20, 20]);
 	});
 
+	it("fills an area from zero, and titles a second axis", async () => {
+		// The send rate never falls below 24, but an area's height is its value, so the axis starts at 0.
+		const area = await chartFor("area");
+		assert.equal(area.yLabels[0], "0");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const titles = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "combo" };
+			await host.run();
+			return [...(host.shadowRoot?.querySelectorAll(".tb-plot text.tb-axis-label") ?? [])].map((t) => t.textContent);
+		});
+		assert.deepEqual(titles, ["Hour", "Calls", "Dropped (%)"]);
+		await page.close();
+	});
+
 	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
 		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
 		const chart = await chartFor("lines");
@@ -1714,6 +1731,32 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.keyboard.press("End");
 		const row = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout li")?.textContent);
 		assert.equal(row, "median 12 ms (q1 8, q3 18; 4 to 30)Morning");
+		await page.close();
+	});
+
+	it("sizes bubbles by area across the whole chart, with a key and the size in the table (#127)", async () => {
+		// 9,000 calls is the largest, 24 units of radius; 1,000 is a ninth of the area, so a third of the radius.
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "bubble" };
+			await host.run();
+			const root = host.shadowRoot;
+			const radius = (s: number) => Number(root?.querySelector(`.tb-plot circle.tb-bubble[data-s="${s}"]`)?.getAttribute("r"));
+			return {
+				radii: [0, 1, 2, 3].map(radius),
+				key: [...(root?.querySelectorAll(".tb-size-key text") ?? [])].map((t) => t.textContent),
+				head: [...(root?.querySelectorAll(".tb-chart-data thead th") ?? [])].map((t) => t.textContent),
+			};
+		});
+		const [europe, americas, , africa] = read.radii as number[];
+		assert.equal(americas, 24);
+		assert.ok(Math.abs((africa as number) / 24 - 1 / 3) < 0.01, `a ninth of the area is a third of the radius: ${africa}`);
+		assert.ok(Math.abs((europe as number) / 24 - Math.sqrt(4 / 9)) < 0.01, `4,000 of 9,000: ${europe}`);
+		assert.equal(read.key[0], "9,000");
+		assert.deepEqual(read.head.at(-1), "Calls");
 		await page.close();
 	});
 
@@ -1850,6 +1893,32 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.keyboard.press("ArrowDown");
 		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
 		assert.equal(title, "Path Across a continent", "the down arrow steps through the rows");
+		await page.close();
+	});
+
+	it("mirrors a pyramid: both halves on one row, every number a magnitude (#125)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "pyramid" };
+			await host.run();
+			const root = host.shadowRoot;
+			const svg = root?.querySelector(".tb-plot svg");
+			const n = (el: Element, a: string) => Number(el.getAttribute(a));
+			const desk = [...(svg?.querySelectorAll("rect.tb-bar[data-i='2']") ?? [])].map((r) => ({ x: n(r, "x"), w: n(r, "width"), y: n(r, "y") }));
+			return {
+				ticks: [...(svg?.querySelectorAll("text.tb-tick[text-anchor=middle]") ?? [])].map((t) => t.textContent),
+				desk,
+				cells: [...(root?.querySelectorAll(".tb-chart-data tbody tr:nth-child(3) td") ?? [])].map((td) => td.textContent),
+			};
+		});
+		assert.ok(read.ticks.every((t) => !String(t).startsWith("-")), `no negative labels: ${read.ticks.join(", ")}`);
+		// Desk phone: 64 up and 64 down, so two bars of equal length meeting at zero, on the same row.
+		const [up, down] = read.desk;
+		assert.ok(up && down && Math.abs(up.w - down.w) < 0.5 && up.y === down.y, JSON.stringify(read.desk));
+		assert.deepEqual(read.cells, ["64", "64"], "magnitudes in the table, and no total column for a mirror");
 		await page.close();
 	});
 
@@ -2055,6 +2124,158 @@ describe("the chart readout (#112)", () => {
 		});
 		assert.ok(fits.flipped && fits.right <= fits.edge, `card right ${fits.right}, chart right ${fits.edge}`);
 		await page.close();
+	});
+});
+
+describe("heatmaps (#121)", () => {
+	async function heatmapCase(value: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-heatmap svg").waitFor({ timeout: 15_000 });
+		return { page, scripts };
+	}
+
+	it("draws one cell per value, hatches the missing one, and darkens with the value", async () => {
+		const { page } = await heatmapCase("heatmap");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const cells = [...(root?.querySelectorAll(".tb-cell") ?? [])];
+			// color-mix in OKLab is reported in OKLab, whose first number is the lightness.
+			const lum = (el: Element) => Number(/oklab\(([\d.]+)/.exec(getComputedStyle(el).fill)?.[1]);
+			const at = (r: number, c: number) => cells.find((x) => x.getAttribute("data-r") === String(r) && x.getAttribute("data-c") === String(c)) as Element;
+			return {
+				cells: cells.length,
+				empty: cells.filter((c) => c.hasAttribute("data-empty")).length,
+				// Monday: 00:00 is the low, 08:00 between, 18:00 the high.
+				order: [lum(at(0, 0)), lum(at(0, 4)), lum(at(0, 9))],
+				key: [...(root?.querySelectorAll(".tb-heatmap svg text.tb-tick") ?? [])].slice(-2).map((t) => t.textContent),
+			};
+		});
+		assert.equal(read.cells, 84, "seven days of twelve hours");
+		assert.equal(read.empty, 1, "Saturday 02:00 was not measured");
+		assert.ok(read.order[0] > read.order[1] && read.order[1] > read.order[2], `lighter for less: ${read.order.join(", ")}`);
+		await page.close();
+	});
+
+	it("reads out the cell under the keyboard, and moves through the grid both ways", async () => {
+		const { page } = await heatmapCase("heatmap-diverging");
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowDown");
+		await page.keyboard.press("ArrowRight");
+		const card = await page.evaluate(() => {
+			const r = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout");
+			return { title: r?.querySelector(".tb-readout-title")?.textContent, row: r?.querySelector("li")?.textContent };
+		});
+		assert.deepEqual(card, { title: "Region North America, Service Media relay", row: "-12 msChange in p95 latency" });
+		await page.close();
+	});
+
+	it("is its own chunk, sharing a common one with the series chart but not importing it", async () => {
+		/*
+		 * Asserted on the built chunk's imports rather than on what a page fetched: a page host preloads every
+		 * kind its tool declares, and the gallery fixture declares series too, so the fetch list could not tell
+		 * a heatmap that needs the chart code from one that merely shares a page with it.
+		 */
+		const { page, scripts } = await heatmapCase("heatmap");
+		const heatmapUrl = scripts.find((url) => /\/heatmap-[^/]+\.js$/.test(url));
+		assert.ok(heatmapUrl, "the heatmap chunk was fetched");
+		const source = await (await fetch(heatmapUrl)).text();
+		const imports = [...source.matchAll(/from"\.\/([^"]+)"/g)].map((m) => m[1] ?? "");
+		assert.ok(imports.some((n) => n.startsWith("plot-common-")), `it imports the shared chunk: ${imports.join(", ")}`);
+		assert.ok(!imports.some((n) => /^chart-/.test(n)), `and not the line and bar renderer: ${imports.join(", ")}`);
+		await page.close();
+	});
+});
+
+describe("pies and donuts (#123)", () => {
+	async function pieCase(value: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-pie").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				slices: [...(root?.querySelectorAll(".tb-pie .tb-slice") ?? [])].map((p) => p.getAttribute("d") ?? ""),
+				key: [...(root?.querySelectorAll(".tb-pie-key li") ?? [])].map((li) => li.textContent),
+				caption: root?.querySelector(".tb-pie .tb-chart-data caption")?.textContent ?? "",
+				message: root?.querySelector(".tb-pie-message")?.textContent ?? "",
+				total: root?.querySelector(".tb-pie-total")?.textContent ?? "",
+			};
+		});
+		return { page, read };
+	}
+
+	it("starts at 12 o'clock, goes clockwise in the given order, and labels every share", async () => {
+		// 32, 4.8, 3.2 and 8 of 48 kb/s: 67%, 10%, 6.7% and 17%.
+		const { page, read } = await pieCase("pie");
+		assert.deepEqual(read.key, ["Opus audio67%32 kb/s", "RTP headers10%4.80 kb/s", "UDP headers6.7%3.20 kb/s", "IPv4 headers17%8 kb/s"]);
+		// The first slice runs from the centre to the top of the circle (cx 150, cy 130, r 112: y = 18).
+		assert.match(read.slices[0] ?? "", /^M150,130L150\.00,18\.00A/);
+		// Clockwise: the first slice ends right of centre, having swept two thirds of the way round.
+		const end = /A112,112 0 \d 1 ([\d.]+),([\d.]+)Z$/.exec(read.slices[0] ?? "");
+		assert.ok(end && Number(end[1]) < 150 && Number(end[2]) > 130, `two thirds round, clockwise, ends lower left: ${end?.slice(1)}`);
+		await page.close();
+	});
+
+	it("pulls an exploded slice out along its middle, and changes no share (#126)", async () => {
+		/*
+		 * The language model's slice runs from 29% to 79% of the way round, so its middle is 54%: 104.4 degrees
+		 * clockwise from 3 o'clock in screen terms. 8% of a 104 radius is 8.32, so it moves about (-2.07, 8.06).
+		 */
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "donut-exploded" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				moves: [...(root?.querySelectorAll(".tb-slice") ?? [])].map((p) => p.getAttribute("transform")),
+				shares: [...(root?.querySelectorAll(".tb-pie-key .tb-share") ?? [])].map((s) => s.textContent),
+			};
+		});
+		assert.deepEqual(read.moves[0], null);
+		assert.deepEqual(read.moves[2], null);
+		const m = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(read.moves[1] ?? "");
+		assert.ok(m && Math.abs(Number(m[1]) + 2.07) < 0.1 && Math.abs(Number(m[2]) - 8.06) < 0.1, `moved ${read.moves[1]}`);
+		assert.deepEqual(read.shares, ["29%", "50%", "21%"]);
+		await page.close();
+	});
+
+	it("folds more than six parts into Other, and says so", async () => {
+		const { page, read } = await pieCase("pie-many");
+		assert.equal(read.key.length, 6);
+		assert.match(read.key.at(-1) ?? "", /^Other3\.0%30$/, "Speex 12, G.729 10 and GSM 8 make 30 of 1,000");
+		assert.match(read.caption, /3 smallest parts folded into Other/);
+		await page.close();
+	});
+
+	it("draws a donut's total in its centre, and no pie at all for a negative value", async () => {
+		const donut = await pieCase("donut");
+		assert.equal(donut.read.total, "620 ms");
+		assert.equal(donut.read.slices.length, 3);
+		await donut.page.close();
+		const negative = await pieCase("pie-negative");
+		assert.equal(negative.read.slices.length, 0);
+		assert.match(negative.read.message, /not drawn as a pie/);
+		await negative.page.close();
 	});
 });
 

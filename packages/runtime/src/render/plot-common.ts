@@ -1,5 +1,9 @@
 /**
- * The chart's stylesheet, in the chart chunk rather than the runtime's.
+ * What every chart kind shares: the stylesheet and how a number is written. One module, so the series chart,
+ * the heatmap and the pie (#121, #123) each fetch one small shared chunk alongside their own, and a page
+ * drawing a heatmap never downloads the line and bar renderer.
+ *
+ * The chart's stylesheet, in a chart chunk rather than the runtime's.
  *
  * Every rule here styles something only a chart draws, and every tool page used to download them, about
  * 1 KB gzipped, whether or not it drew a chart. They now arrive with the renderer, and the first chart
@@ -68,6 +72,13 @@ export const CHART_STYLES = /* css */ `
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
 /* Hollow, so markers at the same point nest rather than cover each other. */
 .tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
+/* A bubble (#127): translucent so overlaps show, with a surface ring so each edge is found. */
+.tb-bubble { fill: var(--c); fill-opacity: 0.5; stroke: var(--tb-bg); stroke-width: 1.5; }
+.tb-bubble.tb-hot { fill-opacity: 0.8; stroke: var(--tb-fg); }
+.tb-size-key { margin-top: 0.5rem; display: flex; align-items: flex-end; gap: 0.5rem; }
+.tb-size-key svg { width: 25%; max-width: 13rem; height: auto; display: block; overflow: visible; }
+.tb-size-title { margin: 0 0 0.25rem; font-size: 0.78rem; color: var(--tb-muted); }
+.tb-size-ref { fill: none; stroke: var(--tb-muted); stroke-width: 1; }
 /* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
 .tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
 /* The readout (#112): a dashed crosshair under the data, the lifted marks, and a card beside the line. */
@@ -103,8 +114,6 @@ export const CHART_STYLES = /* css */ `
 .tb-chart-data table { margin-top: 0.5rem; }
 `;
 
-let sheet: CSSStyleSheet | undefined;
-
 /**
  * Adopt the chart sheet into the shadow root a chart was just drawn into, once per root.
  *
@@ -113,26 +122,50 @@ let sheet: CSSStyleSheet | undefined;
  * the browser paints, so the chart is never seen unstyled.
  */
 export function adoptChartStyles(node: Node): void {
+	adoptStyles(node, "chart", () => CHART_STYLES);
+}
+
+const sheets = new Map<string, CSSStyleSheet>();
+
+/** Adopt a named sheet into the shadow root `node` is drawn into, once per root. See `adoptChartStyles`. */
+export function adoptStyles(node: Node, name: string, css: () => string): void {
 	queueMicrotask(() => {
 		const root = node.getRootNode();
 		if (!(root instanceof ShadowRoot)) return;
 		if ("adoptedStyleSheets" in root && typeof CSSStyleSheet === "function") {
 			try {
-				sheet ??= (() => {
-					const s = new CSSStyleSheet();
-					s.replaceSync(CHART_STYLES);
-					return s;
-				})();
+				let sheet = sheets.get(name);
+				if (!sheet) {
+					sheet = new CSSStyleSheet();
+					sheet.replaceSync(css());
+					sheets.set(name, sheet);
+				}
 				if (!root.adoptedStyleSheets.includes(sheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
 				return;
 			} catch {
 				// Fall through, as the runtime's own sheet does.
 			}
 		}
-		if (root.querySelector("style[data-tb-chart]")) return;
+		if (root.querySelector(`style[data-tb-sheet="${name}"]`)) return;
 		const style = document.createElement("style");
-		style.setAttribute("data-tb-chart", "");
-		style.textContent = CHART_STYLES;
+		style.setAttribute("data-tb-sheet", name);
+		style.textContent = css();
 		root.append(style);
 	});
+}
+
+/**
+ * How a chart writes a number, shared by every chart kind so a value reads the same in a line chart, a
+ * heatmap and a pie.
+ */
+export function format(value: number): string {
+	if (!Number.isFinite(value)) return "—";
+	const abs = Math.abs(value);
+	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
+	if (Number.isInteger(value) && abs < 1000) return String(value);
+	if (abs >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+	if (abs >= 10) return value.toFixed(abs % 1 === 0 ? 0 : 1);
+	if (abs >= 1) return value.toFixed(2);
+	if (abs === 0) return "0";
+	return value.toPrecision(2);
 }

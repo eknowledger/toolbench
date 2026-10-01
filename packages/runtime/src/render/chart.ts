@@ -12,7 +12,9 @@
  */
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
-import { adoptChartStyles } from "./chart-styles.ts";
+import { adoptChartStyles, format } from "./plot-common.ts";
+
+const formatNumber = format;
 import { attachReadout, attachScatterReadout, type Geometry, type ScatterPoint } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
@@ -54,8 +56,9 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * ⚠️ A bar is measured from zero, so a bar chart's scale always includes it. Without that, values of 32
 	 * and 64 drew on an axis from 30, and the shorter bar read as a sixteenth of the longer.
 	 */
+	// An area is measured from zero as a bar is: its filled height is its value.
 	const withZero = (scale: Scale, series: Series[]): Scale =>
-		series.some((x) => x.shape === "bar") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
+		series.some((x) => x.shape === "bar" || x.shape === "area") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
 	// A threshold above or below every value must still be on screen, so the scale reaches it.
 	const reach = (scale: Scale, axis: "left" | "right"): Scale => {
 		const ys = (chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y);
@@ -113,7 +116,14 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
 	const slot = xs.length > 1 ? (xMax - xMin) / (xs.length - 1) : Math.abs(xMax) || 1;
 	const xLog = chart.xScale === "log" && !categories;
-	const xScale: Scale = xLog ? logScale(allX) : bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
+	// Bubbles need room at the ends: the largest is 24 units in radius, so the x scale is padded by about 6%.
+	const bubbleMax = largestSize(chart);
+	const bubblePad = bubbleMax > 0 ? (xMax - xMin || 1) * 0.06 : 0;
+	const xScale: Scale = xLog
+		? logScale(allX)
+		: bars || categories
+			? { min: xMin - slot / 2, max: xMax + slot / 2 }
+			: { min: xMin - bubblePad, max: xMax + bubblePad };
 
 	const px = (value: number) => plot.x + along(value, xScale) * plot.w;
 	const py = (value: number, scale: Scale) => plot.y + plot.h - along(value, scale) * plot.h;
@@ -231,7 +241,9 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 						}),
 					}
 				: series;
-		marks.push(...drawSeries(drawn, index, scatter && series.x ? series.x : xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
+		marks.push(
+			...drawSeries(drawn, index, scatter && series.x ? series.x : xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series), bubbleMax),
+		);
 	}
 
 	marks.push(...labelsOnTop);
@@ -247,6 +259,20 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 			{ class: "tb-axis-label", x: 12, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${plot.y + plot.h / 2})` },
 			withUnit(chart.yLabel, chart.yUnit),
 		),
+		/*
+		 * The second axis's title, on the right edge reading downward. Declared in the contract since the right
+		 * axis existed, and never drawn: a combination chart showed numbers on its right with nothing saying
+		 * what they were.
+		 */
+		...(rightScale && chart.yLabelRight
+			? [
+					svg(
+						"text",
+						{ class: "tb-axis-label", x: W - 8, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(90 ${W - 8} ${plot.y + plot.h / 2})` },
+						withUnit(chart.yLabelRight, right[0]?.unit),
+					),
+				]
+			: []),
 	];
 
 	const figure = el("figure", {
@@ -268,6 +294,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	figure.append(el("div", { class: "tb-plot" }, picture));
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
+	const sizes = sizeKey(chart);
+	if (sizes) figure.append(sizes);
 	// The same numbers, for anyone or anything that cannot see the picture.
 	const notes = [
 		dropped > 0 ? `${dropped} value${dropped === 1 ? "" : "s"} at or below zero not drawn on a log axis` : "",
@@ -313,11 +341,27 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
  * A scatter's data, one row per point, since its series share no x to align on (#120): series, x, y.
  */
 function scatterTable(chart: Chart): HTMLElement {
-	const head = el("tr", {}, el("th", { scope: "col" }, "Series"), el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)), el("th", { scope: "col" }, withUnit(chart.yLabel, chart.yUnit)));
+	const sized = chart.series.find((s) => s.sizes);
+	const head = el(
+		"tr",
+		{},
+		el("th", { scope: "col" }, "Series"),
+		el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)),
+		el("th", { scope: "col" }, withUnit(chart.yLabel, chart.yUnit)),
+		sized ? el("th", { scope: "col" }, sized.sizeLabel ?? "Size") : null,
+	);
 	const rows = chart.series.flatMap((series) =>
 		series.points.map((y, i) => {
 			const x = (series.x ?? chart.x)[i];
-			return el("tr", {}, el("th", { scope: "row" }, series.label), el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")), el("td", {}, y === null ? "—" : format(y)));
+			const size = series.sizes?.[i];
+			return el(
+				"tr",
+				{},
+				el("th", { scope: "row" }, series.label),
+				el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")),
+				el("td", {}, y === null ? "—" : format(y)),
+				sized ? el("td", {}, size === null || size === undefined ? "—" : format(size)) : null,
+			);
 		}),
 	);
 	return el(
@@ -335,6 +379,8 @@ function scatterTable(chart: Chart): HTMLElement {
  * over: grouping, stacking, thresholds (now vertical rules), the readout, the data table.
  */
 function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
+	// A mirrored chart (#125) draws negatives leftward and writes every number as its magnitude.
+	const fmt = chart.mirror === true ? (v: number) => format(Math.abs(v)) : format;
 	const categories = chart.x.map((v) => (typeof v === "string" ? v : format(v)));
 	const n = Math.max(1, categories.length);
 	const bars = chart.series.filter((series) => series.shape === "bar");
@@ -354,7 +400,8 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 	const marks: SVGElement[] = [];
 	const top: SVGElement[] = [];
 	const valueTicks = ticks(scale);
-	const valueFormat = formatterFor(valueTicks);
+	const baseFormat = formatterFor(valueTicks);
+	const valueFormat = chart.mirror === true ? (v: number) => baseFormat(Math.abs(v)) : baseFormat;
 	for (const tick of valueTicks) {
 		const x = pv(tick);
 		marks.push(svg("line", { class: "tb-grid", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
@@ -425,7 +472,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 	figure.append(el("div", { class: "tb-plot" }, picture));
 	if (bars.length > 1) figure.append(legend(bars));
 	const skipped = chart.series.length - bars.length;
-	figure.append(dataTable(chart, (i) => categories[i] ?? "", skipped > 0 ? `${skipped} series not drawn: a horizontal chart draws bars only` : undefined));
+	figure.append(dataTable(chart, (i) => categories[i] ?? "", skipped > 0 ? `${skipped} series not drawn: a horizontal chart draws bars only` : undefined, fmt));
 	attachReadout(figure, picture, chart, {
 		horizontal: true,
 		xs: categories.map((_, i) => i),
@@ -440,7 +487,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 		plot,
 		width: W,
 		height,
-		format,
+		format: fmt,
 		key: (s) => keyFor(chart.series[s] as Series, s),
 	});
 	adoptChartStyles(figure);
@@ -616,6 +663,8 @@ function drawSeries(
 	group: { index: number; count: number },
 	zero: number,
 	stacked?: ({ from: number; to: number } | null)[],
+	// ⚠️ The largest size in the whole chart, not in this series: per series, every one-point series drew the same size.
+	bubbleMax = 0,
 ): SVGElement[] {
 	const cls = `tb-s${(index % 6) + 1}`;
 	const shape = series.shape ?? "line";
@@ -759,6 +808,23 @@ function drawSeries(
 	 * series agreeing on frames 1 to 4 showed only the last one's triangles. Outlines nest instead, so a
 	 * circle inside a diamond inside a triangle reads as three series that agree.
 	 */
+	/*
+	 * Bubbles (#127): a circle per point whose AREA is proportional to its size, the largest 24 units across
+	 * in radius. Drawn largest first, so a small one in front of a large one stays findable, each with a
+	 * surface ring where they overlap.
+	 */
+	if (series.sizes && shape === "points") {
+		const largest = bubbleMax;
+		const order = series.points.map((_, i) => i).sort((a, b) => (series.sizes?.[b] ?? 0) - (series.sizes?.[a] ?? 0));
+		for (const i of order) {
+			const point = series.points[i];
+			const size = series.sizes[i];
+			const x = xs[i];
+			if (point === null || point === undefined || size === null || size === undefined || size <= 0 || x === undefined || largest === 0) continue;
+			marks.push(svg("circle", { class: `tb-bubble ${cls}`, "data-i": i, "data-s": index, cx: px(x), cy: py(point), r: bubbleRadius(size, largest) }));
+		}
+		return marks;
+	}
 	if (dots) {
 		series.points.forEach((point, i) => {
 			const x = xs[i];
@@ -767,6 +833,40 @@ function drawSeries(
 		});
 	}
 	return marks;
+}
+
+/** The largest bubble size anywhere in the chart, which every bubble and the key are scaled against. */
+function largestSize(chart: Chart): number {
+	return Math.max(0, ...chart.series.flatMap((s) => (s.shape === "points" ? (s.sizes ?? []) : [])).filter((v): v is number => v !== null && v > 0));
+}
+
+/** A bubble's radius: area proportional to size, so radius goes as its square root. Never under 3 units. */
+function bubbleRadius(size: number, largest: number): number {
+	return Math.max(3, Math.sqrt(size / largest) * 24);
+}
+
+/**
+ * The size key for bubbles (#127): three reference circles and their values, since size has no axis. Its
+ * own small SVG at the chart's scale (160 of the chart's 640 units is a quarter of its width), so a key
+ * circle is the same size as a bubble of that value.
+ */
+function sizeKey(chart: Chart): HTMLElement | null {
+	const sized = chart.series.find((s) => s.sizes && s.shape === "points");
+	if (!sized?.sizes) return null;
+	const largest = largestSize(chart);
+	if (largest === 0) return null;
+	const refs = [largest, largest / 4, largest / 16].map((v) => Number(v.toPrecision(2)));
+	const marks: SVGElement[] = [];
+	let x = 30;
+	for (const v of refs) {
+		const r = bubbleRadius(v, largest);
+		marks.push(svg("circle", { class: "tb-size-ref", cx: x, cy: 52 - r, r }));
+		marks.push(svg("text", { class: "tb-tick", x, y: 64, "text-anchor": "middle" }, format(v)));
+		x += 2 * r + 22;
+	}
+	const title = el("p", { class: "tb-size-title" });
+	title.textContent = sized.sizeLabel ?? "Size";
+	return el("div", { class: "tb-size-key" }, title, svg("svg", { viewBox: "0 0 160 68", "aria-hidden": "true" }, ...marks));
 }
 
 /** Six marker shapes, in series order, each about 8 units across: circle, diamond, triangle, square, down-triangle, cross. */
@@ -791,6 +891,7 @@ function markerPath(index: number, x: number, y: number): string {
 
 /** A series' key: its marker where it has markers, otherwise a stroke of its colour. Shared by the legend and the readout. */
 function keyFor(s: Series, i: number): HTMLElement {
+	if (s.sizes && s.shape === "points") return el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": "0", "aria-hidden": "true" });
 	if (s.shape === "box") return el("span", { class: `tb-swatch-box tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	if (s.shape === "band") return el("span", { class: `tb-swatch-band tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	return s.shape === "points" || s.markers === true
@@ -814,9 +915,11 @@ function legend(series: Series[]): HTMLElement {
 	);
 }
 
-function dataTable(chart: Chart, xText: (i: number) => string, note?: string): HTMLElement {
+function dataTable(chart: Chart, xText: (i: number) => string, note?: string, format: (v: number) => string = formatNumber): HTMLElement {
 	// A stack's total is a number the chart shows and no series holds, so the table gives it a column (#115).
-	const stacks = [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
+	// A mirrored chart's halves share a stack only to share a row: their sum is upload minus download, not a total.
+	const stacks =
+		chart.mirror === true ? [] : [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
 	const totalOf = (id: string, i: number) =>
 		chart.series.filter((s) => s.shape === "bar" && s.stack === id).reduce((sum, s) => sum + (s.points[i] ?? 0), 0);
 	const head = el(
@@ -882,14 +985,3 @@ function formatterFor(values: number[]): (value: number) => string {
 	};
 }
 
-function format(value: number): string {
-	if (!Number.isFinite(value)) return "—";
-	const abs = Math.abs(value);
-	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
-	if (Number.isInteger(value) && abs < 1000) return String(value);
-	if (abs >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-	if (abs >= 10) return value.toFixed(abs % 1 === 0 ? 0 : 1);
-	if (abs >= 1) return value.toFixed(2);
-	if (abs === 0) return "0";
-	return value.toPrecision(2);
-}

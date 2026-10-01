@@ -32,6 +32,8 @@ export {
 	type Output,
 	type OutputKind,
 	type Sample,
+	type Heatmap,
+	type Pie,
 	type Readout,
 	type Series,
 	type Tone,

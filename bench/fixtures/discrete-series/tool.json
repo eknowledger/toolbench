@@ -8,7 +8,7 @@
 	"runtime": { "entry": "index.ts", "thread": "main" },
 	"autoRun": true,
 	"card": "live",
-	"kinds": ["series", "group", "table", "error"],
+	"kinds": ["series", "group", "table", "heatmap", "pie", "error"],
 	"tags": ["bench"],
 	"inputs": [
 		{
@@ -20,6 +20,9 @@
 			"default": "lines",
 			"options": [
 				{ "value": "lines", "label": "Lines over frames 1 to 20" },
+				{ "value": "area", "label": "An area under a line" },
+				{ "value": "histogram", "label": "A histogram" },
+				{ "value": "combo", "label": "Bars, a line and markers, two axes" },
 				{ "value": "two-bars", "label": "Two bar series" },
 				{ "value": "zero-bars", "label": "A bar series of zeros" },
 				{ "value": "signed-bars", "label": "Bars either side of zero" },
@@ -34,12 +37,21 @@
 				{ "value": "stacked-signed", "label": "A stack either side of zero, beside a plain bar" },
 				{ "value": "horizontal", "label": "Horizontal stacked bars" },
 				{ "value": "horizontal-grouped", "label": "Horizontal grouped bars, long names" },
+				{ "value": "pyramid", "label": "A mirrored pyramid" },
 				{ "value": "step", "label": "A step line beside a sloped one" },
 				{ "value": "log", "label": "Both axes on a log scale" },
 				{ "value": "log-zero", "label": "A log axis given a zero" },
 				{ "value": "band", "label": "A median inside a p5 to p95 band" },
 				{ "value": "scatter", "label": "Two series with their own x" },
-				{ "value": "box", "label": "Box plots per network, two series" }
+				{ "value": "bubble", "label": "Bubbles: a third measure as size" },
+				{ "value": "box", "label": "Box plots per network, two series" },
+				{ "value": "heatmap", "label": "A heatmap, sequential" },
+				{ "value": "heatmap-diverging", "label": "A heatmap, diverging around zero" },
+				{ "value": "pie", "label": "A pie of four parts" },
+				{ "value": "donut", "label": "A donut with its total" },
+				{ "value": "pie-many", "label": "A pie of eight parts, folded to six" },
+				{ "value": "donut-exploded", "label": "A donut with one slice pulled out" },
+				{ "value": "pie-negative", "label": "A pie given a negative value" }
 			]
 		}
 	]
