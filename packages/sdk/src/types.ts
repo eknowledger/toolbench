@@ -147,6 +147,44 @@ export interface Chart {
 }
 
 /**
+ * A value over two dimensions: latency by hour and weekday, loss by bitrate and delay (#121).
+ *
+ * `values[row][column]`, one row per `y` and one column per `x`. A `null` cell has no value and is drawn
+ * hatched, never as zero. Colour alone never carries a value: every cell is in the readout and the data
+ * table, and a key shows the scale.
+ */
+export interface Heatmap {
+	xLabel: string;
+	yLabel: string;
+	/** What a cell's value is, for the key and the readout: "p95 latency". */
+	label: string;
+	unit?: string;
+	x: (number | string)[];
+	y: (number | string)[];
+	values: (number | null)[][];
+	/** `sequential` (default) is one hue, light to dark: how much. `diverging` is two hues either side of `midpoint`. */
+	scale?: "sequential" | "diverging";
+	/** The neutral value of a diverging scale. Default 0. */
+	midpoint?: number;
+}
+
+/**
+ * Parts of a whole (#123). Built so the known ways a pie misleads cannot happen: every slice is labelled
+ * with its share, slices are drawn in the order given from 12 o'clock clockwise, more than six fold into
+ * "Other", and a negative or zero total draws a message rather than a chart.
+ */
+export interface Pie {
+	/** What the whole is: "Traffic by codec". */
+	label: string;
+	unit?: string;
+	slices: { label: string; value: number; tone?: Tone }[];
+	/** A ring rather than a disc, with `total` in its centre. */
+	donut?: boolean;
+	/** The donut's centre text: "48 kb/s". */
+	total?: string;
+}
+
+/**
  * A run of bytes worth calling out inside a `bytes` output: a header field, a length prefix, the
  * region an error points at.
  *
@@ -185,6 +223,10 @@ export type Output =
 			link?: { chart: string; keys: (number | string | null)[] };
 	  }
 	| { kind: "series"; chart: Chart }
+	/** A value over two dimensions, one coloured cell each (#121, contract version 4). */
+	| { kind: "heatmap"; heatmap: Heatmap }
+	/** Parts of a whole, every slice labelled with its name and share (#123, contract version 4). */
+	| { kind: "pie"; pie: Pie }
 	| { kind: "group"; parts: Output[] }
 	/**
 	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
@@ -219,6 +261,8 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 	"group",
 	"error",
 	"bytes",
+	"heatmap",
+	"pie",
 ];
 
 // ---------------------------------------------------------------------------

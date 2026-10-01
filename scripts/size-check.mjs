@@ -153,8 +153,27 @@ const BUDGETS = [
 	 * Raised from 8_000 to 9_500 by stacked bars (#115) and horizontal bars (#116), a second layout with its own axes, labels and readout geometry. 8,561 measured.
 	 *
 	 * Raised from 9_500 to 11_500 by bands (#119) and scatter (#120): a second readout that snaps to the nearest point in two dimensions, and a one-row-per-point data table. 10,349 measured.
+	 *
+	 * Lowered from 11_500 to 9_000 when the stylesheet and the number format moved into plot-common, the
+	 * chunk every chart kind shares (#121): about 10.9 KB to 8,266. A line or bar page now fetches both, 11,191
+	 * together, 0.3 KB more than one chunk was, which buys a heatmap or pie page not fetching this one.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 11_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 9_000 },
+	/*
+	 * What every chart kind shares: the chart stylesheet and the number format. Fetched with the series
+	 * chart, the heatmap or the pie, whichever a page draws first. 2,925 measured.
+	 */
+	{ label: "chart common", pattern: /^plot-common-[^/]+\.js$/, budget: 3_500 },
+	/*
+	 * The heatmap (#121), its own chunk so only a page that draws one fetches it: cells, the key, the
+	 * hatch for missing values and its cell-by-cell readout. 2,852 measured.
+	 */
+	{ label: "heatmap renderer", pattern: /^heatmap-[^/]+\.js$/, budget: 3_500 },
+	/*
+	 * The pie and donut (#123), its own chunk: slices, the key beside them, folding into Other and its
+	 * slice-by-slice readout. 2,731 measured.
+	 */
+	{ label: "pie renderer", pattern: /^pie-[^/]+\.js$/, budget: 3_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

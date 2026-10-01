@@ -343,6 +343,84 @@ export default {
 					},
 				};
 			}
+			case "heatmap": {
+				// Illustrative: packet loss by hour and weekday, busiest in the evenings. Saturday 03:00 was not measured.
+				const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+				const hours = Array.from({ length: 12 }, (_, h) => `${String(h * 2).padStart(2, "0")}:00`);
+				const values = days.map((_, d) =>
+					hours.map((_, h) => (d === 5 && h === 1 ? null : Number((0.2 + 1.6 * Math.max(0, Math.sin(((h - 3) / 12) * Math.PI)) * (d >= 5 ? 0.7 : 1)).toFixed(2)))),
+				);
+				return { kind: "heatmap", heatmap: { xLabel: "Hour", yLabel: "Day", label: "Packet loss", unit: "%", x: hours, y: days, values } };
+			}
+			case "heatmap-diverging":
+				// Illustrative: change in p95 latency against last week, by region and service; negative is faster.
+				return {
+					kind: "heatmap",
+					heatmap: {
+						xLabel: "Service",
+						yLabel: "Region",
+						label: "Change in p95 latency",
+						unit: "ms",
+						scale: "diverging",
+						midpoint: 0,
+						x: ["Signalling", "Media relay", "Transcription", "Synthesis"],
+						y: ["Europe", "North America", "Asia Pacific"],
+						values: [
+							[-4, 2, 18, -9],
+							[1, -12, 6, 0],
+							[7, 25, -3, 11],
+						],
+					},
+				};
+			case "pie":
+				// Illustrative: where 48 kb/s of one voice stream goes, in the order a packet is built.
+				return {
+					kind: "pie",
+					pie: {
+						label: "One voice stream, 48 kb/s",
+						unit: "kb/s",
+						slices: [
+							{ label: "Opus audio", value: 32 },
+							{ label: "RTP headers", value: 4.8 },
+							{ label: "UDP headers", value: 3.2 },
+							{ label: "IPv4 headers", value: 8 },
+						],
+					},
+				};
+			case "donut":
+				return {
+					kind: "pie",
+					pie: {
+						label: "Time to first audio",
+						unit: "ms",
+						donut: true,
+						total: "620 ms",
+						slices: [
+							{ label: "Speech recognition", value: 180 },
+							{ label: "Language model", value: 310 },
+							{ label: "Speech synthesis", value: 130 },
+						],
+					},
+				};
+			case "pie-many":
+				return {
+					kind: "pie",
+					pie: {
+						label: "Calls by codec",
+						slices: [
+							{ label: "Opus", value: 640 },
+							{ label: "G.711", value: 180 },
+							{ label: "G.722", value: 90 },
+							{ label: "AMR-WB", value: 40 },
+							{ label: "iLBC", value: 20 },
+							{ label: "Speex", value: 12 },
+							{ label: "G.729", value: 10 },
+							{ label: "GSM", value: 8 },
+						],
+					},
+				};
+			case "pie-negative":
+				return { kind: "pie", pie: { label: "Change by region", slices: [{ label: "Up", value: 5 }, { label: "Down", value: -3 }] } };
 			case "two-bars":
 				return {
 					kind: "series",

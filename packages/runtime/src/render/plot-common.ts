@@ -1,5 +1,9 @@
 /**
- * The chart's stylesheet, in the chart chunk rather than the runtime's.
+ * What every chart kind shares: the stylesheet and how a number is written. One module, so the series chart,
+ * the heatmap and the pie (#121, #123) each fetch one small shared chunk alongside their own, and a page
+ * drawing a heatmap never downloads the line and bar renderer.
+ *
+ * The chart's stylesheet, in a chart chunk rather than the runtime's.
  *
  * Every rule here styles something only a chart draws, and every tool page used to download them, about
  * 1 KB gzipped, whether or not it drew a chart. They now arrive with the renderer, and the first chart
@@ -103,8 +107,6 @@ export const CHART_STYLES = /* css */ `
 .tb-chart-data table { margin-top: 0.5rem; }
 `;
 
-let sheet: CSSStyleSheet | undefined;
-
 /**
  * Adopt the chart sheet into the shadow root a chart was just drawn into, once per root.
  *
@@ -113,26 +115,50 @@ let sheet: CSSStyleSheet | undefined;
  * the browser paints, so the chart is never seen unstyled.
  */
 export function adoptChartStyles(node: Node): void {
+	adoptStyles(node, "chart", () => CHART_STYLES);
+}
+
+const sheets = new Map<string, CSSStyleSheet>();
+
+/** Adopt a named sheet into the shadow root `node` is drawn into, once per root. See `adoptChartStyles`. */
+export function adoptStyles(node: Node, name: string, css: () => string): void {
 	queueMicrotask(() => {
 		const root = node.getRootNode();
 		if (!(root instanceof ShadowRoot)) return;
 		if ("adoptedStyleSheets" in root && typeof CSSStyleSheet === "function") {
 			try {
-				sheet ??= (() => {
-					const s = new CSSStyleSheet();
-					s.replaceSync(CHART_STYLES);
-					return s;
-				})();
+				let sheet = sheets.get(name);
+				if (!sheet) {
+					sheet = new CSSStyleSheet();
+					sheet.replaceSync(css());
+					sheets.set(name, sheet);
+				}
 				if (!root.adoptedStyleSheets.includes(sheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
 				return;
 			} catch {
 				// Fall through, as the runtime's own sheet does.
 			}
 		}
-		if (root.querySelector("style[data-tb-chart]")) return;
+		if (root.querySelector(`style[data-tb-sheet="${name}"]`)) return;
 		const style = document.createElement("style");
-		style.setAttribute("data-tb-chart", "");
-		style.textContent = CHART_STYLES;
+		style.setAttribute("data-tb-sheet", name);
+		style.textContent = css();
 		root.append(style);
 	});
+}
+
+/**
+ * How a chart writes a number, shared by every chart kind so a value reads the same in a line chart, a
+ * heatmap and a pie.
+ */
+export function format(value: number): string {
+	if (!Number.isFinite(value)) return "—";
+	const abs = Math.abs(value);
+	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
+	if (Number.isInteger(value) && abs < 1000) return String(value);
+	if (abs >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+	if (abs >= 10) return value.toFixed(abs % 1 === 0 ? 0 : 1);
+	if (abs >= 1) return value.toFixed(2);
+	if (abs === 0) return "0";
+	return value.toPrecision(2);
 }

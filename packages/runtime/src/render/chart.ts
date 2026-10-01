@@ -12,7 +12,7 @@
  */
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
-import { adoptChartStyles } from "./chart-styles.ts";
+import { adoptChartStyles, format } from "./plot-common.ts";
 import { attachReadout, attachScatterReadout, type Geometry, type ScatterPoint } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
@@ -882,14 +882,3 @@ function formatterFor(values: number[]): (value: number) => string {
 	};
 }
 
-function format(value: number): string {
-	if (!Number.isFinite(value)) return "—";
-	const abs = Math.abs(value);
-	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
-	if (Number.isInteger(value) && abs < 1000) return String(value);
-	if (abs >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-	if (abs >= 10) return value.toFixed(abs % 1 === 0 ? 0 : 1);
-	if (abs >= 1) return value.toFixed(2);
-	if (abs === 0) return "0";
-	return value.toPrecision(2);
-}

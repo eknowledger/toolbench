@@ -34,7 +34,7 @@
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { ChartRendererMissing, loadChartRenderer, render, unknownOutput, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, isLazyKind, loadRenderers, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -351,8 +351,8 @@ export class ToolHost extends HTMLElement {
 			 * renderer it does not yet need is still a working card; a seed that needed it degrades in
 			 * `#paint` to the parts that can be drawn.
 			 */
-			const drawsNow = this.mode !== "card" || containsSeries(this.#seed);
-			if (manifest.kinds.includes("series") && drawsNow) await loadChartRenderer().catch(() => undefined);
+			const needed = this.mode !== "card" ? manifest.kinds.filter(isLazyKind) : lazyKindsIn(this.#seed);
+			if (needed.length > 0) await loadRenderers(needed).catch(() => undefined);
 			this.#paint();
 
 			/*
@@ -416,7 +416,8 @@ export class ToolHost extends HTMLElement {
 		this.#paint();
 		try {
 			// Not fatal, for the same reason as in `#prepare`: `#draw` retries if a chart turns up without it.
-			const chart = this.#manifest?.kinds.includes("series") ? loadChartRenderer().catch(() => undefined) : undefined;
+			const lazyKinds = this.#manifest?.kinds.filter(isLazyKind) ?? [];
+			const chart = lazyKinds.length > 0 ? loadRenderers(lazyKinds).catch(() => undefined) : undefined;
 			this.#loaded = await this.#resolve(cfg);
 			await chart;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
@@ -1120,7 +1121,7 @@ export class ToolHost extends HTMLElement {
 				 * preload. Load and draw again rather than telling a reader the shape cannot be drawn, which
 				 * would be false. One frame late is the cost of a manifest that understated itself.
 				 */
-				void loadChartRenderer().then(
+				void loadRenderers([error.kind]).then(
 					() => this.#draw(output),
 					() => fill(target, degraded(output, (rest) => render(rest, { compact }))),
 				);
@@ -1217,11 +1218,11 @@ function lifecycleMark(status: NonNullable<Manifest["status"]>): HTMLElement | n
 	return null;
 }
 
-/** Whether an output has a chart anywhere in it. */
-function containsSeries(output: Output | undefined): boolean {
-	if (!output) return false;
-	if (output.kind === "series") return true;
-	return output.kind === "group" && output.parts.some((part) => containsSeries(part));
+/** Every kind in an output that is drawn by code of its own (a chart, a heatmap, a pie). */
+function lazyKindsIn(output: Output | undefined): LazyKind[] {
+	if (!output) return [];
+	if (output.kind === "group") return [...new Set(output.parts.flatMap((part) => lazyKindsIn(part)))];
+	return isLazyKind(output.kind) ? [output.kind] : [];
 }
 
 /**
@@ -1241,7 +1242,7 @@ function renderOrDegrade(output: Output, options: RenderOptions): HTMLElement {
 
 function degraded(output: Output, draw: (rest: Output) => HTMLElement): HTMLElement {
 	const note = el("p", { class: "tb-status" }, "The chart could not be loaded.");
-	const rest = output.kind === "group" ? output.parts.filter((part) => !containsSeries(part)) : [];
+	const rest = output.kind === "group" ? output.parts.filter((part) => lazyKindsIn(part).length === 0) : [];
 	if (rest.length === 0) return note;
 	const body = draw(rest.length === 1 ? (rest[0] as Output) : { kind: "group", parts: rest });
 	return el("div", {}, body, note);
@@ -1286,6 +1287,10 @@ function summarise(output: Output, brief = false): string {
 			return `table, ${output.rows.length} row${output.rows.length === 1 ? "" : "s"}`;
 		case "series":
 			return `chart, ${output.chart.series.length} series`;
+		case "heatmap":
+			return `heatmap, ${output.heatmap.y.length} by ${output.heatmap.x.length}`;
+		case "pie":
+			return `${output.pie.donut ? "donut" : "pie"} chart, ${output.pie.slices.length} slice${output.pie.slices.length === 1 ? "" : "s"}`;
 		case "bytes": {
 			// The named ranges are the useful part: "84 bytes" tells a screen-reader user nothing they
 			// can act on, whereas the field names are the reason they ran the tool.

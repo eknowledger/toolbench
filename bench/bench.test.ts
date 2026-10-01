@@ -2056,6 +2056,132 @@ describe("the chart readout (#112)", () => {
 	});
 });
 
+describe("heatmaps (#121)", () => {
+	async function heatmapCase(value: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-heatmap svg").waitFor({ timeout: 15_000 });
+		return { page, scripts };
+	}
+
+	it("draws one cell per value, hatches the missing one, and darkens with the value", async () => {
+		const { page } = await heatmapCase("heatmap");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const cells = [...(root?.querySelectorAll(".tb-cell") ?? [])];
+			// color-mix in OKLab is reported in OKLab, whose first number is the lightness.
+			const lum = (el: Element) => Number(/oklab\(([\d.]+)/.exec(getComputedStyle(el).fill)?.[1]);
+			const at = (r: number, c: number) => cells.find((x) => x.getAttribute("data-r") === String(r) && x.getAttribute("data-c") === String(c)) as Element;
+			return {
+				cells: cells.length,
+				empty: cells.filter((c) => c.hasAttribute("data-empty")).length,
+				// Monday: 00:00 is the low, 08:00 between, 18:00 the high.
+				order: [lum(at(0, 0)), lum(at(0, 4)), lum(at(0, 9))],
+				key: [...(root?.querySelectorAll(".tb-heatmap svg text.tb-tick") ?? [])].slice(-2).map((t) => t.textContent),
+			};
+		});
+		assert.equal(read.cells, 84, "seven days of twelve hours");
+		assert.equal(read.empty, 1, "Saturday 02:00 was not measured");
+		assert.ok(read.order[0] > read.order[1] && read.order[1] > read.order[2], `lighter for less: ${read.order.join(", ")}`);
+		await page.close();
+	});
+
+	it("reads out the cell under the keyboard, and moves through the grid both ways", async () => {
+		const { page } = await heatmapCase("heatmap-diverging");
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowDown");
+		await page.keyboard.press("ArrowRight");
+		const card = await page.evaluate(() => {
+			const r = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout");
+			return { title: r?.querySelector(".tb-readout-title")?.textContent, row: r?.querySelector("li")?.textContent };
+		});
+		assert.deepEqual(card, { title: "Region North America, Service Media relay", row: "-12 msChange in p95 latency" });
+		await page.close();
+	});
+
+	it("is its own chunk, sharing a common one with the series chart but not importing it", async () => {
+		/*
+		 * Asserted on the built chunk's imports rather than on what a page fetched: a page host preloads every
+		 * kind its tool declares, and the gallery fixture declares series too, so the fetch list could not tell
+		 * a heatmap that needs the chart code from one that merely shares a page with it.
+		 */
+		const { page, scripts } = await heatmapCase("heatmap");
+		const heatmapUrl = scripts.find((url) => /\/heatmap-[^/]+\.js$/.test(url));
+		assert.ok(heatmapUrl, "the heatmap chunk was fetched");
+		const source = await (await fetch(heatmapUrl)).text();
+		const imports = [...source.matchAll(/from"\.\/([^"]+)"/g)].map((m) => m[1] ?? "");
+		assert.ok(imports.some((n) => n.startsWith("plot-common-")), `it imports the shared chunk: ${imports.join(", ")}`);
+		assert.ok(!imports.some((n) => /^chart-/.test(n)), `and not the line and bar renderer: ${imports.join(", ")}`);
+		await page.close();
+	});
+});
+
+describe("pies and donuts (#123)", () => {
+	async function pieCase(value: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-pie").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				slices: [...(root?.querySelectorAll(".tb-pie .tb-slice") ?? [])].map((p) => p.getAttribute("d") ?? ""),
+				key: [...(root?.querySelectorAll(".tb-pie-key li") ?? [])].map((li) => li.textContent),
+				caption: root?.querySelector(".tb-pie .tb-chart-data caption")?.textContent ?? "",
+				message: root?.querySelector(".tb-pie-message")?.textContent ?? "",
+				total: root?.querySelector(".tb-pie-total")?.textContent ?? "",
+			};
+		});
+		return { page, read };
+	}
+
+	it("starts at 12 o'clock, goes clockwise in the given order, and labels every share", async () => {
+		// 32, 4.8, 3.2 and 8 of 48 kb/s: 67%, 10%, 6.7% and 17%.
+		const { page, read } = await pieCase("pie");
+		assert.deepEqual(read.key, ["Opus audio67%32 kb/s", "RTP headers10%4.80 kb/s", "UDP headers6.7%3.20 kb/s", "IPv4 headers17%8 kb/s"]);
+		// The first slice runs from the centre to the top of the circle (cx 150, cy 130, r 112: y = 18).
+		assert.match(read.slices[0] ?? "", /^M150,130L150\.00,18\.00A/);
+		// Clockwise: the first slice ends right of centre, having swept two thirds of the way round.
+		const end = /A112,112 0 \d 1 ([\d.]+),([\d.]+)Z$/.exec(read.slices[0] ?? "");
+		assert.ok(end && Number(end[1]) < 150 && Number(end[2]) > 130, `two thirds round, clockwise, ends lower left: ${end?.slice(1)}`);
+		await page.close();
+	});
+
+	it("folds more than six parts into Other, and says so", async () => {
+		const { page, read } = await pieCase("pie-many");
+		assert.equal(read.key.length, 6);
+		assert.match(read.key.at(-1) ?? "", /^Other3\.0%30$/, "Speex 12, G.729 10 and GSM 8 make 30 of 1,000");
+		assert.match(read.caption, /3 smallest parts folded into Other/);
+		await page.close();
+	});
+
+	it("draws a donut's total in its centre, and no pie at all for a negative value", async () => {
+		const donut = await pieCase("donut");
+		assert.equal(donut.read.total, "620 ms");
+		assert.equal(donut.read.slices.length, 3);
+		await donut.page.close();
+		const negative = await pieCase("pie-negative");
+		assert.equal(negative.read.slices.length, 0);
+		assert.match(negative.read.message, /not drawn as a pie/);
+		await negative.page.close();
+	});
+});
+
 describe("the chart renderer is its own chunk", () => {
 	/*
 	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the

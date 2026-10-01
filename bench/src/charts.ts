@@ -50,6 +50,24 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "many-categories", caption: "Twenty-four categories: every third is labelled, and all are in the data table and the readout" },
 		],
 	},
+	{
+		heading: "Heatmaps",
+		note: "A value over two dimensions. Sequential is one hue, light to dark; diverging is two hues around a neutral midpoint. The key shows the scale, and every cell answers the pointer and the arrow keys.",
+		cases: [
+			{ id: "heatmap", caption: "Sequential: packet loss by hour and weekday, with one cell not measured (illustrative values)" },
+			{ id: "heatmap-diverging", caption: "Diverging: change in p95 latency against last week, faster in orange, slower in blue (illustrative values)" },
+		],
+	},
+	{
+		heading: "Parts of a whole",
+		note: "Pies and donuts, drawn in the order given from 12 o'clock, every part labelled with its share. More than six parts fold into Other, and values that cannot be shares draw a message instead.",
+		cases: [
+			{ id: "pie", caption: "A pie: where one voice stream's 48 kb/s goes" },
+			{ id: "donut", caption: "A donut with its total in the centre (illustrative values)" },
+			{ id: "pie-many", caption: "Eight parts folded to six: the three smallest become Other (illustrative values)" },
+			{ id: "pie-negative", caption: "A negative value: a share of it means nothing, so there is no pie" },
+		],
+	},
 ];
 
 const gallery = document.getElementById("gallery");

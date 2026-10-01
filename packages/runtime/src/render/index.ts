@@ -30,30 +30,66 @@ import { el } from "../dom.ts";
  * the module, `render` throws `ChartRendererMissing`, which `#draw` catches, loads, and redraws. One frame
  * later rather than never.
  */
-let renderChart: typeof import("./chart.ts").renderChart | undefined;
+/**
+ * The kinds drawn by code of their own, fetched only when one is drawn: the series chart, the heatmap and
+ * the pie (#121, #123), each its own chunk, so a page pays for the kinds it draws and no others.
+ */
+export const LAZY_KINDS = ["series", "heatmap", "pie"] as const;
+export type LazyKind = (typeof LAZY_KINDS)[number];
 
-/** Thrown when a `series` reaches `render` before the chart chunk has loaded. Caught by `#draw`. */
+type Drawer = (output: Output, options: RenderOptions) => HTMLElement;
+const drawers: Partial<Record<LazyKind, Drawer>> = {};
+const loaders: Record<LazyKind, () => Promise<Drawer>> = {
+	series: async () => {
+		const { renderChart } = await import("./chart.ts");
+		return (output, options) => renderChart((output as Extract<Output, { kind: "series" }>).chart, options);
+	},
+	heatmap: async () => {
+		const { renderHeatmap } = await import("./heatmap.ts");
+		return (output, options) => renderHeatmap((output as Extract<Output, { kind: "heatmap" }>).heatmap, options);
+	},
+	pie: async () => {
+		const { renderPie } = await import("./pie.ts");
+		return (output, options) => renderPie((output as Extract<Output, { kind: "pie" }>).pie, options);
+	},
+};
+
 export class ChartRendererMissing extends Error {
-	constructor() {
-		super("the chart renderer has not loaded yet");
+	readonly kind: LazyKind;
+	constructor(kind: LazyKind = "series") {
+		super(`the ${kind} renderer has not loaded yet`);
 		this.name = "ChartRendererMissing";
+		this.kind = kind;
 	}
 }
 
-/** Loads the chart chunk. Idempotent, and awaited by `<tool-host>` for tools that declare `series`. */
+export const isLazyKind = (kind: string): kind is LazyKind => (LAZY_KINDS as readonly string[]).includes(kind);
+
 /*
  * ⚠️ A failed load is final for the page. Browsers keep a failed dynamic import in the module map and
  * hand back the same rejection to every later `import()` of that URL: measured in Chrome, one refused
  * request and no second one, however often this is called. So a caller must treat failure as "draw
- * without charts until reload", which is what the host does, rather than expect a retry to help.
+ * without that kind until reload", which is what the host does, rather than expect a retry to help.
  */
-export async function loadChartRenderer(): Promise<void> {
-	renderChart ??= (await import("./chart.ts")).renderChart;
+export async function loadRenderers(kinds: readonly string[]): Promise<void> {
+	await Promise.all(
+		kinds.filter(isLazyKind).map(async (kind) => {
+			drawers[kind] ??= await loaders[kind]();
+		}),
+	);
 }
+
+export const loadChartRenderer = (): Promise<void> => loadRenderers(["series"]);
 
 /** Whether a `series` can be drawn right now, without loading anything. */
 export function chartRendererReady(): boolean {
-	return renderChart !== undefined;
+	return drawers.series !== undefined;
+}
+
+function lazy(kind: LazyKind, output: Output, options: RenderOptions): HTMLElement {
+	const draw = drawers[kind];
+	if (draw === undefined) throw new ChartRendererMissing(kind);
+	return draw(output, options);
 }
 
 export interface RenderOptions {
@@ -128,10 +164,10 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 			return renderCode(output.lang, output.source, options.highlight);
 		case "table":
 			return renderTable(output, options);
-		case "series": {
-			if (renderChart === undefined) throw new ChartRendererMissing();
-			return renderChart(output.chart, options);
-		}
+		case "series":
+		case "heatmap":
+		case "pie":
+			return lazy(output.kind, output, options);
 		case "group": {
 			/*
 			 * ⚠️ A compact slot renders the FIRST FEW parts, and says how many it left out.
