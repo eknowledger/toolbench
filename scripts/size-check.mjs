@@ -93,8 +93,11 @@ const BUDGETS = [
 	 * #97's chart loading +202, #103's layout and controls +134, #99/#101/#104's Run area +76, #111's
 	 * ticks and bars +59, #100 +16, and the chart readout's styles +351 (#112), which is the commit that
 	 * crossed it. 23,628 measured, all of it fixes and requested features, none of it a dependency.
+	 *
+	 * Lowered from 24_000 to 22_500 when the chart rules moved into the chart chunk: 23,628 to 22,195, so a
+	 * tool page that draws no chart stopped paying about 1.4 KB for styles it never used.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 24_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -130,8 +133,12 @@ const BUDGETS = [
 	 * Raised again, from 3_000 to 4_500, by the chart readout (#112): the crosshair, the card, pointer,
 	 * touch and key handling and the nearest-x arithmetic, 1,510 bytes. 4,257 measured. Only a page that
 	 * draws a chart downloads it.
+	 *
+	 * Raised from 4_500 to 6_500 when the chart rules moved here from the runtime: 4,257 to 6,288. A page
+	 * with a chart pays about 0.6 KB more than before, because CSS compresses better in one file than split
+	 * across two; a page without one saves 1.4 KB. That trade favours the pages that never draw a chart.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 4_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 6_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

@@ -12,6 +12,7 @@
  */
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
+import { adoptChartStyles } from "./chart-styles.ts";
 import { attachReadout } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
@@ -174,6 +175,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		format,
 		key: (s) => keyFor(chart.series[s] as Series, s),
 	});
+	adoptChartStyles(figure);
 	return figure;
 }
 
