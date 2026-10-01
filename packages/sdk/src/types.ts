@@ -137,6 +137,12 @@ export interface Chart {
 	 */
 	orientation?: "vertical" | "horizontal";
 	/**
+	 * On a horizontal bar chart: series the tool gives as negative values are drawn to the left, and every
+	 * label (ticks, readout, data table) shows the magnitude. For back-to-back comparisons and pyramids,
+	 * where both sides are quantities and neither is negative (#125, contract version 4).
+	 */
+	mirror?: boolean;
+	/**
 	 * `log` draws an axis in powers of ten, for values spanning orders of magnitude: latency distributions,
 	 * loss from 0.01% to 10% (#118, contract version 4). A log axis cannot show zero or a negative, so those
 	 * points are left out and the data table's caption says so; bars are not drawn on a log y axis, because

@@ -50,6 +50,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "stacked-signed", caption: "A stack either side of zero, beside a bar that is not stacked" },
 			{ id: "horizontal", caption: "Horizontal: the same budget read left to right, the threshold now a vertical rule" },
 			{ id: "horizontal-grouped", caption: "Horizontal grouped bars: long names on their own line beside their bars (illustrative values)" },
+			{ id: "pyramid", caption: "Mirrored: upload left, download right, every number a magnitude (illustrative values)" },
 			{ id: "many-categories", caption: "Twenty-four categories: every third is labelled, and all are in the data table and the readout" },
 		],
 	},

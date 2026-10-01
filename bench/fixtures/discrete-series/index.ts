@@ -456,6 +456,24 @@ export default {
 						],
 					},
 				};
+			case "pyramid":
+				// Illustrative: upload against download per kind of client, back to back. Upload is given negative,
+				// and shared stack id puts both halves on one row; mirror writes every number as a magnitude.
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						mirror: true,
+						xLabel: "Client",
+						yLabel: "Bitrate",
+						yUnit: "kb/s",
+						x: ["Desktop browser", "Phone app", "Desk phone", "Smart speaker", "Car"],
+						series: [
+							{ label: "Upload", unit: "kb/s", shape: "bar", stack: "rate", points: [-48, -32, -64, -24, -32] },
+							{ label: "Download", unit: "kb/s", shape: "bar", stack: "rate", points: [96, 64, 64, 48, 32] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

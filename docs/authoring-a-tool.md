@@ -681,6 +681,9 @@ finds it. See §4b for what counts as running.
 * `shape: "box"` with `boxes` draws a box plot per x: whiskers `low` to `high`, a box `q1` to `q3`, the
   `median`, and `outliers`. You compute the summary, so the whiskers mean what you say they mean; put it
   in the axis label. Set `points` to the medians. The readout and the data table show all five numbers.
+* `mirror: true` on a horizontal bar chart draws series given as negative values to the left and writes
+  every number as its magnitude: back-to-back comparisons and pyramids. Put both halves in one `stack` so
+  they share a row.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

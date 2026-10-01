@@ -13,6 +13,8 @@
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import { adoptChartStyles, format } from "./plot-common.ts";
+
+const formatNumber = format;
 import { attachReadout, attachScatterReadout, type Geometry, type ScatterPoint } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
@@ -350,6 +352,8 @@ function scatterTable(chart: Chart): HTMLElement {
  * over: grouping, stacking, thresholds (now vertical rules), the readout, the data table.
  */
 function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
+	// A mirrored chart (#125) draws negatives leftward and writes every number as its magnitude.
+	const fmt = chart.mirror === true ? (v: number) => format(Math.abs(v)) : format;
 	const categories = chart.x.map((v) => (typeof v === "string" ? v : format(v)));
 	const n = Math.max(1, categories.length);
 	const bars = chart.series.filter((series) => series.shape === "bar");
@@ -369,7 +373,8 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 	const marks: SVGElement[] = [];
 	const top: SVGElement[] = [];
 	const valueTicks = ticks(scale);
-	const valueFormat = formatterFor(valueTicks);
+	const baseFormat = formatterFor(valueTicks);
+	const valueFormat = chart.mirror === true ? (v: number) => baseFormat(Math.abs(v)) : baseFormat;
 	for (const tick of valueTicks) {
 		const x = pv(tick);
 		marks.push(svg("line", { class: "tb-grid", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
@@ -440,7 +445,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 	figure.append(el("div", { class: "tb-plot" }, picture));
 	if (bars.length > 1) figure.append(legend(bars));
 	const skipped = chart.series.length - bars.length;
-	figure.append(dataTable(chart, (i) => categories[i] ?? "", skipped > 0 ? `${skipped} series not drawn: a horizontal chart draws bars only` : undefined));
+	figure.append(dataTable(chart, (i) => categories[i] ?? "", skipped > 0 ? `${skipped} series not drawn: a horizontal chart draws bars only` : undefined, fmt));
 	attachReadout(figure, picture, chart, {
 		horizontal: true,
 		xs: categories.map((_, i) => i),
@@ -455,7 +460,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 		plot,
 		width: W,
 		height,
-		format,
+		format: fmt,
 		key: (s) => keyFor(chart.series[s] as Series, s),
 	});
 	adoptChartStyles(figure);
@@ -829,9 +834,11 @@ function legend(series: Series[]): HTMLElement {
 	);
 }
 
-function dataTable(chart: Chart, xText: (i: number) => string, note?: string): HTMLElement {
+function dataTable(chart: Chart, xText: (i: number) => string, note?: string, format: (v: number) => string = formatNumber): HTMLElement {
 	// A stack's total is a number the chart shows and no series holds, so the table gives it a column (#115).
-	const stacks = [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
+	// A mirrored chart's halves share a stack only to share a row: their sum is upload minus download, not a total.
+	const stacks =
+		chart.mirror === true ? [] : [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
 	const totalOf = (id: string, i: number) =>
 		chart.series.filter((s) => s.shape === "bar" && s.stack === id).reduce((sum, s) => sum + (s.points[i] ?? 0), 0);
 	const head = el(

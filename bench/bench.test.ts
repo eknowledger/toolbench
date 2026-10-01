@@ -1868,6 +1868,32 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("mirrors a pyramid: both halves on one row, every number a magnitude (#125)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "pyramid" };
+			await host.run();
+			const root = host.shadowRoot;
+			const svg = root?.querySelector(".tb-plot svg");
+			const n = (el: Element, a: string) => Number(el.getAttribute(a));
+			const desk = [...(svg?.querySelectorAll("rect.tb-bar[data-i='2']") ?? [])].map((r) => ({ x: n(r, "x"), w: n(r, "width"), y: n(r, "y") }));
+			return {
+				ticks: [...(svg?.querySelectorAll("text.tb-tick[text-anchor=middle]") ?? [])].map((t) => t.textContent),
+				desk,
+				cells: [...(root?.querySelectorAll(".tb-chart-data tbody tr:nth-child(3) td") ?? [])].map((td) => td.textContent),
+			};
+		});
+		assert.ok(read.ticks.every((t) => !String(t).startsWith("-")), `no negative labels: ${read.ticks.join(", ")}`);
+		// Desk phone: 64 up and 64 down, so two bars of equal length meeting at zero, on the same row.
+		const [up, down] = read.desk;
+		assert.ok(up && down && Math.abs(up.w - down.w) < 0.5 && up.y === down.y, JSON.stringify(read.desk));
+		assert.deepEqual(read.cells, ["64", "64"], "magnitudes in the table, and no total column for a mirror");
+		await page.close();
+	});
+
 	it("stacks parts end to end, either side of zero, beside a bar that is not stacked (#115)", async () => {
 		// A: 5 then 2 on top (0 to 5, 5 to 7). B: -3 then -4 below (0 to -3, -3 to -7). "Alone" is 4 at both.
 		const chart = await chartFor("stacked-signed");
