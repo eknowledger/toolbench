@@ -1683,6 +1683,24 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("draws a step as runs and risers, rising only where the value changes (#117)", async () => {
+		// Depths 40 40 40 60 60 60 60 80 80 60 60 40: four changes, so four risers, and never a slope.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const d = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "step" };
+			await host.run();
+			return host.shadowRoot?.querySelector(".tb-plot path.tb-line.tb-s1")?.getAttribute("d") ?? "";
+		});
+		assert.ok(d.startsWith("M") && !d.slice(1).includes("L"), `a step has no sloped segment: ${d.slice(0, 60)}`);
+		const ys = [...d.matchAll(/V([\d.]+)/g)].map((m) => m[1]);
+		const changes = ys.filter((y, i) => i > 0 && y !== ys[i - 1]).length + (ys[0] !== /M[\d.]+,([\d.]+)/.exec(d)?.[1] ? 1 : 0);
+		assert.equal(changes, 4);
+		await page.close();
+	});
+
 	it("draws horizontal bars rightward from zero, names on the left, the threshold vertical (#116)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });

@@ -560,7 +560,13 @@ function drawSeries(
 			current = [];
 			return;
 		}
-		current.push(`${current.length === 0 ? "M" : "L"}${px(x).toFixed(2)},${py(point).toFixed(2)}`);
+		const at = `${px(x).toFixed(2)},${py(point).toFixed(2)}`;
+		/*
+		 * A step holds the previous value across to this x, then moves straight to this value (#117): a run
+		 * and a riser, never a slope, because the state did not change gradually in between.
+		 */
+		if (current.length > 0 && shape === "step") current.push(`H${px(x).toFixed(2)}V${py(point).toFixed(2)}`);
+		else current.push(`${current.length === 0 ? "M" : "L"}${at}`);
 	});
 	if (current.length > 1) segments.push(current.join(" "));
 

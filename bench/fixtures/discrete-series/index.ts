@@ -225,6 +225,24 @@ export default {
 						],
 					},
 				};
+			case "step": {
+				// A jitter buffer's target depth, which changes only when the receiver decides, drawn both ways.
+				const depth = [40, 40, 40, 60, 60, 60, 60, 80, 80, 60, 60, 40];
+				const ticks = frames.slice(0, 12);
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Buffer depth",
+						yUnit: "ms",
+						x: ticks,
+						series: [
+							{ label: "As a step", unit: "ms", shape: "step", markers: true, points: depth },
+							{ label: "As a line", unit: "ms", points: depth.map((d) => d - 10) },
+						],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

@@ -47,8 +47,11 @@ export interface Series {
 	 * `points` draws a marker at each value and no line between them: for an x of separate items (frames,
 	 * requests, runs) where nothing exists between two of them, so a joining line would invent a slope.
 	 * Contract version 4.
+	 *
+	 * `step` holds each value until the next x, then rises or falls straight to the next: for state sampled
+	 * on events (a buffer's depth, a configured rate), where a sloped line invents a gradual change (#117).
 	 */
-	shape?: "line" | "area" | "bar" | "points";
+	shape?: "line" | "area" | "bar" | "points" | "step";
 	/**
 	 * Draw a marker at each value of a `line` or `area`, so every real point is visible and a series under
 	 * an identical one can still be found. Each series gets its own marker shape. Contract version 4.

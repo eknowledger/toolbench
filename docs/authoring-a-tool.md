@@ -666,6 +666,9 @@ finds it. See §4b for what counts as running.
 * `orientation: "horizontal"` draws bars growing rightward, one row per x: for long names, and for a
   budget read left to right. Grouping, stacking, thresholds (as vertical rules) and the readout all carry
   over, and the down arrow steps through the rows. Bars only; other shapes are not drawn there.
+* `shape: "step"` holds each value until the next x and then moves straight to the next one: for state
+  sampled on events, a buffer depth or a configured rate, where a sloped line invents a gradual change.
+  `markers: true` marks the start of each run.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

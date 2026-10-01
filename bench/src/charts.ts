@@ -19,6 +19,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "markers", caption: "Markers: every value visible, one shape per series, so equal values stay apart" },
 			{ id: "points", caption: "Points: the same data with no line between frames" },
 			{ id: "thresholds", caption: "Thresholds: two labelled limits, the higher one above every value, so the scale widens to show it" },
+			{ id: "step", caption: "Step: a value that holds until it changes, beside the same data as a line (offset by 10), which invents slopes" },
 		],
 	},
 	{
