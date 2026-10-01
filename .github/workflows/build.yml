@@ -120,6 +120,13 @@ jobs:
           pnpm exec playwright install --with-deps "$PLAYWRIGHT_BROWSER"
           pnpm test:bench
 
+      - name: Check documented test counts
+        if: matrix.browser == 'chromium'
+        env:
+          PLAYWRIGHT_BROWSER: chromium
+          CHROME_CHANNEL: chromium
+        run: pnpm test:counts
+
   # ⚠️ This job exists for branch protection, and its name must not change.
   #
   # `main` requires a status check called "packages, bench, browser". GitHub appends matrix values to a
