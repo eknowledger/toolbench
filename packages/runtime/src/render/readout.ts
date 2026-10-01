@@ -17,6 +17,11 @@ import type { Chart } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 
 export interface Geometry {
+	/**
+	 * A horizontal bar chart (#116): categories run down the y axis and values along x. `px` then gives a
+	 * category's y and `py` a value's x, so everything below swaps which line is which and nothing else.
+	 */
+	horizontal?: boolean;
 	/** Each x as a position: the value itself, or a category's index. */
 	xs: number[];
 	/** Each x as a reader sees it: a formatted number, or a category's full text. */
@@ -24,7 +29,7 @@ export interface Geometry {
 	/** x in data units to x in viewBox units. */
 	px: (value: number) => number;
 	/** A series' value to y in viewBox units, on the scale that series is drawn against. */
-	py: (seriesIndex: number, value: number) => number;
+	py: (seriesIndex: number, value: number, index: number) => number;
 	plot: { x: number; y: number; w: number; h: number };
 	width: number;
 	height: number;
@@ -62,11 +67,13 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 
 	let current = -1;
 	const xs = g.xs;
-	const nearestIndex = (vbX: number) => {
+	const h = g.horizontal === true;
+	// Along the category axis: x on an ordinary chart, y on a horizontal one.
+	const nearestIndex = (along: number) => {
 		let best = 0;
 		let bestDistance = Number.POSITIVE_INFINITY;
 		xs.forEach((x, i) => {
-			const d = Math.abs(g.px(x) - vbX);
+			const d = Math.abs(g.px(x) - along);
 			if (d < bestDistance) {
 				bestDistance = d;
 				best = i;
@@ -103,11 +110,11 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		current = index;
 		const x = xs[index] as number;
 		const key = chart.x[index];
-		const cx = g.px(x);
+		const cx = g.px(x); // the category's position along its axis
 		const rows: { series: number; y: number }[] = [];
 		chart.series.forEach((series, s) => {
 			const value = series.points[index];
-			if (value !== null && value !== undefined) rows.push({ series: s, y: g.py(s, value) });
+			if (value !== null && value !== undefined) rows.push({ series: s, y: g.py(s, value, index) });
 		});
 		/*
 		 * `point` mode keeps only the series nearest the pointer. From the keyboard there is no pointer, so
@@ -118,16 +125,23 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 				? [rows.reduce((a, b) => (pointerY !== undefined && Math.abs(b.y - pointerY) < Math.abs(a.y - pointerY) ? b : a))]
 				: rows;
 
-		vLine.setAttribute("x1", String(cx));
-		vLine.setAttribute("x2", String(cx));
-		vLine.setAttribute("visibility", crosshair === "x" || crosshair === "both" ? "visible" : "hidden");
+		// "x" is the line through the category, "y" the line through the value, whichever way they run.
+		const categoryLine = h ? hLine : vLine;
+		const valueLine = h ? vLine : hLine;
+		// A horizontal line is placed by its y, a vertical one by its x.
+		const place = (line: SVGElement, at: number) => {
+			const axis = line === hLine ? "y" : "x";
+			line.setAttribute(`${axis}1`, String(at));
+			line.setAttribute(`${axis}2`, String(at));
+		};
+		place(categoryLine, cx);
+		categoryLine.setAttribute("visibility", crosshair === "x" || crosshair === "both" ? "visible" : "hidden");
 		const nearest = shown[0];
 		if (nearest && (crosshair === "y" || crosshair === "both")) {
-			hLine.setAttribute("y1", String(nearest.y));
-			hLine.setAttribute("y2", String(nearest.y));
-			hLine.setAttribute("visibility", "visible");
+			place(valueLine, nearest.y);
+			valueLine.setAttribute("visibility", "visible");
 		} else {
-			hLine.setAttribute("visibility", "hidden");
+			valueLine.setAttribute("visibility", "hidden");
 		}
 		lift(index);
 		linkRows(key, index);
@@ -166,10 +180,12 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		 */
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
-		const scale = box.width / g.width;
-		const left = box.left - frame.left + cx * scale;
-		const top = box.top - frame.top + (nearest ? nearest.y : g.plot.y + g.plot.h / 2) * (box.height / g.height);
-		const flip = cx > g.plot.x + g.plot.w / 2;
+		const valueAt = nearest ? nearest.y : h ? g.plot.x + g.plot.w / 2 : g.plot.y + g.plot.h / 2;
+		const vx = h ? valueAt : cx;
+		const vy = h ? cx : valueAt;
+		const left = box.left - frame.left + vx * (box.width / g.width);
+		const top = box.top - frame.top + vy * (box.height / g.height);
+		const flip = vx > g.plot.x + g.plot.w / 2;
 		card.style.left = `${Math.round(left)}px`;
 		card.style.top = `${Math.round(top)}px`;
 		card.toggleAttribute("data-flip", flip);
@@ -195,13 +211,13 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 
 	plotSvg.addEventListener("pointermove", (event) => {
 		const p = toViewBox(event);
-		if (inPlot(p)) show(nearestIndex(p.x), p.y);
+		if (inPlot(p)) show(nearestIndex(h ? p.y : p.x), h ? p.x : p.y);
 		else if (event.pointerType === "mouse") hide();
 	});
 	// A touch has no hover: a tap shows the card, and it stays until a tap lands somewhere else.
 	plotSvg.addEventListener("pointerdown", (event) => {
 		const p = toViewBox(event);
-		if (inPlot(p)) show(nearestIndex(p.x), p.y);
+		if (inPlot(p)) show(nearestIndex(h ? p.y : p.x), h ? p.x : p.y);
 	});
 	plotSvg.addEventListener("pointerleave", (event) => {
 		if (event.pointerType === "mouse") hide();
@@ -234,8 +250,8 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		if (event.target !== plotBox) return;
 		const last = xs.length - 1;
 		const next =
-			key === "ArrowRight" ? Math.min(last, current + 1)
-			: key === "ArrowLeft" ? Math.max(0, current - 1)
+			key === "ArrowRight" || (h && key === "ArrowDown") ? Math.min(last, current + 1)
+			: key === "ArrowLeft" || (h && key === "ArrowUp") ? Math.max(0, current - 1)
 			: key === "Home" ? 0
 			: key === "End" ? last
 			: undefined;

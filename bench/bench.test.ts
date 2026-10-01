@@ -1683,6 +1683,41 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("draws horizontal bars rightward from zero, names on the left, the threshold vertical (#116)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "horizontal" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg");
+			const num = (el: Element, a: string) => Number(el.getAttribute(a));
+			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => ({ x: num(r, "x"), y: num(r, "y"), w: num(r, "width"), i: num(r, "data-i") }));
+			const rule = svg?.querySelector("line.tb-threshold");
+			const names = [...(svg?.querySelectorAll("text.tb-tick[text-anchor=end]") ?? [])].map((t) => t.textContent);
+			return { bars, rule: rule ? { x1: num(rule, "x1"), x2: num(rule, "x2") } : null, names };
+		});
+		assert.deepEqual(read.names, ["Same city", "Across a continent", "Through a relay"]);
+		assert.ok(read.rule && read.rule.x1 === read.rule.x2, "the threshold is a vertical rule");
+		// Row 0: 25 + 10 + 40 + 15 = 90 ms, starting at zero; its four segments run end to end.
+		const row0 = read.bars.filter((b) => b.i === 0).sort((a, b) => a.x - b.x);
+		assert.equal(row0.length, 4);
+		for (let k = 1; k < row0.length; k++) {
+			const prev = row0[k - 1] as { x: number; w: number };
+			assert.ok(Math.abs((row0[k] as { x: number }).x - (prev.x + prev.w)) < 0.5, "segments meet");
+		}
+		const total = row0.reduce((sum, b) => sum + b.w, 0);
+		const row2 = read.bars.filter((b) => b.i === 2).reduce((sum, b) => sum + b.w, 0);
+		assert.ok(Math.abs(row2 / total - 195 / 90) < 0.02, "rows are as long as their totals, 195 against 90");
+
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowDown");
+		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
+		assert.equal(title, "Path Across a continent", "the down arrow steps through the rows");
+		await page.close();
+	});
+
 	it("stacks parts end to end, either side of zero, beside a bar that is not stacked (#115)", async () => {
 		// A: 5 then 2 on top (0 to 5, 5 to 7). B: -3 then -4 below (0 to -3, -3 to -7). "Alone" is 4 at both.
 		const chart = await chartFor("stacked-signed");

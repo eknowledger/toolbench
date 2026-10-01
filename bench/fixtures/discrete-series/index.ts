@@ -189,6 +189,42 @@ export default {
 						],
 					},
 				};
+			case "horizontal": {
+				// The same delay budget as the stacked case, read left to right against the 150 ms line.
+				const stage = (label: string, points: number[]): Series => ({ label, unit: "ms", shape: "bar", stack: "budget", points });
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						xLabel: "Path",
+						yLabel: "Delay",
+						yUnit: "ms",
+						x: ["Same city", "Across a continent", "Through a relay"],
+						thresholds: [{ y: 150, label: "150 ms", tone: "warn" }],
+						series: [
+							stage("Capture and encode", [25, 25, 25]),
+							stage("Network", [10, 70, 95]),
+							stage("Jitter buffer", [40, 40, 60]),
+							stage("Decode and play", [15, 15, 15]),
+						],
+					},
+				};
+			}
+			case "horizontal-grouped":
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						xLabel: "Network",
+						yLabel: "Loss",
+						yUnit: "%",
+						x: ["Office fibre", "Home broadband", "Mobile, good signal", "Mobile, at the cell's edge", "Satellite"],
+						series: [
+							{ label: "Median", unit: "%", shape: "bar", points: [0.1, 0.4, 0.8, 3.5, 1.2] },
+							{ label: "Worst hour", unit: "%", shape: "bar", points: [0.3, 1.5, 2.6, 9.0, 4.0] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

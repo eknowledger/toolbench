@@ -515,7 +515,7 @@ Measured on the built bench with gzip, not estimated:
 | | Transfer |
 |---|---|
 | Runtime plus the bench's page wiring, once per page that uses a tool | 22.5 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.2 KB |
+| Worker entry, only for pages with a worker-mode tool | 4.1 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |

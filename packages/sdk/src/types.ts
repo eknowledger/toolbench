@@ -108,6 +108,12 @@ export interface Chart {
 	readout?: Readout;
 	/** A name a `table` in the same result can link to with `link.chart` (#124). Unique within a result. */
 	id?: string;
+	/**
+	 * `horizontal` draws bars growing rightward, one row per x, for long category names and budgets read left
+	 * to right (#116, contract version 4). Bar series only: other shapes are not drawn on a horizontal chart,
+	 * and the data table's caption says so.
+	 */
+	orientation?: "vertical" | "horizontal";
 }
 
 /**
