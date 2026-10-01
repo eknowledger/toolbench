@@ -1291,6 +1291,12 @@ function summarise(output: Output, brief = false): string {
 			return `heatmap, ${output.heatmap.y.length} by ${output.heatmap.x.length}`;
 		case "pie":
 			return `${output.pie.donut ? "donut" : "pie"} chart, ${output.pie.slices.length} slice${output.pie.slices.length === 1 ? "" : "s"}`;
+		case "radar":
+			return `radar chart, ${output.radar.axes.length} axes, ${output.radar.series.length} series`;
+		case "treemap":
+			return `treemap, ${output.treemap.root.children?.length ?? 0} groups`;
+		case "venn":
+			return `Venn diagram, ${output.venn.sets.length} sets`;
 		case "bytes": {
 			// The named ranges are the useful part: "84 bytes" tells a screen-reader user nothing they
 			// can act on, whereas the field names are the reason they ran the tool.

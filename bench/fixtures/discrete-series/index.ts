@@ -508,6 +508,65 @@ export default {
 						],
 					},
 				};
+			case "radar":
+				// Illustrative scores out of 10, higher is better. Satellite's stability was not measured.
+				return {
+					kind: "radar",
+					radar: {
+						label: "Network quality, out of 10",
+						axes: [{ label: "Latency" }, { label: "Jitter" }, { label: "Loss" }, { label: "Bandwidth" }, { label: "Stability" }],
+						series: [
+							{ label: "Fibre", values: [9, 9, 9, 10, 9] },
+							{ label: "Mobile", values: [6, 5, 6, 7, 5] },
+							{ label: "Satellite", values: [2, 6, 7, 5, null] },
+						],
+					},
+				};
+			case "treemap":
+				// Illustrative monthly cost of a voice service by area and component.
+				return {
+					kind: "treemap",
+					treemap: {
+						label: "Monthly cost",
+						unit: "k$",
+						root: {
+							label: "All",
+							children: [
+								{
+									label: "Media",
+									children: [
+										{ label: "Relays", children: [{ label: "Europe", value: 38 }, { label: "Americas", value: 52 }, { label: "Asia Pacific", value: 30 }] },
+										{ label: "TURN", value: 22 },
+										{ label: "Recording", value: 14 },
+									],
+								},
+								{ label: "Speech", children: [{ label: "Recognition", value: 64 }, { label: "Synthesis", value: 41 }] },
+								{ label: "Model", children: [{ label: "Inference", value: 120 }, { label: "Caching", value: 9 }] },
+								{ label: "Signalling", value: 11 },
+							],
+						},
+					},
+				};
+			case "venn-two":
+				// Two sets of 100 sharing 50: drawn exactly, each circle 100 in area and the lens between them 50.
+				return { kind: "venn", venn: { label: "Users by client", sets: [{ label: "Web", size: 100 }, { label: "Mobile", size: 100 }], overlaps: [{ sets: [0, 1], size: 50 }] } };
+			case "venn-three":
+				// Illustrative: calls that touched each kind of relay, and how they overlapped.
+				return {
+					kind: "venn",
+					venn: {
+						label: "Calls by relay used",
+						sets: [{ label: "TURN", size: 420 }, { label: "SFU", size: 600 }, { label: "Gateway", size: 260 }],
+						overlaps: [
+							{ sets: [0, 1], size: 180 },
+							{ sets: [0, 2], size: 60 },
+							{ sets: [1, 2], size: 90 },
+							{ sets: [0, 1, 2], size: 30 },
+						],
+					},
+				};
+			case "venn-impossible":
+				return { kind: "venn", venn: { label: "Bad numbers", sets: [{ label: "A", size: 10 }, { label: "B", size: 40 }], overlaps: [{ sets: [0, 1], size: 25 }] } };
 			case "two-bars":
 				return {
 					kind: "series",

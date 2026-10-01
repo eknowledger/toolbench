@@ -74,6 +74,17 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "pie-negative", caption: "A negative value: a share of it means nothing, so there is no pie" },
 		],
 	},
+	{
+		heading: "Profiles, hierarchies and overlaps",
+		note: "Radar charts compare a few things across several measures; treemaps show a hierarchy by area; Venn diagrams show how two or three sets overlap, with every region labelled.",
+		cases: [
+			{ id: "radar", caption: "A radar: three networks scored on five measures, with one not measured (illustrative values)" },
+			{ id: "treemap", caption: "A treemap: a month's cost by area and component, three levels deep (illustrative values)" },
+			{ id: "venn-two", caption: "Two sets, drawn exactly: each circle's area its size, the lens its overlap" },
+			{ id: "venn-three", caption: "Three sets: every region labelled with its count, the areas approximate (illustrative values)" },
+			{ id: "venn-impossible", caption: "Numbers that cannot be true, an overlap of 25 in a set of 10: a message, not a diagram" },
+		],
+	},
 ];
 
 const gallery = document.getElementById("gallery");

@@ -2277,6 +2277,112 @@ describe("pies and donuts (#123)", () => {
 	});
 });
 
+describe("radar, treemap and Venn (#128, #129, #130)", () => {
+	async function kindCase(value: string, selector: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator(`#host >> ${selector}`).first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	it("gives each part an area in proportion to its value, labels what fits, and lists everything (#129)", async () => {
+		// 401 k$ in all.
+		const page = await kindCase("treemap", ".tb-treemap svg");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const tiles = [...(root?.querySelectorAll(".tb-tile") ?? [])].map((r) => ({ w: Number(r.getAttribute("width")), h: Number(r.getAttribute("height")) }));
+			const labels = [...(root?.querySelectorAll(".tb-tile-label") ?? [])].map((t) => t.textContent);
+			const rows = [...(root?.querySelectorAll(".tb-chart-data tbody tr") ?? [])].map((tr) => [...tr.children].map((c) => c.textContent));
+			return { tiles, labels, rows };
+		});
+		// Media and its six descendants, Speech and two, Model and two, Signalling: fourteen nodes.
+		assert.equal(read.rows.length, 14, "every node listed");
+		const total = read.rows.reduce((sum, r) => sum + (r[0] === "Media" || r[0] === "Speech" || r[0] === "Model" || r[0] === "Signalling" ? Number(r[1]) : 0), 0);
+		assert.equal(total, 401, "the groups add up to the whole");
+		assert.ok(read.rows.some((r) => r[0] === "Relays" && r[1] === "120"), "a group's value is the sum of its parts: Relays 38 + 52 + 30");
+		// Tile areas: the whole is 640 x 360; Inference's tile is 120 / 401 of it, less the 2-unit insets.
+		const areas = read.tiles.map((t) => t.w * t.h);
+		const largest = Math.max(...areas);
+		// Media is the largest group: 38 + 52 + 30 + 22 + 14 = 156 of 401.
+		assert.ok(Math.abs(largest / (640 * 360) - 156 / 401) < 0.01, `Media, the largest group, is ${(largest / (640 * 360)).toFixed(3)} of the area`);
+		await page.locator("#host >> .tb-plot").focus();
+		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
+		assert.match(title ?? "", / \/ /, `the readout names the path: ${title}`);
+		await page.close();
+	});
+
+	it("draws two sets exactly, labels every region of three, and refuses numbers that cannot be true (#130)", async () => {
+		const two = await kindCase("venn-two", ".tb-venn svg");
+		const geometry = await two.evaluate(() => {
+			const cs = [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-venn-circle") ?? [])].map((c) => ({
+				x: Number(c.getAttribute("cx")),
+				y: Number(c.getAttribute("cy")),
+				r: Number(c.getAttribute("r")),
+			}));
+			return cs;
+		});
+		const [a, b] = geometry;
+		assert.ok(a && b && Math.abs(a.r - b.r) < 0.01, "two sets of 100 are equal circles");
+		// The lens two equal circles make at centre distance d, as a share of one circle: it must be 50 of 100.
+		const d = Math.hypot(b.x - a.x, b.y - a.y);
+		const r = a.r;
+		const lensArea = 2 * r * r * Math.acos(d / (2 * r)) - (d / 2) * Math.sqrt(4 * r * r - d * d);
+		assert.ok(Math.abs(lensArea / (Math.PI * r * r) - 0.5) < 0.005, `lens is ${(lensArea / (Math.PI * r * r)).toFixed(4)} of a circle`);
+		await two.close();
+
+		const three = await kindCase("venn-three", ".tb-venn svg");
+		const read = await three.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				counts: [...(root?.querySelectorAll(".tb-venn-count") ?? [])].map((t) => t.textContent).sort(),
+				caption: root?.querySelector(".tb-venn .tb-chart-data caption")?.textContent ?? "",
+			};
+		});
+		// TURN only 420 - 180 - 60 + 30, SFU only 600 - 180 - 90 + 30, Gateway only 260 - 60 - 90 + 30, the pairs less the 30 in all three.
+		assert.deepEqual(read.counts, ["140", "150", "210", "30", "30", "360", "60"]);
+		assert.match(read.caption, /areas are approximate; the counts are exact/);
+		await three.close();
+
+		const bad = await kindCase("venn-impossible", ".tb-venn");
+		const text = await bad.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-venn-message")?.textContent ?? "");
+		assert.match(text, /larger than one of them/);
+		await bad.close();
+	});
+
+	it("puts a value at its axis's maximum on the outer ring, clockwise from 12 o'clock, broken at a null (#128)", async () => {
+		const page = await kindCase("radar", ".tb-radar svg");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const dots = [...(root?.querySelectorAll(".tb-radar-dot.tb-s1") ?? [])].map((c) => ({ x: Number(c.getAttribute("cx")), y: Number(c.getAttribute("cy")), k: Number(c.getAttribute("data-k")) }));
+			return {
+				fibre: dots,
+				satelliteShapes: root?.querySelectorAll(".tb-radar-shape.tb-s3").length,
+				satelliteDots: root?.querySelectorAll(".tb-radar-dot.tb-s3").length,
+				rings: [...(root?.querySelectorAll(".tb-radar-ring-label") ?? [])].map((t) => t.textContent),
+			};
+		});
+		// Centre (220, 170), radius 120. Fibre scores 9 on latency, the first spoke, straight up: (220, 62).
+		const latency = read.fibre.find((d) => d.k === 0);
+		assert.ok(latency && Math.abs(latency.x - 220) < 0.5 && Math.abs(latency.y - (170 - 108)) < 0.5, JSON.stringify(latency));
+		// Bandwidth, the fourth of five spokes, scores 10 of 10: on the outer ring, left of centre and below.
+		const bandwidth = read.fibre.find((d) => d.k === 3);
+		assert.ok(bandwidth && Math.abs(Math.hypot(bandwidth.x - 220, bandwidth.y - 170) - 120) < 0.5 && bandwidth.x < 220 && bandwidth.y > 170, JSON.stringify(bandwidth));
+		assert.equal(read.satelliteShapes, 0, "a broken shape is not filled");
+		assert.equal(read.satelliteDots, 4, "four of five values present");
+		assert.deepEqual(read.rings, ["2", "4", "6", "8", "10"]);
+		await page.locator("#host >> .tb-plot").focus();
+		const rows = await page.evaluate(() => [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-readout li") ?? [])].map((li) => li.textContent));
+		assert.deepEqual(rows, ["9Fibre", "6Mobile", "2Satellite"]);
+		await page.close();
+	});
+});
+
 describe("the chart renderer is its own chunk", () => {
 	/*
 	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the
