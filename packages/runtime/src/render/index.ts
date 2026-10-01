@@ -311,10 +311,11 @@ function renderTable(
 			el("th", { scope: "col", "data-align": column.align ?? "start", class: column.mono ? "tb-mono" : "" }, column.label),
 		),
 	);
-	const body = output.rows.map((row) =>
+	const link = output.link;
+	const body = output.rows.map((row, r) =>
 		el(
 			"tr",
-			{},
+			link && link.keys[r] !== null && link.keys[r] !== undefined ? { "data-key": String(link.keys[r]) } : {},
 			...row.map((cell, i) => {
 				const column = output.columns[i];
 				const value = typeof cell === "object" && cell !== null ? cell : { text: String(cell) };
@@ -331,17 +332,31 @@ function renderTable(
 			}),
 		),
 	);
-	return el(
-		"div",
-		{ class: "tb-out-table" },
-		el(
-			"table",
-			{},
-			output.caption && !options.compact ? el("caption", {}, output.caption) : null,
-			el("thead", {}, head),
-			el("tbody", {}, ...body),
-		),
+	const table = el(
+		"table",
+		link ? { "data-link-chart": link.chart } : {},
+		output.caption && !options.compact ? el("caption", {}, output.caption) : null,
+		el("thead", {}, head),
+		el("tbody", {}, ...body),
 	);
+	/*
+	 * A linked table points back at its chart (#124). Found at event time, by id, in the same shadow root,
+	 * so a link can only ever reach within one result and the table needs no reference to a chart that a
+	 * re-run will redraw.
+	 */
+	if (link) {
+		const point = (key: string | null, from: EventTarget | null) => {
+			const root = (from as Node | null)?.getRootNode?.() as ParentNode | undefined;
+			const figure = root?.querySelector?.(`[data-chart-id="${CSS.escape(link.chart)}"]`);
+			figure?.dispatchEvent(new CustomEvent("tb-point", { detail: { key } }));
+		};
+		table.addEventListener("pointerover", (event) => {
+			const row = (event.target as Element).closest?.("tr[data-key]");
+			if (row) point(row.getAttribute("data-key"), table);
+		});
+		table.addEventListener("pointerleave", () => point(null, table));
+	}
+	return el("div", { class: "tb-out-table" }, table);
 }
 
 /** How many bytes per row. 16 is the convention every hex dump uses, and readers expect it. */

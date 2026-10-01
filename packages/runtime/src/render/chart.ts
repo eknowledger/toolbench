@@ -145,7 +145,10 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		),
 	];
 
-	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card" : "tb-out-chart" });
+	const figure = el("figure", {
+		class: compact ? "tb-out-chart tb-out-chart-card" : "tb-out-chart",
+		...(chart.id ? { "data-chart-id": chart.id } : {}),
+	});
 	const picture = svg(
 		"svg",
 		{
@@ -412,7 +415,7 @@ function dataTable(chart: Chart): HTMLElement {
 	const rows = chart.x.map((x, i) =>
 		el(
 			"tr",
-			{},
+			{ "data-i": i },
 			el("th", { scope: "row" }, format(x)),
 			...chart.series.map((s) => {
 				const point = s.points[i];

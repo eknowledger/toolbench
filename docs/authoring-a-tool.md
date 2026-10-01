@@ -648,6 +648,11 @@ finds it. See §4b for what counts as running.
   `readout.titles` (a heading per x) and `series.notes` (the text for one series at one point, instead of
   its value), `null` wherever the default is right. `readout.mode: "point"` shows only the nearest
   series, and `"none"` turns it off. Contract version 4.
+* **Link a chart to tables.** `readout.highlightTable: true` lights the chart's own data-table row as the
+  readout moves. To link a `table` part in the same result, give the chart an `id` and the table
+  `link: { chart: "<id>", keys }`, where `keys[i]` is the x that row `i` describes (`null` for a row with
+  none, a total say). Pointing at the chart then lights the matching row, and pointing at a row moves the
+  chart's readout to it. Links never reach outside one result.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

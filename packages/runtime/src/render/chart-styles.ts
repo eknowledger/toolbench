@@ -61,6 +61,9 @@ export const CHART_STYLES = /* css */ `
   background: var(--tb-bg); color: var(--tb-fg); border: 1px solid var(--tb-border); border-radius: 8px;
   box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.35); font-size: 0.78rem; line-height: 1.35;
 }
+/* A row the readout is on, in the chart's data table or a linked table (#124): a wash and a rule, never colour alone. */
+.tb-chart-data tr.tb-hot > * { background: var(--tb-accent-bg); }
+.tb-chart-data tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
 .tb-readout[data-flip] { transform: translate(calc(-100% - 12px), -50%); }
 .tb-readout-title { margin: 0 0 0.25rem; color: var(--tb-muted); font-weight: 600; }
 .tb-readout-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }

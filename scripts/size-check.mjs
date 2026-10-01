@@ -96,8 +96,11 @@ const BUDGETS = [
 	 *
 	 * Lowered from 24_000 to 22_500 when the chart rules moved into the chart chunk: 23,628 to 22,195, so a
 	 * tool page that draws no chart stopped paying about 1.4 KB for styles it never used.
+	 *
+	 * Raised from 22_500 to 23_000 by linked table rows (#124): a linked table finds its chart and moves its
+	 * readout, and its highlight is styled here because a table is not chart code.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -128,8 +131,7 @@ const BUDGETS = [
 	 *
 	 * Raised from 2_500 to 3_000 by contract v4's markers and points (#111), which spent it: six marker
 	 * shapes and their placement, on top of #111's readable ticks and grouped bars. 2,738 measured.
-	 */
-	/*
+	 *
 	 * Raised again, from 3_000 to 4_500, by the chart readout (#112): the crosshair, the card, pointer,
 	 * touch and key handling and the nearest-x arithmetic, 1,510 bytes. 4,257 measured. Only a page that
 	 * draws a chart downloads it.
@@ -137,8 +139,11 @@ const BUDGETS = [
 	 * Raised from 4_500 to 6_500 when the chart rules moved here from the runtime: 4,257 to 6,288. A page
 	 * with a chart pays about 0.6 KB more than before, because CSS compresses better in one file than split
 	 * across two; a page without one saves 1.4 KB. That trade favours the pages that never draw a chart.
+	 *
+	 * Raised from 6_500 to 7_000 by linked rows (#124): highlighting the chart's own data table and linked
+	 * tables, and answering a row that asks for its x.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 6_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 7_000 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

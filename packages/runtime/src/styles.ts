@@ -283,6 +283,9 @@ export const STYLES = /* css */ `
 .tb-out-table th { color: var(--tb-muted); font-size: 0.78rem; font-weight: 600; }
 .tb-out-table td[data-align="end"], .tb-out-table th[data-align="end"] { text-align: end; }
 .tb-out-table td[data-tone="bad"] { color: var(--tb-bad); }
+/* A row a chart's readout is on (#124), in a table linked to it: a wash and a rule, never colour alone. */
+.tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
+.tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
 .tb-out-table td[data-tone="warn"] { color: var(--tb-warn); }
 
 .tb-out-error {

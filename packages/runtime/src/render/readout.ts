@@ -71,6 +71,24 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		return best;
 	};
 
+	/*
+	 * The rows that describe this x (#124): the chart's own data table when the tool asked for it, and any
+	 * table in the same result linked to this chart by id. A highlight in a closed table waits for it to be
+	 * opened, and nothing is scrolled to, because the reader is looking at the chart.
+	 */
+	const linkRows = (x: number | undefined, index: number) => {
+		if (chart.readout?.highlightTable === true) {
+			for (const row of figure.querySelectorAll(".tb-chart-data tr[data-i]")) {
+				row.classList.toggle("tb-hot", Number(row.getAttribute("data-i")) === index);
+			}
+		}
+		if (!chart.id) return;
+		const root = figure.getRootNode() as ParentNode;
+		for (const row of root.querySelectorAll(`table[data-link-chart="${CSS.escape(chart.id)}"] tr[data-key]`)) {
+			row.classList.toggle("tb-hot", x !== undefined && row.getAttribute("data-key") === String(x));
+		}
+	};
+
 	const lift = (index: number) => {
 		for (const mark of plotSvg.querySelectorAll("[data-i]")) {
 			mark.classList.toggle("tb-hot", Number(mark.getAttribute("data-i")) === index);
@@ -107,6 +125,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 			hLine.setAttribute("visibility", "hidden");
 		}
 		lift(index);
+		linkRows(x, index);
 
 		const title = chart.readout?.titles?.[index] ?? `${chart.xLabel} ${g.format(x)}${chart.xUnit ? ` ${chart.xUnit}` : ""}`;
 		// textContent throughout: series labels and notes are tool output, and tool output is not markup.
@@ -157,6 +176,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		vLine.setAttribute("visibility", "hidden");
 		hLine.setAttribute("visibility", "hidden");
 		lift(-1);
+		linkRows(undefined, -1);
 	};
 
 	const toViewBox = (event: PointerEvent) => {
@@ -191,6 +211,14 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		if (current >= 0 && !event.composedPath().includes(plotSvg)) hide();
 	};
 	doc.addEventListener("pointerdown", outside);
+
+	// A linked table row asked for its x (#124), or let go of it.
+	figure.addEventListener("tb-point", (event) => {
+		const key = (event as CustomEvent<{ key: string | null }>).detail.key;
+		const index = key === null ? -1 : xs.findIndex((x) => String(x) === key);
+		if (index >= 0) show(index);
+		else hide();
+	});
 
 	plotBox.addEventListener("focus", () => {
 		if (current < 0) show(0);

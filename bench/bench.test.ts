@@ -1756,6 +1756,30 @@ describe("the chart readout (#112)", () => {
 		await page.close();
 	});
 
+	it("lights the matching table rows from the chart, and moves the chart from a row (#124)", async () => {
+		const page = await chartCase("linked");
+		const hot = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				return {
+					linked: [...(root?.querySelectorAll(".tb-out-table tr.tb-hot") ?? [])].map((r) => r.getAttribute("data-key")),
+					own: [...(root?.querySelectorAll(".tb-chart-data tr.tb-hot") ?? [])].map((r) => r.getAttribute("data-i")),
+				};
+			});
+		// Frames 4 to 9 span the plot edge to edge; frame 6 is the third of six.
+		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
+		assert.ok(box);
+		await page.mouse.move(box.x + ((56 + (2 / 5) * (620 - 56)) / 640) * box.width, box.y + box.height * 0.4);
+		assert.deepEqual(await hot(), { linked: ["6"], own: ["2"] }, "the linked row for frame 6, and the data table's third row");
+
+		await page.locator('#host >> .tb-out-table tr[data-key="8"]').hover();
+		assert.equal((await card(page)).title, "Frame 8", "pointing at a row moves the readout to its frame");
+		assert.deepEqual((await hot()).linked, ["8"]);
+		await page.mouse.move(2, 2);
+		assert.deepEqual(await hot(), { linked: [], own: [] }, "leaving clears both");
+		await page.close();
+	});
+
 	it("stays inside the chart near its right edge", async () => {
 		const page = await chartCase("markers");
 		await pointAt(page, 20);
