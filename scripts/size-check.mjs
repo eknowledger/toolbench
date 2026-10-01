@@ -82,17 +82,25 @@ const BUDGETS = [
 	 * expanding never re-runs the tool. For a worker-mode tool, a lazy version would be a round trip.
 	 *
 	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
-	 *
-	 * Raised from 22_000 to 22_500 by contract v4's chart markers, the change that crossed it: the marker
-	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured with
-	 * #111's tick and bar fixes beneath it, 242 bytes of that the markers' own.
 	 */
 	/*
-	 * Raised from 22_500 to 24_000 in 0.7.0, measured change by change against main at 21,709: the
-	 * slider +303, #106's accent tokens +268, #98/#105's card structure +244, contract v4's markers +242,
-	 * #97's chart loading +202, #103's layout and controls +134, #99/#101/#104's Run area +76, #111's
-	 * ticks and bars +59, #100 +16, and the chart readout's styles +351 (#112), which is the commit that
-	 * crossed it. 23,628 measured, all of it fixes and requested features, none of it a dependency.
+	 * Raised from 22_000 to 23_000 in the commit that spent it: 21,686 to 22,573 measured, 887 bytes for
+	 * the 0.7.0 card fixes taken together. The card rebuilt as content with a button in it rather than a
+	 * button around content, the run area without its status line or its Run button under autoRun, the
+	 * themed focus ring, the expand that holds a chart's size, the fallback when the chart chunk cannot
+	 * load, and the two accent tokens.
+	 *
+	 * ⚠️ Each of those branches fitted under 22_000 on its own, and nobody measured them together until CI
+	 * did. Measure the combination before stacking branches, not only the tip: the tip of this release sits
+	 * lower again once the chart styles leave this chunk, which hid the overshoot here.
+	 */
+	/*
+	 * Raised from 23_000 to 23_500 by contract v4's first features: 22,573 to 23,249 measured, 676 bytes.
+	 * The chart markers' and legend keys' styles, 242 bytes of it, live in the runtime's stylesheet, which
+	 * is in this chunk; the rest is the slider control and the host's `layout` and `controls` attributes.
+	 */
+	/*
+	 * Raised from 23_500 to 24_000 by the chart readout's styles (#112), +351 bytes, 23,628 measured.
 	 *
 	 * Lowered from 24_000 to 22_500 when the chart rules moved into the chart chunk: 23,628 to 22,195, so a
 	 * tool page that draws no chart stopped paying about 1.4 KB for styles it never used.
