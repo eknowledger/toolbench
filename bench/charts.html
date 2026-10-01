@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Toolbench — charts</title>
+	<link rel="stylesheet" href="/src/bench.css" />
+</head>
+<body>
+	<div class="wrap">
+		<header class="top">
+			<h1>Charts</h1>
+			<nav class="modes">
+				<a href="./index.html">card</a>
+				<a href="./tool.html?id=percentiles">page</a>
+				<a href="./article.html">in an article</a>
+				<a href="./charts.html" aria-current="page">charts</a>
+			</nav>
+		</header>
+		<p class="lead">
+			Every shape a <code>series</code> result can take, and the two chart kinds of their own. Each figure
+			is one bench fixture, <code>discrete-series</code>, answering a different case, so what differs
+			between two figures is only the data a tool returned. Point at any of them, or tab to one and use
+			the arrow keys, to read its values.
+		</p>
+
+		<div id="gallery"></div>
+
+		<p class="footnote">
+			The fixture lives under <code>bench/fixtures/discrete-series/</code>. The browser tests read the
+			geometry of the same figures.
+		</p>
+	</div>
+	<script type="module" src="/src/charts.ts"></script>
+</body>
+</html>

@@ -55,6 +55,26 @@ export interface Series {
 	 */
 	markers?: boolean;
 	axis?: "left" | "right";
+	/**
+	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,
+	 * 60 ms late". `null` keeps the default for that point. Same length as `points`. Contract version 4.
+	 */
+	notes?: (string | null)[];
+}
+
+/**
+ * How a chart answers a pointer or keyboard focus. Omit it for the default: a crosshair at the nearest x
+ * and a card listing every series there. Contract version 4.
+ */
+export interface Readout {
+	/** `x`: every series at the nearest x (default). `point`: only the nearest point. `none`: no readout. */
+	mode?: "x" | "point" | "none";
+	/** Which crosshair lines to draw. Default `x`. */
+	crosshair?: "x" | "y" | "both" | "none";
+	/** A heading per x, replacing "<xLabel> <x>": "Frame 6 (lost)". `null` keeps the default. Same length as `x`. */
+	titles?: (string | null)[];
+	/** Highlight the matching row of this chart's own data table as the readout moves (#124). */
+	highlightTable?: boolean;
 }
 
 export interface Chart {
@@ -68,6 +88,9 @@ export interface Chart {
 	annotations?: { x: number; label: string }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
+	readout?: Readout;
+	/** A name a `table` in the same result can link to with `link.chart` (#124). Unique within a result. */
+	id?: string;
 }
 
 /**
@@ -96,7 +119,18 @@ export type Output =
 	| { kind: "fields"; fields: Field[] }
 	| { kind: "text"; text: string; mono?: boolean }
 	| { kind: "code"; lang: string; source: string }
-	| { kind: "table"; columns: Column[]; rows: Cell[][]; caption?: string }
+	| {
+			kind: "table";
+			columns: Column[];
+			rows: Cell[][];
+			caption?: string;
+			/**
+			 * Link these rows to a chart in the same result (#124): `keys[i]` is the chart x that row i
+			 * describes, `null` for a row with none. Pointing at the chart highlights the matching rows, and
+			 * pointing at a row moves the chart's readout to it. Contract version 4.
+			 */
+			link?: { chart: string; keys: (number | string | null)[] };
+	  }
 	| { kind: "series"; chart: Chart }
 	| { kind: "group"; parts: Output[] }
 	/**

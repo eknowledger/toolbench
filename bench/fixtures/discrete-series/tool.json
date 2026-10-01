@@ -8,7 +8,7 @@
 	"runtime": { "entry": "index.ts", "thread": "main" },
 	"autoRun": true,
 	"card": "live",
-	"kinds": ["series", "error"],
+	"kinds": ["series", "group", "table", "error"],
 	"tags": ["bench"],
 	"inputs": [
 		{
@@ -24,7 +24,9 @@
 				{ "value": "zero-bars", "label": "A bar series of zeros" },
 				{ "value": "signed-bars", "label": "Bars either side of zero" },
 				{ "value": "markers", "label": "Lines with markers" },
-				{ "value": "points", "label": "Points, no lines" }
+				{ "value": "points", "label": "Points, no lines" },
+				{ "value": "readout", "label": "A readout the tool writes" },
+				{ "value": "linked", "label": "A chart linked to a table" }
 			]
 		}
 	]

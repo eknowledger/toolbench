@@ -283,6 +283,9 @@ export const STYLES = /* css */ `
 .tb-out-table th { color: var(--tb-muted); font-size: 0.78rem; font-weight: 600; }
 .tb-out-table td[data-align="end"], .tb-out-table th[data-align="end"] { text-align: end; }
 .tb-out-table td[data-tone="bad"] { color: var(--tb-bad); }
+/* A row a chart's readout is on (#124), in a table linked to it: a wash and a rule, never colour alone. */
+.tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
+.tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
 .tb-out-table td[data-tone="warn"] { color: var(--tb-warn); }
 
 .tb-out-error {
@@ -307,56 +310,8 @@ export const STYLES = /* css */ `
 }
 .tb-unknown p { margin: 0.25rem 0 0; color: var(--tb-muted); }
 
-/* ── chart ────────────────────────────────────────────────────────────────────────────────── */
-.tb-out-chart { margin: 0; }
-.tb-out-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
-/* On a card, the same chart drawn smaller. Capping the width lets the viewBox set the height, so the
-   aspect ratio is untouched: a chart that is half as wide is half as tall, not squashed. */
-.tb-out-chart-card svg { max-width: var(--tb-chart-card-max, 52rem); }
-/* ⚠️ Text inside a viewBox scales with the box, so the labels only need help when the box is SMALLER than
-   the 640-unit viewBox. Above that they scale up and are fine; below it a 10px label renders at 6px and is
-   past reading. 42rem is where a card's chart, minus the body's padding, crosses 640px. Gated on the card's
-   own width rather than the viewport, since the same card is a full-width lead and a third of a rail. */
-@container (max-width: 42rem) {
-  .tb-out-chart-card .tb-tick { font-size: 15px; }
-  .tb-out-chart-card .tb-axis-label { font-size: 16px; }
-  .tb-out-chart-card .tb-annotation-label { font-size: 15px; }
-}
-.tb-grid { stroke: var(--tb-border); stroke-width: 1; }
-.tb-axis { stroke: var(--tb-faint); stroke-width: 1; }
-.tb-tick, .tb-axis-label { fill: var(--tb-faint); font-family: var(--tb-mono); font-size: 10px; }
-.tb-axis-label { font-family: var(--tb-font); font-size: 11px; }
-.tb-annotation { stroke: var(--tb-accent); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
-.tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); font-size: 10px; }
-/* Each series class sets ONE custom property; the shape decides whether that is a stroke or a fill.
-   The first version set stroke and fill together, which beat the line rule's "fill: none" on source
-   order and drew every line as a filled blob. (No backticks in here: this is a template literal.) */
-.tb-s1 { --c: var(--tb-s1); }
-.tb-s2 { --c: var(--tb-s2); }
-.tb-s3 { --c: var(--tb-s3); }
-.tb-s4 { --c: var(--tb-s4); }
-.tb-s5 { --c: var(--tb-s5); }
-.tb-s6 { --c: var(--tb-s6); }
-.tb-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
-/* Opaque, so a bar is the colour its legend swatch says it is. */
-.tb-bar  { stroke: none; fill: var(--c); }
-.tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
-.tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
-.tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
-/* Hollow, so markers at the same point nest rather than cover each other. */
-.tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
-/* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
-.tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
-.tb-swatch-marker[data-marker="0"] { clip-path: circle(50%); }
-.tb-swatch-marker[data-marker="1"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.tb-swatch-marker[data-marker="2"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.tb-swatch-marker[data-marker="4"] { clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.tb-swatch-marker[data-marker="5"] { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
-.tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
-/* 24px tall, the minimum target size (WCAG 2.5.8): at the text's own height it was 19px. */
-.tb-chart-data summary { color: var(--tb-faint); cursor: pointer; min-height: 24px; line-height: 24px; }
-.tb-chart-data table { margin-top: 0.5rem; }
+/* The chart rules live in the chart chunk (render/chart-styles.ts), adopted when a chart is first drawn,
+   so a tool page with no chart does not download them. */
 
 /* ── bytes ────────────────────────────────────────────────────────────────────────────────── */
 .tb-out-bytes { margin: 0; }

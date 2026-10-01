@@ -160,6 +160,7 @@ export default defineConfig({
 				tool: resolve(import.meta.dirname, "tool.html"),
 				article: resolve(import.meta.dirname, "article.html"),
 				failure: resolve(import.meta.dirname, "failure.html"),
+				charts: resolve(import.meta.dirname, "charts.html"),
 			},
 		},
 	},

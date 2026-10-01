@@ -55,6 +55,63 @@ export default {
 					},
 				};
 			}
+			case "readout": {
+				// The tool says what each point means: a heading per frame, and a note on every late one.
+				const deadline = frames.map((n) => 20 * n + 70);
+				const released = held(250);
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Frame",
+						yLabel: "Time",
+						yUnit: "ms",
+						x: frames,
+						readout: { crosshair: "both", titles: frames.map((n) => (n === 5 ? "Frame 5, lost and resent" : null)) },
+						series: [
+							{ label: "Deadline", unit: "ms", points: deadline },
+							{
+								label: "Released",
+								unit: "ms",
+								markers: true,
+								points: released,
+								notes: released.map((t, i) => (t > (deadline[i] as number) ? `${t} ms, ${t - (deadline[i] as number)} ms late` : null)),
+							},
+						],
+					},
+				};
+			}
+			case "linked": {
+				// Frames 4 to 9 as a chart and as a table, linked both ways, and the chart's own data table too.
+				const span = frames.slice(3, 9);
+				const released = held(250).slice(3, 9);
+				return {
+					kind: "group",
+					parts: [
+						{
+							kind: "series",
+							chart: {
+								id: "release",
+								xLabel: "Frame",
+								yLabel: "Time",
+								yUnit: "ms",
+								x: span,
+								readout: { highlightTable: true },
+								series: [
+									{ label: "Deadline", unit: "ms", points: span.map((n) => 20 * n + 70) },
+									{ label: "Released", unit: "ms", markers: true, points: released },
+								],
+							},
+						},
+						{
+							kind: "table",
+							caption: "Each frame, and whether it played",
+							columns: [{ label: "Frame" }, { label: "Released", align: "end", mono: true }, { label: "Played" }],
+							rows: span.map((n, i) => [n, `${released[i]} ms`, (released[i] as number) <= 20 * n + 70 ? "on time" : "late"]),
+							link: { chart: "release", keys: span },
+						},
+					],
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

@@ -321,6 +321,8 @@ describe("card mode — the facade", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
 		const card = page.locator('tool-host[parts="2"]');
+		// The chart renderer is fetched when a chart is drawn (#97), so wait for its legend rather than read at load.
+		await card.locator(".tb-legend li").first().waitFor();
 		const legend = await card.evaluate((host) =>
 			[...(host as HTMLElement).shadowRoot!.querySelectorAll(".tb-legend li")].map((li) => li.textContent?.trim()),
 		);
@@ -1673,6 +1675,125 @@ describe("charts over whole-number x values (#111)", () => {
 		for (const x of geometry.labels) {
 			assert.ok(geometry.centres.some((c) => Math.abs(c - x) < 0.5), `x label at ${x} is not on any bar (${geometry.centres.join(", ")})`);
 		}
+	});
+});
+
+describe("the chart readout (#112)", () => {
+	/*
+	 * Values come from bench/fixtures/discrete-series, worked out by hand: at frame 6 the "markers" case has
+	 * Arrives 150, Released fast 250 and Released timeout 330.
+	 */
+	async function chartCase(value: string) {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-plot svg").waitFor({ timeout: 15_000 });
+		await page.locator("#host >> .tb-plot").scrollIntoViewIfNeeded();
+		return page;
+	}
+	const card = (page: import("playwright").Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const readout = root?.querySelector(".tb-readout") as HTMLElement | null;
+			return {
+				hidden: readout?.hidden ?? true,
+				title: readout?.querySelector(".tb-readout-title")?.textContent ?? "",
+				rows: [...(readout?.querySelectorAll("li") ?? [])].map((li) => li.textContent ?? ""),
+				spoken: root?.querySelector(".tb-out-chart [role=status]")?.textContent ?? "",
+				hot: root?.querySelectorAll(".tb-plot .tb-hot").length ?? 0,
+			};
+		});
+	/** Point at frame n: its x position in the plot, from the axis geometry rather than a guess. */
+	async function pointAt(page: import("playwright").Page, frame: number) {
+		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
+		assert.ok(box);
+		// The plot spans viewBox x 56 to 620 of 640, and frames 1 to 20 span it edge to edge.
+		const vbX = 56 + ((frame - 1) / 19) * (620 - 56);
+		await page.mouse.move(box.x + (vbX / 640) * box.width, box.y + box.height * 0.4);
+	}
+
+	it("shows every series at the nearest frame, with the data's values, and hides when the pointer leaves", async () => {
+		const page = await chartCase("markers");
+		await pointAt(page, 6);
+		const shown = await card(page);
+		assert.equal(shown.hidden, false);
+		assert.equal(shown.title, "Frame 6");
+		assert.deepEqual(shown.rows, ["150 msArrives", "250 msReleased, fast", "330 msReleased, timeout"]);
+		assert.equal(shown.hot, 3, "the three markers at frame 6 are lifted");
+		await page.mouse.move(2, 2);
+		assert.equal((await card(page)).hidden, true);
+		await page.close();
+	});
+
+	it("steps through the values from the keyboard, and reads each one out", async () => {
+		const page = await chartCase("markers");
+		await page.locator("#host >> .tb-plot").focus();
+		assert.equal((await card(page)).title, "Frame 1", "focus shows the first value");
+		await page.keyboard.press("ArrowRight");
+		const second = await card(page);
+		assert.equal(second.title, "Frame 2");
+		assert.match(second.spoken, /^Frame 2: Arrives 70 ms, Released, fast 70 ms, Released, timeout 70 ms$/);
+		await page.keyboard.press("End");
+		assert.equal((await card(page)).title, "Frame 20");
+		await page.keyboard.press("Escape");
+		assert.equal((await card(page)).hidden, true);
+		await page.close();
+	});
+
+	it("says what the tool wrote, where it wrote it, and the default everywhere else", async () => {
+		const page = await chartCase("readout");
+		await pointAt(page, 5);
+		const lost = await card(page);
+		assert.equal(lost.title, "Frame 5, lost and resent");
+		assert.deepEqual(lost.rows, ["170 msDeadline", "250 ms, 80 ms lateReleased"]);
+		await pointAt(page, 12);
+		const fine = await card(page);
+		assert.equal(fine.title, "Frame 12", "no title written for frame 12, so the default");
+		assert.deepEqual(fine.rows, ["310 msDeadline", "270 msReleased"], "and no note, since it was on time");
+		await page.close();
+	});
+
+	it("lights the matching table rows from the chart, and moves the chart from a row (#124)", async () => {
+		const page = await chartCase("linked");
+		const hot = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				return {
+					linked: [...(root?.querySelectorAll(".tb-out-table tr.tb-hot") ?? [])].map((r) => r.getAttribute("data-key")),
+					own: [...(root?.querySelectorAll(".tb-chart-data tr.tb-hot") ?? [])].map((r) => r.getAttribute("data-i")),
+				};
+			});
+		// Frames 4 to 9 span the plot edge to edge; frame 6 is the third of six.
+		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
+		assert.ok(box);
+		await page.mouse.move(box.x + ((56 + (2 / 5) * (620 - 56)) / 640) * box.width, box.y + box.height * 0.4);
+		assert.deepEqual(await hot(), { linked: ["6"], own: ["2"] }, "the linked row for frame 6, and the data table's third row");
+
+		await page.locator('#host >> .tb-out-table tr[data-key="8"]').hover();
+		assert.equal((await card(page)).title, "Frame 8", "pointing at a row moves the readout to its frame");
+		assert.deepEqual((await hot()).linked, ["8"]);
+		await page.mouse.move(2, 2);
+		assert.deepEqual(await hot(), { linked: [], own: [] }, "leaving clears both");
+		await page.close();
+	});
+
+	it("stays inside the chart near its right edge", async () => {
+		const page = await chartCase("markers");
+		await pointAt(page, 20);
+		const fits = await page.evaluate(() => {
+			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart") as HTMLElement;
+			const readout = figure.querySelector(".tb-readout") as HTMLElement;
+			const f = figure.getBoundingClientRect();
+			const r = readout.getBoundingClientRect();
+			return { right: r.right, edge: f.right, flipped: readout.hasAttribute("data-flip") };
+		});
+		assert.ok(fits.flipped && fits.right <= fits.edge, `card right ${fits.right}, chart right ${fits.edge}`);
+		await page.close();
 	});
 });
 
