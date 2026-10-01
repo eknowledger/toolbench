@@ -28,6 +28,16 @@ export const CHART_STYLES = /* css */ `
 .tb-axis-label { font-family: var(--tb-font); font-size: 11px; }
 .tb-annotation { stroke: var(--tb-accent); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
 .tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); font-size: 10px; }
+/* A threshold (#114): a dashed rule in the tone it names, so a limit never reads as a series even where
+   its tone shares a series colour, and a label haloed in the surface colour, drawn over the data. */
+.tb-threshold { stroke: var(--tb-muted); stroke-width: 1.25; stroke-dasharray: 6 4; }
+.tb-threshold[data-tone="warn"] { stroke: var(--tb-warn); }
+.tb-threshold[data-tone="bad"] { stroke: var(--tb-bad); }
+.tb-threshold[data-tone="good"] { stroke: var(--tb-good); }
+.tb-threshold-label { fill: var(--tb-muted); font-family: var(--tb-mono); font-size: 10px; stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; }
+.tb-threshold-label[data-tone="warn"] { fill: var(--tb-warn); }
+.tb-threshold-label[data-tone="bad"] { fill: var(--tb-bad); }
+.tb-threshold-label[data-tone="good"] { fill: var(--tb-good); }
 /* Each series class sets ONE custom property; the shape decides whether that is a stroke or a fill.
    The first version set stroke and fill together, which beat the line rule's "fill: none" on source
    order and drew every line as a filled blob. (No backticks in here: this is a template literal.) */
@@ -39,8 +49,20 @@ export const CHART_STYLES = /* css */ `
 .tb-s6 { --c: var(--tb-s6); }
 .tb-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
+/* A box plot (#122): a pale box with an outline, the median in full colour, whiskers in the same ink. */
+.tb-box { fill: var(--c); fill-opacity: 0.18; stroke: var(--c); stroke-width: 1.5; }
+.tb-box.tb-hot { fill-opacity: 0.32; }
+.tb-median { stroke: var(--c); stroke-width: 2.5; }
+.tb-whisker { stroke: var(--c); stroke-width: 1.25; }
+.tb-outlier { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.5; }
+.tb-swatch-box { width: 0.75rem; height: 0.6rem; border-radius: 2px; flex: none; border: 1.5px solid var(--c, currentColor); background: color-mix(in oklab, var(--c, currentColor) 18%, transparent); }
+/* A band (#119): a quiet fill, drawn first, so the lines over it carry the emphasis. */
+.tb-band { stroke: none; fill: var(--c); opacity: 0.22; }
+.tb-swatch-band { width: 0.75rem; height: 0.6rem; border-radius: 2px; flex: none; background: var(--c, currentColor); opacity: 0.45; }
 /* Opaque, so a bar is the colour its legend swatch says it is. */
 .tb-bar  { stroke: none; fill: var(--c); }
+/* A surface-coloured edge between stacked segments, so neighbouring parts never merge into one bar. */
+.tb-bar[data-stacked] { stroke: var(--tb-bg); stroke-width: 1.5; }
 .tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }

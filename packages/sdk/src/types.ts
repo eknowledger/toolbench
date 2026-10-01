@@ -47,13 +47,41 @@ export interface Series {
 	 * `points` draws a marker at each value and no line between them: for an x of separate items (frames,
 	 * requests, runs) where nothing exists between two of them, so a joining line would invent a slope.
 	 * Contract version 4.
+	 *
+	 * `step` holds each value until the next x, then rises or falls straight to the next: for state sampled
+	 * on events (a buffer's depth, a configured rate), where a sloped line invents a gradual change (#117).
 	 */
-	shape?: "line" | "area" | "bar" | "points";
+	shape?: "line" | "area" | "bar" | "points" | "step" | "band" | "box";
+	/**
+	 * The summary each `box` draws, one per x (#122, contract version 4): whiskers from `low` to `high`, a box
+	 * from `q1` to `q3`, a rule at `median`, and `outliers` as points. The tool computes it, so what the
+	 * whiskers mean (1.5 IQR, min to max, p5 to p95) is the tool's and belongs in the chart's labels. Set
+	 * `points` to the medians, which is what the readout, links and scale read where they read one value.
+	 */
+	boxes?: ({ low: number; q1: number; median: number; q3: number; high: number; outliers?: number[] } | null)[];
+	/**
+	 * The lower edge of a `band`, one per x, with `points` as the upper edge: a spread such as p5 to p95,
+	 * or a min-to-max envelope, filled between the two under every other series (#119, contract version 4).
+	 * A `null` in either edge breaks the band.
+	 */
+	lower?: (number | null)[];
 	/**
 	 * Draw a marker at each value of a `line` or `area`, so every real point is visible and a series under
 	 * an identical one can still be found. Each series gets its own marker shape. Contract version 4.
 	 */
 	markers?: boolean;
+	/**
+	 * Bar series sharing a `stack` id are stacked at each x, in series order, bottom to top, so a reader
+	 * sees each part and the total (#115, contract version 4). Positive and negative values stack away from
+	 * zero separately. Bar series without one are grouped beside the stack as before.
+	 */
+	stack?: string;
+	/**
+	 * This series' own x values, one per point, instead of the chart's shared `x`: for measurements that do
+	 * not share x positions, a scatter of (delay, cut-off) pairs say (#120, contract version 4). The x scale
+	 * covers every series. Usually with `shape: "points"`.
+	 */
+	x?: number[];
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,
@@ -80,17 +108,42 @@ export interface Readout {
 export interface Chart {
 	xLabel: string;
 	yLabel: string;
-	x: number[];
+	/**
+	 * One position per value. Numbers for a quantity; text for named things, "Mesh", "SFU", "p99", which
+	 * are drawn as evenly spaced categories in the order given (#113, contract version 4). If any value is
+	 * text, all are read as text.
+	 */
+	x: (number | string)[];
 	series: Series[];
 	xUnit?: string;
 	yUnit?: string;
 	/** A vertical marker with a name: "the knee", "capacity", "p99". */
-	annotations?: { x: number; label: string }[];
+	annotations?: { x: number | string; label: string }[];
+	/**
+	 * A labelled horizontal rule at a y value: a budget, an SLO, a limit (#114, contract version 4). Not a
+	 * series, so it adds no legend entry, no data-table column and no readout row, and the y scale widens
+	 * to show it. `tone` lets a limit read as one.
+	 */
+	thresholds?: { y: number; label: string; axis?: "left" | "right"; tone?: Tone }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
 	readout?: Readout;
 	/** A name a `table` in the same result can link to with `link.chart` (#124). Unique within a result. */
 	id?: string;
+	/**
+	 * `horizontal` draws bars growing rightward, one row per x, for long category names and budgets read left
+	 * to right (#116, contract version 4). Bar series only: other shapes are not drawn on a horizontal chart,
+	 * and the data table's caption says so.
+	 */
+	orientation?: "vertical" | "horizontal";
+	/**
+	 * `log` draws an axis in powers of ten, for values spanning orders of magnitude: latency distributions,
+	 * loss from 0.01% to 10% (#118, contract version 4). A log axis cannot show zero or a negative, so those
+	 * points are left out and the data table's caption says so; bars are not drawn on a log y axis, because
+	 * a bar's length means nothing there.
+	 */
+	yScale?: "linear" | "log";
+	xScale?: "linear" | "log";
 }
 
 /**

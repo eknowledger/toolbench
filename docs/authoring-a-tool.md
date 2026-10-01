@@ -638,6 +638,10 @@ finds it. See §4b for what counts as running.
 ```
 
 * `shape` is `"line"`, `"area"`, `"bar"` or, from contract version 4, `"points"`.
+* `x` can be text, from contract version 4: `["Mesh", "MCU", "SFU"]`. Text values are categories, drawn
+  evenly spaced in the order you give them, never sorted, and labelled with their text (cut short if the
+  slot is narrow; the full text is in the data table and the readout). A bar chart's axis always starts at
+  zero, since a bar's length is its value.
 * When x is a set of separate items (frames, requests, runs) rather than a continuous quantity, a line
   between two of them invents a value that does not exist. Use `markers: true` on a line or area to draw
   every real point, or `shape: "points"` to draw only the points. Each series gets its own marker shape,
@@ -653,6 +657,30 @@ finds it. See §4b for what counts as running.
   `link: { chart: "<id>", keys }`, where `keys[i]` is the x that row `i` describes (`null` for a row with
   none, a total say). Pointing at the chart then lights the matching row, and pointing at a row moves the
   chart's readout to it. Links never reach outside one result.
+* `thresholds: [{ y, label, tone }]` draws a labelled horizontal rule at a y value: a budget, an SLO, a
+  limit. It is not a series, so it adds no legend entry, no table column and no readout row, and the
+  scale widens to show it. `tone` is `warn`, `bad` or `good` for a limit that should read as one.
+* `stack: "<id>"` on bar series stacks them at each x, in series order, bottom to top: each part and the
+  total in one bar. Positive and negative values stack away from zero separately, unstacked bars sit
+  beside the stack, and the data table gains a total column per stack.
+* `orientation: "horizontal"` draws bars growing rightward, one row per x: for long names, and for a
+  budget read left to right. Grouping, stacking, thresholds (as vertical rules) and the readout all carry
+  over, and the down arrow steps through the rows. Bars only; other shapes are not drawn there.
+* `shape: "step"` holds each value until the next x and then moves straight to the next one: for state
+  sampled on events, a buffer depth or a configured rate, where a sloped line invents a gradual change.
+  `markers: true` marks the start of each run.
+* `yScale: "log"` or `xScale: "log"` draws that axis in powers of ten, for values across orders of
+  magnitude. A log axis cannot show zero or a negative, so such points are left out and the data
+  table says how many; bars are not drawn on a log y axis.
+* `shape: "band"` with `lower` fills the region between `lower` and `points`, the upper edge: a p5 to
+  p95 spread, a min-to-max envelope. It is drawn beneath every other series, a null in either edge breaks
+  it, the readout reads it as a range, and the data table gives it low and high columns.
+* `x` on a series gives it its own x values, one per point, for measurements that share no x: a
+  scatter. Use it with `shape: "points"`. The x scale covers every series, the readout snaps to the
+  nearest point rather than the nearest x, and the data table lists one row per point.
+* `shape: "box"` with `boxes` draws a box plot per x: whiskers `low` to `high`, a box `q1` to `q3`, the
+  `median`, and `outliers`. You compute the summary, so the whiskers mean what you say they mean; put it
+  in the axis label. Set `points` to the medians. The readout and the data table show all five numbers.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

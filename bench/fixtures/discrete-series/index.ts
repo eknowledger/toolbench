@@ -112,6 +112,237 @@ export default {
 					],
 				};
 			}
+			case "categories":
+				// Three call topologies, three participants, 32 kb/s each: upload per client, and the server's load.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Topology",
+						yLabel: "Bitrate",
+						yUnit: "kb/s",
+						x: ["Mesh", "MCU", "Selective forwarding"],
+						series: [
+							{ label: "Upload per client", unit: "kb/s", shape: "bar", points: [64, 32, 32] },
+							{ label: "Download per client", unit: "kb/s", shape: "bar", points: [64, 32, 64] },
+						],
+					},
+				};
+			case "many-categories":
+				// Hours of a day: more categories than labels fit, so every few are labelled and all are in the table.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Hour",
+						yLabel: "Calls",
+						x: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`),
+						series: [{ label: "Calls", shape: "bar", points: Array.from({ length: 24 }, (_, h) => Math.round(40 + 35 * Math.sin(((h - 6) / 24) * 2 * Math.PI))) }],
+					},
+				};
+			case "thresholds":
+				// Mouth-to-ear delay per call against ITU-T G.114's planning guides: 150 ms preferred, 400 ms the limit.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Call",
+						yLabel: "Mouth-to-ear delay",
+						yUnit: "ms",
+						x: frames.slice(0, 12),
+						thresholds: [
+							{ y: 150, label: "150 ms, G.114 preferred", tone: "warn" },
+							{ y: 400, label: "400 ms, G.114 planning limit", tone: "bad" },
+						],
+						series: [{ label: "Delay", unit: "ms", markers: true, points: [120, 135, 128, 160, 190, 142, 138, 210, 175, 131, 126, 148] }],
+					},
+				};
+			case "stacked": {
+				// An illustrative delay budget per path, stage by stage, against a 150 ms line.
+				const stage = (label: string, points: number[]): Series => ({ label, unit: "ms", shape: "bar", stack: "budget", points });
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Path",
+						yLabel: "Delay",
+						yUnit: "ms",
+						x: ["Same city", "Across a continent", "Through a relay"],
+						thresholds: [{ y: 150, label: "150 ms", tone: "warn" }],
+						series: [
+							stage("Capture and encode", [25, 25, 25]),
+							stage("Network", [10, 70, 95]),
+							stage("Jitter buffer", [40, 40, 60]),
+							stage("Decode and play", [15, 15, 15]),
+						],
+					},
+				};
+			}
+			case "stacked-signed":
+				// Two parts stacked either side of zero, and a plain bar beside the stack at each x.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Case",
+						yLabel: "Value",
+						x: ["A", "B"],
+						series: [
+							{ label: "Part one", shape: "bar", stack: "s", points: [5, -3] },
+							{ label: "Part two", shape: "bar", stack: "s", points: [2, -4] },
+							{ label: "Alone", shape: "bar", points: [4, 4] },
+						],
+					},
+				};
+			case "horizontal": {
+				// The same delay budget as the stacked case, read left to right against the 150 ms line.
+				const stage = (label: string, points: number[]): Series => ({ label, unit: "ms", shape: "bar", stack: "budget", points });
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						xLabel: "Path",
+						yLabel: "Delay",
+						yUnit: "ms",
+						x: ["Same city", "Across a continent", "Through a relay"],
+						thresholds: [{ y: 150, label: "150 ms", tone: "warn" }],
+						series: [
+							stage("Capture and encode", [25, 25, 25]),
+							stage("Network", [10, 70, 95]),
+							stage("Jitter buffer", [40, 40, 60]),
+							stage("Decode and play", [15, 15, 15]),
+						],
+					},
+				};
+			}
+			case "horizontal-grouped":
+				return {
+					kind: "series",
+					chart: {
+						orientation: "horizontal",
+						xLabel: "Network",
+						yLabel: "Loss",
+						yUnit: "%",
+						x: ["Office fibre", "Home broadband", "Mobile, good signal", "Mobile, at the cell's edge", "Satellite"],
+						series: [
+							{ label: "Median", unit: "%", shape: "bar", points: [0.1, 0.4, 0.8, 3.5, 1.2] },
+							{ label: "Worst hour", unit: "%", shape: "bar", points: [0.3, 1.5, 2.6, 9.0, 4.0] },
+						],
+					},
+				};
+			case "step": {
+				// A jitter buffer's target depth, which changes only when the receiver decides, drawn both ways.
+				const depth = [40, 40, 40, 60, 60, 60, 60, 80, 80, 60, 60, 40];
+				const ticks = frames.slice(0, 12);
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Buffer depth",
+						yUnit: "ms",
+						x: ticks,
+						series: [
+							{ label: "As a step", unit: "ms", shape: "step", markers: true, points: depth },
+							{ label: "As a line", unit: "ms", points: depth.map((d) => d - 10) },
+						],
+					},
+				};
+			}
+			case "log": {
+				/*
+				 * The Mathis et al. ceiling on one TCP flow, throughput = (MSS / RTT) x 1.22 / sqrt(p), for a
+				 * 1460-byte MSS at 50 ms, across loss rates from 0.01% to 10%: four orders of magnitude of loss,
+				 * two of throughput, which only a log scale shows as the straight line it is.
+				 */
+				const loss = [0.01, 0.03, 0.1, 0.3, 1, 3, 10];
+				const mbps = loss.map((pct) => Number((((1460 * 8) / 0.05) * (1.22 / Math.sqrt(pct / 100)) / 1e6).toPrecision(3)));
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Loss",
+						xUnit: "%",
+						yLabel: "Throughput ceiling",
+						yUnit: "Mb/s",
+						xScale: "log",
+						yScale: "log",
+						x: loss,
+						series: [{ label: "One TCP flow, 50 ms", unit: "Mb/s", markers: true, points: mbps }],
+					},
+				};
+			}
+			case "log-zero":
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Run",
+						yLabel: "Errors",
+						yScale: "log",
+						x: [1, 2, 3, 4, 5],
+						series: [{ label: "Errors", markers: true, points: [12, 0, 150, 1200, 40] }],
+					},
+				};
+			case "band": {
+				// Illustrative arrival delay per second: the median, inside its p5 to p95 spread. Second 7 is missing.
+				const seconds = frames.slice(0, 12);
+				const median = [31, 32, 30, 34, 38, 36, null, 33, 31, 45, 52, 40];
+				const spread = [4, 5, 4, 7, 12, 9, null, 6, 5, 18, 26, 14];
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Arrival delay",
+						yUnit: "ms",
+						x: seconds,
+						series: [
+							{ label: "Median", unit: "ms", markers: true, points: median },
+							{
+								label: "p5 to p95",
+								unit: "ms",
+								shape: "band",
+								points: median.map((m, i) => (m === null ? null : m + (spread[i] as number))),
+								lower: median.map((m, i) => (m === null ? null : Math.max(0, m - (spread[i] as number) / 2))),
+							},
+						],
+					},
+				};
+			}
+			case "scatter":
+				// Illustrative: response delay against turns cut off early, swept on two recording sets whose
+				// timeouts were not the same, so neither series shares the other's x.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "End-of-speech timeout",
+						xUnit: "ms",
+						yLabel: "Turns cut off early",
+						yUnit: "%",
+						x: [],
+						series: [
+							{ label: "Quiet room", unit: "%", shape: "points", x: [200, 300, 400, 500, 700, 900], points: [18, 11, 7, 4.5, 2.2, 1.1] },
+							{ label: "Street noise", unit: "%", shape: "points", x: [250, 350, 450, 600, 800, 1000, 1200], points: [26, 17, 12, 8, 4.8, 3.1, 2.0] },
+						],
+					},
+				};
+			case "box": {
+				// Illustrative jitter per network, morning and evening; whiskers are p5 to p95, outliers beyond.
+				type Box = { low: number; q1: number; median: number; q3: number; high: number; outliers?: number[] };
+				const morning: Box[] = [
+					{ low: 1, q1: 2, median: 3, q3: 4, high: 6 },
+					{ low: 2, q1: 4, median: 6, q3: 9, high: 14, outliers: [22] },
+					{ low: 4, q1: 8, median: 12, q3: 18, high: 30, outliers: [41, 47] },
+				];
+				const evening: Box[] = [
+					{ low: 1, q1: 2, median: 3, q3: 5, high: 7 },
+					{ low: 3, q1: 6, median: 9, q3: 14, high: 22, outliers: [31] },
+					{ low: 6, q1: 12, median: 19, q3: 27, high: 40, outliers: [55] },
+				];
+				const series = (label: string, boxes: Box[]): Series => ({ label, unit: "ms", shape: "box", boxes, points: boxes.map((b) => b.median) });
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Network",
+						yLabel: "Jitter, p5 to p95",
+						yUnit: "ms",
+						x: ["Fibre", "Broadband", "Mobile"],
+						series: [series("Morning", morning), series("Evening", evening)],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",

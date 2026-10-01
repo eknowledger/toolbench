@@ -1657,6 +1657,267 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.ok(Math.abs(minus30.height - 3 * minus10.height) < 0.5, "-30 is three times as tall as -10");
 	});
 
+	it("widens the scale to a threshold above the data, labels it, and keeps it out of the data (#114)", async () => {
+		// Delays peak at 210 ms; the 400 ms limit is above all of them and must still be drawn.
+		const chart = await chartFor("thresholds");
+		assert.equal(chart.yLabels.at(-1), "400");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "thresholds" };
+			await host.run();
+		});
+		const read = await page.evaluate(() => {
+			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
+			return {
+				rules: [...(figure?.querySelectorAll("line.tb-threshold") ?? [])].map((l) => l.getAttribute("data-tone")),
+				labels: [...(figure?.querySelectorAll("text.tb-threshold-label") ?? [])].map((t) => t.textContent),
+				columns: figure?.querySelectorAll(".tb-chart-data thead th").length,
+				legend: figure?.querySelectorAll(".tb-legend li").length ?? 0,
+			};
+		});
+		assert.deepEqual(read.rules, ["warn", "bad"]);
+		assert.deepEqual(read.labels, ["150 ms, G.114 preferred", "400 ms, G.114 planning limit"]);
+		assert.equal(read.columns, 2, "the data table has the x and the one series, not the thresholds");
+		assert.equal(read.legend, 0, "one series and two thresholds: still no legend");
+		await page.close();
+	});
+
+	it("draws a box from q1 to q3 with its median, whiskers and outliers, and reads all five numbers (#122)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "box" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg") as SVGSVGElement;
+			const n = (el: Element | null, a: string) => Number(el?.getAttribute(a));
+			const boxes = [...svg.querySelectorAll("rect.tb-box")];
+			const medians = [...svg.querySelectorAll("line.tb-median")];
+			return {
+				boxes: boxes.length,
+				outliers: svg.querySelectorAll("circle.tb-outlier").length,
+				// Mobile, morning: q1 8, median 12, q3 18. The box is 10 units of value tall, the median 6 above q1... below q3.
+				mobile: { top: n(boxes[2] ?? null, "y"), height: n(boxes[2] ?? null, "height"), median: n(medians[2] ?? null, "y1") },
+				heads: host.shadowRoot?.querySelectorAll(".tb-chart-data thead th").length,
+			};
+		});
+		assert.equal(read.boxes, 6, "three networks, two series");
+		assert.equal(read.outliers, 5, "22, 41 and 47 in the morning; 31 and 55 in the evening");
+		// (q3 - median) / (q3 - q1) = (18 - 12) / (18 - 8) = 0.6 of the box, measured from its top.
+		assert.ok(Math.abs((read.mobile.median - read.mobile.top) / read.mobile.height - 0.6) < 0.02, JSON.stringify(read.mobile));
+		assert.equal(read.heads, 1 + 2 * 5, "the x, then low, q1, median, q3 and high for each series");
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("End");
+		const row = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout li")?.textContent);
+		assert.equal(row, "median 12 ms (q1 8, q3 18; 4 to 30)Morning");
+		await page.close();
+	});
+
+	it("draws series at their own x, lists every point, and reads out the nearest one (#120)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "scatter" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				markers: root?.querySelectorAll(".tb-plot .tb-marker").length,
+				rows: root?.querySelectorAll(".tb-chart-data tbody tr").length,
+				first: [...(root?.querySelector(".tb-chart-data tbody tr")?.children ?? [])].map((c) => c.textContent),
+			};
+		});
+		assert.equal(read.markers, 13, "six points and seven");
+		assert.equal(read.rows, 13, "one table row per point, since the series share no x");
+		assert.deepEqual(read.first, ["Quiet room", "200", "18"]);
+		// From the keyboard the points go left to right: the first is (200, 18), the second (250, 26).
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowRight");
+		const card = await page.evaluate(() => {
+			const r = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout");
+			return { title: r?.querySelector(".tb-readout-title")?.textContent, row: r?.querySelector("li")?.textContent };
+		});
+		assert.deepEqual(card, { title: "End-of-speech timeout 250 ms", row: "26 %Street noise" });
+		await page.close();
+	});
+
+	it("fills a band beneath the lines, breaks it at a gap, and reads it as a range (#119)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "band" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg") as SVGSVGElement;
+			const all = [...svg.querySelectorAll("path")];
+			return {
+				bands: svg.querySelectorAll("path.tb-band").length,
+				bandFirst: all.findIndex((p) => p.classList.contains("tb-band")) < all.findIndex((p) => p.classList.contains("tb-line")),
+				heads: [...(host.shadowRoot?.querySelectorAll(".tb-chart-data thead th") ?? [])].map((th) => th.textContent),
+			};
+		});
+		assert.equal(read.bands, 2, "second 7 has no data, so the band is two pieces");
+		assert.ok(read.bandFirst, "the band is drawn beneath the median line");
+		assert.deepEqual(read.heads, ["Second", "Median (ms)", "p5 to p95, low (ms)", "p5 to p95, high (ms)"]);
+		await page.locator("#host >> .tb-plot").focus();
+		const rows = await page.evaluate(() => [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-readout li") ?? [])].map((li) => li.textContent));
+		// Second 1: median 31, spread 4, so 29 to 35.
+		assert.deepEqual(rows, ["31 msMedian", "29 to 35 msp5 to p95"]);
+		await page.close();
+	});
+
+	it("puts powers of ten evenly apart on a log axis, and leaves out what it cannot show (#118)", async () => {
+		const chart = await chartFor("log");
+		assert.deepEqual(chart.yLabels, ["0.1", "1", "10", "100"]);
+		assert.deepEqual(chart.xLabels, ["0.01", "0.1", "1", "10"]);
+		const ys = chart.ticks.filter((t) => t.anchor === "end").map((t) => t.y);
+		const gaps = ys.slice(1).map((y, i) => Math.abs(y - (ys[i] as number)));
+		assert.ok(gaps.every((g) => Math.abs(g - (gaps[0] as number)) < 0.5), `decades equally spaced: ${gaps.join(", ")}`);
+
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "log-zero" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				markers: root?.querySelectorAll(".tb-plot .tb-marker").length,
+				caption: root?.querySelector(".tb-chart-data caption")?.textContent ?? "",
+				cells: [...(root?.querySelectorAll(".tb-chart-data tbody td") ?? [])].map((td) => td.textContent),
+			};
+		});
+		assert.equal(read.markers, 4, "five values, one of them zero: four are drawn");
+		assert.match(read.caption, /1 value at or below zero not drawn on a log axis/);
+		assert.deepEqual(read.cells, ["12", "0", "150", "1,200", "40"], "the table still has every value");
+		await page.close();
+	});
+
+	it("draws a step as runs and risers, rising only where the value changes (#117)", async () => {
+		// Depths 40 40 40 60 60 60 60 80 80 60 60 40: four changes, so four risers, and never a slope.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const d = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "step" };
+			await host.run();
+			return host.shadowRoot?.querySelector(".tb-plot path.tb-line.tb-s1")?.getAttribute("d") ?? "";
+		});
+		assert.ok(d.startsWith("M") && !d.slice(1).includes("L"), `a step has no sloped segment: ${d.slice(0, 60)}`);
+		const ys = [...d.matchAll(/V([\d.]+)/g)].map((m) => m[1]);
+		const changes = ys.filter((y, i) => i > 0 && y !== ys[i - 1]).length + (ys[0] !== /M[\d.]+,([\d.]+)/.exec(d)?.[1] ? 1 : 0);
+		assert.equal(changes, 4);
+		await page.close();
+	});
+
+	it("draws horizontal bars rightward from zero, names on the left, the threshold vertical (#116)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "horizontal" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg");
+			const num = (el: Element, a: string) => Number(el.getAttribute(a));
+			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => ({ x: num(r, "x"), y: num(r, "y"), w: num(r, "width"), i: num(r, "data-i") }));
+			const rule = svg?.querySelector("line.tb-threshold");
+			const names = [...(svg?.querySelectorAll("text.tb-tick[text-anchor=end]") ?? [])].map((t) => t.textContent);
+			return { bars, rule: rule ? { x1: num(rule, "x1"), x2: num(rule, "x2") } : null, names };
+		});
+		assert.deepEqual(read.names, ["Same city", "Across a continent", "Through a relay"]);
+		assert.ok(read.rule && read.rule.x1 === read.rule.x2, "the threshold is a vertical rule");
+		// Row 0: 25 + 10 + 40 + 15 = 90 ms, starting at zero; its four segments run end to end.
+		const row0 = read.bars.filter((b) => b.i === 0).sort((a, b) => a.x - b.x);
+		assert.equal(row0.length, 4);
+		for (let k = 1; k < row0.length; k++) {
+			const prev = row0[k - 1] as { x: number; w: number };
+			assert.ok(Math.abs((row0[k] as { x: number }).x - (prev.x + prev.w)) < 0.5, "segments meet");
+		}
+		const total = row0.reduce((sum, b) => sum + b.w, 0);
+		const row2 = read.bars.filter((b) => b.i === 2).reduce((sum, b) => sum + b.w, 0);
+		assert.ok(Math.abs(row2 / total - 195 / 90) < 0.02, "rows are as long as their totals, 195 against 90");
+
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowDown");
+		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
+		assert.equal(title, "Path Across a continent", "the down arrow steps through the rows");
+		await page.close();
+	});
+
+	it("stacks parts end to end, either side of zero, beside a bar that is not stacked (#115)", async () => {
+		// A: 5 then 2 on top (0 to 5, 5 to 7). B: -3 then -4 below (0 to -3, -3 to -7). "Alone" is 4 at both.
+		const chart = await chartFor("stacked-signed");
+		const at = (series: string, i: number) => chart.bars.filter((b) => b.series === series)[i];
+		const [a1, a2, b1, b2, alone] = [at("tb-s1", 0), at("tb-s2", 0), at("tb-s1", 1), at("tb-s2", 1), at("tb-s3", 0)];
+		assert.ok(a1 && a2 && b1 && b2 && alone);
+		assert.ok(Math.abs(a2.y + a2.height - a1.y) < 0.5, "the second part starts where the first ends");
+		assert.ok(Math.abs(a1.height / a2.height - 5 / 2) < 0.05, "heights in the ratio of the values, 5 to 2");
+		assert.ok(Math.abs(b2.y - (b1.y + b1.height)) < 0.5, "below zero, the second part continues downward");
+		assert.equal(a1.x, a2.x, "a stack is one bar");
+		assert.ok(alone.x >= a1.x + a1.width - 0.01, "the unstacked bar sits beside the stack, not on it");
+		await (async () => {
+			const page = await browser.newPage();
+			await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+			await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+			const totals = await page.evaluate(async () => {
+				const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+				host.values = { case: "stacked-signed" };
+				await host.run();
+				const table = host.shadowRoot?.querySelector(".tb-chart-data table");
+				return [...(table?.querySelectorAll("tbody tr") ?? [])].map((tr) => tr.lastElementChild?.textContent);
+			});
+			assert.deepEqual(totals, ["7", "-7"], "the data table carries each stack's total");
+			await page.close();
+		})();
+	});
+
+	it("draws named categories in the order given, labelled with their text, from zero (#113)", async () => {
+		const chart = await chartFor("categories");
+		assert.deepEqual(chart.xLabels, ["Mesh", "MCU", "Selective forwarding"]);
+		assert.equal(chart.yLabels[0], "0", "a bar chart's axis starts at zero even when every value is above 30");
+		// Two series, three categories: six bars, the two at each category side by side.
+		assert.equal(chart.bars.length, 6);
+		const centre = (b: { x: number; width: number }) => b.x + b.width / 2;
+		const first = chart.bars.filter((b) => b.series === "tb-s1").map(centre);
+		assert.ok(first[0] !== undefined && first[1] !== undefined && first[2] !== undefined && first[0] < first[1] && first[1] < first[2], "left to right in the given order");
+	});
+
+	it("labels as many categories as fit, and keeps every one in the table and the readout (#113)", async () => {
+		const chart = await chartFor("many-categories");
+		assert.ok(chart.xLabels.length < 24 && chart.xLabels.length >= 6, `${chart.xLabels.length} labels for 24 categories`);
+		assert.equal(chart.xLabels[0], "00:00");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "many-categories" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("End");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				title: root?.querySelector(".tb-readout-title")?.textContent ?? "",
+				rows: [...(root?.querySelectorAll(".tb-chart-data tbody th") ?? [])].map((th) => th.textContent),
+			};
+		});
+		assert.equal(read.title, "Hour 23:00");
+		assert.equal(read.rows.length, 24);
+		assert.equal(read.rows[13], "13:00");
+		await page.close();
+	});
+
 	it("puts a bar chart's x labels on bars, not between them", async () => {
 		// The histogram's bins are two apart; any label must name one of them.
 		const page = await browser.newPage();

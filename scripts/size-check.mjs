@@ -125,8 +125,13 @@ const BUDGETS = [
 	 * discrete-series fixture (#111). Both exist so browser tests can put a contract feature on screen; no
 	 * reader downloads this chunk.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 2_500, deployOnly: true },
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	/*
+	 * Both raised to 4_000 in 0.7.0: the discrete-series fixture grows a case for each chart feature (#111
+	 * to #124), so the charts page and the browser tests can put every one on screen. Bench-only; no reader
+	 * downloads either chunk.
+	 */
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -150,8 +155,14 @@ const BUDGETS = [
 	 *
 	 * Raised from 6_500 to 7_000 by linked rows (#124): highlighting the chart's own data table and linked
 	 * tables, and answering a row that asks for its x.
+	 *
+	 * Raised from 7_000 to 8_000 by thresholds (#114): rules, tones and haloed labels. 7185 measured.
+	 *
+	 * Raised from 8_000 to 9_500 by stacked bars (#115) and horizontal bars (#116), a second layout with its own axes, labels and readout geometry. 8,561 measured.
+	 *
+	 * Raised from 9_500 to 11_500 by bands (#119) and scatter (#120): a second readout that snaps to the nearest point in two dimensions, and a one-row-per-point data table. 10,349 measured.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 7_000 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 11_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
