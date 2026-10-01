@@ -2163,7 +2163,8 @@ describe("heatmaps (#121)", () => {
 		});
 		assert.equal(read.cells, 84, "seven days of twelve hours");
 		assert.equal(read.empty, 1, "Saturday 02:00 was not measured");
-		assert.ok(read.order[0] > read.order[1] && read.order[1] > read.order[2], `lighter for less: ${read.order.join(", ")}`);
+		const [low, middle, high] = read.order as [number, number, number];
+		assert.ok(low > middle && middle > high, `lighter for less: ${read.order.join(", ")}`);
 		await page.close();
 	});
 

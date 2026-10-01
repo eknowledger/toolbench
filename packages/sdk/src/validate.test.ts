@@ -75,6 +75,19 @@ describe("validateManifest", () => {
 		assert.equal(manifest.inputs.filter((input) => input.primary === true).length, 2);
 	});
 
+	it("refuses a known key in the wrong object, saying where it belongs (#87)", () => {
+		// The case that was reported: a timeout beside the thread it pairs with, silently ignored.
+		failsWith((m) => { m.runtime = { entry: "index.ts", thread: "worker", timeoutMs: 2000 }; }, "runtime.timeoutMs", "top level");
+		failsWith((m) => { m.thread = "worker"; }, "thread", "`runtime`");
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9, autoRun: true }]; }, "inputs[0].autoRun", "top level");
+		failsWith((m) => { m.step = 1; }, "step", "an entry of `inputs`");
+	});
+
+	it("still ignores a key it does not know, which loaded before and must keep loading", () => {
+		const m = { ...good(), $comment: "for a reader of the file", runtime: { entry: "index.ts", note: "x" } };
+		assert.doesNotThrow(() => validateManifest(m));
+	});
+
 	it("requires min and max on a number input", () => {
 		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1 }]; }, "inputs[0].min/max", "runaway");
 	});

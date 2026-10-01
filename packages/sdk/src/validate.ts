@@ -70,6 +70,7 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], path: st
 
 function validateInput(raw: unknown, path: string): InputSpec {
 	const o = obj(raw, path);
+	misplaced(o, "input", `${path}.`);
 	const id = str(o, "id", `${path}.`);
 	if (!ID.test(id)) fail(`${path}.id`, `"${id}" must be lowercase letters, digits and hyphens`);
 	str(o, "label", `${path}.`);
@@ -255,8 +256,33 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  * Call `upgradeManifest` first unless you know the manifest is current — this function deliberately
  * rejects an `sdk` it does not recognise rather than guessing.
  */
+/*
+ * Where each known key belongs (#87). A key in the wrong object is worse than a missing one: the author has
+ * said what they want, validation used to agree, and the runtime did something else. `timeoutMs` written
+ * inside `runtime`, beside the `thread` it only means anything with, validated clean and ran on the 5,000 ms
+ * default. So a known key found in the wrong place is refused with the place it belongs. Unknown keys are
+ * still ignored: refusing those would narrow the contract and stop manifests that load today from loading.
+ */
+const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
+const RUNTIME_KEYS = ["entry", "thread"];
+const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength"];
+
+function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
+	const belongs = (key: string): string | undefined => {
+		if (where !== "manifest" && TOP_LEVEL_KEYS.includes(key) && !(where === "input" && key === "id")) return "the top level of the manifest";
+		if (where !== "runtime" && RUNTIME_KEYS.includes(key)) return "`runtime`";
+		if (where !== "input" && INPUT_KEYS.includes(key) && !TOP_LEVEL_KEYS.includes(key) && !RUNTIME_KEYS.includes(key)) return "an entry of `inputs`";
+		return undefined;
+	};
+	for (const key of Object.keys(o)) {
+		const home = belongs(key);
+		if (home) fail(`${path}${key}`, `belongs in ${home}, not here; here it would be ignored`);
+	}
+}
+
 export function validateManifest(raw: unknown): Manifest {
 	const o = obj(raw, "manifest");
+	misplaced(o, "manifest", "");
 
 	// --- the contract version, first, because it decides how to read everything else -------------
 	if (typeof o.sdk !== "number" || !Number.isInteger(o.sdk)) {
@@ -298,6 +324,7 @@ export function validateManifest(raw: unknown): Manifest {
 
 	// --- runtime ----------------------------------------------------------------------------------
 	const runtime = obj(o.runtime, "runtime");
+	misplaced(runtime, "runtime", "runtime.");
 	str(runtime, "entry", "runtime.");
 	const thread = runtime.thread === undefined ? "main" : oneOf(runtime.thread, ["main", "worker"] as const, "runtime.thread");
 

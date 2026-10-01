@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    /*
+     * The bench is the opposite of a tool (tools/tsconfig.json): its pages need the DOM and its browser
+     * suite needs Node and Playwright, so it is its own project rather than a line in another (#93).
+     * Code inside page.evaluate runs in the browser but is checked here, in the same file, which is why
+     * the DOM lib is on for the test file too.
+     */
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@toolbench/sdk": ["../packages/sdk/src/index.ts"],
+      "@toolbench/runtime": ["../packages/runtime/src/index.ts"],
+      "@toolbench/runtime/*": ["../packages/runtime/src/*"]
+    }
+  },
+  "include": ["*.ts", "src/**/*.ts", "fixtures/*/index.ts"]
+}

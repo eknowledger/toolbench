@@ -113,7 +113,7 @@ function seedCards(): Plugin {
 				 * markup for every existing card is byte-for-byte unchanged.
 				 */
 				const kept = output.kind === "group" ? output.parts.slice(0, parts) : [output];
-				const forCard = kept.length === 1 ? kept[0] : { kind: "group" as const, parts: kept };
+				const forCard = kept.length === 1 && kept[0] ? kept[0] : { kind: "group" as const, parts: kept };
 				const json = serialiseSeed(forCard);
 				out = out.replace(
 					new RegExp(`(<tool-host tool="${id}"[^>]*data-seed\\b[^>]*>)`),

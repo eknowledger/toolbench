@@ -112,6 +112,7 @@ they pay; give test instruments their own chunk and their own budget line.
 | **Vite builds workers in a separate pass** | `build.rollupOptions` does not apply. Without `worker.rollupOptions` the worker's tool copies are all `index-*.js` and duplication is invisible |
 | **`interface` for a tool's input type** | Does not satisfy the SDK's index-signature constraint. Must be a `type` alias |
 | **Release PRs sit at `BLOCKED`** | GitHub does not trigger workflows for `GITHUB_TOKEN` events, so required checks never attach. Merge with `gh pr merge <n> --squash --admin`; see [releasing.md](docs/releasing.md) |
+| **`tsc -b --watch` can go stale silently** | It wrote `tsconfig.tsbuildinfo` without emitting, so a later `pnpm build` said "up to date" while `dist/` held old styles. The bench bundles `dist/`, and tests that assert classes still passed. Do not run the watcher; if `dist/` looks behind `src/`, `npx tsc -b --force` in each package |
 | **Publishing needs OIDC, not a token** | The npm account's second factor is a passkey, which cannot answer the CLI's one-time-password prompt. A token in CI fails `EOTP` every time |
 
 ## 10. Shell
