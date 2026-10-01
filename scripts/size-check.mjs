@@ -82,12 +82,24 @@ const BUDGETS = [
 	 * expanding never re-runs the tool. For a worker-mode tool, a lazy version would be a round trip.
 	 *
 	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
-	 *
-	 * Raised from 22_000 to 22_500 by contract v4's chart markers, the change that crossed it: the marker
-	 * and legend-key styles live in the runtime's stylesheet, which is in this chunk. 22,010 measured with
-	 * #111's tick and bar fixes beneath it, 242 bytes of that the markers' own.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_500 },
+	/*
+	 * Raised from 22_000 to 23_000 in the commit that spent it: 21,686 to 22,573 measured, 887 bytes for
+	 * the 0.7.0 card fixes taken together. The card rebuilt as content with a button in it rather than a
+	 * button around content, the run area without its status line or its Run button under autoRun, the
+	 * themed focus ring, the expand that holds a chart's size, the fallback when the chart chunk cannot
+	 * load, and the two accent tokens.
+	 *
+	 * ⚠️ Each of those branches fitted under 22_000 on its own, and nobody measured them together until CI
+	 * did. Measure the combination before stacking branches, not only the tip: the tip of this release sits
+	 * lower again once the chart styles leave this chunk, which hid the overshoot here.
+	 */
+	/*
+	 * Raised from 23_000 to 23_500 by contract v4's first features: 22,573 to 23,249 measured, 676 bytes.
+	 * The chart markers' and legend keys' styles, 242 bytes of it, live in the runtime's stylesheet, which
+	 * is in this chunk; the rest is the slider control and the host's `layout` and `controls` attributes.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
