@@ -112,6 +112,32 @@ export default {
 					],
 				};
 			}
+			case "categories":
+				// Three call topologies, three participants, 32 kb/s each: upload per client, and the server's load.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Topology",
+						yLabel: "Bitrate",
+						yUnit: "kb/s",
+						x: ["Mesh", "MCU", "Selective forwarding"],
+						series: [
+							{ label: "Upload per client", unit: "kb/s", shape: "bar", points: [64, 32, 32] },
+							{ label: "Download per client", unit: "kb/s", shape: "bar", points: [64, 32, 64] },
+						],
+					},
+				};
+			case "many-categories":
+				// Hours of a day: more categories than labels fit, so every few are labelled and all are in the table.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Hour",
+						yLabel: "Calls",
+						x: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`),
+						series: [{ label: "Calls", shape: "bar", points: Array.from({ length: 24 }, (_, h) => Math.round(40 + 35 * Math.sin(((h - 6) / 24) * 2 * Math.PI))) }],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

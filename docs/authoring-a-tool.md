@@ -638,6 +638,10 @@ finds it. See §4b for what counts as running.
 ```
 
 * `shape` is `"line"`, `"area"`, `"bar"` or, from contract version 4, `"points"`.
+* `x` can be text, from contract version 4: `["Mesh", "MCU", "SFU"]`. Text values are categories, drawn
+  evenly spaced in the order you give them, never sorted, and labelled with their text (cut short if the
+  slot is narrow; the full text is in the data table and the readout). A bar chart's axis always starts at
+  zero, since a bar's length is its value.
 * When x is a set of separate items (frames, requests, runs) rather than a continuous quantity, a line
   between two of them invents a value that does not exist. Use `markers: true` on a line or area to draw
   every real point, or `shape: "points"` to draw only the points. Each series gets its own marker shape,

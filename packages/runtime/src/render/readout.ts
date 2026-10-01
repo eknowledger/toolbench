@@ -17,6 +17,10 @@ import type { Chart } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 
 export interface Geometry {
+	/** Each x as a position: the value itself, or a category's index. */
+	xs: number[];
+	/** Each x as a reader sees it: a formatted number, or a category's full text. */
+	xText: (index: number) => string;
 	/** x in data units to x in viewBox units. */
 	px: (value: number) => number;
 	/** A series' value to y in viewBox units, on the scale that series is drawn against. */
@@ -57,7 +61,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 	plotBox.setAttribute("aria-label", `${plotSvg.getAttribute("aria-label") ?? ""}. Arrow keys read each value.`);
 
 	let current = -1;
-	const xs = chart.x;
+	const xs = g.xs;
 	const nearestIndex = (vbX: number) => {
 		let best = 0;
 		let bestDistance = Number.POSITIVE_INFINITY;
@@ -76,7 +80,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 	 * table in the same result linked to this chart by id. A highlight in a closed table waits for it to be
 	 * opened, and nothing is scrolled to, because the reader is looking at the chart.
 	 */
-	const linkRows = (x: number | undefined, index: number) => {
+	const linkRows = (x: number | string | undefined, index: number) => {
 		if (chart.readout?.highlightTable === true) {
 			for (const row of figure.querySelectorAll(".tb-chart-data tr[data-i]")) {
 				row.classList.toggle("tb-hot", Number(row.getAttribute("data-i")) === index);
@@ -98,6 +102,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 	const show = (index: number, pointerY?: number) => {
 		current = index;
 		const x = xs[index] as number;
+		const key = chart.x[index];
 		const cx = g.px(x);
 		const rows: { series: number; y: number }[] = [];
 		chart.series.forEach((series, s) => {
@@ -125,9 +130,9 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 			hLine.setAttribute("visibility", "hidden");
 		}
 		lift(index);
-		linkRows(x, index);
+		linkRows(key, index);
 
-		const title = chart.readout?.titles?.[index] ?? `${chart.xLabel} ${g.format(x)}${chart.xUnit ? ` ${chart.xUnit}` : ""}`;
+		const title = chart.readout?.titles?.[index] ?? `${chart.xLabel} ${g.xText(index)}${chart.xUnit ? ` ${chart.xUnit}` : ""}`;
 		// textContent throughout: series labels and notes are tool output, and tool output is not markup.
 		const heading = el("p", { class: "tb-readout-title" });
 		heading.textContent = title;
@@ -215,7 +220,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 	// A linked table row asked for its x (#124), or let go of it.
 	figure.addEventListener("tb-point", (event) => {
 		const key = (event as CustomEvent<{ key: string | null }>).detail.key;
-		const index = key === null ? -1 : xs.findIndex((x) => String(x) === key);
+		const index = key === null ? -1 : chart.x.findIndex((x) => String(x) === key);
 		if (index >= 0) show(index);
 		else hide();
 	});

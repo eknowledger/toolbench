@@ -80,12 +80,17 @@ export interface Readout {
 export interface Chart {
 	xLabel: string;
 	yLabel: string;
-	x: number[];
+	/**
+	 * One position per value. Numbers for a quantity; text for named things, "Mesh", "SFU", "p99", which
+	 * are drawn as evenly spaced categories in the order given (#113, contract version 4). If any value is
+	 * text, all are read as text.
+	 */
+	x: (number | string)[];
 	series: Series[];
 	xUnit?: string;
 	yUnit?: string;
 	/** A vertical marker with a name: "the knee", "capacity", "p99". */
-	annotations?: { x: number; label: string }[];
+	annotations?: { x: number | string; label: string }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
 	readout?: Readout;

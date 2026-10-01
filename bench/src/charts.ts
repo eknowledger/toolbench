@@ -35,6 +35,8 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "two-bars", caption: "Two bar series, grouped" },
 			{ id: "signed-bars", caption: "Bars either side of zero" },
 			{ id: "zero-bars", caption: "A series of zeros draws nothing, on an axis that does not go below zero" },
+			{ id: "categories", caption: "Named categories: three call topologies, in the order the tool gave them" },
+			{ id: "many-categories", caption: "Twenty-four categories: every third is labelled, and all are in the data table and the readout" },
 		],
 	},
 ];

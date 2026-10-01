@@ -1655,6 +1655,44 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.ok(Math.abs(minus30.height - 3 * minus10.height) < 0.5, "-30 is three times as tall as -10");
 	});
 
+	it("draws named categories in the order given, labelled with their text, from zero (#113)", async () => {
+		const chart = await chartFor("categories");
+		assert.deepEqual(chart.xLabels, ["Mesh", "MCU", "Selective forwarding"]);
+		assert.equal(chart.yLabels[0], "0", "a bar chart's axis starts at zero even when every value is above 30");
+		// Two series, three categories: six bars, the two at each category side by side.
+		assert.equal(chart.bars.length, 6);
+		const centre = (b: { x: number; width: number }) => b.x + b.width / 2;
+		const first = chart.bars.filter((b) => b.series === "tb-s1").map(centre);
+		assert.ok(first[0] !== undefined && first[1] !== undefined && first[2] !== undefined && first[0] < first[1] && first[1] < first[2], "left to right in the given order");
+	});
+
+	it("labels as many categories as fit, and keeps every one in the table and the readout (#113)", async () => {
+		const chart = await chartFor("many-categories");
+		assert.ok(chart.xLabels.length < 24 && chart.xLabels.length >= 6, `${chart.xLabels.length} labels for 24 categories`);
+		assert.equal(chart.xLabels[0], "00:00");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "many-categories" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("End");
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return {
+				title: root?.querySelector(".tb-readout-title")?.textContent ?? "",
+				rows: [...(root?.querySelectorAll(".tb-chart-data tbody th") ?? [])].map((th) => th.textContent),
+			};
+		});
+		assert.equal(read.title, "Hour 23:00");
+		assert.equal(read.rows.length, 24);
+		assert.equal(read.rows[13], "13:00");
+		await page.close();
+	});
+
 	it("puts a bar chart's x labels on bars, not between them", async () => {
 		// The histogram's bins are two apart; any label must name one of them.
 		const page = await browser.newPage();

@@ -49,8 +49,14 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		h: H - PAD.top - PAD.bottom,
 	};
 
-	const leftScale = niceScale(scaleFor(left));
-	const rightScale = right.length > 0 ? niceScale(scaleFor(right)) : undefined;
+	/*
+	 * ⚠️ A bar is measured from zero, so a bar chart's scale always includes it. Without that, values of 32
+	 * and 64 drew on an axis from 30, and the shorter bar read as a sixteenth of the longer.
+	 */
+	const withZero = (scale: Scale, series: Series[]): Scale =>
+		series.some((x) => x.shape === "bar") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
+	const leftScale = niceScale(withZero(scaleFor(left), left));
+	const rightScale = right.length > 0 ? niceScale(withZero(scaleFor(right), right)) : undefined;
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -68,12 +74,21 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * sit inside their own share of the plot. Line and area series keep the tight domain, because a line
 	 * genuinely starts at its first point and padding it would put a gap before the data.
 	 */
-	const xMin = Math.min(...chart.x);
-	const xMax = Math.max(...chart.x);
+	/*
+	 * Categories (#113): text x values are drawn at positions 0, 1, 2 ... in the order given, never sorted,
+	 * and labelled with their text. Everything below works on those positions, so bars, markers, the
+	 * readout and the data table treat a category exactly like a number, and only the labels differ. A
+	 * category is a slot, not a point on a line, so the domain is padded as a bar chart's is.
+	 */
+	const categories = chart.x.some((v) => typeof v === "string") ? chart.x.map(String) : undefined;
+	const xs: number[] = categories ? chart.x.map((_, i) => i) : (chart.x as number[]);
+	const xText = (i: number) => (categories ? (categories[i] ?? "") : format(xs[i] as number));
+	const xMin = Math.min(...xs);
+	const xMax = Math.max(...xs);
 	const bars = chart.series.some((series) => series.shape === "bar");
 	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
-	const slot = chart.x.length > 1 ? (xMax - xMin) / (chart.x.length - 1) : Math.abs(xMax) || 1;
-	const xScale = bars ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
+	const slot = xs.length > 1 ? (xMax - xMin) / (xs.length - 1) : Math.abs(xMax) || 1;
+	const xScale = bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
 
 	const px = (value: number) => plot.x + ((value - xScale.min) / span(xScale)) * plot.w;
 	const py = (value: number, scale: Scale) => plot.y + plot.h - ((value - scale.min) / span(scale)) * plot.h;
@@ -88,10 +103,23 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		marks.push(svg("line", { class: "tb-grid", x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
 		marks.push(svg("text", { class: "tb-tick", x: plot.x - 8, y: y + 4, "text-anchor": "end" }, axisFormat(tick)));
 	}
-	const xTicks = xTicksFor(chart.x, xScale, bars);
+	/*
+	 * Every category is labelled while its slot holds a few characters; past that, every second, third ...
+	 * so labels never collide. A numeric axis keeps its round-value ticks.
+	 */
+	const every = categories ? Math.max(1, Math.ceil(36 / (plot.w / Math.max(1, xs.length)))) : 1;
+	const xTicks = categories ? xs.filter((i) => i % every === 0) : xTicksFor(xs, xScale, bars);
 	const xFormat = formatterFor(xTicks);
+	/*
+	 * A category label is cut to the room its slot has, about six viewBox units a character at this size,
+	 * with the whole text kept in the data table and the readout. Rotated labels were the alternative, and
+	 * slanted text is harder to read than a shortened word.
+	 */
+	const room = Math.max(3, Math.floor(((plot.w / Math.max(1, xs.length)) * every) / 6.2));
+	const cut = (text: string) => (text.length > room ? `${text.slice(0, room - 1)}…` : text);
 	for (const tick of xTicks) {
-		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + 20, "text-anchor": "middle" }, xFormat(tick)));
+		const label = categories ? cut(categories[tick] ?? "") : xFormat(tick);
+		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + 20, "text-anchor": "middle" }, label));
 	}
 	if (rightScale) {
 		const rightTicks = ticks(rightScale);
@@ -105,7 +133,10 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 
 	// Annotations sit under the data: they are context, not the subject.
 	for (const annotation of chart.annotations ?? []) {
-		const x = px(annotation.x);
+		// On a category axis an annotation names its category; on a numeric one, its value.
+		const at = typeof annotation.x === "string" ? (categories?.indexOf(annotation.x) ?? -1) : annotation.x;
+		if (at < 0) continue;
+		const x = px(at);
 		marks.push(svg("line", { class: "tb-annotation", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
 		// Flip the label inward near the right edge, or it runs off the chart — which is exactly
 		// where "you are here" lands when a system is nearly saturated.
@@ -129,7 +160,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	chart.series.forEach((series, index) => {
 		const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
 		const group = { index: barSeries.indexOf(series), count: barSeries.length };
-		marks.push(...drawSeries(series, index, chart.x, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale)));
+		marks.push(...drawSeries(series, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale)));
 	});
 
 	// Axis lines last, so they sit above the gridlines.
@@ -165,8 +196,10 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
 	// The same numbers, for anyone or anything that cannot see the picture.
-	figure.append(dataTable(chart));
+	figure.append(dataTable(chart, xText));
 	attachReadout(figure, picture, chart, {
+		xs,
+		xText,
 		px,
 		py: (s, v) => {
 			const series = chart.series[s];
@@ -285,9 +318,13 @@ function drawSeries(
 	const shape = series.shape ?? "line";
 
 	if (shape === "bar") {
-		const slot = (plot.w / Math.max(1, xs.length)) * 0.7;
+		/*
+		 * Thin bars, with the rest of the slot left as air: each bar is capped at 32 viewBox units, about
+		 * 46px at full width. Three categories used to draw bars 95 units wide, slabs rather than marks.
+		 */
 		const count = Math.max(1, group.count);
-		const width = Math.max(1, slot / count);
+		const width = Math.max(1, Math.min(((plot.w / Math.max(1, xs.length)) * 0.7) / count, 32));
+		const slot = width * count;
 		const offset = -slot / 2 + Math.max(0, group.index) * width;
 		return series.points.flatMap((point, i) => {
 			const x = xs[i];
@@ -405,18 +442,18 @@ function legend(series: Series[]): HTMLElement {
 	);
 }
 
-function dataTable(chart: Chart): HTMLElement {
+function dataTable(chart: Chart, xText: (i: number) => string): HTMLElement {
 	const head = el(
 		"tr",
 		{},
 		el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)),
 		...chart.series.map((s) => el("th", { scope: "col" }, withUnit(s.label, s.unit))),
 	);
-	const rows = chart.x.map((x, i) =>
+	const rows = chart.x.map((_, i) =>
 		el(
 			"tr",
 			{ "data-i": i },
-			el("th", { scope: "row" }, format(x)),
+			el("th", { scope: "row" }, xText(i)),
 			...chart.series.map((s) => {
 				const point = s.points[i];
 				return el("td", {}, point === null || point === undefined ? "—" : format(point));
