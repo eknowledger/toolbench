@@ -83,7 +83,18 @@ const BUDGETS = [
 	 *
 	 * 21_250 left 341 bytes, so this was always going to be the change that spent it.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 22_000 },
+	/*
+	 * Raised from 22_000 to 23_000 in the commit that spent it: 21,686 to 22,573 measured, 887 bytes for
+	 * the 0.7.0 card fixes taken together. The card rebuilt as content with a button in it rather than a
+	 * button around content, the run area without its status line or its Run button under autoRun, the
+	 * themed focus ring, the expand that holds a chart's size, the fallback when the chart chunk cannot
+	 * load, and the two accent tokens.
+	 *
+	 * ⚠️ Each of those branches fitted under 22_000 on its own, and nobody measured them together until CI
+	 * did. Measure the combination before stacking branches, not only the tip: the tip of this release sits
+	 * lower again once the chart styles leave this chunk, which hid the overshoot here.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
