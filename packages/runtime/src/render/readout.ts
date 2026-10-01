@@ -157,7 +157,10 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 			const series = chart.series[row.series];
 			if (!series) continue;
 			const value = series.points[index] as number;
-			const text = series.notes?.[index] ?? `${g.format(value)}${series.unit ? ` ${series.unit}` : ""}`;
+			const unit = series.unit ? ` ${series.unit}` : "";
+			const low = series.shape === "band" ? series.lower?.[index] : undefined;
+			// A band reads as its range, low to high.
+			const text = series.notes?.[index] ?? (low !== undefined && low !== null ? `${g.format(low)} to ${g.format(value)}${unit}` : `${g.format(value)}${unit}`);
 			const strong = el("strong", {});
 			strong.textContent = text;
 			const name = el("span", {});

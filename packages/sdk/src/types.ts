@@ -51,7 +51,13 @@ export interface Series {
 	 * `step` holds each value until the next x, then rises or falls straight to the next: for state sampled
 	 * on events (a buffer's depth, a configured rate), where a sloped line invents a gradual change (#117).
 	 */
-	shape?: "line" | "area" | "bar" | "points" | "step";
+	shape?: "line" | "area" | "bar" | "points" | "step" | "band";
+	/**
+	 * The lower edge of a `band`, one per x, with `points` as the upper edge: a spread such as p5 to p95,
+	 * or a min-to-max envelope, filled between the two under every other series (#119, contract version 4).
+	 * A `null` in either edge breaks the band.
+	 */
+	lower?: (number | null)[];
 	/**
 	 * Draw a marker at each value of a `line` or `area`, so every real point is visible and a series under
 	 * an identical one can still be found. Each series gets its own marker shape. Contract version 4.

@@ -1683,6 +1683,32 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("fills a band beneath the lines, breaks it at a gap, and reads it as a range (#119)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "band" };
+			await host.run();
+			const svg = host.shadowRoot?.querySelector(".tb-plot svg") as SVGSVGElement;
+			const all = [...svg.querySelectorAll("path")];
+			return {
+				bands: svg.querySelectorAll("path.tb-band").length,
+				bandFirst: all.findIndex((p) => p.classList.contains("tb-band")) < all.findIndex((p) => p.classList.contains("tb-line")),
+				heads: [...(host.shadowRoot?.querySelectorAll(".tb-chart-data thead th") ?? [])].map((th) => th.textContent),
+			};
+		});
+		assert.equal(read.bands, 2, "second 7 has no data, so the band is two pieces");
+		assert.ok(read.bandFirst, "the band is drawn beneath the median line");
+		assert.deepEqual(read.heads, ["Second", "Median (ms)", "p5 to p95, low (ms)", "p5 to p95, high (ms)"]);
+		await page.locator("#host >> .tb-plot").focus();
+		const rows = await page.evaluate(() => [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-readout li") ?? [])].map((li) => li.textContent));
+		// Second 1: median 31, spread 4, so 29 to 35.
+		assert.deepEqual(rows, ["31 msMedian", "29 to 35 msp5 to p95"]);
+		await page.close();
+	});
+
 	it("puts powers of ten evenly apart on a log axis, and leaves out what it cannot show (#118)", async () => {
 		const chart = await chartFor("log");
 		assert.deepEqual(chart.yLabels, ["0.1", "1", "10", "100"]);

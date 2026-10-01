@@ -207,12 +207,15 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 */
 	let dropped = 0;
 	let unbarred = 0;
-	chart.series.forEach((series, index) => {
+	// Bands first, so a spread sits beneath every line and mark drawn over it (#119). Order is otherwise kept.
+	const order = [...chart.series.keys()].sort((a, b) => Number(chart.series[b]?.shape === "band") - Number(chart.series[a]?.shape === "band"));
+	for (const index of order) {
+		const series = chart.series[index] as Series;
 		const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
 		const group = { index: slots.indexOf(series.stack ?? series), count: slots.length };
 		if (yLog && series.shape === "bar") {
 			unbarred++;
-			return;
+			continue;
 		}
 		const drawn =
 			yLog || xLog
@@ -226,7 +229,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 					}
 				: series;
 		marks.push(...drawSeries(drawn, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
-	});
+	}
 
 	marks.push(...labelsOnTop);
 
@@ -479,7 +482,7 @@ function barSlots(chart: Chart): (string | Series)[] {
 }
 
 function scaleFor(series: Series[]): Scale {
-	const values = series.flatMap((s) => s.points.filter((p): p is number => p !== null));
+	const values = series.flatMap((s) => [...s.points, ...(s.lower ?? [])].filter((p): p is number => p !== null && p !== undefined));
 	if (values.length === 0) return { min: 0, max: 1 };
 	const min = Math.min(...values);
 	const max = Math.max(...values);
@@ -573,6 +576,36 @@ function drawSeries(
 ): SVGElement[] {
 	const cls = `tb-s${(index % 6) + 1}`;
 	const shape = series.shape ?? "line";
+
+	/*
+	 * A band (#119): the region between `lower` and `points`, one closed path per unbroken run, so a null in
+	 * either edge leaves a gap rather than a fill across it.
+	 */
+	if (shape === "band") {
+		const runs: string[] = [];
+		let top: [number, number][] = [];
+		let bottom: [number, number][] = [];
+		const close = () => {
+			if (top.length > 1) {
+				const path = [...top, ...bottom.reverse()].map(([x, y], k) => `${k === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`).join("");
+				runs.push(`${path}Z`);
+			}
+			top = [];
+			bottom = [];
+		};
+		series.points.forEach((high, i) => {
+			const low = series.lower?.[i];
+			const x = xs[i];
+			if (high === null || low === null || low === undefined || x === undefined || !Number.isFinite(py(high)) || !Number.isFinite(py(low))) {
+				close();
+				return;
+			}
+			top.push([px(x), py(high)]);
+			bottom.push([px(x), py(low)]);
+		});
+		close();
+		return runs.map((d) => svg("path", { class: `tb-band ${cls}`, d }));
+	}
 
 	if (shape === "bar") {
 		/*
@@ -687,6 +720,7 @@ function markerPath(index: number, x: number, y: number): string {
 
 /** A series' key: its marker where it has markers, otherwise a stroke of its colour. Shared by the legend and the readout. */
 function keyFor(s: Series, i: number): HTMLElement {
+	if (s.shape === "band") return el("span", { class: `tb-swatch-band tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	return s.shape === "points" || s.markers === true
 		? el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": String(i % 6), "aria-hidden": "true" })
 		: el("span", { class: `tb-swatch tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
@@ -717,7 +751,11 @@ function dataTable(chart: Chart, xText: (i: number) => string, note?: string): H
 		"tr",
 		{},
 		el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)),
-		...chart.series.map((s) => el("th", { scope: "col" }, withUnit(s.label, s.unit))),
+		...chart.series.flatMap((s) =>
+			s.shape === "band"
+				? [el("th", { scope: "col" }, withUnit(`${s.label}, low`, s.unit)), el("th", { scope: "col" }, withUnit(`${s.label}, high`, s.unit))]
+				: [el("th", { scope: "col" }, withUnit(s.label, s.unit))],
+		),
 		...stacks.map((id) => el("th", { scope: "col" }, stacks.length > 1 ? `Total, ${id}` : "Total")),
 	);
 	const rows = chart.x.map((_, i) =>
@@ -725,9 +763,9 @@ function dataTable(chart: Chart, xText: (i: number) => string, note?: string): H
 			"tr",
 			{ "data-i": i },
 			el("th", { scope: "row" }, xText(i)),
-			...chart.series.map((s) => {
-				const point = s.points[i];
-				return el("td", {}, point === null || point === undefined ? "—" : format(point));
+			...chart.series.flatMap((s) => {
+				const cell = (v: number | null | undefined) => el("td", {}, v === null || v === undefined ? "—" : format(v));
+				return s.shape === "band" ? [cell(s.lower?.[i]), cell(s.points[i])] : [cell(s.points[i])];
 			}),
 			...stacks.map((id) => el("td", {}, format(totalOf(id, i)))),
 		),

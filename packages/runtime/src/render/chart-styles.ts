@@ -49,6 +49,9 @@ export const CHART_STYLES = /* css */ `
 .tb-s6 { --c: var(--tb-s6); }
 .tb-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
+/* A band (#119): a quiet fill, drawn first, so the lines over it carry the emphasis. */
+.tb-band { stroke: none; fill: var(--c); opacity: 0.22; }
+.tb-swatch-band { width: 0.75rem; height: 0.6rem; border-radius: 2px; flex: none; background: var(--c, currentColor); opacity: 0.45; }
 /* Opaque, so a bar is the colour its legend swatch says it is. */
 .tb-bar  { stroke: none; fill: var(--c); }
 /* A surface-coloured edge between stacked segments, so neighbouring parts never merge into one bar. */

@@ -276,6 +276,31 @@ export default {
 						series: [{ label: "Errors", markers: true, points: [12, 0, 150, 1200, 40] }],
 					},
 				};
+			case "band": {
+				// Illustrative arrival delay per second: the median, inside its p5 to p95 spread. Second 7 is missing.
+				const seconds = frames.slice(0, 12);
+				const median = [31, 32, 30, 34, 38, 36, null, 33, 31, 45, 52, 40];
+				const spread = [4, 5, 4, 7, 12, 9, null, 6, 5, 18, 26, 14];
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Arrival delay",
+						yUnit: "ms",
+						x: seconds,
+						series: [
+							{ label: "Median", unit: "ms", markers: true, points: median },
+							{
+								label: "p5 to p95",
+								unit: "ms",
+								shape: "band",
+								points: median.map((m, i) => (m === null ? null : m + (spread[i] as number))),
+								lower: median.map((m, i) => (m === null ? null : Math.max(0, m - (spread[i] as number) / 2))),
+							},
+						],
+					},
+				};
+			}
 			case "two-bars":
 				return {
 					kind: "series",
