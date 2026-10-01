@@ -1,5 +1,82 @@
 # @toolbench/sdk
 
+## 0.7.0
+
+### Minor Changes
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: bands.** ([#119](https://github.com/eknowledger/toolbench/issues/119)) `shape: "band"` with a `lower` edge fills the range between two edges, a p5 to p95 spread around a median say, beneath every other series. The readout reads it as "29 to 35 ms", and the data table shows both edges.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: box plots.** ([#122](https://github.com/eknowledger/toolbench/issues/122)) `shape: "box"` with a `boxes` summary per x draws whiskers, the quartile box, the median and outliers, grouped like bars. The tool computes the summary, so the whiskers mean what the tool says; the readout and the data table list all five numbers.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: bubble charts.** ([#127](https://github.com/eknowledger/toolbench/issues/127)) `sizes` on a points series draws a third measure as each bubble's area, scaled across the whole chart, with a key of reference sizes, the size in the readout and a size column in the data table.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: named categories on a chart's x axis.** ([#113](https://github.com/eknowledger/toolbench/issues/113))
+
+  `x: ["Mesh", "MCU", "SFU"]` draws one evenly spaced slot per name, in the order given, labelled with the text. When the labels would collide, every second or third is shown; all of them are in the data table and the readout.
+
+  - **Fixed:** a bar chart's axis always starts at zero, so a bar's length is its value.
+  - **Fixed:** bars are capped in thickness, so a chart of a few categories draws bars rather than slabs.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: exploded pie and donut slices.** ([#126](https://github.com/eknowledger/toolbench/issues/126)) `explode: true` on a slice pulls it out a little along its middle, to point at the one part the text is about. Its share is unchanged.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: heatmaps.** ([#121](https://github.com/eknowledger/toolbench/issues/121)) A `heatmap` output draws a value over two dimensions as coloured cells, sequential (one hue) or diverging (two hues around a midpoint), with a key, hatched cells where there is no value, and a readout the arrow keys move through. Its code is fetched only by pages that draw one; theme the colours with `--tb-heat-lo`, `--tb-heat-hi`, `--tb-heat-neg`, `--tb-heat-mid` and `--tb-heat-pos`.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: horizontal bars.** ([#116](https://github.com/eknowledger/toolbench/issues/116))
+
+  `orientation: "horizontal"` draws one row per category with its bars growing rightward, so long names sit beside their bars. Grouping, stacking, thresholds (as vertical rules), the readout and the data table all work the same way; the chart grows taller with its rows.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: log scales.** ([#118](https://github.com/eknowledger/toolbench/issues/118)) `yScale: "log"` and `xScale: "log"` draw an axis in powers of ten (0.1, 1, 10, 100, 1k), for values spanning orders of magnitude. Values a log axis cannot show (zero, negatives) are left out with a note in the data table, and bars are not drawn on a log y axis.
+
+- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: chart markers, for data over separate items.** ([#111](https://github.com/eknowledger/toolbench/issues/111))
+
+  - `markers: true` on a `line` or `area` series draws a marker at every point; `shape: "points"` draws the points with no line between them.
+  - Each series gets its own marker shape as well as its colour, so series with equal values stay distinguishable, and the legend keys each one by its marker.
+
+  Contract version 4. A tool uses these with `"sdk": 4`; existing tools are unaffected.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: mirrored horizontal bars, for pyramids and back-to-back comparisons.** ([#125](https://github.com/eknowledger/toolbench/issues/125)) `mirror: true` on a horizontal chart draws negative values to the left and labels every number, on the axis, in the readout and in the table, as its magnitude.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: pie and donut charts.** ([#123](https://github.com/eknowledger/toolbench/issues/123)) A `pie` output draws parts of a whole in the order given, from 12 o'clock clockwise, every slice labelled with its share. More than six parts fold into "Other", a negative or zero total draws a message instead, and `donut: true` shows the total in the centre. Its code is fetched only by pages that draw one.
+
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: radar charts.** ([#128](https://github.com/eknowledger/toolbench/issues/128)) A `radar` output draws a profile across several measures, one spoke each from 12 o'clock, on a shared scale from zero or each axis's own maximum, with round-valued rings, markers on every vertex and a readout that steps spoke by spoke.
+
+- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: charts read out their values on hover and from the keyboard.** ([#112](https://github.com/eknowledger/toolbench/issues/112))
+
+  - Pointing at a chart snaps to the nearest x, draws a crosshair and shows a card of every series' value there. Tab to a chart and the arrow keys step through it, with each card read out to screen readers.
+  - A tool can say what a point means: `readout.titles` for a heading per x, `series.notes` for the text of one value, `readout.mode` and `readout.crosshair` to shape or turn it off.
+  - Whole numbers now print without decimals in charts and their data tables: frame 6, not 6.00.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: scatter plots.** ([#120](https://github.com/eknowledger/toolbench/issues/120)) A series can carry its own `x` values, so measurements that share no x positions plot together. The readout snaps to the nearest point, with both crosshair lines, and the keyboard steps through the points left to right; the data table lists one row per point.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: stacked bars.** ([#115](https://github.com/eknowledger/toolbench/issues/115))
+
+  Bar series with the same `stack` id are drawn as one bar of parts at each x, so a reader sees each part and the total: a delay budget stage by stage, traffic by protocol. Negative values stack below zero, plain bar series sit beside the stack, and the data table adds a total per stack.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: step lines.** ([#117](https://github.com/eknowledger/toolbench/issues/117)) `shape: "step"` draws a value that holds until it changes, a buffer depth or a configured rate, as flat runs joined by straight risers instead of slopes.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: threshold lines on a chart.** ([#114](https://github.com/eknowledger/toolbench/issues/114))
+
+  `thresholds: [{ y: 150, label: "150 ms budget", tone: "warn" }]` draws a labelled, dashed rule across the plot at that value. The scale widens to include it, and it stays out of the legend, the data table and the readout, because it is a limit rather than a measurement.
+
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: treemaps.** ([#129](https://github.com/eknowledger/toolbench/issues/129)) A `treemap` output draws a hierarchy of sizes as nested rectangles, squarified so they compare, groups in their own hue, labels where they fit and every node in the readout and the data table.
+
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Venn diagrams for two or three sets.** ([#130](https://github.com/eknowledger/toolbench/issues/130)) Two sets are drawn with exact areas; three are placed as closely as circles allow, with every region labelled by its count and the caption saying the areas are approximate. More sets, or numbers that cannot be true, draw a message.
+
+- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: link a chart to its tables.** ([#124](https://github.com/eknowledger/toolbench/issues/124))
+
+  - `readout.highlightTable: true` highlights the chart's own data-table row as the reader points along the chart.
+  - A `table` part with `link: { chart, keys }` is linked to the chart with that `id`: pointing at the chart lights the matching rows, and pointing at a row moves the chart's readout there.
+
+- [#137](https://github.com/eknowledger/toolbench/pull/137) [`3027d43`](https://github.com/eknowledger/toolbench/commit/3027d430e92ef15ecf1bef1d1bfbb937da911ad8) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a manifest key in the wrong object is refused, with where it belongs, instead of silently ignored.** ([#87](https://github.com/eknowledger/toolbench/issues/87)) `timeoutMs` inside `runtime`, `thread` at the top level, or `autoRun` inside an input now fail validation with a message naming the right place.
+
+  ⚠️ Heads-up: a manifest that relied on a misplaced key being ignored will now fail to validate. Unknown keys are still ignored.
+
+- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a slider for number inputs.** ([#102](https://github.com/eknowledger/toolbench/issues/102))
+
+  `"control": "slider"` on a number input draws a range control beside its number box, so a reader can sweep a value and watch the answer follow (with `autoRun`). The box stays editable for exact values, and the slider honours `min`, `max` and `step`.
+
+  Contract version 4. A tool uses it with `"sdk": 4`; a runtime that predates it shows the number box alone.
+
 ## 0.6.0
 
 ### Minor Changes
