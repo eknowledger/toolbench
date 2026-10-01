@@ -10,7 +10,7 @@
     "build": "pnpm -r --filter \"./packages/*\" run build",
     "test": "node --test \"packages/**/*.test.ts\" \"tools/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "new-tool": "node scripts/new-tool.mjs",
-    "typecheck": "tsc -b packages/sdk packages/runtime && tsc --noEmit -p tools/tsconfig.json",
+    "typecheck": "tsc -b packages/sdk packages/runtime && tsc --noEmit -p tools/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
     "bench": "pnpm --filter @toolbench/bench dev",
     "bench:build": "pnpm --filter @toolbench/bench build",
     "check": "pnpm typecheck && pnpm test",
