@@ -1683,6 +1683,33 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("stacks parts end to end, either side of zero, beside a bar that is not stacked (#115)", async () => {
+		// A: 5 then 2 on top (0 to 5, 5 to 7). B: -3 then -4 below (0 to -3, -3 to -7). "Alone" is 4 at both.
+		const chart = await chartFor("stacked-signed");
+		const at = (series: string, i: number) => chart.bars.filter((b) => b.series === series)[i];
+		const [a1, a2, b1, b2, alone] = [at("tb-s1", 0), at("tb-s2", 0), at("tb-s1", 1), at("tb-s2", 1), at("tb-s3", 0)];
+		assert.ok(a1 && a2 && b1 && b2 && alone);
+		assert.ok(Math.abs(a2.y + a2.height - a1.y) < 0.5, "the second part starts where the first ends");
+		assert.ok(Math.abs(a1.height / a2.height - 5 / 2) < 0.05, "heights in the ratio of the values, 5 to 2");
+		assert.ok(Math.abs(b2.y - (b1.y + b1.height)) < 0.5, "below zero, the second part continues downward");
+		assert.equal(a1.x, a2.x, "a stack is one bar");
+		assert.ok(alone.x >= a1.x + a1.width - 0.01, "the unstacked bar sits beside the stack, not on it");
+		await (async () => {
+			const page = await browser.newPage();
+			await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+			await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+			const totals = await page.evaluate(async () => {
+				const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+				host.values = { case: "stacked-signed" };
+				await host.run();
+				const table = host.shadowRoot?.querySelector(".tb-chart-data table");
+				return [...(table?.querySelectorAll("tbody tr") ?? [])].map((tr) => tr.lastElementChild?.textContent);
+			});
+			assert.deepEqual(totals, ["7", "-7"], "the data table carries each stack's total");
+			await page.close();
+		})();
+	});
+
 	it("draws named categories in the order given, labelled with their text, from zero (#113)", async () => {
 		const chart = await chartFor("categories");
 		assert.deepEqual(chart.xLabels, ["Mesh", "MCU", "Selective forwarding"]);

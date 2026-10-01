@@ -54,6 +54,12 @@ export interface Series {
 	 * an identical one can still be found. Each series gets its own marker shape. Contract version 4.
 	 */
 	markers?: boolean;
+	/**
+	 * Bar series sharing a `stack` id are stacked at each x, in series order, bottom to top, so a reader
+	 * sees each part and the total (#115, contract version 4). Positive and negative values stack away from
+	 * zero separately. Bar series without one are grouped beside the stack as before.
+	 */
+	stack?: string;
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,

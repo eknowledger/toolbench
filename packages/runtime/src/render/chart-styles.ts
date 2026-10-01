@@ -51,6 +51,8 @@ export const CHART_STYLES = /* css */ `
 .tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
 /* Opaque, so a bar is the colour its legend swatch says it is. */
 .tb-bar  { stroke: none; fill: var(--c); }
+/* A surface-coloured edge between stacked segments, so neighbouring parts never merge into one bar. */
+.tb-bar[data-stacked] { stroke: var(--tb-bg); stroke-width: 1.5; }
 .tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }

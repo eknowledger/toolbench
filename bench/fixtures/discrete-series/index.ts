@@ -154,6 +154,41 @@ export default {
 						series: [{ label: "Delay", unit: "ms", markers: true, points: [120, 135, 128, 160, 190, 142, 138, 210, 175, 131, 126, 148] }],
 					},
 				};
+			case "stacked": {
+				// An illustrative delay budget per path, stage by stage, against a 150 ms line.
+				const stage = (label: string, points: number[]): Series => ({ label, unit: "ms", shape: "bar", stack: "budget", points });
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Path",
+						yLabel: "Delay",
+						yUnit: "ms",
+						x: ["Same city", "Across a continent", "Through a relay"],
+						thresholds: [{ y: 150, label: "150 ms", tone: "warn" }],
+						series: [
+							stage("Capture and encode", [25, 25, 25]),
+							stage("Network", [10, 70, 95]),
+							stage("Jitter buffer", [40, 40, 60]),
+							stage("Decode and play", [15, 15, 15]),
+						],
+					},
+				};
+			}
+			case "stacked-signed":
+				// Two parts stacked either side of zero, and a plain bar beside the stack at each x.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Case",
+						yLabel: "Value",
+						x: ["A", "B"],
+						series: [
+							{ label: "Part one", shape: "bar", stack: "s", points: [5, -3] },
+							{ label: "Part two", shape: "bar", stack: "s", points: [2, -4] },
+							{ label: "Alone", shape: "bar", points: [4, 4] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

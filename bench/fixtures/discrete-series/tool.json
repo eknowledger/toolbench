@@ -29,7 +29,9 @@
 				{ "value": "linked", "label": "A chart linked to a table" },
 				{ "value": "categories", "label": "Bars over named categories" },
 				{ "value": "many-categories", "label": "Twenty-four categories" },
-				{ "value": "thresholds", "label": "A line against two thresholds" }
+				{ "value": "thresholds", "label": "A line against two thresholds" },
+				{ "value": "stacked", "label": "Stacked bars against a budget" },
+				{ "value": "stacked-signed", "label": "A stack either side of zero, beside a plain bar" }
 			]
 		}
 	]

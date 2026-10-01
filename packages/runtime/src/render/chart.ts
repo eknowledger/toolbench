@@ -60,8 +60,39 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		const ys = (chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y);
 		return ys.length === 0 ? scale : { min: Math.min(scale.min, ...ys), max: Math.max(scale.max, ...ys) };
 	};
-	const leftScale = niceScale(reach(withZero(scaleFor(left), left), "left"));
-	const rightScale = right.length > 0 ? niceScale(reach(withZero(scaleFor(right), right), "right")) : undefined;
+	/*
+	 * Stacks (#115). Each stacked bar series gets, per x, the value range it covers: its positive values
+	 * piled up from zero after the series before it in the stack, its negative ones piled down. The scale
+	 * then has to reach the stack totals rather than any one series' values.
+	 */
+	const ranges = new Map<Series, ({ from: number; to: number } | null)[]>();
+	const stackTotals: number[] = [];
+	const stackIds = [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
+	for (const id of stackIds) {
+		const members = chart.series.filter((s) => s.shape === "bar" && s.stack === id);
+		const up = chart.x.map(() => 0);
+		const down = chart.x.map(() => 0);
+		for (const member of members) {
+			ranges.set(
+				member,
+				member.points.map((value, i) => {
+					if (value === null) return null;
+					const base = value >= 0 ? (up[i] as number) : (down[i] as number);
+					const top = base + value;
+					if (value >= 0) up[i] = top;
+					else down[i] = top;
+					return { from: base, to: top };
+				}),
+			);
+		}
+		stackTotals.push(...up, ...down);
+	}
+	const withStacks = (scale: Scale, series: Series[]): Scale =>
+		stackTotals.length === 0 || !series.some((s) => s.stack !== undefined)
+			? scale
+			: { min: Math.min(scale.min, ...stackTotals), max: Math.max(scale.max, ...stackTotals) };
+	const leftScale = niceScale(reach(withStacks(withZero(scaleFor(left), left), left), "left"));
+	const rightScale = right.length > 0 ? niceScale(reach(withStacks(withZero(scaleFor(right), right), right), "right")) : undefined;
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -182,11 +213,17 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * legend does not show: violet over teal read as a light cyan in the dark theme. Splitting the slot
 	 * puts series i of k in the i-th of k sub-slots.
 	 */
-	const barSeries = chart.series.filter((series) => series.shape === "bar");
+	// One sub-slot per stack and per unstacked bar series: a stack is one bar made of parts.
+	const slots: (string | Series)[] = [];
+	for (const series of chart.series) {
+		if (series.shape !== "bar") continue;
+		const key = series.stack ?? series;
+		if (!slots.includes(key)) slots.push(key);
+	}
 	chart.series.forEach((series, index) => {
 		const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
-		const group = { index: barSeries.indexOf(series), count: barSeries.length };
-		marks.push(...drawSeries(series, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale)));
+		const group = { index: slots.indexOf(series.stack ?? series), count: slots.length };
+		marks.push(...drawSeries(series, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
 	});
 
 	marks.push(...labelsOnTop);
@@ -341,6 +378,7 @@ function drawSeries(
 	plot: { x: number; y: number; w: number; h: number },
 	group: { index: number; count: number },
 	zero: number,
+	stacked?: ({ from: number; to: number } | null)[],
 ): SVGElement[] {
 	const cls = `tb-s${(index % 6) + 1}`;
 	const shape = series.shape ?? "line";
@@ -362,15 +400,18 @@ function drawSeries(
 			 * edge, which is only zero when the scale starts there: on a scale from -40 to 40 a bar of 10 was
 			 * drawn 50 tall, and a bar of -10 pointed down from -10 instead of up to zero.
 			 */
-			const y = py(point);
+			const range = stacked?.[i];
+			const y = py(range ? range.to : point);
+			const base = range ? py(range.from) : zero;
 			return [
 				svg("rect", {
 					class: `tb-bar ${cls}`,
 					"data-i": i,
+					...(stacked ? { "data-stacked": "" } : {}),
 					x: px(x) + offset,
-					y: Math.min(y, zero),
+					y: Math.min(y, base),
 					width,
-					height: Math.abs(zero - y),
+					height: Math.abs(base - y),
 				}),
 			];
 		});
@@ -471,11 +512,16 @@ function legend(series: Series[]): HTMLElement {
 }
 
 function dataTable(chart: Chart, xText: (i: number) => string): HTMLElement {
+	// A stack's total is a number the chart shows and no series holds, so the table gives it a column (#115).
+	const stacks = [...new Set(chart.series.filter((s) => s.shape === "bar" && s.stack !== undefined).map((s) => s.stack as string))];
+	const totalOf = (id: string, i: number) =>
+		chart.series.filter((s) => s.shape === "bar" && s.stack === id).reduce((sum, s) => sum + (s.points[i] ?? 0), 0);
 	const head = el(
 		"tr",
 		{},
 		el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)),
 		...chart.series.map((s) => el("th", { scope: "col" }, withUnit(s.label, s.unit))),
+		...stacks.map((id) => el("th", { scope: "col" }, stacks.length > 1 ? `Total, ${id}` : "Total")),
 	);
 	const rows = chart.x.map((_, i) =>
 		el(
@@ -486,6 +532,7 @@ function dataTable(chart: Chart, xText: (i: number) => string): HTMLElement {
 				const point = s.points[i];
 				return el("td", {}, point === null || point === undefined ? "—" : format(point));
 			}),
+			...stacks.map((id) => el("td", {}, format(totalOf(id, i)))),
 		),
 	);
 	return el(
