@@ -219,6 +219,21 @@ const BUDGETS = [
 	{ label: "bench fixture: json-code", pattern: /^tool-json-code-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	{ label: "bench fixture: stress", pattern: /^tool-stress-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	/*
+	 * Lines that #86's check found missing: chunks the build emitted and nothing measured. utf8-bytes is a real
+	 * example tool, so a reader of it pays for it; the rest are bench fixtures and bench pages, which no reader
+	 * of a consumer's site downloads. Budgets sit just above what each measured.
+	 */
+	{ label: "tool: utf8-bytes", pattern: /^tool-utf8-bytes-[^/]+\.js$/, budget: 1_000 },
+	{ label: "bench fixture: deprecated", pattern: /^tool-deprecated-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "bench fixture: retired", pattern: /^tool-retired-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "bench fixture: slider", pattern: /^tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "bench fixture: discrete-series", pattern: /^tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
+	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
+	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
+	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
+	{ label: "bench source links", pattern: /^source-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	/*
 	 * The worker's own copies. Vite builds the worker in a separate Rollup pass, so every tool
 	 * reachable from it is emitted twice. A reader downloads one copy (a tool declares one thread);
 	 * the second copy costs deploy bytes only. Tracked so it stays a known cost rather than a
@@ -230,6 +245,11 @@ const BUDGETS = [
 	{ label: "worker copy: histogram", pattern: /^worker-tool-histogram-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: json-code", pattern: /^worker-tool-json-code-[^/]+\.js$/, budget: 2_000, deployOnly: true },
 	{ label: "worker copy: bench fixture stress", pattern: /^worker-tool-stress-[^/]+\.js$/, budget: 2_000, deployOnly: true },
+	{ label: "worker copy: utf8-bytes", pattern: /^worker-tool-utf8-bytes-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture deprecated", pattern: /^worker-tool-deprecated-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture retired", pattern: /^worker-tool-retired-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture slider", pattern: /^worker-tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture discrete-series", pattern: /^worker-tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 ];
 
 let files;
@@ -257,6 +277,25 @@ for (const { label, pattern, budget, deployOnly } of BUDGETS) {
 	const over = size > budget;
 	if (over) failed++;
 	rows.push({ label, size, budget, over, deployOnly });
+}
+
+/*
+ * ⚠️ Every built asset must be claimed by a budget line (#86).
+ *
+ * The loop above only looks at files a pattern matches, so a new chunk nobody wrote a line for was never
+ * measured, and the run stayed green: regex-explainer arrived as the largest tool in the repository and
+ * was invisible, and the same mistake had happened twice before. Anything left over now fails the run,
+ * which turns "remember to add a line" into something CI does. Source maps are not shipped to a reader,
+ * so they are the one exclusion, by name rather than by silence.
+ */
+const UNMEASURED = [/\.map$/];
+const claimed = new Set(BUDGETS.flatMap(({ pattern }) => files.filter((f) => pattern.test(f))));
+const unclaimed = files.filter((f) => !claimed.has(f) && !UNMEASURED.some((p) => p.test(f)));
+for (const file of unclaimed) {
+	console.error(
+		`✗ ${file}: no budget line measures this file. Add one to BUDGETS in scripts/size-check.mjs, and decide whether a reader downloads it (reader cost) or only the bench does (deployOnly: true).`,
+	);
+	failed++;
 }
 
 const width = Math.max(...rows.map((r) => r.label.length));
