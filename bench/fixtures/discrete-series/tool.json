@@ -43,6 +43,7 @@
 				{ "value": "log-zero", "label": "A log axis given a zero" },
 				{ "value": "band", "label": "A median inside a p5 to p95 band" },
 				{ "value": "scatter", "label": "Two series with their own x" },
+				{ "value": "bubble", "label": "Bubbles: a third measure as size" },
 				{ "value": "box", "label": "Box plots per network, two series" },
 				{ "value": "heatmap", "label": "A heatmap, sequential" },
 				{ "value": "heatmap-diverging", "label": "A heatmap, diverging around zero" },

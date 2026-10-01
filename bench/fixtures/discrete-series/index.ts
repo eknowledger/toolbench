@@ -490,6 +490,24 @@ export default {
 						],
 					},
 				};
+			case "bubble":
+				// Illustrative: loss against p95 delay per region, each bubble's area its share of calls.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Loss",
+						xUnit: "%",
+						yLabel: "p95 delay",
+						yUnit: "ms",
+						x: [],
+						series: [
+							{ label: "Europe", unit: "ms", shape: "points", sizeLabel: "Calls", x: [0.4], points: [120], sizes: [4000] },
+							{ label: "Americas", unit: "ms", shape: "points", sizeLabel: "Calls", x: [0.7], points: [160], sizes: [9000] },
+							{ label: "Asia Pacific", unit: "ms", shape: "points", sizeLabel: "Calls", x: [1.6], points: [210], sizes: [6000] },
+							{ label: "Africa", unit: "ms", shape: "points", sizeLabel: "Calls", x: [2.4], points: [260], sizes: [1000] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

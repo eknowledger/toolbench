@@ -116,7 +116,14 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
 	const slot = xs.length > 1 ? (xMax - xMin) / (xs.length - 1) : Math.abs(xMax) || 1;
 	const xLog = chart.xScale === "log" && !categories;
-	const xScale: Scale = xLog ? logScale(allX) : bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
+	// Bubbles need room at the ends: the largest is 24 units in radius, so the x scale is padded by about 6%.
+	const bubbleMax = largestSize(chart);
+	const bubblePad = bubbleMax > 0 ? (xMax - xMin || 1) * 0.06 : 0;
+	const xScale: Scale = xLog
+		? logScale(allX)
+		: bars || categories
+			? { min: xMin - slot / 2, max: xMax + slot / 2 }
+			: { min: xMin - bubblePad, max: xMax + bubblePad };
 
 	const px = (value: number) => plot.x + along(value, xScale) * plot.w;
 	const py = (value: number, scale: Scale) => plot.y + plot.h - along(value, scale) * plot.h;
@@ -234,7 +241,9 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 						}),
 					}
 				: series;
-		marks.push(...drawSeries(drawn, index, scatter && series.x ? series.x : xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
+		marks.push(
+			...drawSeries(drawn, index, scatter && series.x ? series.x : xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series), bubbleMax),
+		);
 	}
 
 	marks.push(...labelsOnTop);
@@ -285,6 +294,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	figure.append(el("div", { class: "tb-plot" }, picture));
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
+	const sizes = sizeKey(chart);
+	if (sizes) figure.append(sizes);
 	// The same numbers, for anyone or anything that cannot see the picture.
 	const notes = [
 		dropped > 0 ? `${dropped} value${dropped === 1 ? "" : "s"} at or below zero not drawn on a log axis` : "",
@@ -330,11 +341,27 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
  * A scatter's data, one row per point, since its series share no x to align on (#120): series, x, y.
  */
 function scatterTable(chart: Chart): HTMLElement {
-	const head = el("tr", {}, el("th", { scope: "col" }, "Series"), el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)), el("th", { scope: "col" }, withUnit(chart.yLabel, chart.yUnit)));
+	const sized = chart.series.find((s) => s.sizes);
+	const head = el(
+		"tr",
+		{},
+		el("th", { scope: "col" }, "Series"),
+		el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)),
+		el("th", { scope: "col" }, withUnit(chart.yLabel, chart.yUnit)),
+		sized ? el("th", { scope: "col" }, sized.sizeLabel ?? "Size") : null,
+	);
 	const rows = chart.series.flatMap((series) =>
 		series.points.map((y, i) => {
 			const x = (series.x ?? chart.x)[i];
-			return el("tr", {}, el("th", { scope: "row" }, series.label), el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")), el("td", {}, y === null ? "—" : format(y)));
+			const size = series.sizes?.[i];
+			return el(
+				"tr",
+				{},
+				el("th", { scope: "row" }, series.label),
+				el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")),
+				el("td", {}, y === null ? "—" : format(y)),
+				sized ? el("td", {}, size === null || size === undefined ? "—" : format(size)) : null,
+			);
 		}),
 	);
 	return el(
@@ -636,6 +663,8 @@ function drawSeries(
 	group: { index: number; count: number },
 	zero: number,
 	stacked?: ({ from: number; to: number } | null)[],
+	// ⚠️ The largest size in the whole chart, not in this series: per series, every one-point series drew the same size.
+	bubbleMax = 0,
 ): SVGElement[] {
 	const cls = `tb-s${(index % 6) + 1}`;
 	const shape = series.shape ?? "line";
@@ -779,6 +808,23 @@ function drawSeries(
 	 * series agreeing on frames 1 to 4 showed only the last one's triangles. Outlines nest instead, so a
 	 * circle inside a diamond inside a triangle reads as three series that agree.
 	 */
+	/*
+	 * Bubbles (#127): a circle per point whose AREA is proportional to its size, the largest 24 units across
+	 * in radius. Drawn largest first, so a small one in front of a large one stays findable, each with a
+	 * surface ring where they overlap.
+	 */
+	if (series.sizes && shape === "points") {
+		const largest = bubbleMax;
+		const order = series.points.map((_, i) => i).sort((a, b) => (series.sizes?.[b] ?? 0) - (series.sizes?.[a] ?? 0));
+		for (const i of order) {
+			const point = series.points[i];
+			const size = series.sizes[i];
+			const x = xs[i];
+			if (point === null || point === undefined || size === null || size === undefined || size <= 0 || x === undefined || largest === 0) continue;
+			marks.push(svg("circle", { class: `tb-bubble ${cls}`, "data-i": i, "data-s": index, cx: px(x), cy: py(point), r: bubbleRadius(size, largest) }));
+		}
+		return marks;
+	}
 	if (dots) {
 		series.points.forEach((point, i) => {
 			const x = xs[i];
@@ -787,6 +833,40 @@ function drawSeries(
 		});
 	}
 	return marks;
+}
+
+/** The largest bubble size anywhere in the chart, which every bubble and the key are scaled against. */
+function largestSize(chart: Chart): number {
+	return Math.max(0, ...chart.series.flatMap((s) => (s.shape === "points" ? (s.sizes ?? []) : [])).filter((v): v is number => v !== null && v > 0));
+}
+
+/** A bubble's radius: area proportional to size, so radius goes as its square root. Never under 3 units. */
+function bubbleRadius(size: number, largest: number): number {
+	return Math.max(3, Math.sqrt(size / largest) * 24);
+}
+
+/**
+ * The size key for bubbles (#127): three reference circles and their values, since size has no axis. Its
+ * own small SVG at the chart's scale (160 of the chart's 640 units is a quarter of its width), so a key
+ * circle is the same size as a bubble of that value.
+ */
+function sizeKey(chart: Chart): HTMLElement | null {
+	const sized = chart.series.find((s) => s.sizes && s.shape === "points");
+	if (!sized?.sizes) return null;
+	const largest = largestSize(chart);
+	if (largest === 0) return null;
+	const refs = [largest, largest / 4, largest / 16].map((v) => Number(v.toPrecision(2)));
+	const marks: SVGElement[] = [];
+	let x = 30;
+	for (const v of refs) {
+		const r = bubbleRadius(v, largest);
+		marks.push(svg("circle", { class: "tb-size-ref", cx: x, cy: 52 - r, r }));
+		marks.push(svg("text", { class: "tb-tick", x, y: 64, "text-anchor": "middle" }, format(v)));
+		x += 2 * r + 22;
+	}
+	const title = el("p", { class: "tb-size-title" });
+	title.textContent = sized.sizeLabel ?? "Size";
+	return el("div", { class: "tb-size-key" }, title, svg("svg", { viewBox: "0 0 160 68", "aria-hidden": "true" }, ...marks));
 }
 
 /** Six marker shapes, in series order, each about 8 units across: circle, diamond, triangle, square, down-triangle, cross. */
@@ -811,6 +891,7 @@ function markerPath(index: number, x: number, y: number): string {
 
 /** A series' key: its marker where it has markers, otherwise a stroke of its colour. Shared by the legend and the readout. */
 function keyFor(s: Series, i: number): HTMLElement {
+	if (s.sizes && s.shape === "points") return el("span", { class: `tb-swatch-marker tb-s${(i % 6) + 1}`, "data-marker": "0", "aria-hidden": "true" });
 	if (s.shape === "box") return el("span", { class: `tb-swatch-box tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	if (s.shape === "band") return el("span", { class: `tb-swatch-band tb-s${(i % 6) + 1}`, "aria-hidden": "true" });
 	return s.shape === "points" || s.markers === true

@@ -326,7 +326,9 @@ export function attachScatterReadout(figure: HTMLElement, plotSvg: SVGSVGElement
 			mark.classList.toggle("tb-hot", Number(mark.getAttribute("data-s")) === p.series && Number(mark.getAttribute("data-i")) === p.index);
 		}
 		const title = `${chart.xLabel} ${g.format(p.x)}${chart.xUnit ? ` ${chart.xUnit}` : ""}`;
-		const text = series?.notes?.[p.index] ?? `${g.format(p.y)}${series?.unit ? ` ${series.unit}` : ""}`;
+		const size = series?.sizes?.[p.index];
+		const sized = size !== null && size !== undefined ? `, ${series?.sizeLabel ?? "size"} ${g.format(size)}` : "";
+		const text = series?.notes?.[p.index] ?? `${g.format(p.y)}${series?.unit ? ` ${series.unit}` : ""}${sized}`;
 		const heading = el("p", { class: "tb-readout-title" });
 		heading.textContent = title;
 		const strong = el("strong", {});

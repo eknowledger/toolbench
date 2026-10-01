@@ -82,6 +82,13 @@ export interface Series {
 	 * covers every series. Usually with `shape: "points"`.
 	 */
 	x?: number[];
+	/**
+	 * A third measure per point, drawn as the AREA of a bubble on a `points` series (#127, contract version 4).
+	 * By area, not radius, so a value twice as large looks twice as large. `sizeLabel` names it in the key
+	 * and the readout: "Calls".
+	 */
+	sizes?: (number | null)[];
+	sizeLabel?: string;
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,

@@ -72,6 +72,13 @@ export const CHART_STYLES = /* css */ `
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
 /* Hollow, so markers at the same point nest rather than cover each other. */
 .tb-marker { fill: var(--tb-bg); stroke: var(--c); stroke-width: 1.75; }
+/* A bubble (#127): translucent so overlaps show, with a surface ring so each edge is found. */
+.tb-bubble { fill: var(--c); fill-opacity: 0.5; stroke: var(--tb-bg); stroke-width: 1.5; }
+.tb-bubble.tb-hot { fill-opacity: 0.8; stroke: var(--tb-fg); }
+.tb-size-key { margin-top: 0.5rem; display: flex; align-items: flex-end; gap: 0.5rem; }
+.tb-size-key svg { width: 25%; max-width: 13rem; height: auto; display: block; overflow: visible; }
+.tb-size-title { margin: 0 0 0.25rem; font-size: 0.78rem; color: var(--tb-muted); }
+.tb-size-ref { fill: none; stroke: var(--tb-muted); stroke-width: 1; }
 /* The legend key for a marked series is its marker, drawn with the same six outlines as the plot. */
 .tb-swatch-marker { width: 0.7rem; height: 0.7rem; flex: none; background: var(--c, currentColor); }
 /* The readout (#112): a dashed crosshair under the data, the lifted marks, and a card beside the line. */

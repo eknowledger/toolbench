@@ -684,6 +684,9 @@ finds it. See §4b for what counts as running.
 * `mirror: true` on a horizontal bar chart draws series given as negative values to the left and writes
   every number as its magnitude: back-to-back comparisons and pyramids. Put both halves in one `stack` so
   they share a row.
+* `sizes` on a `points` series draws each point as a bubble whose area is its size, scaled across the whole
+  chart, with a key of reference sizes underneath. `sizeLabel` names the measure. By area, not radius, so a
+  value twice as large looks twice as large.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

@@ -1732,6 +1732,32 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("sizes bubbles by area across the whole chart, with a key and the size in the table (#127)", async () => {
+		// 9,000 calls is the largest, 24 units of radius; 1,000 is a ninth of the area, so a third of the radius.
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "bubble" };
+			await host.run();
+			const root = host.shadowRoot;
+			const radius = (s: number) => Number(root?.querySelector(`.tb-plot circle.tb-bubble[data-s="${s}"]`)?.getAttribute("r"));
+			return {
+				radii: [0, 1, 2, 3].map(radius),
+				key: [...(root?.querySelectorAll(".tb-size-key text") ?? [])].map((t) => t.textContent),
+				head: [...(root?.querySelectorAll(".tb-chart-data thead th") ?? [])].map((t) => t.textContent),
+			};
+		});
+		const [europe, americas, , africa] = read.radii as number[];
+		assert.equal(americas, 24);
+		assert.ok(Math.abs((africa as number) / 24 - 1 / 3) < 0.01, `a ninth of the area is a third of the radius: ${africa}`);
+		assert.ok(Math.abs((europe as number) / 24 - Math.sqrt(4 / 9)) < 0.01, `4,000 of 9,000: ${europe}`);
+		assert.equal(read.key[0], "9,000");
+		assert.deepEqual(read.head.at(-1), "Calls");
+		await page.close();
+	});
+
 	it("draws series at their own x, lists every point, and reads out the nearest one (#120)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });

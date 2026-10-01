@@ -23,6 +23,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "thresholds", caption: "Thresholds: two labelled limits, the higher one above every value, so the scale widens to show it" },
 			{ id: "step", caption: "Step: a value that holds until it changes, beside the same data as a line (offset by 10), which invents slopes" },
 			{ id: "scatter", caption: "Scatter: two series with their own x values, so the readout snaps to the nearest point, not the nearest x (illustrative values)" },
+			{ id: "bubble", caption: "Bubbles: loss against delay per region, each bubble's area its number of calls (illustrative values)" },
 			{ id: "box", caption: "Box plots: the spread per network, morning and evening, whiskers p5 to p95 and outliers beyond (illustrative values)" },
 			{ id: "band", caption: "A band: the p5 to p95 spread around a median, drawn beneath it, with a gap where second 7 has no data (illustrative values)" },
 			{ id: "log", caption: "Log scales: one TCP flow's throughput ceiling across loss from 0.01% to 10%, a straight line on two log axes" },
