@@ -28,6 +28,16 @@ export const CHART_STYLES = /* css */ `
 .tb-axis-label { font-family: var(--tb-font); font-size: 11px; }
 .tb-annotation { stroke: var(--tb-accent); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
 .tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); font-size: 10px; }
+/* A threshold (#114): a dashed rule in the tone it names, so a limit never reads as a series even where
+   its tone shares a series colour, and a label haloed in the surface colour, drawn over the data. */
+.tb-threshold { stroke: var(--tb-muted); stroke-width: 1.25; stroke-dasharray: 6 4; }
+.tb-threshold[data-tone="warn"] { stroke: var(--tb-warn); }
+.tb-threshold[data-tone="bad"] { stroke: var(--tb-bad); }
+.tb-threshold[data-tone="good"] { stroke: var(--tb-good); }
+.tb-threshold-label { fill: var(--tb-muted); font-family: var(--tb-mono); font-size: 10px; stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; }
+.tb-threshold-label[data-tone="warn"] { fill: var(--tb-warn); }
+.tb-threshold-label[data-tone="bad"] { fill: var(--tb-bad); }
+.tb-threshold-label[data-tone="good"] { fill: var(--tb-good); }
 /* Each series class sets ONE custom property; the shape decides whether that is a stroke or a fill.
    The first version set stroke and fill together, which beat the line rule's "fill: none" on source
    order and drew every line as a filled blob. (No backticks in here: this is a template literal.) */

@@ -18,6 +18,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "lines", caption: "Lines: frame 5 is lost, and the release line runs flat until the copy arrives" },
 			{ id: "markers", caption: "Markers: every value visible, one shape per series, so equal values stay apart" },
 			{ id: "points", caption: "Points: the same data with no line between frames" },
+			{ id: "thresholds", caption: "Thresholds: two labelled limits, the higher one above every value, so the scale widens to show it" },
 		],
 	},
 	{

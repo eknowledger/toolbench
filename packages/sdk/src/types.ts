@@ -91,6 +91,12 @@ export interface Chart {
 	yUnit?: string;
 	/** A vertical marker with a name: "the knee", "capacity", "p99". */
 	annotations?: { x: number | string; label: string }[];
+	/**
+	 * A labelled horizontal rule at a y value: a budget, an SLO, a limit (#114, contract version 4). Not a
+	 * series, so it adds no legend entry, no data-table column and no readout row, and the y scale widens
+	 * to show it. `tone` lets a limit read as one.
+	 */
+	thresholds?: { y: number; label: string; axis?: "left" | "right"; tone?: Tone }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
 	readout?: Readout;

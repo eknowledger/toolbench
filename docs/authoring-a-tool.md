@@ -657,6 +657,9 @@ finds it. See §4b for what counts as running.
   `link: { chart: "<id>", keys }`, where `keys[i]` is the x that row `i` describes (`null` for a row with
   none, a total say). Pointing at the chart then lights the matching row, and pointing at a row moves the
   chart's readout to it. Links never reach outside one result.
+* `thresholds: [{ y, label, tone }]` draws a labelled horizontal rule at a y value: a budget, an SLO, a
+  limit. It is not a series, so it adds no legend entry, no table column and no readout row, and the
+  scale widens to show it. `tone` is `warn`, `bad` or `good` for a limit that should read as one.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

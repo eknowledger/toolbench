@@ -138,6 +138,22 @@ export default {
 						series: [{ label: "Calls", shape: "bar", points: Array.from({ length: 24 }, (_, h) => Math.round(40 + 35 * Math.sin(((h - 6) / 24) * 2 * Math.PI))) }],
 					},
 				};
+			case "thresholds":
+				// Mouth-to-ear delay per call against ITU-T G.114's planning guides: 150 ms preferred, 400 ms the limit.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Call",
+						yLabel: "Mouth-to-ear delay",
+						yUnit: "ms",
+						x: frames.slice(0, 12),
+						thresholds: [
+							{ y: 150, label: "150 ms, G.114 preferred", tone: "warn" },
+							{ y: 400, label: "400 ms, G.114 planning limit", tone: "bad" },
+						],
+						series: [{ label: "Delay", unit: "ms", markers: true, points: [120, 135, 128, 160, 190, 142, 138, 210, 175, 131, 126, 148] }],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

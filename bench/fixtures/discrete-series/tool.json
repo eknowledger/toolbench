@@ -28,7 +28,8 @@
 				{ "value": "readout", "label": "A readout the tool writes" },
 				{ "value": "linked", "label": "A chart linked to a table" },
 				{ "value": "categories", "label": "Bars over named categories" },
-				{ "value": "many-categories", "label": "Twenty-four categories" }
+				{ "value": "many-categories", "label": "Twenty-four categories" },
+				{ "value": "thresholds", "label": "A line against two thresholds" }
 			]
 		}
 	]

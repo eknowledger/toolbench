@@ -142,8 +142,10 @@ const BUDGETS = [
 	 *
 	 * Raised from 6_500 to 7_000 by linked rows (#124): highlighting the chart's own data table and linked
 	 * tables, and answering a row that asks for its x.
+	 *
+	 * Raised from 7_000 to 8_000 by thresholds (#114): rules, tones and haloed labels. 7185 measured.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 7_000 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 8_000 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager

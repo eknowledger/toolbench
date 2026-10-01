@@ -55,8 +55,13 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 */
 	const withZero = (scale: Scale, series: Series[]): Scale =>
 		series.some((x) => x.shape === "bar") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
-	const leftScale = niceScale(withZero(scaleFor(left), left));
-	const rightScale = right.length > 0 ? niceScale(withZero(scaleFor(right), right)) : undefined;
+	// A threshold above or below every value must still be on screen, so the scale reaches it.
+	const reach = (scale: Scale, axis: "left" | "right"): Scale => {
+		const ys = (chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y);
+		return ys.length === 0 ? scale : { min: Math.min(scale.min, ...ys), max: Math.max(scale.max, ...ys) };
+	};
+	const leftScale = niceScale(reach(withZero(scaleFor(left), left), "left"));
+	const rightScale = right.length > 0 ? niceScale(reach(withZero(scaleFor(right), right), "right")) : undefined;
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -94,6 +99,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	const py = (value: number, scale: Scale) => plot.y + plot.h - ((value - scale.min) / span(scale)) * plot.h;
 
 	const marks: SVGElement[] = [];
+	// Labels that must stay readable over the data, appended after every series.
+	const labelsOnTop: SVGElement[] = [];
 
 	// Gridlines and y labels, from the left scale — a second axis gets ticks but not its own grid.
 	const leftTicks = ticks(leftScale);
@@ -151,6 +158,25 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	}
 
 	/*
+	 * Thresholds (#114), under the data like annotations: a rule across the plot and its label at the right
+	 * end, above the line, or below it where the line is near the top.
+	 */
+	for (const threshold of chart.thresholds ?? []) {
+		const scale = threshold.axis === "right" && rightScale ? rightScale : leftScale;
+		const y = py(threshold.y, scale);
+		const tone = threshold.tone ?? "normal";
+		marks.push(svg("line", { class: "tb-threshold", "data-tone": tone, x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
+		const below = y < plot.y + 14;
+		labelsOnTop.push(
+			svg(
+				"text",
+				{ class: "tb-threshold-label", "data-tone": tone, x: plot.x + plot.w - 4, y: below ? y + 12 : y - 5, "text-anchor": "end" },
+				threshold.label,
+			),
+		);
+	}
+
+	/*
 	 * ⚠️ Bar series share a slot, so each needs its own place in it. Drawn at the full slot width, a second
 	 * bar series lands exactly on top of the first, and at the bars' opacity the two blend into a colour the
 	 * legend does not show: violet over teal read as a light cyan in the dark theme. Splitting the slot
@@ -162,6 +188,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		const group = { index: barSeries.indexOf(series), count: barSeries.length };
 		marks.push(...drawSeries(series, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale)));
 	});
+
+	marks.push(...labelsOnTop);
 
 	// Axis lines last, so they sit above the gridlines.
 	marks.push(svg("line", { class: "tb-axis", x1: plot.x, x2: plot.x, y1: plot.y, y2: plot.y + plot.h }));

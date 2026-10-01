@@ -1655,6 +1655,34 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.ok(Math.abs(minus30.height - 3 * minus10.height) < 0.5, "-30 is three times as tall as -10");
 	});
 
+	it("widens the scale to a threshold above the data, labels it, and keeps it out of the data (#114)", async () => {
+		// Delays peak at 210 ms; the 400 ms limit is above all of them and must still be drawn.
+		const chart = await chartFor("thresholds");
+		assert.equal(chart.yLabels.at(-1), "400");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "thresholds" };
+			await host.run();
+		});
+		const read = await page.evaluate(() => {
+			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
+			return {
+				rules: [...(figure?.querySelectorAll("line.tb-threshold") ?? [])].map((l) => l.getAttribute("data-tone")),
+				labels: [...(figure?.querySelectorAll("text.tb-threshold-label") ?? [])].map((t) => t.textContent),
+				columns: figure?.querySelectorAll(".tb-chart-data thead th").length,
+				legend: figure?.querySelectorAll(".tb-legend li").length ?? 0,
+			};
+		});
+		assert.deepEqual(read.rules, ["warn", "bad"]);
+		assert.deepEqual(read.labels, ["150 ms, G.114 preferred", "400 ms, G.114 planning limit"]);
+		assert.equal(read.columns, 2, "the data table has the x and the one series, not the thresholds");
+		assert.equal(read.legend, 0, "one series and two thresholds: still no legend");
+		await page.close();
+	});
+
 	it("draws named categories in the order given, labelled with their text, from zero (#113)", async () => {
 		const chart = await chartFor("categories");
 		assert.deepEqual(chart.xLabels, ["Mesh", "MCU", "Selective forwarding"]);
