@@ -675,6 +675,9 @@ finds it. See §4b for what counts as running.
 * `shape: "band"` with `lower` fills the region between `lower` and `points`, the upper edge: a p5 to
   p95 spread, a min-to-max envelope. It is drawn beneath every other series, a null in either edge breaks
   it, the readout reads it as a range, and the data table gives it low and high columns.
+* `x` on a series gives it its own x values, one per point, for measurements that share no x: a
+  scatter. Use it with `shape: "points"`. The x scale covers every series, the readout snaps to the
+  nearest point rather than the nearest x, and the data table lists one row per point.
 * `axis: "right"` for a second scale. The renderer reserves the extra padding for it, so labels are not
   clipped.
 * `format` is per axis, not per value. A mix of `20, 15, 10, 5.00` on one axis is a formatting bug, and

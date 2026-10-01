@@ -268,3 +268,120 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		}
 	});
 }
+
+/** One drawn point of a scatter chart, in data and viewBox terms. */
+export interface ScatterPoint {
+	series: number;
+	index: number;
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+}
+
+/**
+ * The readout for a chart whose series have their own x values (#120). With no shared x to snap to, it
+ * snaps to the nearest point in both directions, shows that one point, and the keyboard steps through the
+ * points left to right. Everything else (the card, the crosshair, the live region, `mode: "none"`) is the
+ * same as the ordinary readout's.
+ */
+export function attachScatterReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart: Chart, g: Geometry, points: ScatterPoint[]): void {
+	if ((chart.readout?.mode ?? "x") === "none" || points.length === 0) return;
+	const crosshair = chart.readout?.crosshair ?? "both";
+	const ordered = [...points].sort((a, b) => a.vx - b.vx || a.vy - b.vy);
+	const vLine = svg("line", { class: "tb-crosshair", y1: g.plot.y, y2: g.plot.y + g.plot.h, visibility: "hidden" });
+	const hLine = svg("line", { class: "tb-crosshair", x1: g.plot.x, x2: g.plot.x + g.plot.w, visibility: "hidden" });
+	plotSvg.insertBefore(hLine, plotSvg.firstChild);
+	plotSvg.insertBefore(vLine, plotSvg.firstChild);
+	const card = el("div", { class: "tb-readout", hidden: true, "aria-hidden": "true" });
+	const live = el("p", { class: "tb-sr", role: "status", "aria-live": "polite" });
+	figure.append(card, live);
+	const plotBox = plotSvg.parentElement as HTMLElement;
+	plotBox.setAttribute("tabindex", "0");
+	plotBox.setAttribute("role", "group");
+	plotBox.setAttribute("aria-roledescription", "chart");
+	plotBox.setAttribute("aria-label", `${plotSvg.getAttribute("aria-label") ?? ""}. Arrow keys read each point.`);
+
+	let current = -1;
+	const show = (k: number) => {
+		const p = ordered[k];
+		if (!p) return;
+		current = k;
+		const series = chart.series[p.series];
+		vLine.setAttribute("x1", String(p.vx));
+		vLine.setAttribute("x2", String(p.vx));
+		hLine.setAttribute("y1", String(p.vy));
+		hLine.setAttribute("y2", String(p.vy));
+		vLine.setAttribute("visibility", crosshair === "x" || crosshair === "both" ? "visible" : "hidden");
+		hLine.setAttribute("visibility", crosshair === "y" || crosshair === "both" ? "visible" : "hidden");
+		for (const mark of plotSvg.querySelectorAll("[data-s]")) {
+			mark.classList.toggle("tb-hot", Number(mark.getAttribute("data-s")) === p.series && Number(mark.getAttribute("data-i")) === p.index);
+		}
+		const title = `${chart.xLabel} ${g.format(p.x)}${chart.xUnit ? ` ${chart.xUnit}` : ""}`;
+		const text = series?.notes?.[p.index] ?? `${g.format(p.y)}${series?.unit ? ` ${series.unit}` : ""}`;
+		const heading = el("p", { class: "tb-readout-title" });
+		heading.textContent = title;
+		const strong = el("strong", {});
+		strong.textContent = text;
+		const name = el("span", {});
+		name.textContent = series?.label ?? "";
+		card.replaceChildren(heading, el("ul", { class: "tb-readout-rows" }, el("li", {}, g.key(p.series), strong, name)));
+		card.hidden = false;
+		live.textContent = `${title}: ${series?.label ?? ""} ${text}`;
+		const box = plotSvg.getBoundingClientRect();
+		const frame = figure.getBoundingClientRect();
+		card.style.left = `${Math.round(box.left - frame.left + p.vx * (box.width / g.width))}px`;
+		card.style.top = `${Math.round(box.top - frame.top + p.vy * (box.height / g.height))}px`;
+		card.toggleAttribute("data-flip", p.vx > g.plot.x + g.plot.w / 2);
+	};
+	const hide = () => {
+		current = -1;
+		card.hidden = true;
+		vLine.setAttribute("visibility", "hidden");
+		hLine.setAttribute("visibility", "hidden");
+		for (const mark of plotSvg.querySelectorAll(".tb-hot")) mark.classList.remove("tb-hot");
+	};
+	const nearest = (vx: number, vy: number) => {
+		let best = 0;
+		let bestDistance = Number.POSITIVE_INFINITY;
+		ordered.forEach((p, k) => {
+			const d = (p.vx - vx) ** 2 + (p.vy - vy) ** 2;
+			if (d < bestDistance) {
+				bestDistance = d;
+				best = k;
+			}
+		});
+		return best;
+	};
+	const toViewBox = (event: PointerEvent) => {
+		const box = plotSvg.getBoundingClientRect();
+		return { x: ((event.clientX - box.left) / box.width) * g.width, y: ((event.clientY - box.top) / box.height) * g.height };
+	};
+	plotSvg.addEventListener("pointermove", (event) => {
+		const p = toViewBox(event);
+		const inside = p.x >= g.plot.x - 8 && p.x <= g.plot.x + g.plot.w + 8 && p.y >= g.plot.y && p.y <= g.plot.y + g.plot.h;
+		if (inside) show(nearest(p.x, p.y));
+		else if (event.pointerType === "mouse") hide();
+	});
+	plotSvg.addEventListener("pointerleave", (event) => {
+		if (event.pointerType === "mouse") hide();
+	});
+	plotBox.addEventListener("focus", () => {
+		if (current < 0) show(0);
+	});
+	plotBox.addEventListener("blur", hide);
+	plotBox.addEventListener("keydown", (event) => {
+		if (event.target !== plotBox) return;
+		const key = (event as KeyboardEvent).key;
+		const last = ordered.length - 1;
+		const next =
+			key === "ArrowRight" ? Math.min(last, current + 1) : key === "ArrowLeft" ? Math.max(0, current - 1) : key === "Home" ? 0 : key === "End" ? last : undefined;
+		if (key === "Escape") {
+			hide();
+			event.preventDefault();
+		} else if (next !== undefined) {
+			show(next);
+			event.preventDefault();
+		}
+	});
+}

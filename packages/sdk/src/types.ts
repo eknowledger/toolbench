@@ -69,6 +69,12 @@ export interface Series {
 	 * zero separately. Bar series without one are grouped beside the stack as before.
 	 */
 	stack?: string;
+	/**
+	 * This series' own x values, one per point, instead of the chart's shared `x`: for measurements that do
+	 * not share x positions, a scatter of (delay, cut-off) pairs say (#120, contract version 4). The x scale
+	 * covers every series. Usually with `shape: "points"`.
+	 */
+	x?: number[];
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,

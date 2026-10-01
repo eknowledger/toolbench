@@ -301,6 +301,23 @@ export default {
 					},
 				};
 			}
+			case "scatter":
+				// Illustrative: response delay against turns cut off early, swept on two recording sets whose
+				// timeouts were not the same, so neither series shares the other's x.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "End-of-speech timeout",
+						xUnit: "ms",
+						yLabel: "Turns cut off early",
+						yUnit: "%",
+						x: [],
+						series: [
+							{ label: "Quiet room", unit: "%", shape: "points", x: [200, 300, 400, 500, 700, 900], points: [18, 11, 7, 4.5, 2.2, 1.1] },
+							{ label: "Street noise", unit: "%", shape: "points", x: [250, 350, 450, 600, 800, 1000, 1200], points: [26, 17, 12, 8, 4.8, 3.1, 2.0] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

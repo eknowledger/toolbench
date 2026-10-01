@@ -1683,6 +1683,35 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.close();
 	});
 
+	it("draws series at their own x, lists every point, and reads out the nearest one (#120)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "scatter" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				markers: root?.querySelectorAll(".tb-plot .tb-marker").length,
+				rows: root?.querySelectorAll(".tb-chart-data tbody tr").length,
+				first: [...(root?.querySelector(".tb-chart-data tbody tr")?.children ?? [])].map((c) => c.textContent),
+			};
+		});
+		assert.equal(read.markers, 13, "six points and seven");
+		assert.equal(read.rows, 13, "one table row per point, since the series share no x");
+		assert.deepEqual(read.first, ["Quiet room", "200", "18"]);
+		// From the keyboard the points go left to right: the first is (200, 18), the second (250, 26).
+		await page.locator("#host >> .tb-plot").focus();
+		await page.keyboard.press("ArrowRight");
+		const card = await page.evaluate(() => {
+			const r = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout");
+			return { title: r?.querySelector(".tb-readout-title")?.textContent, row: r?.querySelector("li")?.textContent };
+		});
+		assert.deepEqual(card, { title: "End-of-speech timeout 250 ms", row: "26 %Street noise" });
+		await page.close();
+	});
+
 	it("fills a band beneath the lines, breaks it at a gap, and reads it as a range (#119)", async () => {
 		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });

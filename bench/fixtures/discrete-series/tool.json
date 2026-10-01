@@ -37,7 +37,8 @@
 				{ "value": "step", "label": "A step line beside a sloped one" },
 				{ "value": "log", "label": "Both axes on a log scale" },
 				{ "value": "log-zero", "label": "A log axis given a zero" },
-				{ "value": "band", "label": "A median inside a p5 to p95 band" }
+				{ "value": "band", "label": "A median inside a p5 to p95 band" },
+				{ "value": "scatter", "label": "Two series with their own x" }
 			]
 		}
 	]

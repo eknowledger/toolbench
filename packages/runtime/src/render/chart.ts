@@ -13,7 +13,7 @@
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import { adoptChartStyles } from "./chart-styles.ts";
-import { attachReadout } from "./readout.ts";
+import { attachReadout, attachScatterReadout, type Geometry, type ScatterPoint } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
 const W = 640;
@@ -104,13 +104,16 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	const categories = chart.x.some((v) => typeof v === "string") ? chart.x.map(String) : undefined;
 	const xs: number[] = categories ? chart.x.map((_, i) => i) : (chart.x as number[]);
 	const xText = (i: number) => (categories ? (categories[i] ?? "") : format(xs[i] as number));
-	const xMin = Math.min(...xs);
-	const xMax = Math.max(...xs);
+	// A series with its own x (#120) widens the x scale to cover it; a category axis has no room for one.
+	const scatter = !categories && chart.series.some((s) => s.x !== undefined);
+	const allX = scatter ? [...xs, ...chart.series.flatMap((s) => s.x ?? [])] : xs;
+	const xMin = Math.min(...allX);
+	const xMax = Math.max(...allX);
 	const bars = chart.series.some((series) => series.shape === "bar");
 	// One bar has no spacing to measure, so fall back to its own magnitude, and to 1 for a bar at zero.
 	const slot = xs.length > 1 ? (xMax - xMin) / (xs.length - 1) : Math.abs(xMax) || 1;
 	const xLog = chart.xScale === "log" && !categories;
-	const xScale: Scale = xLog ? logScale(xs) : bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
+	const xScale: Scale = xLog ? logScale(allX) : bars || categories ? { min: xMin - slot / 2, max: xMax + slot / 2 } : { min: xMin, max: xMax };
 
 	const px = (value: number) => plot.x + along(value, xScale) * plot.w;
 	const py = (value: number, scale: Scale) => plot.y + plot.h - along(value, scale) * plot.h;
@@ -133,7 +136,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * so labels never collide. A numeric axis keeps its round-value ticks.
 	 */
 	const every = categories ? Math.max(1, Math.ceil(36 / (plot.w / Math.max(1, xs.length)))) : 1;
-	const xTicks = categories ? xs.filter((i) => i % every === 0) : xLog ? powers(xScale) : xTicksFor(xs, xScale, bars);
+	const xTicks = categories ? xs.filter((i) => i % every === 0) : xLog ? powers(xScale) : scatter ? ticks(xScale, 5) : xTicksFor(xs, xScale, bars);
 	const xFormat = xLog ? powerLabel : formatterFor(xTicks);
 	/*
 	 * A category label is cut to the room its slot has, about six viewBox units a character at this size,
@@ -228,7 +231,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 						}),
 					}
 				: series;
-		marks.push(...drawSeries(drawn, index, xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
+		marks.push(...drawSeries(drawn, index, scatter && series.x ? series.x : xs, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale), ranges.get(series)));
 	}
 
 	marks.push(...labelsOnTop);
@@ -270,8 +273,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		dropped > 0 ? `${dropped} value${dropped === 1 ? "" : "s"} at or below zero not drawn on a log axis` : "",
 		unbarred > 0 ? `${unbarred} bar series not drawn: a bar's length means nothing on a log axis` : "",
 	].filter(Boolean);
-	figure.append(dataTable(chart, xText, notes.length > 0 ? notes.join(". ") : undefined));
-	attachReadout(figure, picture, chart, {
+	figure.append(scatter ? scatterTable(chart) : dataTable(chart, xText, notes.length > 0 ? notes.join(". ") : undefined));
+	const geometry: Geometry = {
 		xs,
 		xText,
 		px,
@@ -284,10 +287,45 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		width: W,
 		height: H,
 		format,
-		key: (s) => keyFor(chart.series[s] as Series, s),
-	});
+		key: (s: number) => keyFor(chart.series[s] as Series, s),
+	};
+	if (scatter) {
+		const points: ScatterPoint[] = chart.series.flatMap((series, s) => {
+			const own = series.x ?? xs;
+			const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
+			return series.points.flatMap((y, i) => {
+				const x = own[i];
+				if (y === null || x === undefined) return [];
+				const vx = px(x);
+				const vy = py(y, scale);
+				return Number.isFinite(vx) && Number.isFinite(vy) ? [{ series: s, index: i, x, y, vx, vy }] : [];
+			});
+		});
+		attachScatterReadout(figure, picture, chart, geometry, points);
+	} else {
+		attachReadout(figure, picture, chart, geometry);
+	}
 	adoptChartStyles(figure);
 	return figure;
+}
+
+/**
+ * A scatter's data, one row per point, since its series share no x to align on (#120): series, x, y.
+ */
+function scatterTable(chart: Chart): HTMLElement {
+	const head = el("tr", {}, el("th", { scope: "col" }, "Series"), el("th", { scope: "col" }, withUnit(chart.xLabel, chart.xUnit)), el("th", { scope: "col" }, withUnit(chart.yLabel, chart.yUnit)));
+	const rows = chart.series.flatMap((series) =>
+		series.points.map((y, i) => {
+			const x = (series.x ?? chart.x)[i];
+			return el("tr", {}, el("th", { scope: "row" }, series.label), el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")), el("td", {}, y === null ? "—" : format(y)));
+		}),
+	);
+	return el(
+		"details",
+		{ class: "tb-chart-data" },
+		el("summary", {}, "Show the data as a table"),
+		el("table", {}, el("caption", {}, describe(chart)), el("thead", {}, head), el("tbody", {}, ...rows)),
+	);
 }
 
 /**
@@ -692,7 +730,7 @@ function drawSeries(
 		series.points.forEach((point, i) => {
 			const x = xs[i];
 			if (point === null || x === undefined) return;
-			marks.push(svg("path", { class: `tb-marker ${cls}`, "data-i": i, d: markerPath(index, px(x), py(point)) }));
+			marks.push(svg("path", { class: `tb-marker ${cls}`, "data-i": i, "data-s": index, d: markerPath(index, px(x), py(point)) }));
 		});
 	}
 	return marks;
