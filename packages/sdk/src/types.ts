@@ -183,7 +183,11 @@ export interface Pie {
 	/** What the whole is: "Traffic by codec". */
 	label: string;
 	unit?: string;
-	slices: { label: string; value: number; tone?: Tone }[];
+	/**
+	 * `explode` pulls a slice out a little to point at it (#126). A slice pulled out looks bigger than it is,
+	 * so use it for the one part the surrounding text is about, not for decoration.
+	 */
+	slices: { label: string; value: number; tone?: Tone; explode?: boolean }[];
 	/** A ring rather than a disc, with `total` in its centre. */
 	donut?: boolean;
 	/** The donut's centre text: "48 kb/s". */

@@ -722,6 +722,8 @@ so a page fetches the code for the kinds it draws and no others. Declare them in
   clockwise, every slice labelled with its share. More than six fold into "Other" and the data table says
   so; a negative value or a zero total draws a message instead of a chart. If your parts are many, or close
   in size, a bar chart reads better.
+* `explode: true` on a slice pulls it out a little, to point at the part your text is about. A slice
+  pulled out looks bigger than it is, so use it on one slice, not for decoration.
 
 ## 10. Help text
 

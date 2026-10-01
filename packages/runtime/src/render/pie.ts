@@ -46,6 +46,7 @@ interface Slice {
 	label: string;
 	value: number;
 	tone?: string;
+	explode?: boolean;
 	share: number;
 }
 
@@ -77,7 +78,8 @@ export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 
 	const cx = 150;
 	const cy = H / 2;
-	const r = 112;
+	// Room for an exploded slice to move out without leaving the picture.
+	const r = slices.some((s) => s.explode === true) ? 104 : 112;
 	const inner = pie.donut ? 68 : 0;
 	const marks: SVGElement[] = [];
 	let angle = -Math.PI / 2;
@@ -95,19 +97,26 @@ export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 				: inner > 0
 					? `M${point(r, angle)}A${r},${r} 0 ${large} 1 ${point(r, end)}L${point(inner, end)}A${inner},${inner} 0 ${large} 0 ${point(inner, angle)}Z`
 					: `M${cx},${cy}L${point(r, angle)}A${r},${r} 0 ${large} 1 ${point(r, end)}Z`;
+		/*
+		 * An exploded slice (#126) moves out along its bisector by a fixed 8% of the radius, label and all.
+		 * Fixed rather than configurable, because a slice pulled further out reads as larger still.
+		 */
+		const mid = angle + sweep / 2;
+		const push = slice.explode === true ? r * 0.08 : 0;
+		const shift = push > 0 ? `translate(${(push * Math.cos(mid)).toFixed(2)} ${(push * Math.sin(mid)).toFixed(2)})` : undefined;
 		marks.push(
 			svg("path", {
 				class: `tb-slice tb-s${(i % 6) + 1}`,
 				"data-i": i,
 				...(slice.tone ? { "data-tone": slice.tone } : {}),
+				...(shift ? { transform: shift, "data-exploded": "" } : {}),
 				"fill-rule": "evenodd",
 				d,
 			}),
 		);
 		// The share on the slice where it fits; the key beside the pie always has it.
 		if (sweep > 0.42) {
-			const mid = angle + sweep / 2;
-			const at = (inner + r) / 2;
+			const at = (inner + r) / 2 + push;
 			marks.push(
 				svg(
 					"text",

@@ -402,6 +402,22 @@ export default {
 						],
 					},
 				};
+			case "donut-exploded":
+				// The same time to first audio, with the part the text is about, the language model, pulled out.
+				return {
+					kind: "pie",
+					pie: {
+						label: "Time to first audio",
+						unit: "ms",
+						donut: true,
+						total: "620 ms",
+						slices: [
+							{ label: "Speech recognition", value: 180 },
+							{ label: "Language model", value: 310, explode: true },
+							{ label: "Speech synthesis", value: 130 },
+						],
+					},
+				};
 			case "pie-many":
 				return {
 					kind: "pie",

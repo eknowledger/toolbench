@@ -68,6 +68,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 		cases: [
 			{ id: "pie", caption: "A pie: where one voice stream's 48 kb/s goes" },
 			{ id: "donut", caption: "A donut with its total in the centre (illustrative values)" },
+			{ id: "donut-exploded", caption: "Exploded: one slice pulled out to point at it, its share unchanged (illustrative values)" },
 			{ id: "pie-many", caption: "Eight parts folded to six: the three smallest become Other (illustrative values)" },
 			{ id: "pie-negative", caption: "A negative value: a share of it means nothing, so there is no pie" },
 		],

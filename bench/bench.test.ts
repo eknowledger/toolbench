@@ -2205,6 +2205,32 @@ describe("pies and donuts (#123)", () => {
 		await page.close();
 	});
 
+	it("pulls an exploded slice out along its middle, and changes no share (#126)", async () => {
+		/*
+		 * The language model's slice runs from 29% to 79% of the way round, so its middle is 54%: 104.4 degrees
+		 * clockwise from 3 o'clock in screen terms. 8% of a 104 radius is 8.32, so it moves about (-2.07, 8.06).
+		 */
+		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "donut-exploded" };
+			await host.run();
+			const root = host.shadowRoot;
+			return {
+				moves: [...(root?.querySelectorAll(".tb-slice") ?? [])].map((p) => p.getAttribute("transform")),
+				shares: [...(root?.querySelectorAll(".tb-pie-key .tb-share") ?? [])].map((s) => s.textContent),
+			};
+		});
+		assert.deepEqual(read.moves[0], null);
+		assert.deepEqual(read.moves[2], null);
+		const m = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(read.moves[1] ?? "");
+		assert.ok(m && Math.abs(Number(m[1]) + 2.07) < 0.1 && Math.abs(Number(m[2]) - 8.06) < 0.1, `moved ${read.moves[1]}`);
+		assert.deepEqual(read.shares, ["29%", "50%", "21%"]);
+		await page.close();
+	});
+
 	it("folds more than six parts into Other, and says so", async () => {
 		const { page, read } = await pieCase("pie-many");
 		assert.equal(read.key.length, 6);
