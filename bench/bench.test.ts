@@ -1610,6 +1610,23 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.deepEqual(marks.counts, [19, 20, 20]);
 	});
 
+	it("fills an area from zero, and titles a second axis", async () => {
+		// The send rate never falls below 24, but an area's height is its value, so the axis starts at 0.
+		const area = await chartFor("area");
+		assert.equal(area.yLabels[0], "0");
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		const titles = await page.evaluate(async () => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: "combo" };
+			await host.run();
+			return [...(host.shadowRoot?.querySelectorAll(".tb-plot text.tb-axis-label") ?? [])].map((t) => t.textContent);
+		});
+		assert.deepEqual(titles, ["Hour", "Calls", "Dropped (%)"]);
+		await page.close();
+	});
+
 	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
 		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
 		const chart = await chartFor("lines");

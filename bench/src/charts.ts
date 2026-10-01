@@ -18,6 +18,8 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 			{ id: "lines", caption: "Lines: frame 5 is lost, and the release line runs flat until the copy arrives" },
 			{ id: "markers", caption: "Markers: every value visible, one shape per series, so equal values stay apart" },
 			{ id: "points", caption: "Points: the same data with no line between frames" },
+			{ id: "area", caption: "An area: one call's send rate over a minute (illustrative values)" },
+			{ id: "combo", caption: "A combination: calls as bars on the left axis, the drop rate as a marked line on the right (illustrative values)" },
 			{ id: "thresholds", caption: "Thresholds: two labelled limits, the higher one above every value, so the scale widens to show it" },
 			{ id: "step", caption: "Step: a value that holds until it changes, beside the same data as a line (offset by 10), which invents slopes" },
 			{ id: "scatter", caption: "Scatter: two series with their own x values, so the readout snaps to the nearest point, not the nearest x (illustrative values)" },
@@ -39,6 +41,7 @@ const sections: { heading: string; note: string; cases: { id: string; caption: s
 		heading: "Bars",
 		note: "Bars grow from zero, sit side by side when there are several series, and take their labels from the bars themselves.",
 		cases: [
+			{ id: "histogram", caption: "A histogram: bars over bins, 200 inter-arrival gaps 2 ms wide (illustrative values)" },
 			{ id: "two-bars", caption: "Two bar series, grouped" },
 			{ id: "signed-bars", caption: "Bars either side of zero" },
 			{ id: "zero-bars", caption: "A series of zeros draws nothing, on an axis that does not go below zero" },

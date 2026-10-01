@@ -421,6 +421,41 @@ export default {
 				};
 			case "pie-negative":
 				return { kind: "pie", pie: { label: "Change by region", slices: [{ label: "Up", value: 5 }, { label: "Down", value: -3 }] } };
+			case "area":
+				// Illustrative: one call's send rate over a minute, as the area under it.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Second",
+						yLabel: "Send rate",
+						yUnit: "kb/s",
+						x: Array.from({ length: 13 }, (_, i) => i * 5),
+						series: [{ label: "Send rate", unit: "kb/s", shape: "area", points: [32, 34, 40, 48, 48, 46, 30, 24, 28, 40, 48, 48, 44] }],
+					},
+				};
+			case "histogram": {
+				// A histogram is bars over bins: here, 200 inter-arrival gaps around 20 ms, binned 2 ms wide.
+				const bins = [12, 14, 16, 18, 20, 22, 24, 26, 28];
+				return {
+					kind: "series",
+					chart: { xLabel: "Gap between packets", xUnit: "ms", yLabel: "Packets", x: bins, series: [{ label: "Packets", shape: "bar", points: [2, 6, 19, 42, 64, 38, 17, 9, 3] }] },
+				};
+			}
+			case "combo":
+				// Bars for the count, a line with markers for the rate, each on its own axis.
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Hour",
+						yLabel: "Calls",
+						yLabelRight: "Dropped",
+						x: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"],
+						series: [
+							{ label: "Calls", shape: "bar", points: [120, 340, 410, 380, 450, 300] },
+							{ label: "Dropped", unit: "%", axis: "right", markers: true, points: [0.8, 1.1, 1.6, 1.3, 2.4, 1.2] },
+						],
+					},
+				};
 			case "two-bars":
 				return {
 					kind: "series",

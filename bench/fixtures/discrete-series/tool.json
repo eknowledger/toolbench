@@ -20,6 +20,9 @@
 			"default": "lines",
 			"options": [
 				{ "value": "lines", "label": "Lines over frames 1 to 20" },
+				{ "value": "area", "label": "An area under a line" },
+				{ "value": "histogram", "label": "A histogram" },
+				{ "value": "combo", "label": "Bars, a line and markers, two axes" },
 				{ "value": "two-bars", "label": "Two bar series" },
 				{ "value": "zero-bars", "label": "A bar series of zeros" },
 				{ "value": "signed-bars", "label": "Bars either side of zero" },

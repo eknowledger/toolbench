@@ -54,8 +54,9 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	 * ⚠️ A bar is measured from zero, so a bar chart's scale always includes it. Without that, values of 32
 	 * and 64 drew on an axis from 30, and the shorter bar read as a sixteenth of the longer.
 	 */
+	// An area is measured from zero as a bar is: its filled height is its value.
 	const withZero = (scale: Scale, series: Series[]): Scale =>
-		series.some((x) => x.shape === "bar") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
+		series.some((x) => x.shape === "bar" || x.shape === "area") ? { min: Math.min(0, scale.min), max: Math.max(0, scale.max) } : scale;
 	// A threshold above or below every value must still be on screen, so the scale reaches it.
 	const reach = (scale: Scale, axis: "left" | "right"): Scale => {
 		const ys = (chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y);
@@ -247,6 +248,20 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 			{ class: "tb-axis-label", x: 12, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${plot.y + plot.h / 2})` },
 			withUnit(chart.yLabel, chart.yUnit),
 		),
+		/*
+		 * The second axis's title, on the right edge reading downward. Declared in the contract since the right
+		 * axis existed, and never drawn: a combination chart showed numbers on its right with nothing saying
+		 * what they were.
+		 */
+		...(rightScale && chart.yLabelRight
+			? [
+					svg(
+						"text",
+						{ class: "tb-axis-label", x: W - 8, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(90 ${W - 8} ${plot.y + plot.h / 2})` },
+						withUnit(chart.yLabelRight, right[0]?.unit),
+					),
+				]
+			: []),
 	];
 
 	const figure = el("figure", {
