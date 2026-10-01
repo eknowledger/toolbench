@@ -1,0 +1,29 @@
+{
+	"sdk": 1,
+	"id": "discrete-series",
+	"name": "Discrete series",
+	"blurb": "Draws each chart shape that once misled over whole-number x values, so the renderer's answer to each is on screen.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"autoRun": true,
+	"card": "live",
+	"kinds": ["series", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "case",
+			"type": "select",
+			"label": "Case",
+			"description": "Each is one defect from issue 111, drawn with the data that exposed it.",
+			"primary": true,
+			"default": "lines",
+			"options": [
+				{ "value": "lines", "label": "Lines over frames 1 to 20" },
+				{ "value": "two-bars", "label": "Two bar series" },
+				{ "value": "zero-bars", "label": "A bar series of zeros" },
+				{ "value": "signed-bars", "label": "Bars either side of zero" }
+			]
+		}
+	]
+}

@@ -312,15 +312,25 @@ export class ToolHost extends HTMLElement {
 			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
 			/*
-			 * ⚠️ Before the first paint, not on first use, and only for tools that say they draw one.
+			 * ⚠️ Before the first paint, and only when this paint is going to draw a chart.
 			 *
 			 * The chart renderer is its own chunk, about 1.5 KB gzipped that most pages never need. Awaiting
 			 * it here is what lets `render` stay synchronous: a seeded card paints a chart in `#paint` with
-			 * no chance to await, and every later draw is synchronous too. `kinds` is the manifest's own
-			 * declaration of what `run` can return, so it is the right thing to ask, and a tool that gets it
-			 * wrong is covered by the redraw in `#draw`.
+			 * no chance to await, and every later draw is synchronous too.
+			 *
+			 * The trigger used to be `kinds`, which says what `run` CAN return. A closed card has not run and
+			 * may never run, so every card declaring `series` fetched the chunk for a chart it would not draw
+			 * unless opened (#97). A card now asks what its seed contains; activation loads it for everything
+			 * else. Embed and page hosts activate as soon as they are visible, so they keep the early start.
+			 *
+			 * ⚠️ And the load is not fatal. It sat inside this `try`, whose `catch` is `#fatal`, so one missed
+			 * request (a purge mid-deploy, an offline reload, a strict CSP) replaced every series-declaring
+			 * card on the page with a bundler error before a facade had painted. A card that cannot fetch a
+			 * renderer it does not yet need is still a working card; a seed that needed it degrades in
+			 * `#paint` to the parts that can be drawn.
 			 */
-			if (manifest.kinds.includes("series")) await loadChartRenderer();
+			const drawsNow = this.mode !== "card" || containsSeries(this.#seed);
+			if (manifest.kinds.includes("series") && drawsNow) await loadChartRenderer().catch(() => undefined);
 			this.#paint();
 
 			/*
@@ -383,7 +393,10 @@ export class ToolHost extends HTMLElement {
 		this.#loading = true;
 		this.#paint();
 		try {
+			// Not fatal, for the same reason as in `#prepare`: `#draw` retries if a chart turns up without it.
+			const chart = this.#manifest?.kinds.includes("series") ? loadChartRenderer().catch(() => undefined) : undefined;
 			this.#loaded = await this.#resolve(cfg);
+			await chart;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -402,9 +415,18 @@ export class ToolHost extends HTMLElement {
 			 * Skip the prompt when a host already prefilled: `#paint` has just marked the seed stale,
 			 * and overwriting that with "showing the default result" would lie about whose inputs these
 			 * are.
+			 *
+			 * ⚠️ No prompt at all for a host with nothing on screen. "press Run" sat directly above a button
+			 * labelled Run, restating it, and it was the first line every reader met (#99).
+			 *
+			 * ⚠️ The one exception to "activation does not run": an `autoRun` tool. It has declared itself
+			 * instant and has no Run button (#104), so waiting for the reader to touch an input meant an empty
+			 * output under a form, with nothing saying why. Its default answer is computed once, here.
 			 */
-			if (!this.#hostWroteValues) {
-				this.#say(this.#seed ? "showing the default result — press Run to try your own" : "press Run");
+			if (this.#manifest?.autoRun === true) {
+				void this.#run({ focusResult: false });
+			} else if (!this.#hostWroteValues && this.#seed) {
+				this.#say("showing the default result — press Run to try your own");
 			}
 		} catch (error) {
 			this.#activated = false;
@@ -451,7 +473,8 @@ export class ToolHost extends HTMLElement {
 		const hasResult = output.children.length > 0;
 		output.toggleAttribute("data-stale", hasResult);
 		this.#els.run?.toggleAttribute("data-attention", true);
-		this.#say(hasResult ? "inputs changed — press Run" : "press Run");
+		// Nothing on screen means nothing is stale, and "press Run" would only restate the button (#99).
+		this.#say(hasResult ? "inputs changed — press Run" : "");
 	}
 
 	async #run(options: { focusResult: boolean }): Promise<void> {
@@ -558,13 +581,32 @@ export class ToolHost extends HTMLElement {
 			const deprecatedCard = compact && life === "deprecated";
 			// One string for the visible hint and the accessible name, so they cannot drift apart.
 			const hint = this.#seed ? "Try it" : "Open this tool";
+			const liveCard = compact && !this.#loading && !deprecatedCard;
+			/*
+			 * ⚠️ On a live card the hint IS the control, and the card around it is ordinary content (#98, #105).
+			 *
+			 * The whole card used to be one <button> named with aria-label. aria-label replaces an element's
+			 * contents as its accessible name, so a screen reader heard "Try it: Queue explorer, button" and
+			 * never reached the blurb or the seeded answer, the part of a closed card worth hearing. The same
+			 * shape failed three axe rules: the name could never contain all the visible text inside it
+			 * (2.5.3), the seeded chart's "Show the data as a table" <summary> was a focusable control nested
+			 * in a button (4.1.2), and that summary was 19px tall (2.5.8). No wording fixes a button that
+			 * wraps a paragraph; not wrapping it does.
+			 *
+			 * The name starts with the visible text, "Try it", so a speech-input user saying it still matches,
+			 * which was the point of the previous fix. A click anywhere else on the card still opens it: see
+			 * the handler below.
+			 */
+			const hintEl = liveCard
+				? el("button", { class: "tb-facade-hint", type: "button", "aria-label": `${hint}: ${manifest.name}` }, hint)
+				: el("span", { class: "tb-facade-hint" }, this.#loading ? "loading…" : hint);
 			const preview = el(
 				"div",
 				{ class: "tb-body" },
 				mode === "page" ? null : el("p", { class: "tb-blurb" }, manifest.blurb),
 				mode === "embed" ? lifecycleMark(life) : null,
 				this.#seed
-					? render(
+					? renderOrDegrade(
 							this.#seed,
 							withHostHighlight({
 								compact,
@@ -578,19 +620,23 @@ export class ToolHost extends HTMLElement {
 							}),
 						)
 					: null,
-				deprecatedCard ? null : el("span", { class: "tb-facade-hint" }, this.#loading ? "loading…" : hint),
+				deprecatedCard ? null : hintEl,
 			);
-			if (compact && !this.#loading && !deprecatedCard) {
-				const button = el("button", { class: "tb-facade", type: "button" });
+			if (liveCard) {
+				const card = el("div", { class: "tb-facade" });
+				card.append(preview);
 				/*
-				 * ⚠️ "Open ${name}" failed WCAG 2.5.3. The button's visible affordance is the hint,
-				 * so a speech-input user saying "click Try it" matched nothing. Naming it by the
-				 * whole card would announce the blurb and the seed as a paragraph.
+				 * A click anywhere on the card opens it, as it always has, except one that lands on a control
+				 * of its own: the seeded chart's data-table disclosure, a link in a result. Those do what they
+				 * say. The hint button's own click bubbles here, which is how it opens the card too.
 				 */
-				button.setAttribute("aria-label", `${hint}: ${manifest.name}`);
-				button.append(preview);
-				button.addEventListener("click", () => void this.#activate());
-				frame.append(button);
+				card.addEventListener("click", (event) => {
+					const target = event.target as Element | null;
+					const control = target?.closest?.("a, button, summary, input, select, textarea, label");
+					if (control && !control.classList.contains("tb-facade-hint")) return;
+					void this.#activate();
+				});
+				frame.append(card);
 			} else {
 				frame.append(preview);
 				if (deprecatedCard && pageUrl) {
@@ -609,7 +655,13 @@ export class ToolHost extends HTMLElement {
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
-		run.addEventListener("click", () => void this.#run({ focusResult: true }));
+		/*
+		 * ⚠️ Focus moves to the answer only for a keyboard press. Focusing the output scrolls it into view,
+		 * and a reader who clicked Run is looking at the button: the page jumped 773px on every click,
+		 * including clicks that recomputed the same answer (#101). A click produced by Enter or Space on a
+		 * button has `detail` 0, which is how the two are told apart.
+		 */
+		run.addEventListener("click", (event) => void this.#run({ focusResult: event.detail === 0 }));
 		// Hidden until a run outlasts SLOW_MS. A bar that flashes for 20 ms is noise.
 		const progress = el("div", { class: "tb-progress", "aria-hidden": "true", hidden: true }, el("i", { style: "width:0%" }));
 		/*
@@ -669,7 +721,13 @@ export class ToolHost extends HTMLElement {
 		 */
 		const samples = manifest.samples ?? [];
 		if (!compact && samples.length > 0) body.append(this.#sampleRow(samples));
-		body.append(el("div", { class: "tb-actions" }, run, progress), status, announce, output);
+		/*
+		 * No Run button for an `autoRun` tool: every change already recomputes, so the button could only
+		 * re-run unchanged inputs, and "press Run" described a mode the tool is not in (#104). The progress
+		 * bar stays, for the rare slow run.
+		 */
+		const autoRun = manifest.autoRun === true;
+		body.append(autoRun ? progress : el("div", { class: "tb-actions" }, run, progress), status, announce, output);
 		frame.append(body);
 
 		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
@@ -997,7 +1055,10 @@ export class ToolHost extends HTMLElement {
 				 * preload. Load and draw again rather than telling a reader the shape cannot be drawn, which
 				 * would be false. One frame late is the cost of a manifest that understated itself.
 				 */
-				void loadChartRenderer().then(() => this.#draw(output));
+				void loadChartRenderer().then(
+					() => this.#draw(output),
+					() => fill(target, degraded(output, (rest) => render(rest, { compact }))),
+				);
 				return;
 			}
 			// A kind this build cannot draw: an old runtime meeting a newer tool.
@@ -1089,6 +1150,36 @@ function lifecycleMark(status: NonNullable<Manifest["status"]>): HTMLElement | n
 	if (status === "deprecated") return el("span", { class: "tb-mark", "data-status": "deprecated" }, "Deprecated");
 	if (status === "retired") return el("span", { class: "tb-mark", "data-status": "retired" }, "Retired");
 	return null;
+}
+
+/** Whether an output has a chart anywhere in it. */
+function containsSeries(output: Output | undefined): boolean {
+	if (!output) return false;
+	if (output.kind === "series") return true;
+	return output.kind === "group" && output.parts.some((part) => containsSeries(part));
+}
+
+/**
+ * Render, and if the chart renderer is not loaded, render everything that is not a chart.
+ *
+ * Only reached when the chart chunk could not be fetched. The reader gets the fields and tables and a
+ * line saying the chart is missing, instead of an error in place of the whole result.
+ */
+function renderOrDegrade(output: Output, options: RenderOptions): HTMLElement {
+	try {
+		return render(output, options);
+	} catch (error) {
+		if (!(error instanceof ChartRendererMissing)) throw error;
+		return degraded(output, (rest) => render(rest, options));
+	}
+}
+
+function degraded(output: Output, draw: (rest: Output) => HTMLElement): HTMLElement {
+	const note = el("p", { class: "tb-status" }, "The chart could not be loaded.");
+	const rest = output.kind === "group" ? output.parts.filter((part) => !containsSeries(part)) : [];
+	if (rest.length === 0) return note;
+	const body = draw(rest.length === 1 ? (rest[0] as Output) : { kind: "group", parts: rest });
+	return el("div", {}, body, note);
 }
 
 function titleRow(manifest: Manifest, compact: boolean, pageUrl: string | undefined): HTMLElement {

@@ -37,7 +37,7 @@ const PAD = { top: 18, right: 20, rightWithAxis: 58, bottom: 44, left: 56 };
  * viewBox is what keeps the aspect ratio, which is the part that was broken before.
  */
 export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElement {
-	const compact = options.compact === true;
+	const compact = (options.cardChart ?? options.compact) === true;
 	const left = chart.series.filter((s) => (s.axis ?? "left") === "left");
 	const right = chart.series.filter((s) => s.axis === "right");
 	const plot = {
@@ -47,8 +47,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		h: H - PAD.top - PAD.bottom,
 	};
 
-	const leftScale = scaleFor(left);
-	const rightScale = right.length > 0 ? scaleFor(right) : undefined;
+	const leftScale = niceScale(scaleFor(left));
+	const rightScale = right.length > 0 ? niceScale(scaleFor(right)) : undefined;
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -86,7 +86,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		marks.push(svg("line", { class: "tb-grid", x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
 		marks.push(svg("text", { class: "tb-tick", x: plot.x - 8, y: y + 4, "text-anchor": "end" }, axisFormat(tick)));
 	}
-	const xTicks = ticks(xScale, 5);
+	const xTicks = xTicksFor(chart.x, xScale, bars);
 	const xFormat = formatterFor(xTicks);
 	for (const tick of xTicks) {
 		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + 20, "text-anchor": "middle" }, xFormat(tick)));
@@ -117,9 +117,17 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		);
 	}
 
+	/*
+	 * ⚠️ Bar series share a slot, so each needs its own place in it. Drawn at the full slot width, a second
+	 * bar series lands exactly on top of the first, and at the bars' opacity the two blend into a colour the
+	 * legend does not show: violet over teal read as a light cyan in the dark theme. Splitting the slot
+	 * puts series i of k in the i-th of k sub-slots.
+	 */
+	const barSeries = chart.series.filter((series) => series.shape === "bar");
 	chart.series.forEach((series, index) => {
 		const scale = series.axis === "right" && rightScale ? rightScale : leftScale;
-		marks.push(...drawSeries(series, index, chart.x, px, (v) => py(v, scale), plot));
+		const group = { index: barSeries.indexOf(series), count: barSeries.length };
+		marks.push(...drawSeries(series, index, chart.x, px, (v) => py(v, scale), plot, group, py(clamp(0, scale), scale)));
 	});
 
 	// Axis lines last, so they sit above the gridlines.
@@ -168,16 +176,82 @@ function scaleFor(series: Series[]): Scale {
 	if (values.length === 0) return { min: 0, max: 1 };
 	const min = Math.min(...values);
 	const max = Math.max(...values);
-	if (min === max) return { min: min - 1, max: max + 1 };
+	/*
+	 * ⚠️ A flat series must not be padded across zero. This used to return `min - 1 .. max + 1`, so a series
+	 * of zeros got an axis from -1 to 1, and every zero was drawn as a bar from the middle of the plot down
+	 * to the floor: a row of solid bars reading as negative values, for data that was all zero.
+	 */
+	if (min === max) {
+		if (min === 0) return { min: 0, max: 1 };
+		return min > 0 ? { min: 0, max } : { min, max: 0 };
+	}
 	// Include zero when the data is close to it: a bar chart floating above zero misleads.
 	const lo = min > 0 && min < (max - min) * 0.5 ? 0 : min;
 	return { min: lo, max };
 }
 
-function ticks(scale: Scale, count = 4): number[] {
-	const step = span(scale) / count;
-	return Array.from({ length: count + 1 }, (_, i) => scale.min + step * i);
+/**
+ * A step a reader can count in: 1, 2 or 5 times a power of ten, the smallest that fits `count` intervals.
+ *
+ * Dividing the range into equal parts gave axes reading 0, 118, 235, 353, 470 for data from 50 to 470,
+ * and frame numbers of 4.8 and 12.4. A reader reads values off a chart by the gridlines, and those are
+ * gridlines nobody can read a value off.
+ */
+function niceStep(range: number, count: number): number {
+	const raw = range / count;
+	const power = 10 ** Math.floor(Math.log10(raw));
+	const step = [1, 2, 5, 10].find((m) => m * power >= raw - 1e-9) ?? 10;
+	return step * power;
 }
+
+/** Widen a scale to whole steps, so the top and bottom gridlines are tick values rather than the data's extremes. */
+function niceScale(scale: Scale, count = 5): Scale {
+	const step = niceStep(span(scale), count);
+	return { min: Math.floor(scale.min / step + 1e-9) * step, max: Math.ceil(scale.max / step - 1e-9) * step };
+}
+
+function ticks(scale: Scale, count = 5): number[] {
+	const step = niceStep(span(scale), count);
+	const first = Math.ceil(scale.min / step - 1e-9) * step;
+	const out: number[] = [];
+	for (let value = first; value <= scale.max + step * 1e-9; value += step) out.push(Number(value.toPrecision(12)));
+	return out;
+}
+
+/**
+ * The x ticks. The x domain is not widened like the y scale: a line genuinely starts at its first point,
+ * and a bar chart's domain is already padded by half a slot.
+ *
+ * ⚠️ When every x is a whole number, so is every tick. Frame 4.8 does not exist, and neither does the
+ * padded edge of a bar chart at 0.5: ticks there label the space between bars rather than any bar.
+ *
+ * ⚠️ A bar chart's ticks sit on bars. Its x values are categories (bins, frames), so a tick between two
+ * of them names nothing: a histogram with bins centred on 3, 5, 7 ... read "5, 10, 15", and 10 is the gap
+ * between two bars. The step is therefore a whole multiple of the bars' own spacing, and the ticks are
+ * data positions, at round values where there are any.
+ */
+function xTicksFor(xs: number[], scale: Scale, bars: boolean): number[] {
+	if (xs.length === 0) return [];
+	const lo = Math.min(...xs);
+	const hi = Math.max(...xs);
+	if (bars) {
+		const sorted = [...new Set(xs)].sort((a, b) => a - b);
+		const gaps = sorted.slice(1).map((x, i) => x - (sorted[i] as number));
+		const spacing = gaps.length > 0 ? Math.min(...gaps) : 1;
+		const multiple = niceStep(Math.max(spacing, (hi - lo) / 5), 1) / spacing;
+		const step = spacing * Math.max(1, Math.ceil(multiple - 1e-9));
+		const on = (x: number, origin: number) => Math.abs(((x - origin) / step) % 1) < 1e-9 || Math.abs(((x - origin) / step) % 1) > 1 - 1e-9;
+		const round = sorted.filter((x) => on(x, 0));
+		return round.length > 0 ? round : sorted.filter((x) => on(x, lo));
+	}
+	if (!xs.every((x) => Number.isInteger(x))) return ticks(scale, 5);
+	const step = Math.max(1, niceStep(Math.max(1, hi - lo), 5));
+	const out: number[] = [];
+	for (let value = Math.ceil(lo / step) * step; value <= hi; value += step) out.push(value);
+	return out;
+}
+
+const clamp = (value: number, scale: Scale) => Math.min(scale.max, Math.max(scale.min, value));
 
 function drawSeries(
 	series: Series,
@@ -186,23 +260,33 @@ function drawSeries(
 	px: (v: number) => number,
 	py: (v: number) => number,
 	plot: { x: number; y: number; w: number; h: number },
+	group: { index: number; count: number },
+	zero: number,
 ): SVGElement[] {
 	const cls = `tb-s${(index % 6) + 1}`;
 	const shape = series.shape ?? "line";
 
 	if (shape === "bar") {
-		const width = Math.max(1, (plot.w / Math.max(1, xs.length)) * 0.7);
+		const slot = (plot.w / Math.max(1, xs.length)) * 0.7;
+		const count = Math.max(1, group.count);
+		const width = Math.max(1, slot / count);
+		const offset = -slot / 2 + Math.max(0, group.index) * width;
 		return series.points.flatMap((point, i) => {
 			const x = xs[i];
 			if (point === null || x === undefined) return [];
+			/*
+			 * ⚠️ From zero, not from the floor of the plot. A bar used to run from its value down to the bottom
+			 * edge, which is only zero when the scale starts there: on a scale from -40 to 40 a bar of 10 was
+			 * drawn 50 tall, and a bar of -10 pointed down from -10 instead of up to zero.
+			 */
 			const y = py(point);
 			return [
 				svg("rect", {
 					class: `tb-bar ${cls}`,
-					x: px(x) - width / 2,
-					y,
+					x: px(x) + offset,
+					y: Math.min(y, zero),
 					width,
-					height: Math.max(0, plot.y + plot.h - y),
+					height: Math.abs(zero - y),
 				}),
 			];
 		});
@@ -299,7 +383,9 @@ const withUnit = (label: string, unit?: string) => (unit ? `${label} (${unit})` 
 function formatterFor(values: number[]): (value: number) => string {
 	const finite = values.filter((v) => Number.isFinite(v));
 	const step = finite.length > 1 ? Math.abs((finite[1] as number) - (finite[0] as number)) : Math.abs(finite[0] ?? 1);
-	const digits = step >= 10 ? 0 : step >= 1 ? 1 : step >= 0.1 ? 2 : 3;
+	// Whole-number ticks print as whole numbers: a frame axis reading "5.0, 10.0" suggests frames in between.
+	const whole = finite.length > 0 && finite.every((v) => Number.isInteger(v));
+	const digits = whole ? 0 : step >= 10 ? 0 : step >= 1 ? 1 : step >= 0.1 ? 2 : 3;
 	return (value) => {
 		if (!Number.isFinite(value)) return "—";
 		if (Math.abs(value) >= 10000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });

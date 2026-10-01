@@ -32,6 +32,14 @@
 		<tool-host tool="stress" mode="page"></tool-host>
 		<p class="source" data-tool="stress"><a href="https://github.com/eknowledger/toolbench/tree/main/bench/fixtures/stress/" rel="noopener">Source: bench/fixtures/stress/</a></p>
 
+		<h2>A card that has not drawn a chart yet</h2>
+		<p class="note">
+			This tool returns a chart, but a closed card with no seed has nothing to draw, so the chart renderer is
+			not fetched until the card is opened. If that fetch fails, the card still opens and says the chart could
+			not be loaded, instead of turning into an error box.
+		</p>
+		<tool-host tool="histogram" mode="card" id="chartless-card"></tool-host>
+
 		<h2>A tool that does not exist</h2>
 		<p class="note">A host will get this wrong eventually, so it has to fail legibly.</p>
 		<tool-host tool="not-a-real-tool" mode="card"></tool-host>

@@ -234,7 +234,8 @@ describe("card mode — the facade", () => {
 		await host.locator(".tb-form").waitFor();
 
 		assert.equal(await host.locator(".tb-output > *").count(), 0, "activation must not run the tool");
-		assert.match(String(await host.locator(".tb-status").textContent()), /press Run/);
+		// Nothing is on screen, so there is nothing to say: "press Run" only restated the button below it (#99).
+		assert.equal(String(await host.locator(".tb-status").textContent()).trim(), "");
 
 		await host.locator(".tb-run").click();
 		/*
@@ -724,6 +725,19 @@ describe("sample inputs — contract version 3", () => {
 		await page.close();
 	});
 
+	it("gives an autoRun tool no Run button and no instruction to press one (#104)", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const state = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			return { run: root?.querySelectorAll(".tb-run").length ?? -1, status: root?.querySelector(".tb-status")?.textContent ?? "" };
+		});
+		assert.equal(state.run, 0);
+		assert.doesNotMatch(state.status, /press Run/);
+		await page.close();
+	});
+
 	/*
 	 * The other branch of #applySample. percentiles above proves a sample fills and stops; histogram sets
 	 * `autoRun`, so the same click must also produce a result, and the status must be the run's own rather
@@ -737,18 +751,22 @@ describe("sample inputs — contract version 3", () => {
 		await page.waitForSelector("#host >> .tb-samples");
 
 		/*
-		 * ⚠️ `autoRun` fires from #inputChanged only, never on load, so there is no result on the page yet.
-		 * Asserting that first is what stops "a result exists afterwards" from being true either way.
+		 * ⚠️ An `autoRun` tool computes its default answer on arrival (#104), so a result is already on the
+		 * page. What the sample has to prove is that it produces a DIFFERENT one, so the data table's text is
+		 * compared before and after rather than asking whether any result exists.
 		 */
 		const before = await page.locator("#host >> .tb-textarea").inputValue();
-		assert.equal(
-			await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.children.length ?? -1),
-			0,
-			"autoRun means as the reader types, not on arrival: a fresh page must show no result",
-		);
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const tableOf = () => page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? "");
+		const firstTable = await tableOf();
+		assert.ok(firstTable.length > 0, "an autoRun tool shows its default result on arrival, with no Run button to press");
 
 		await page.locator('#host >> .tb-sample:text-is("One spike")').click();
-		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		await page.waitForFunction(
+			(previous) => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? previous) !== previous,
+			firstTable,
+			{ timeout: 10_000 },
+		);
 		const after = await page.evaluate(() => {
 			const root = document.querySelector("#host")?.shadowRoot;
 			return {
@@ -1401,6 +1419,28 @@ describe("expanding a truncated result in place", () => {
 		assert.equal(await plain.locator(".tb-more").count(), 0);
 		await page.close();
 	});
+
+	it("keeps a card's chart the same size when the rest is expanded (#100)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const h = page.locator("#expandable-chart-card");
+		await h.scrollIntoViewIfNeeded();
+		await h.locator(".tb-facade").click();
+		await h.locator(".tb-run").click();
+		await h.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+		const size = () =>
+			h.locator(".tb-out-chart svg").first().evaluate((svg) => {
+				const box = svg.getBoundingClientRect();
+				return { width: Math.round(box.width), height: Math.round(box.height), card: svg.closest(".tb-out-chart")?.classList.contains("tb-out-chart-card") };
+			});
+		const before = await size();
+		assert.equal(before.card, true, "a card draws its chart at card size");
+		await h.locator(".tb-disclose").click();
+		await h.locator(".tb-disclose[aria-expanded=true]").waitFor();
+		const after = await size();
+		assert.deepEqual(after, before, "expanding shows more parts; it does not redraw the chart already on screen at another size");
+		await page.close();
+	});
 });
 
 describe("bar chart geometry", () => {
@@ -1415,7 +1455,7 @@ describe("bar chart geometry", () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
 		await page.locator("#host").scrollIntoViewIfNeeded();
-		await page.locator("#host >> .tb-run").click();
+		// histogram is `autoRun`, so its default chart is drawn on arrival and there is no Run to press.
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
 
 		const geometry = await page.evaluate(() => {
@@ -1480,6 +1520,119 @@ describe("bar chart geometry", () => {
 	});
 });
 
+describe("charts over whole-number x values (#111)", () => {
+	/*
+	 * Every expectation here is worked out from the data in `bench/fixtures/discrete-series`, not read off
+	 * the renderer: frames 1 to 20, a deadline of 20n + 70 ms, arrivals of 20n + 30, and frame 5 lost.
+	 */
+	async function chartFor(value: string) {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
+		/*
+		 * Through the host API, and waiting on the run itself. Selecting the option and waiting for "a chart"
+		 * reads whichever chart is on screen first, which for an autoRun tool can be the default case.
+		 */
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async (c) => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { case: c };
+			await host.run();
+		}, value);
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const read = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			const num = (el: Element, name: string) => Number(el.getAttribute(name));
+			const ticks = [...(svg?.querySelectorAll("text.tb-tick") ?? [])].map((t) => ({
+				text: t.textContent ?? "",
+				x: num(t, "x"),
+				y: num(t, "y"),
+				anchor: t.getAttribute("text-anchor"),
+			}));
+			const bars = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => ({
+				x: num(r, "x"),
+				y: num(r, "y"),
+				width: num(r, "width"),
+				height: num(r, "height"),
+				series: [...r.classList].find((c) => /^tb-s\d$/.test(c)) ?? "",
+			}));
+			const grid = [...(svg?.querySelectorAll("line.tb-grid") ?? [])].map((l) => num(l, "y1"));
+			return { ticks, bars, grid };
+		});
+		await page.close();
+		// y labels are right-anchored at the axis, x labels centred under the plot.
+		return {
+			...read,
+			yLabels: read.ticks.filter((t) => t.anchor === "end").map((t) => t.text),
+			xLabels: read.ticks.filter((t) => t.anchor === "middle").map((t) => t.text),
+		};
+	}
+
+	it("labels a frame axis with whole frames, and a time axis in round steps", async () => {
+		// Data runs from 50 (frame 1 arrives) to 470 (frame 20's deadline). Five intervals of 100 cover it.
+		const chart = await chartFor("lines");
+		assert.deepEqual(chart.yLabels, ["0", "100", "200", "300", "400", "500"]);
+		assert.deepEqual(chart.xLabels, ["5", "10", "15", "20"]);
+	});
+
+	it("puts two bar series side by side, never on top of each other", async () => {
+		const chart = await chartFor("two-bars");
+		const first = chart.bars.filter((b) => b.series === "tb-s1");
+		const second = chart.bars.filter((b) => b.series === "tb-s2");
+		assert.equal(first.length, 20);
+		assert.equal(second.length, 20);
+		first.forEach((a, i) => {
+			const b = second[i];
+			assert.ok(b, `frame ${i + 1} has a bar in each series`);
+			assert.ok(a.x + a.width <= b.x + 1e-6, `frame ${i + 1}: the first series ends at ${a.x + a.width}, the second starts at ${b.x}`);
+		});
+		// Repair at 330 leaves frames 5 to 12 late by 160, 140 ... 20, so the tallest second-series bar is frame 5.
+		const tallest = second.reduce((best, bar, i) => (bar.height > (second[best]?.height ?? 0) ? i : best), 0);
+		assert.equal(tallest, 4);
+	});
+
+	it("draws nothing for a series of zeros, on an axis that does not go below zero", async () => {
+		const chart = await chartFor("zero-bars");
+		assert.ok(chart.bars.every((b) => b.height === 0), `bar heights: ${chart.bars.map((b) => b.height).join(",")}`);
+		assert.ok(chart.yLabels.every((label) => !label.startsWith("-") && !label.startsWith("−")), `y labels: ${chart.yLabels.join(", ")}`);
+		// The value, not its spelling: a 0.2-step axis prints two decimals, which is the formatter's rule and not this fix.
+		assert.equal(Number(chart.yLabels[0]), 0);
+	});
+
+	it("grows bars up and down from zero, not from the floor of the plot", async () => {
+		// Values -10, 10, -30, 40: the scale is -40 to 40, and every bar has one edge on the zero gridline.
+		const chart = await chartFor("signed-bars");
+		const zeroTick = chart.ticks.find((t) => t.anchor === "end" && t.text === "0");
+		assert.ok(zeroTick, `a 0 on the y axis, got ${chart.yLabels.join(", ")}`);
+		const zeroY = zeroTick.y - 4; // the label sits 4 units below its gridline
+		const [minus10, plus10, minus30, plus40] = chart.bars;
+		assert.ok(minus10 && plus10 && minus30 && plus40, "four bars");
+		assert.ok(Math.abs(plus10.y + plus10.height - zeroY) < 0.5, "a positive bar ends on zero");
+		assert.ok(Math.abs(minus10.y - zeroY) < 0.5, "a negative bar starts on zero");
+		assert.ok(Math.abs(plus40.height - 4 * plus10.height) < 0.5, "40 is four times as tall as 10");
+		assert.ok(Math.abs(minus30.height - 3 * minus10.height) < 0.5, "-30 is three times as tall as -10");
+	});
+
+	it("puts a bar chart's x labels on bars, not between them", async () => {
+		// The histogram's bins are two apart; any label must name one of them.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=histogram`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement & { run(): Promise<void> }).run());
+		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const geometry = await page.evaluate(() => {
+			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
+			const centres = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => Number(r.getAttribute("x")) + Number(r.getAttribute("width")) / 2);
+			const labels = [...(svg?.querySelectorAll("text.tb-tick[text-anchor=middle]") ?? [])].map((t) => Number(t.getAttribute("x")));
+			return { centres, labels };
+		});
+		await page.close();
+		assert.ok(geometry.labels.length > 1, "more than one x label");
+		for (const x of geometry.labels) {
+			assert.ok(geometry.centres.some((c) => Math.abs(c - x) < 0.5), `x label at ${x} is not on any bar (${geometry.centres.join(", ")})`);
+		}
+	});
+});
+
 describe("the chart renderer is its own chunk", () => {
 	/*
 	 * The saving is only real if the chunk stays unfetched for pages that never draw a chart, and the
@@ -1538,6 +1691,48 @@ describe("the chart renderer is its own chunk", () => {
 			"and exactly once: the module is cached, not re-imported per draw",
 		);
 		await page.close();
+	});
+
+	it("is not fetched by a closed card that has no chart to draw yet (#97)", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/failure.html`, { waitUntil: "load" });
+		const card = page.locator("#chartless-card");
+		await card.locator(".tb-facade").waitFor({ timeout: 10_000 });
+		assert.equal(scripts.filter((url) => chartChunk.test(url)).length, 0, "histogram declares series, but a closed unseeded card draws none");
+
+		await card.locator(".tb-facade").click();
+		// Through the host API rather than the Run button, which an autoRun tool may not have.
+		await card.evaluate((host) => (host as HTMLElement & { run(): Promise<void> }).run());
+		await card.locator(".tb-out-chart svg").waitFor({ timeout: 15_000 });
+		assert.equal(scripts.filter((url) => chartChunk.test(url)).length, 1, "opening it is what fetches the renderer");
+		await page.close();
+	});
+
+	it("leaves every card working when the chart renderer cannot be fetched (#97)", async () => {
+		const page = await browser.newPage();
+		await page.route(chartChunk, (route) => route.abort());
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		// The seeded queue-explorer card needs the chart to paint its seed: it paints the rest instead.
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-facade").waitFor({ timeout: 10_000 });
+		assert.equal(await seeded.locator(".tb-out-error").count(), 0, "no error box in place of the card");
+		assert.match(String(await seeded.locator(".tb-facade").textContent()), /The chart could not be loaded/);
+		await page.close();
+
+		// An unseeded card opens and runs, and says the chart is missing rather than failing.
+		const other = await browser.newPage();
+		await other.route(chartChunk, (route) => route.abort());
+		await other.goto(`${BASE}/failure.html`, { waitUntil: "load" });
+		const card = other.locator("#chartless-card");
+		await card.locator(".tb-facade").click();
+		await card.evaluate((host) => (host as HTMLElement & { run(): Promise<void> }).run());
+		await card.locator(".tb-output").getByText("The chart could not be loaded.").waitFor({ timeout: 15_000 });
+		assert.equal(await card.locator(".tb-out-error").count(), 0);
+		await other.close();
 	});
 });
 
@@ -1852,6 +2047,52 @@ describe("lifecycle status", () => {
 });
 
 describe("accessibility wiring", () => {
+	it("moves focus to the answer for a keyboard Run, not for a mouse click (#101)", async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		const run = page.locator("#host >> .tb-run");
+		await run.waitFor();
+		const where = () =>
+			page.evaluate(() => ({
+				scrollY: window.scrollY,
+				onOutput: document.querySelector("#host")?.shadowRoot?.activeElement?.classList.contains("tb-output") === true,
+			}));
+
+		await run.scrollIntoViewIfNeeded();
+		const before = await where();
+		await run.click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
+		const afterClick = await where();
+		assert.equal(afterClick.onOutput, false, "a pointer press leaves focus where the reader is");
+		assert.equal(afterClick.scrollY, before.scrollY, "and does not scroll the page to the result");
+
+		await run.focus();
+		await page.keyboard.press("Enter");
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.activeElement?.classList.contains("tb-output") === true, null, {
+			timeout: 10_000,
+		});
+		// The ring it then wears is the theme's accent outline, not the browser's default (#99).
+		const ring = await page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement;
+			const output = host.shadowRoot?.querySelector(".tb-output") as HTMLElement;
+			const probe = document.createElement("span");
+			probe.style.color = getComputedStyle(host).getPropertyValue("--tb-accent");
+			document.body.append(probe);
+			const accent = getComputedStyle(probe).color;
+			probe.remove();
+			const style = getComputedStyle(output);
+			return { style: style.outlineStyle, color: style.outlineColor, accent };
+		});
+		/*
+		 * Engines differ on whether focus moved by script after a key press is :focus-visible: Chromium and
+		 * WebKit draw a ring, Firefox draws none. What must hold in every engine is that a ring, when there
+		 * is one, is the theme's accent and never the browser's default.
+		 */
+		assert.ok(ring.style === "none" || (ring.style === "solid" && ring.color === ring.accent), `ring ${ring.style} ${ring.color}, accent ${ring.accent}`);
+		assert.notEqual(ring.style, "auto", "never the browser's default ring");
+		await page.close();
+	});
+
 	it("names the facade button with the visible try/open hint, not just Open plus the tool name", async () => {
 		/*
 		 * WCAG 2.5.3 (Label in Name). The facade is one button wrapping the card body. Its visible
@@ -1870,7 +2111,8 @@ describe("accessibility wiring", () => {
 			const read = (host: Element | null) => {
 				const root = host?.shadowRoot;
 				const hint = root?.querySelector(".tb-facade-hint")?.textContent ?? "";
-				const name = root?.querySelector(".tb-facade")?.getAttribute("aria-label") ?? "";
+				// The hint itself is the button now (#98, #105), so it carries the name.
+				const name = root?.querySelector("button.tb-facade-hint")?.getAttribute("aria-label") ?? "";
 				return { hint, name };
 			};
 			return {
@@ -1892,6 +2134,61 @@ describe("accessibility wiring", () => {
 			`unseeded facade name "${names.unseeded.name}" must contain the visible hint "${names.unseeded.hint}"`,
 		);
 		assert.match(names.unseeded.name, /Percentiles/);
+		await page.close();
+	});
+
+	it("keeps a card's contents out of its button, so they are announced and nothing is nested (#98, #105)", async () => {
+		/*
+		 * The three axe failures had one cause: the whole card inside a <button>. Asserted structurally, since
+		 * axe is not a dependency here and two of the three rules are skipped by its default tags anyway.
+		 */
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-facade .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		const shape = await seeded.evaluate((host) => {
+			const root = host.shadowRoot as ShadowRoot;
+			const buttons = [...root.querySelectorAll("button")];
+			const summary = root.querySelector(".tb-chart-data summary");
+			return {
+				buttons: buttons.map((b) => ({ cls: b.className, text: b.textContent?.trim() ?? "", name: b.getAttribute("aria-label") ?? "" })),
+				blurbInButton: Boolean(root.querySelector(".tb-blurb")?.closest("button")),
+				seedInButton: Boolean(root.querySelector(".tb-out-chart")?.closest("button")),
+				summaryInButton: Boolean(summary?.closest("button")),
+				summaryHeight: summary?.getBoundingClientRect().height ?? 0,
+			};
+		});
+		assert.deepEqual(
+			shape.buttons.map((b) => b.cls),
+			["tb-facade-hint"],
+			"a closed card has exactly one button, the hint",
+		);
+		assert.ok(shape.buttons[0]?.name.startsWith(shape.buttons[0]?.text ?? "?"), "its name starts with its visible text (WCAG 2.5.3)");
+		assert.equal(shape.blurbInButton, false, "the blurb is content, reachable by a screen reader");
+		assert.equal(shape.seedInButton, false, "and so is the seeded answer");
+		assert.equal(shape.summaryInButton, false, "the data-table disclosure is not nested in a button (WCAG 4.1.2)");
+		assert.ok(shape.summaryHeight >= 24, `the disclosure is a 24px target (WCAG 2.5.8), measured ${shape.summaryHeight}px`);
+		await page.close();
+	});
+
+	it("opens a card from anywhere on it, and from the keyboard, but not from a control inside it (#98)", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		// A click on the blurb opens the card, as it always did.
+		const byClick = page.locator("tool-host[tool=percentiles]").first();
+		await byClick.locator(".tb-blurb").click();
+		await byClick.locator(".tb-form").waitFor({ timeout: 10_000 });
+
+		// Opening the seeded chart's data table does not open the card.
+		const seeded = page.locator("tool-host[tool=queue-explorer][data-seed]");
+		await seeded.locator(".tb-chart-data summary").click();
+		assert.equal(await seeded.locator(".tb-chart-data").getAttribute("open"), "", "the table opened");
+		assert.equal(await seeded.locator(".tb-form").count(), 0, "and the card stayed closed");
+
+		// Enter on the hint opens it.
+		await seeded.locator("button.tb-facade-hint").focus();
+		await page.keyboard.press("Enter");
+		await seeded.locator(".tb-form").waitFor({ timeout: 10_000 });
 		await page.close();
 	});
 
@@ -2029,6 +2326,44 @@ describe("accessibility wiring", () => {
 		assert.equal(accents.themed, "#0b6b5f");
 		await page.close();
 	});
+
+	it("lets a host give accent text its own colour, while fills keep the accent (#106)", async () => {
+		// An amber bright enough for a button is not readable as small text on white, so the two can differ.
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=queue-explorer`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-foot a").first().waitFor({ timeout: 15_000 });
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot;
+				const link = root?.querySelector(".tb-foot a");
+				const run = root?.querySelector(".tb-run");
+				return { link: link ? getComputedStyle(link).color : "", run: run ? getComputedStyle(run).backgroundColor : "" };
+			});
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent", "rgb(245, 158, 11)"));
+		const accentOnly = await read();
+		assert.equal(accentOnly.run, "rgb(245, 158, 11)", "Run is filled with the accent");
+		assert.equal(accentOnly.link, "rgb(245, 158, 11)", "with no text token set, text follows the accent, as before");
+
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent-text", "rgb(164, 104, 5)"));
+		const both = await read();
+		assert.equal(both.run, "rgb(245, 158, 11)", "the fill does not move");
+		assert.equal(both.link, "rgb(164, 104, 5)", "the link takes the text token");
+
+		// And the label ON the fill has its own token, since white on a bright amber is 3.18:1 at best.
+		const ink = () => page.evaluate(() => getComputedStyle(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-run") as Element).color);
+		const surface = await page.evaluate(() => {
+			const probe = document.createElement("span");
+			probe.style.color = getComputedStyle(document.querySelector("#host") as Element).getPropertyValue("--tb-bg");
+			document.body.append(probe);
+			const c = getComputedStyle(probe).color;
+			probe.remove();
+			return c;
+		});
+		assert.equal(await ink(), surface, "by default the label is the surface colour, as before");
+		await page.evaluate(() => (document.querySelector("#host") as HTMLElement).style.setProperty("--tb-accent-ink", "rgb(0, 0, 0)"));
+		assert.equal(await ink(), "rgb(0, 0, 0)");
+		await page.close();
+	});
 });
 
 describe("host code highlight hook", () => {
@@ -2043,8 +2378,7 @@ describe("host code highlight hook", () => {
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
 		const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 		await host.scrollIntoViewIfNeeded();
-		await host.locator(".tb-run").waitFor();
-		await host.locator(".tb-run").click();
+		// json-code is `autoRun`: its default result arrives without a Run button to press.
 		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 		const painted = await page.evaluate(() => {
@@ -2087,8 +2421,7 @@ describe("host code highlight hook", () => {
 		await page.goto(`${BASE}/index.html?code=plain`, { waitUntil: "load" });
 		const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 		await host.scrollIntoViewIfNeeded();
-		await host.locator(".tb-run").waitFor();
-		await host.locator(".tb-run").click();
+		// json-code is `autoRun`: its default result arrives without a Run button to press.
 		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 		const plain = await page.evaluate(() => {
@@ -2126,7 +2459,6 @@ describe("host code highlight hook", () => {
 			await page.goto(`${BASE}/index.html?code=${mode}`, { waitUntil: "load" });
 			const host = page.locator('tool-host[tool="json-code"][mode="page"]');
 			await host.scrollIntoViewIfNeeded();
-			await host.locator(".tb-run").click();
 			await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
 
 			const shown = await page.evaluate(() => {

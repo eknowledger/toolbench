@@ -48,6 +48,14 @@ export const STYLES = /* css */ `
      cannot be reached from outside, so the tokens are the hook. */
   --tb-mark-fg:   var(--tb-warn);
   --tb-mark-bg:   var(--tb-accent-bg);
+  /* The accent as TEXT. A fill wants a bright accent and small text needs 4.5:1 on the surface, and for
+     an amber no single value is both: #d97706 is 3.19:1 on white. Defaults to the accent, so a host that
+     sets only --tb-accent sees no change. */
+  --tb-accent-text: var(--tb-accent);
+  /* Text ON an accent fill: the Run button's label, a marked byte. It was the surface colour, white on a
+     light page, which is 3.18:1 on #d97706; a bright accent wants dark text instead, black being 9.78:1
+     on #f59e0b. Defaults to the surface, so nothing changes unless a host sets it. */
+  --tb-accent-ink: var(--tb-bg);
 
   /* Series colours. Six, then they repeat — a chart needing seven is a chart needing a rethink. */
   --tb-s1: #8a5a00; --tb-s2: #5b3fa8; --tb-s3: #0f6e6e;
@@ -93,7 +101,7 @@ export const STYLES = /* css */ `
   min-height: 24px;
   padding-block: 2px;
 }
-.tb-name a:hover, .tb-name a:focus-visible { color: var(--tb-accent); text-decoration: underline; }
+.tb-name a:hover, .tb-name a:focus-visible { color: var(--tb-accent-text); text-decoration: underline; }
 .tb-blurb { margin: 0.25rem 0 0; color: var(--tb-muted); font-size: 0.9rem; }
 .tb-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.55rem; }
 .tb-mark {
@@ -129,7 +137,8 @@ export const STYLES = /* css */ `
 }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade:focus-visible, .tb-sample:focus-visible {
+/* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
@@ -140,7 +149,7 @@ export const STYLES = /* css */ `
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--tb-bg);
+  color: var(--tb-accent-ink);
   background: var(--tb-accent);
   border: 0;
   border-radius: 8px;
@@ -182,7 +191,7 @@ export const STYLES = /* css */ `
   border-radius: 999px;
   cursor: pointer;
 }
-.tb-sample:hover { border-color: var(--tb-accent); color: var(--tb-accent); }
+.tb-sample:hover { border-color: var(--tb-accent); color: var(--tb-accent-text); }
 
 .tb-progress[hidden] { display: none; }
 .tb-progress {
@@ -313,7 +322,7 @@ export const STYLES = /* css */ `
 .tb-tick, .tb-axis-label { fill: var(--tb-faint); font-family: var(--tb-mono); font-size: 10px; }
 .tb-axis-label { font-family: var(--tb-font); font-size: 11px; }
 .tb-annotation { stroke: var(--tb-accent); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
-.tb-annotation-label { fill: var(--tb-accent); font-family: var(--tb-mono); font-size: 10px; }
+.tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); font-size: 10px; }
 /* Each series class sets ONE custom property; the shape decides whether that is a stroke or a fill.
    The first version set stroke and fill together, which beat the line rule's "fill: none" on source
    order and drew every line as a filled blob. (No backticks in here: this is a template literal.) */
@@ -325,12 +334,14 @@ export const STYLES = /* css */ `
 .tb-s6 { --c: var(--tb-s6); }
 .tb-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .tb-area { stroke: none; fill: var(--c); opacity: 0.14; }
-.tb-bar  { stroke: none; fill: var(--c); opacity: 0.85; }
+/* Opaque, so a bar is the colour its legend swatch says it is. */
+.tb-bar  { stroke: none; fill: var(--c); }
 .tb-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.78rem; color: var(--tb-muted); }
 .tb-legend li { display: flex; align-items: center; gap: 0.375rem; }
 .tb-swatch { width: 0.75rem; height: 0.1875rem; border-radius: 2px; background: var(--c, currentColor); }
 .tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
-.tb-chart-data summary { color: var(--tb-faint); cursor: pointer; }
+/* 24px tall, the minimum target size (WCAG 2.5.8): at the text's own height it was 19px. */
+.tb-chart-data summary { color: var(--tb-faint); cursor: pointer; min-height: 24px; line-height: 24px; }
 .tb-chart-data table { margin-top: 0.5rem; }
 
 /* ── bytes ────────────────────────────────────────────────────────────────────────────────── */
@@ -357,7 +368,7 @@ export const STYLES = /* css */ `
    it is nearly the surface colour: every two and three-byte highlight was invisible, and only the one
    range that happened to carry a tone showed up at all. */
 .tb-byte[data-tone] { border-radius: 2px; }
-.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-bg); }
+.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-accent-ink); }
 .tb-byte[data-tone="good"]   { background: var(--tb-good); color: var(--tb-bg); }
 .tb-byte[data-tone="warn"]   { background: var(--tb-warn); color: var(--tb-bg); }
 .tb-byte[data-tone="bad"]    { background: var(--tb-bad); color: var(--tb-bg); }
@@ -373,14 +384,18 @@ export const STYLES = /* css */ `
 .tb-bytes-legend li[data-tone="bad"]  .tb-bytes-swatch { background: var(--tb-bad); }
 
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
-.tb-facade {
-  display: block; width: 100%; text-align: start;
-  font: inherit; color: inherit; background: none; border: 0; padding: 0;
-  cursor: pointer;
-}
+/* Ordinary content, clickable as a whole; the hint inside it is the button (#98, #105). */
+.tb-facade { cursor: pointer; }
 .tb-facade-hint {
   display: inline-flex; align-items: center; gap: 0.375rem;
-  font-size: 0.8rem; font-weight: 600; color: var(--tb-accent);
+  font-size: 0.8rem; font-weight: 600; color: var(--tb-accent-text);
+}
+/* The hint as a button: no button chrome, and a 24px target (WCAG 2.5.8). */
+button.tb-facade-hint {
+  font-family: inherit; background: none; border: 0; padding: 0; margin: 0;
+  min-height: 24px; cursor: pointer;
+  /* The card body is a grid, which would stretch the button, and its focus ring, across the card. */
+  justify-self: start;
 }
 .tb-facade-hint::before {
   content: ""; width: 0; height: 0;
@@ -389,7 +404,7 @@ export const STYLES = /* css */ `
 .tb-facade:hover .tb-facade-hint { text-decoration: underline; }
 
 .tb-foot { display: flex; gap: 0.875rem; flex-wrap: wrap; padding: 0 1rem 0.875rem; font-size: 0.8rem; }
-.tb-foot a { color: var(--tb-accent); text-decoration: none; }
+.tb-foot a { color: var(--tb-accent-text); text-decoration: none; }
 .tb-foot a:hover { text-decoration: underline; }
 
 /* Screen-reader-only, for the announcements that should not take space. */
