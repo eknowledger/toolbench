@@ -177,6 +177,7 @@ export function render(output: Output, options: RenderOptions = {}): HTMLElement
 	const node = draw(output, options);
 	node.setAttribute("data-kind", output.kind);
 	if (output.role) node.setAttribute("data-role", output.role);
+	if (output.id) node.setAttribute("data-part", output.id);
 	return node;
 }
 

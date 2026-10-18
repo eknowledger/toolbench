@@ -90,7 +90,8 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		from: 4,
 		/*
-		 * 4 → 5 added names only: `role` on a part and on a field, and the `muted` tone on fields and cells.
+		 * 4 → 5 added names only: `role` on a part and on a field, `id` on a part, and the `muted` tone on
+		 * fields and cells.
 		 *
 		 * Identity on both halves. A v4 part without a role is a part with no name, which is what it was,
 		 * and inventing one would be a guess about what the tool meant.

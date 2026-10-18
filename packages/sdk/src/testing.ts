@@ -102,6 +102,12 @@ export async function assertCases(
 
 /** Returns undefined when the output matches, or a description of the first difference. */
 export function compare(actual: Output, testCase: Case): string | undefined {
+	/*
+	 * Checked on every case, whatever the matching mode, because it is a property of the tool rather than
+	 * of one answer: a page linking to a part by id would open whichever came first, with nothing saying so.
+	 */
+	const twice = repeatedPartId(actual, new Set());
+	if (twice !== undefined) return `output: part id "${twice}" is used twice. host.reveal(id) needs each id once per result.`;
 	const mode = testCase.match ?? "exact";
 	if (mode === "subset") {
 		if (!testCase.why) {
@@ -235,6 +241,20 @@ function subset(actual: Output, testCase: Case): string | undefined {
 }
 
 /** Every part of a possibly-nested group, in order, excluding the groups themselves. */
+/** The first part `id` that appears twice in one result, at any depth. Contract version 5. */
+function repeatedPartId(output: Output, seen: Set<string>): string | undefined {
+	if (output.id !== undefined) {
+		if (seen.has(output.id)) return output.id;
+		seen.add(output.id);
+	}
+	if (output.kind !== "group") return undefined;
+	for (const part of output.parts) {
+		const found = repeatedPartId(part, seen);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
 function flatten(output: Output): Output[] {
 	return output.kind === "group" ? output.parts.flatMap(flatten) : [output];
 }

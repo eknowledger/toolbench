@@ -72,6 +72,19 @@ describe("compare — subset, and its guard rails", () => {
 		assert.equal(compare(actual, testCase), undefined);
 	});
 
+	it("refuses a result that uses one part id twice, in any matching mode (contract 5)", () => {
+		const twice: Output = {
+			kind: "group",
+			parts: [
+				{ kind: "text", id: "trade", text: "a" },
+				{ kind: "group", parts: [{ kind: "text", id: "trade", text: "b" }] },
+			],
+		};
+		assert.match(String(compare(twice, { ...base, expect: twice })), /part id "trade" is used twice/);
+		const once: Output = { kind: "group", parts: [{ kind: "text", id: "trade", text: "a" }, { kind: "text", id: "cost", text: "b" }] };
+		assert.equal(compare(once, { ...base, expect: once }), undefined);
+	});
+
 	it("says what it looked at when no part matches", () => {
 		const actual: Output = { kind: "group", parts: [{ kind: "text", text: "hello" }] };
 		const testCase: Case = { ...base, match: "subset", why: "composite output", fieldCount: 1, expect: fields(["a", "1"]) };

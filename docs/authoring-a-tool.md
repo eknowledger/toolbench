@@ -525,9 +525,9 @@ used decoratively implies a distinction the reader cannot see.
 Two notes on `group`. Order matters: a **card renders only the first part**, so put the part that works
 alone at the front. And declare every kind you use, `"group"` included.
 
-### Naming parts for a host's stylesheet
+### Naming parts for a host's stylesheet and links
 
-Contract version 5 (`"sdk": 5`) adds two things a host's CSS can use. Neither changes how anything looks
+Contract version 5 (`"sdk": 5`) adds three things a host can use. None changes how anything looks
 on a host that styles nothing.
 
 * **`role`** on any part, or on any field: a name such as `"verdict"` or `"stats"`, rendered as
@@ -537,6 +537,15 @@ on a host that styles nothing.
   ```ts
   { kind: "fields", role: "stats", fields: [{ label: "Checked", value: "8" }, { label: "Risky", value: "2" }] }
   { kind: "fields", fields: [{ label: "Verdict", value: "2 fields accept any text", tone: "bad", role: "verdict" }] }
+  ```
+
+* **`id`** on any part: a name unique within the result, rendered as `data-part`, so a page can link to
+  that one part with `host.reveal(id)`. Where `role` says what kind of part it is, `id` says which one.
+  Keep it stable across inputs, because a page's link is written once. A fixture fails if a result uses
+  one id twice.
+
+  ```ts
+  { kind: "series", id: "trade", chart }
   ```
 
 * **`tone: "muted"`** on a field or a table cell, for the routine majority of a dense table, so the cells
