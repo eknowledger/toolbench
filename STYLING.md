@@ -70,6 +70,7 @@ same order, so the cascade is the same.
 | `.tb-status` | The visible status line |
 | `.tb-output` | Where the result is drawn |
 | `.tb-more`, `.tb-disclose`, `.tb-rest` | A truncated result's notice, its expand button, and the parts it reveals |
+| `.tb-copy-bar`, `.tb-copy`, `.tb-copy-note` | Under a code or table result: the row, its Copy button, and the note beside it saying whether the copy worked. Not on a closed card |
 | `.tb-foot` | Links under the tool |
 
 ### Result parts
@@ -82,9 +83,9 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 |---|---|---|
 | `group` | `.tb-group` | One root per part |
 | `fields` | `.tb-out-fields` | `.tb-fields` (a `<dl>`, for grouped and ungrouped fields alike), `.tb-field-group` with an `<h4>` for a group, `.tb-field` (with `<dt>` and `<dd>`), `.tb-value`, `.tb-note` |
-| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>` |
+| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>`, then `.tb-copy-bar` |
 | `text` | `.tb-out-text` | A `<p>`, or a `<pre class="tb-mono">` |
-| `code` | `.tb-out-code` | `<pre><code class="language-…">` |
+| `code` | `.tb-out-code` | `<pre><code class="language-…">`, then `.tb-copy-bar` |
 | `bytes` | `.tb-out-bytes` | `.tb-bytes-grid`, `.tb-bytes-row`, `.tb-bytes-offset`, `.tb-bytes-hex`, `.tb-bytes-ascii`, `.tb-byte`, `.tb-bytes-legend`, `.tb-bytes-caption` |
 | every chart kind | `.tb-out-chart`, plus `.tb-out-chart-card` on a card | The chart's own markup. Not covered: see below |
 | `graph` | `.tb-out-graph` | `.tb-graph-plot` (the picture, one tab stop), `.tb-graph-readout`, `.tb-graph-data` (the edge table, a `<details>`), `.tb-graph-message` (why a graph is listed instead of drawn, or that it is being laid out). Inside the picture, the parts below |

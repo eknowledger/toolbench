@@ -718,6 +718,8 @@ export class ToolHost extends HTMLElement {
 							this.#seed,
 							withHostHighlight({
 								compact,
+								// No Copy either: nothing here can announce whether it worked, and the preview's job is to open.
+								copy: false,
 								/*
 								 * No `more` here on purpose. This is the facade, and in card mode the whole preview
 								 * is inside a button: a disclosure button nested in it would be invalid and would
@@ -819,6 +821,19 @@ export class ToolHost extends HTMLElement {
 			this.#draw(this.#shown);
 			const next = output.querySelector(".tb-disclose");
 			if (next instanceof HTMLButtonElement) next.focus();
+		});
+		/*
+		 * A Copy button's outcome (#155), said in the unseen region: the note beside the button is what a
+		 * sighted reader sees, and it is aria-hidden so this is not heard twice. Written directly rather than
+		 * through `#announce`, which also clears the visible line, and copying does not answer "inputs changed".
+		 *
+		 * ⚠️ Emptied first, then written a frame later. A second copy would otherwise write the same "Copied"
+		 * into the region, which is not a change, and a screen reader would say nothing the second time.
+		 */
+		output.addEventListener("tb-copy", (event) => {
+			const { message } = (event as CustomEvent<{ message: string }>).detail;
+			announce.textContent = "";
+			setTimeout(() => (announce.textContent = message), 50);
 		});
 
 		this.#els = { run, progress, status, announce, output };

@@ -148,8 +148,13 @@ const BUDGETS = [
 	 *
 	 * The graph families (#152) moved it 3 bytes, to 26,514, and passing the host's worker factory to a large
 	 * graph spent 17 more, 26,531, both inside it.
+	 *
+	 * Raised from 27_000 to 27_500 by the Copy action on code and table results (#155), in the commit that
+	 * spent it: 26,531 to 27,060 measured, 529 bytes. The button, its note and their styles, drawn with the
+	 * result, and the host announcing the outcome. The copying itself is a chunk of its own, below; built into
+	 * this chunk instead it cost 685 here, measured on v6. 27_000 would have left the build 60 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -247,6 +252,13 @@ const BUDGETS = [
 	 * other page pays nothing for it. Reader cost, because that reader does download it. 956 measured.
 	 */
 	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
+	/*
+	 * What a Copy button does (#155): the clipboard write, the tab-separated form of a table with spreadsheet
+	 * quoting and its guard against a pasted formula, the fallback that selects the text, and the words for
+	 * each outcome. Fetched when the first code or table result is drawn, so a page with neither pays nothing.
+	 * Reader cost: that reader downloads it. 576 measured, 63 of them the formula guard.
+	 */
+	{ label: "copy action", pattern: /^copy-[^/]+\.js$/, budget: 1_000 },
 	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *

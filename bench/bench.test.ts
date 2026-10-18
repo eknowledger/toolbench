@@ -3762,6 +3762,227 @@ describe("host code highlight hook", () => {
 
 });
 
+describe("the Copy action on code and tables (#155)", () => {
+	/*
+	 * The clipboard is stubbed in every test, before any page script runs. That is the only way to see the
+	 * exact text written in all three engines, since Firefox and WebKit grant no clipboard permission to an
+	 * automated page, and it is how the refused and the missing clipboard are produced on demand.
+	 */
+	type Clipboard = "records" | "refuses" | "missing";
+	const open = async (path: string, clipboard: Clipboard) => {
+		const page = await browser.newPage();
+		await page.addInitScript((mode: Clipboard) => {
+			const w = window as unknown as { copied: string[] };
+			w.copied = [];
+			const stub =
+				mode === "missing"
+					? undefined
+					: {
+							writeText: (text: string) => {
+								if (mode === "refuses") return Promise.reject(new DOMException("Write permission denied.", "NotAllowedError"));
+								w.copied.push(text);
+								return Promise.resolve();
+							},
+						};
+			Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => stub });
+		}, clipboard);
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		return page;
+	};
+	// The json-code fixture's default, pretty-printed: the same hand-derived string the highlight tests use.
+	const pretty = '{\n  "ok": true,\n  "n": 3\n}';
+	const jsonHost = 'tool-host[tool="json-code"][mode="page"]';
+
+	const state = (page: Page, host: string) =>
+		page.evaluate((host) => {
+			const root = document.querySelector(host)?.shadowRoot;
+			return {
+				copied: (window as unknown as { copied: string[] }).copied,
+				announced: root?.querySelector(".tb-announce")?.textContent ?? "",
+				note: root?.querySelector(".tb-copy-note")?.textContent ?? "",
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+				selected: (root as ShadowRoot & { getSelection?: () => Selection | null })?.getSelection?.()?.toString() ?? document.getSelection()?.toString() ?? "",
+			};
+		}, host);
+
+	it("copies a code result's source exactly, from the keyboard, and announces it", async () => {
+		const page = await open("index.html", "records");
+		const host = page.locator(jsonHost);
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+		const button = host.locator(".tb-out-code .tb-copy");
+		assert.equal(await button.evaluate((b) => b.tagName), "BUTTON", "a real button, so it is focusable and announced as one");
+		assert.equal(await button.textContent(), "Copy code", "a visible label, not an icon");
+		const box = await button.boundingBox();
+		assert.ok(box && box.height >= 24, `a 24px target for WCAG 2.5.8, got ${box?.height}`);
+		// Enabled once the copy chunk is here; focusing it before then would press nothing.
+		await host.locator(".tb-out-code .tb-copy:enabled").waitFor();
+		await button.focus();
+		await page.keyboard.press("Enter");
+		await page.waitForFunction((host) => document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Copied", jsonHost);
+		const after = await state(page, jsonHost);
+		assert.deepEqual(after.copied, [pretty], "the source, exactly, and once");
+		assert.equal(after.note, "Copied", "a sighted reader sees it beside the button");
+		assert.equal(await host.locator(".tb-copy-note").getAttribute("aria-hidden"), "true", "and does not hear it twice");
+		assert.equal(after.status, "", "the visible status line is left alone");
+
+		// A second press announces again: the region is emptied and rewritten, so the same word is still a change.
+		await page.evaluate((host) => {
+			const region = document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce");
+			(window as unknown as { cleared: boolean }).cleared = false;
+			if (region) new MutationObserver(() => region.textContent === "" && ((window as unknown as { cleared: boolean }).cleared = true)).observe(region, { childList: true, characterData: true, subtree: true });
+		}, jsonHost);
+		await page.keyboard.press("Space");
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length === 2);
+		await page.waitForFunction((host) => document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Copied", jsonHost);
+		assert.equal(await page.evaluate(() => (window as unknown as { cleared: boolean }).cleared), true, "the region was emptied between the two");
+		await page.close();
+	});
+
+	for (const clipboard of ["refuses", "missing"] as const) {
+		it(`says so when the clipboard ${clipboard === "refuses" ? "refuses the write" : "does not exist"}, and selects the text instead`, async () => {
+			const page = await open("index.html", clipboard);
+			const errors: string[] = [];
+			page.on("pageerror", (error) => errors.push(String(error)));
+			const host = page.locator(jsonHost);
+			await host.scrollIntoViewIfNeeded();
+			await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+			await host.locator(".tb-out-code .tb-copy").click();
+			await page.waitForFunction((host) => /^Copy failed/.test(document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce")?.textContent ?? ""), jsonHost);
+			const after = await state(page, jsonHost);
+			assert.deepEqual(after.copied, [], "nothing was written");
+			assert.equal(after.announced, "Copy failed. The text is selected, so you can copy it yourself");
+			assert.equal(after.note, "Copy failed: the text is selected instead", "visible beside the button, and it stays");
+			assert.equal(after.selected.trim(), pretty, "the block's text is the selection, ready for the keyboard");
+			assert.deepEqual(errors, [], "a refused clipboard is not an uncaught error");
+			await page.close();
+		});
+	}
+
+	it("copies a table as tab-separated text, header first", async () => {
+		const page = await open("styling.html", "records");
+		const host = page.locator("#audit");
+		await host.scrollIntoViewIfNeeded();
+		await host.locator('.tb-output [data-kind="table"]').waitFor({ timeout: 15_000 });
+		const button = host.locator('[data-kind="table"] .tb-copy');
+		assert.equal(await button.textContent(), "Copy table");
+		await button.click();
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length === 1);
+		/*
+		 * Written out by hand from the styled-output fixture's table with "Limits added" off: an unnamed first
+		 * column, so the header starts with a tab; the Risk cell's text and not its tone; numbers as written.
+		 */
+		const expected = [
+			"\tType\tAccepts\tRisk\tBytes\tChecked by",
+			"username\tstring\tany text\thigh\t64\t3 tools",
+			"email\tstring\taddress\tlow\t254\t4 tools",
+			"age\tinteger\t0 to 150\troutine\t1\t2 tools",
+		].join("\n");
+		assert.deepEqual((await state(page, "#audit")).copied, [expected]);
+		await page.close();
+	});
+
+	/*
+	 * The copying is its own chunk, fetched when the first code or table result is drawn. The button is on
+	 * screen with the result regardless, so these hold the chunk back with a route to see the gap a slow
+	 * connection would open, and refuse it to see a page that never gets it.
+	 */
+	const copyChunk = /\/assets\/copy-[^/]+\.js$/;
+
+	it("shows the button disabled until its chunk arrives, then copies", async () => {
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const w = window as unknown as { copied: string[] };
+			w.copied = [];
+			Object.defineProperty(Navigator.prototype, "clipboard", {
+				configurable: true,
+				get: () => ({ writeText: (text: string) => (w.copied.push(text), Promise.resolve()) }),
+			});
+		});
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route(copyChunk, async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const host = page.locator(jsonHost);
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+		const button = host.locator(".tb-out-code .tb-copy");
+		assert.equal(await button.isVisible(), true, "the button is drawn with the result");
+		assert.equal(await button.isDisabled(), true, "and disabled while there is nothing behind it");
+		release();
+		await page.waitForFunction((host) => {
+			const b = document.querySelector(host)?.shadowRoot?.querySelector(".tb-out-code .tb-copy") as HTMLButtonElement | null;
+			return b !== null && !b.disabled;
+		}, jsonHost);
+		await button.click();
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length === 1);
+		assert.deepEqual(await page.evaluate(() => (window as unknown as { copied: string[] }).copied), [pretty]);
+		await page.close();
+	});
+
+	it("says so, and stays disabled, when its chunk cannot be fetched", async () => {
+		const page = await browser.newPage();
+		await page.route(copyChunk, (route) => route.abort());
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const host = page.locator(jsonHost);
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+		await page.waitForFunction((host) => (document.querySelector(host)?.shadowRoot?.querySelector(".tb-copy-note")?.textContent ?? "") !== "", jsonHost);
+		assert.equal(await host.locator(".tb-copy-note").textContent(), "Copy is unavailable: select the text instead");
+		assert.equal(await host.locator(".tb-out-code .tb-copy").isDisabled(), true);
+		await page.close();
+	});
+
+	it("fetches its chunk only for a result with code or a table in it", async () => {
+		const fetched = async (url: string, wait: string) => {
+			const page = await browser.newPage();
+			const scripts: string[] = [];
+			page.on("request", (request) => {
+				if (request.resourceType() === "script") scripts.push(request.url());
+			});
+			await page.goto(`${BASE}/${url}`, { waitUntil: "load" });
+			await page.locator("#host").scrollIntoViewIfNeeded();
+			await page.locator("#host >> .tb-run").click();
+			await page.locator(`#host >> ${wait}`).first().waitFor({ timeout: 15_000 });
+			await page.waitForTimeout(200);
+			await page.close();
+			return scripts.filter((s) => copyChunk.test(s)).length;
+		};
+		assert.equal(await fetched("tool.html?id=utf8-bytes", ".tb-out-bytes"), 0, "fields and bytes have no Copy, so nothing is fetched");
+		assert.equal(await fetched("tool.html?id=percentiles", ".tb-out-table"), 1, "a table fetches it, once");
+	});
+
+	it("is not on a closed card, whose preview is there to be opened", async () => {
+		const page = await open("index.html", "records");
+		// No card on the gallery is seeded with a table or code, so this one is made here, seeded with both.
+		await page.evaluate(() => {
+			const card = document.createElement("tool-host") as HTMLElement & { seed: unknown };
+			card.id = "copy-card";
+			card.setAttribute("tool", "styled-output");
+			card.setAttribute("mode", "card");
+			card.setAttribute("parts", "2");
+			card.seed = {
+				kind: "group",
+				parts: [
+					{ kind: "table", columns: [{ label: "a" }], rows: [["1"]] },
+					{ kind: "code", lang: "json", source: "{}" },
+				],
+			};
+			document.body.append(card);
+		});
+		await page.locator("#copy-card >> .tb-facade .tb-out-code").waitFor({ timeout: 15_000 });
+		const facade = await page.evaluate(() => {
+			const root = document.getElementById("copy-card")?.shadowRoot;
+			return { parts: root?.querySelectorAll(".tb-out-table, .tb-out-code").length ?? 0, copies: root?.querySelectorAll(".tb-copy").length ?? 0 };
+		});
+		assert.deepEqual(facade, { parts: 2, copies: 0 }, "both parts drawn, and no Copy inside the facade");
+		await page.close();
+	});
+});
+
 describe("typing keeps the browser's own undo", () => {
 	/*
 	 * Chrome ends an undo group whenever a node is inserted anywhere in the document. The status line used

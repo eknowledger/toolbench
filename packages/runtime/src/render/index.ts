@@ -70,6 +70,35 @@ const loaders: Record<LazyKind, () => Promise<Drawer>> = {
 	},
 };
 
+/*
+ * The Copy action's code (#155), its own chunk on the chart chunk's pattern: fetched when the first code or
+ * table result is drawn, not by boot. Measured on v6, boot paid 685 gzipped bytes with it built in and 515
+ * with it split, the chunk 513: what stays is the button, its note and their styles, which have to be on
+ * screen with the result.
+ */
+let copier: typeof import("./copy.ts") | undefined;
+let copyLoad: Promise<void> | undefined;
+
+/**
+ * The bar under a code block or a table: a visible note, then the button, drawn here so it is on screen with
+ * the result. Disabled until the chunk arrives, then made to work by it.
+ *
+ * ⚠️ Disabled, never a live button with nothing behind it. A press in the gap would otherwise do nothing and
+ * say nothing, which is the one outcome worse than waiting. And if the chunk cannot be fetched, it says so in
+ * the note and stays disabled, rather than looking ready forever.
+ */
+function copyBar(label: string, text: () => string, select: () => Node): HTMLElement {
+	const note = el("span", { class: "tb-copy-note", "aria-hidden": "true" });
+	const button = el("button", { type: "button", class: "tb-copy", disabled: true }, label);
+	const wire = () => copier?.wireCopy(button, note, text, select);
+	if (copier) wire();
+	else
+		(copyLoad ??= import("./copy.ts").then((module) => void (copier = module))).then(wire, () => {
+			note.textContent = "Copy is unavailable: select the text instead";
+		});
+	return el("div", { class: "tb-copy-bar" }, note, button);
+}
+
 export class ChartRendererMissing extends Error {
 	readonly kind: LazyKind;
 	/**
@@ -175,6 +204,11 @@ export interface RenderOptions {
 	 * graph is laid out on the main thread after a frame, its edge table showing meanwhile.
 	 */
 	graphWorker?: () => Worker;
+	/**
+	 * Whether `code` and `table` results carry a Copy button (#155). Default true. A closed card turns it
+	 * off: its preview is there to be opened, and it has no status region to say whether a copy worked.
+	 */
+	copy?: boolean;
 }
 
 /** One output area per host, so a fixed id is enough for `aria-controls` inside a shadow root. */
@@ -215,7 +249,7 @@ function draw(output: Output, options: RenderOptions): HTMLElement {
 		case "text":
 			return renderText(output.text, output.mono === true);
 		case "code":
-			return renderCode(output.lang, output.source, options.highlight);
+			return renderCode(output.lang, output.source, options);
 		case "table":
 			return renderTable(output, options);
 		case "series":
@@ -381,7 +415,8 @@ export function languageClass(lang: string): string | undefined {
 	return /^[\w+#.-]+$/.test(lang) ? `language-${lang}` : undefined;
 }
 
-function renderCode(lang: string, source: string, highlight?: (source: string, lang: string) => Node): HTMLElement {
+function renderCode(lang: string, source: string, options: RenderOptions): HTMLElement {
+	const highlight = options.highlight;
 	/*
 	 * No bundled highlighter, deliberately. A highlighter is a large dependency and a host site
 	 * usually already has one. `data-lang` stays for CSS. If the host passed `highlight`, that
@@ -398,11 +433,9 @@ function renderCode(lang: string, source: string, highlight?: (source: string, l
 			body = source;
 		}
 	}
-	return el(
-		"div",
-		{ class: "tb-out-code", "data-lang": lang },
-		el("pre", {}, el("code", { class: languageClass(lang) }, body)),
-	);
+	const pre = el("pre", {}, el("code", { class: languageClass(lang) }, body));
+	// `source`, not the DOM's text: a highlighter may add line numbers, and those are not the code.
+	return el("div", { class: "tb-out-code", "data-lang": lang }, pre, options.copy === false ? null : copyBar("Copy code", () => source, () => pre));
 }
 
 function renderTable(
@@ -467,7 +500,7 @@ function renderTable(
 		});
 		table.addEventListener("pointerleave", () => point(null, table));
 	}
-	return el("div", { class: "tb-out-table" }, table);
+	return el("div", { class: "tb-out-table" }, table, options.copy === false ? null : copyBar("Copy table", () => (copier as typeof import("./copy.ts")).tableToTsv(output), () => table));
 }
 
 /** How many bytes per row. 16 is the convention every hex dump uses, and readers expect it. */
