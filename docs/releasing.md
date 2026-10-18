@@ -126,6 +126,20 @@ worth reading, because it is what consumers will see. **Gate 2** is the last sto
 and it exists because a merge can happen for all sorts of reasons while an explicit "yes, publish this"
 cannot happen by accident. npm has no undo.
 
+**A release is done when both packages install, not when the workflow goes green.** After approving, check
+from a clean directory:
+
+```sh
+cd "$(mktemp -d)" && npm init -y >/dev/null && npm install @toolbench/runtime@<version>
+```
+
+⚠️ npm can take minutes to serve a package it has already accepted. During 0.8.0, `changeset publish`
+reported both packages published and `@toolbench/runtime@0.8.0` installed at once, but
+`@toolbench/sdk@0.8.0` was missing from the registry for about three minutes and its tarball returned 404
+for about two more. In that window, installing the runtime failed with `ETARGET`, because it depends on an
+sdk version npm would not yet serve. Wait for the clean install to succeed before announcing a release or
+pointing anyone at it.
+
 ⚠️ The workflow is three jobs rather than one because `environment:` is job-level in GitHub Actions, not
 step-level. A single job carrying the environment would demand an approval on **every** push to `main`,
 including versioning runs that publish nothing, and an approval prompt that fires constantly is one
@@ -196,6 +210,20 @@ the resulting merge commit (`8623014`) kept that branch's tree unchanged.
 
 It is an ordinary merge, so `git push` needs no force. The squash at the end throws the merge commit
 away anyway; it exists so the pull request shows only its own changes and CI runs against them.
+
+**When the stack is open as pull requests, never merge the lower one with `--delete-branch`.** Deleting a
+branch that another pull request targets makes GitHub **close** that pull request rather than retarget it.
+It happened to #165 when #164 merged with `gh pr merge --squash --delete-branch`. In order:
+
+```sh
+gh pr merge <lower> --squash          # no --delete-branch
+gh pr edit <upper> --base main        # retarget first
+# then the two checks and the merge above, on the upper branch, and push
+git push origin --delete <lower-branch>
+```
+
+If it has already happened, the pull request is recoverable: push the deleted branch back to its last
+commit, reopen the pull request, retarget it to `main`, and delete the branch again.
 
 ## 6. One-time setup
 
