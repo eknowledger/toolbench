@@ -19,5 +19,5 @@ export const SDK_CHANGELOG: Record<number, string> = {
 	3: "sample inputs: the optional samples manifest key, a list of labelled example inputs a tool ships with and a host renders under its form.",
 	4: "richer charts and inputs: chart markers (markers: true, shape: \"points\"), and control: \"slider\" on a number input. Later additions in the same release are listed in docs/versioning.md.",
 	5: "names for host stylesheets and links: an optional role on any output part and on any field, rendered as data-role; an optional id on any part, rendered as data-part and opened by host.reveal(id); and the muted tone on fields and table cells.",
-	6: "presets: an optional sets on a select option, the values choosing it writes into other inputs, with the select following the form afterwards.",
+	6: "presets and highlighted inputs: an optional sets on a select option, the values choosing it writes into other inputs, with the select following the form afterwards; and an optional lang on a textarea, painted through the host's highlight hook.",
 };

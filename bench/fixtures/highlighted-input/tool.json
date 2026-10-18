@@ -1,0 +1,27 @@
+{
+	"sdk": 6,
+	"id": "highlighted-input",
+	"name": "Highlighted input",
+	"blurb": "A textarea painted by the host's highlighter: long enough to scroll, with one line long enough to wrap.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "config",
+			"type": "textarea",
+			"label": "Client config",
+			"description": "JSON. Highlighted through the host's highlight hook when one is installed.",
+			"lang": "json",
+			"rows": 8,
+			"dir": "ltr",
+			"default": "{\n  \"name\": \"orders-client\",\n  \"enabled\": true,\n  \"timeouts\": {\n    \"connect\": 5,\n    \"read\": 30,\n    \"total\": null\n  },\n  \"retry\": {\n    \"attempts\": 3,\n    \"backoffMs\": 200,\n    \"multiplier\": 2.0,\n    \"jitter\": false,\n    \"on\": [\"502\", \"503\", \"504\"]\n  },\n  \"pool\": {\n    \"maxIdle\": 16,\n    \"maxPerHost\": 64,\n    \"idleTimeout\": 90\n  },\n  \"tls\": {\n    \"verify\": true,\n    \"minVersion\": \"1.2\",\n    \"alpn\": [\"h2\", \"http/1.1\"]\n  },\n  \"headers\": {\n    \"user-agent\": \"orders-client/4.1\",\n    \"accept\": \"application/json\",\n    \"x-request-budget-ms\": 2500\n  },\n  \"proxy\": null,\n  \"logging\": {\n    \"level\": \"warn\",\n    \"redact\": [\"authorization\", \"cookie\"],\n    \"sampleRate\": 0.05\n  },\n  \"aVeryLongKeyThatForcesTheLineToWrapInsideTheTextareaSoSoftWrapPositionsCanBeCompared\": \"value with spaces that also wraps across the visible width of the field\"\n}"
+		}
+	],
+	"samples": [
+		{ "label": "Short", "input": { "config": "{\"ok\": true, \"n\": 3}" } }
+	]
+}

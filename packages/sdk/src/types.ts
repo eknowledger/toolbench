@@ -397,7 +397,18 @@ interface InputBase {
 
 export type InputSpec =
 	| (InputBase & { type: "text"; default: string; maxLength?: number })
-	| (InputBase & { type: "textarea"; default: string; rows?: number; maxLength?: number })
+	| (InputBase & {
+			type: "textarea";
+			default: string;
+			rows?: number;
+			maxLength?: number;
+			/**
+			 * The language of what the reader types, passed to the host's `highlight(source, lang)` hook, the
+			 * same one `code` results use, which paints it behind the textarea. A hint: with no hook, or a hook
+			 * that cannot paint it, the textarea is the plain one. Contract version 6.
+			 */
+			lang?: string;
+	  })
 	| (InputBase & {
 			type: "number";
 			default: number;

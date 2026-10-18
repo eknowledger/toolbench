@@ -119,14 +119,24 @@ const BUDGETS = [
 	 * that stops a wide result clipping its tool.
 	 *
 	 * #147's `reveal(id)` and `data-part` spent 230 of the headroom, 24,118 to 24,348, inside this ceiling.
+	 *
 	 * Raised from 24_500 to 25_500 by select presets (#151) and contract v6, in the commit that spent it:
 	 * 24,348 to 25,022 measured, 674 bytes. 355 of them are validation, because `validateManifest` ships in
 	 * this chunk: the payload checker that samples and presets now share, and the four rules a preset adds,
 	 * each with a message naming the field. The other 319 are the runtime, the select writing its option's
 	 * values and following the form after typing, a sample or a host write, with the status line saying so,
 	 * plus the v6 changelog line. 24_500 left 152 bytes after v5, so no version of this fitted under it.
+	 *
+	 * The undo fix (#162) spent 7 inside it, 25,029.
+	 *
+	 * Raised from 25_500 to 26_000 by the painted textarea (#153), in the commit that spent it: 25,029 to
+	 * 25,326 measured, 297 bytes, 93 of them validating `lang`. The rest is the wiring only: deciding at
+	 * activation whether to fetch the `paint` chunk, placing its wrapper, repainting after a value is written
+	 * without a keystroke, and `lang` in the v6 changelog line. The layer, its repaint and its sheet are that
+	 * chunk, 956 bytes. Measured before the rebase onto v5, building them into this chunk instead cost 761
+	 * bytes here against 313 split, which is why they are split. 25_500 would have left 174 bytes.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 25_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -148,7 +158,12 @@ const BUDGETS = [
 	 * to #124), so the charts page and the browser tests can put every one on screen. Bench-only; no reader
 	 * downloads either chunk.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
+	/*
+	 * Main copy raised from 4_000 to 5_000 by the highlighted-input fixture (#153): 3,441 to 4,123 measured,
+	 * because its default is 842 characters of JSON, long enough to scroll and to wrap, which is what the
+	 * overlay has to survive. Bench-only. The worker copy still fits its line.
+	 */
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
@@ -208,6 +223,12 @@ const BUDGETS = [
 	{ label: "radar renderer", pattern: /^radar-[^/]+\.js$/, budget: 3_500 },
 	{ label: "treemap renderer", pattern: /^treemap-[^/]+\.js$/, budget: 3_500 },
 	{ label: "venn renderer", pattern: /^venn-[^/]+\.js$/, budget: 4_000 },
+	/*
+	 * The painted textarea (#153): the layer, its debounced repaint and its own sheet. A chunk of its own,
+	 * fetched on activation only by a tool declaring `lang` on a host that passes a highlight hook, so every
+	 * other page pays nothing for it. Reader cost, because that reader does download it. 956 measured.
+	 */
+	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
@@ -254,6 +275,8 @@ const BUDGETS = [
 	{ label: "bench fixture: styled-output", pattern: /^tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Select presets (#151) on screen for the browser tests. 248 measured.
 	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// A textarea declaring `lang` (#153) on screen for the browser tests. 228 measured.
+	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -280,6 +303,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture discrete-series", pattern: /^worker-tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	{ label: "worker copy: bench fixture styled-output", pattern: /^worker-tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture presets", pattern: /^worker-tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture highlighted-input", pattern: /^worker-tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;

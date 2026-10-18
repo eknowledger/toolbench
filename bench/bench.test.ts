@@ -3901,6 +3901,226 @@ describe("select presets (#151)", () => {
 	});
 });
 
+describe("a textarea painted by the host's highlighter (#153)", () => {
+	/*
+	 * The `highlighted-input` fixture declares `lang: "json"` on its textarea; the bench's demo hook paints
+	 * JSON with `data-tok` spans. `?code=` swaps in the deliberately broken hooks from highlight.ts. The
+	 * expectations are the feature's promises read off #153, not values captured from a run.
+	 */
+	async function open(query = ""): Promise<Page> {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=highlighted-input${query}`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> #in-config").waitFor();
+		return page;
+	}
+	const state = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const area = root?.querySelector("#in-config") as HTMLTextAreaElement;
+			const layer = root?.querySelector(".tb-paint") as HTMLElement | null;
+			return {
+				wrapped: Boolean(root?.querySelector(".tb-painted")),
+				painted: Boolean(root?.querySelector(".tb-painted[data-paint]")),
+				hidden: layer?.getAttribute("aria-hidden") ?? null,
+				// The layer ends in a space when the value ends in a newline, so the last empty line has height.
+				matches: layer ? layer.textContent?.replace(/ $/, "") === area.value : false,
+				tokens: layer?.querySelectorAll("[data-tok]").length ?? 0,
+				textColor: getComputedStyle(area).color,
+			};
+		});
+
+	it("paints through the hook behind the real textarea, which stays the labelled control", async () => {
+		const page = await open();
+		const now = await state(page);
+		assert.equal(now.painted, true, "a textarea with lang and a host hook is painted");
+		assert.equal(now.hidden, "true", "the layer is aria-hidden: the textarea is what a screen reader reads");
+		assert.equal(now.matches, true, "the layer holds the textarea's own text");
+		assert.ok(now.tokens > 0, "and the hook's tokens, which is the point");
+		assert.match(now.textColor, /rgba\(0, 0, 0, 0\)|transparent/, `the textarea's text is transparent over the paint, got ${now.textColor}`);
+
+		const box = page.getByRole("textbox", { name: "Client config" });
+		assert.equal(await box.count(), 1, "the textarea keeps its label");
+		assert.equal(await box.getAttribute("aria-describedby"), "in-config-desc in-config-err", "and its description target");
+		await page.close();
+	});
+
+	it("fetches the paint chunk only for a tool that declares lang on a host with a hook", async () => {
+		const fetched = async (url: string) => {
+			const page = await browser.newPage();
+			const scripts: string[] = [];
+			page.on("request", (request) => {
+				if (request.resourceType() === "script") scripts.push(request.url());
+			});
+			await page.goto(`${BASE}/${url}`, { waitUntil: "load" });
+			await page.locator("#host").scrollIntoViewIfNeeded();
+			await page.locator("#host >> .tb-form").waitFor();
+			await page.waitForTimeout(200);
+			await page.close();
+			return scripts.filter((s) => /\/assets\/paint-[^/]+\.js$/.test(s)).length;
+		};
+		assert.equal(await fetched("tool.html?id=highlighted-input"), 1, "the tool that uses it fetches it once");
+		assert.equal(await fetched("tool.html?id=percentiles"), 0, "a textarea without lang does not");
+		assert.equal(await fetched("tool.html?id=highlighted-input&code=plain"), 0, "nor does a host with no hook to paint with");
+	});
+
+	/*
+	 * STYLING.md promises a host's unlayered rule beats every runtime rule, whatever the specificity. The
+	 * paint sheet arrives later, in its own chunk, so it has to be in `@layer toolbench` too. A bare `pre`
+	 * selector is less specific than the runtime's `.tb-paint`, so only the layer can make it win.
+	 */
+	it("loses to a host's unlayered rule, like every runtime rule", async () => {
+		const page = await open();
+		await page.waitForFunction(() => Boolean(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-painted[data-paint]")));
+		const background = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const host = new CSSStyleSheet();
+			host.replaceSync("pre { background: rgb(1, 2, 3); }");
+			root.adoptedStyleSheets = [...root.adoptedStyleSheets, host];
+			return getComputedStyle(root.querySelector(".tb-paint") as Element).backgroundColor;
+		});
+		assert.equal(background, "rgb(1, 2, 3)", "the host's rule must win over the paint sheet");
+		await page.close();
+	});
+
+	it("exposes the same accessibility tree as the plain textarea", async () => {
+		const painted = await open();
+		const plain = await open("&code=plain");
+		assert.equal(await state(plain).then((s) => s.wrapped), false, "no hook, no wrapper: the plain textarea exactly");
+		// An allowlist by construction: the whole tree must equal the plain one, not merely lack the layer.
+		assert.equal(await painted.locator("#host").ariaSnapshot(), await plain.locator("#host").ariaSnapshot());
+		await painted.close();
+		await plain.close();
+	});
+
+	it("gives the layer the textarea's box and font, so the caret lands on the glyph the reader sees", async () => {
+		const page = await open();
+		const same = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const area = root?.querySelector("#in-config") as HTMLElement;
+			const layer = root?.querySelector(".tb-paint") as HTMLElement;
+			const a = getComputedStyle(area);
+			const b = getComputedStyle(layer);
+			const props = ["font-family", "font-size", "line-height", "letter-spacing", "word-spacing", "tab-size", "padding-top", "padding-left", "padding-right", "border-top-width", "border-left-width", "white-space", "overflow-wrap"];
+			const r1 = area.getBoundingClientRect();
+			const r2 = layer.getBoundingClientRect();
+			return {
+				differ: props.filter((p) => a.getPropertyValue(p) !== b.getPropertyValue(p)),
+				box: [r1.left - r2.left, r1.top - r2.top, r1.width - r2.width, r1.height - r2.height, area.clientWidth - layer.clientWidth],
+			};
+		});
+		assert.deepEqual(same.differ, [], "no font or box property may differ");
+		assert.deepEqual(same.box, [0, 0, 0, 0, 0], "and the boxes coincide, content width included");
+
+		// Click the left quarter of painted glyphs and read where the real caret went.
+		const targets = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot;
+			const area = root?.querySelector("#in-config") as HTMLTextAreaElement;
+			const layer = root?.querySelector(".tb-paint") as HTMLElement;
+			const box = area.getBoundingClientRect();
+			const out: { i: number; x: number; y: number }[] = [];
+			const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+			let offset = 0;
+			for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+				for (let k = 0; k < n.data.length; k++, offset++) {
+					if (n.data[k] === "\n" || offset % 9 !== 0) continue;
+					const range = document.createRange();
+					range.setStart(n, k);
+					range.setEnd(n, k + 1);
+					const rect = range.getClientRects()[0];
+					if (!rect || rect.width === 0 || rect.bottom > box.bottom - 8) continue;
+					out.push({ i: offset, x: rect.left + rect.width / 4, y: rect.top + rect.height / 2 });
+				}
+			}
+			return out;
+		});
+		assert.ok(targets.length >= 10, `enough visible glyphs to mean something: ${targets.length}`);
+		const area = page.locator("#host >> #in-config");
+		for (const t of targets) {
+			await page.mouse.click(t.x, t.y);
+			assert.equal(await area.evaluate((el: HTMLTextAreaElement) => el.selectionStart), t.i, `clicking painted character ${t.i} put the caret elsewhere`);
+		}
+		await page.close();
+	});
+
+	it("follows the textarea's scroll", async () => {
+		const page = await open();
+		const scrolled = await page.locator("#host >> #in-config").evaluate(async (el: HTMLTextAreaElement) => {
+			el.scrollTop = el.scrollHeight;
+			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			return [el.scrollTop, (el.parentElement?.querySelector(".tb-paint") as HTMLElement).scrollTop];
+		});
+		assert.ok(scrolled[0]! > 0, "the default is long enough to scroll");
+		assert.equal(scrolled[1], scrolled[0], "and the layer scrolled with it");
+		await page.close();
+	});
+
+	/*
+	 * ⚠️ Repainting inserts nodes, and Chrome ends an undo group at any node insertion, so painting on every
+	 * key made every key its own undo step. The paint waits for a pause instead, and the text shows plain
+	 * until it comes.
+	 */
+	it("shows plain text while typing, paints at a pause, and keeps one undo for the burst", async () => {
+		const page = await open();
+		const area = page.locator("#host >> #in-config");
+		const before = await area.inputValue();
+		await area.click();
+		await area.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+		await page.keyboard.type('{"added": 42,\n', { delay: 30 });
+		let now = await state(page);
+		assert.equal(now.painted, false, "mid-burst the textarea shows its own text");
+		assert.doesNotMatch(now.textColor, /rgba\(0, 0, 0, 0\)/, "visibly, not transparent over a stale paint");
+		await page.waitForTimeout(500);
+		now = await state(page);
+		assert.equal(now.painted, true, "painted again once typing stops");
+		assert.equal(now.matches, true, "with the new text");
+		await page.keyboard.press("ControlOrMeta+z");
+		assert.equal(await area.inputValue(), before, "one undo takes back the burst");
+		await page.close();
+	});
+
+	it("repaints a value written without a keystroke, such as a sample", async () => {
+		const page = await open();
+		await page.locator('#host >> .tb-sample:text-is("Short")').click();
+		const now = await state(page);
+		assert.equal(now.painted, true);
+		assert.equal(now.matches, true, "a sample assigns value, which fires no input event, so the runtime repaints it");
+		await page.close();
+	});
+
+	it("stays plain past 20,000 characters", async () => {
+		const page = await open();
+		const painted = (length: number) =>
+			page.evaluate((n) => {
+				const host = document.querySelector("#host") as HTMLElement & { values: object };
+				host.values = { config: `"${"x".repeat(n - 2)}"` };
+				return Boolean(host.shadowRoot?.querySelector(".tb-painted[data-paint]"));
+			}, length);
+		assert.equal(await painted(20_000), true, "at the cap it paints");
+		assert.equal(await painted(20_001), false, "one past it, it does not");
+		await page.close();
+	});
+
+	for (const [mode, what] of [
+		["throw", "a hook that throws"],
+		["string", "a hook that returns a string"],
+		["reword", "a hook whose text is not the source, which would misplace the caret"],
+	] as const) {
+		it(`falls back to the plain textarea for ${what}`, async () => {
+			const errors: string[] = [];
+			const page = await browser.newPage();
+			page.on("pageerror", (error) => errors.push(String(error)));
+			await page.goto(`${BASE}/tool.html?id=highlighted-input&code=${mode}`, { waitUntil: "load" });
+			await page.locator("#host >> #in-config").waitFor();
+			const now = await state(page);
+			assert.equal(now.painted, false, "nothing painted");
+			assert.doesNotMatch(now.textColor, /rgba\(0, 0, 0, 0\)/, "and the textarea's own text visible");
+			assert.deepEqual(errors, [], "without an uncaught error");
+			await page.close();
+		});
+	}
+});
+
 describe("live demo", () => {
 	it("keeps the stress fixture off the landing page", async () => {
 		const page = await browser.newPage();

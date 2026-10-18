@@ -105,7 +105,7 @@ because it has real errors, and it wants two result shapes at once.
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
 concrete: the current contract is 6 (§3), and declaring 1 opts out of everything added since (`bytes` in
-v2, `samples` in v3, through select presets in v6).
+v2, `samples` in v3, through select presets and highlighted textareas in v6).
 
 `dir: "ltr"` matters more than it looks. Base64 is not prose, and inside a right-to-left page it would
 otherwise be laid out backwards.
@@ -335,6 +335,13 @@ Things the validator will hold you to, and why:
   A native range control appears beside the number box, which stays editable for exact values. It uses
   `min`, `max` and `step`, so a slider can never produce a value the manifest calls invalid. Pair it with
   `autoRun` when the tool is instant, or the answer will not follow the thumb.
+* **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
+  host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
+  behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a
+  hint: a host with no hook, or a hook that does not know your language, gives the reader the plain
+  textarea, so the help text still has to explain the syntax. The paint catches up 250 ms after typing
+  stops and is skipped past 20,000 characters. Pick the name your host's highlighter uses (`json`, `yaml`);
+  it must be one word, and `lang` on any other input type is refused.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and

@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v6-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-25.0%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v6-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-25.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -212,7 +212,7 @@ tools/reverse/
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
 concrete: the current contract is 6, and declaring 1 opts out of everything added since (`bytes` in v2,
-`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets in v6). See [docs/versioning.md](docs/versioning.md).
+`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets and highlighted textareas in v6). See [docs/versioning.md](docs/versioning.md).
 
 **2. Register it.** Once per site:
 
@@ -226,6 +226,7 @@ defineToolHost({
   }),
   pageUrl: (id) => `/tools/${id}/`,
   // Optional. Return a Node, never a string: the runtime will not assign innerHTML.
+  // Paints `code` results, and textareas whose input declares `lang`.
   // highlight: (source, lang) => yourHighlighter(source, lang),
   // Optional. Your own CSS inside every tool, after the runtime's. See STYLING.md.
   // styles: [yourSheet],
@@ -433,6 +434,20 @@ the select through `values` is taken literally and fills nothing. `sets` is chec
 `input`, and may not name its own select or another preset select; the default option's `sets` must equal
 those inputs' defaults. Contract version 6.
 
+**A textarea can be highlighted.** Give a `textarea` input a `lang`, and a host that passes `highlight`
+to `defineToolHost` paints what the reader types with the same hook `code` results use, so a site keeps
+one highlighter:
+
+```jsonc
+{ "id": "config", "type": "textarea", "label": "Client config", "lang": "json" }
+```
+
+The paint sits behind the real textarea, so the caret, selection, undo, paste and the screen reader are the
+browser's own, and it is `aria-hidden`. It catches up 250 ms after typing stops, showing plain text until
+then, and stays plain past 20,000 characters. With no hook, a hook that throws, or a hook whose text is not
+the source, the textarea is the plain one. Its code is a chunk of its own, about 1 KB, fetched only by a tool
+that declares `lang` on a host with a hook. `lang` is refused on any other input type. Contract version 6.
+
 **A host can prefill the form** without putting those examples in the tool, and without reaching into
 the shadow root. `values` fills inputs the way typing does. It does not run the tool. `run()` is
 opt-in:
@@ -565,8 +580,8 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.0 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.2 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 25.3 KB |
+| Worker entry, only for pages with a worker-mode tool | 4.3 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |
