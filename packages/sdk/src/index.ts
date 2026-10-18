@@ -49,6 +49,7 @@ export {
 } from "./types.ts";
 
 export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
+export { isSafeLinkHref } from "./links.ts";
 
 export { SeedError, defaultInputs, seed, serialiseSeed, type SeedOptions } from "./seed.ts";
 export { MIGRATIONS, VersionError, canLoad, upgradeManifest, upgradeOutput, type Migration } from "./migrate.ts";

@@ -33,6 +33,7 @@
  *    "go now", and is wrong anyway for anything slow.
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
+import { isSafeLinkHref } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -853,7 +854,7 @@ export class ToolHost extends HTMLElement {
 				el(
 					"div",
 					{ class: "tb-foot" },
-					...(manifest.links ?? []).map((link) => el("a", { href: link.href, rel: "noopener" }, link.label)),
+					...(manifest.links ?? []).map(linkTo),
 				),
 			);
 		}
@@ -938,7 +939,7 @@ export class ToolHost extends HTMLElement {
 		);
 		if (links.length > 0) {
 			frame.append(
-				el("div", { class: "tb-foot" }, ...links.map((link) => el("a", { href: link.href, rel: "noopener" }, link.label))),
+				el("div", { class: "tb-foot" }, ...links.map(linkTo)),
 			);
 		}
 		fill(this.#root, frame);
@@ -1406,6 +1407,16 @@ function degraded(output: Output, draw: (rest: Output) => HTMLElement): HTMLElem
 	if (rest.length === 0) return note;
 	const body = draw(rest.length === 1 ? (rest[0] as Output) : { kind: "group", parts: rest });
 	return el("div", {}, body, note);
+}
+
+/**
+ * A manifest link, or its label as plain text when the target is not one a reader should be handed.
+ * The validator refuses such a link already; this is the second layer, because a host can construct a
+ * manifest without ever passing it through the validator, and `href` is the one attribute where a string
+ * becomes script.
+ */
+function linkTo(link: { label: string; href: string }): HTMLElement {
+	return isSafeLinkHref(link.href) ? el("a", { href: link.href, rel: "noopener" }, link.label) : el("span", {}, link.label);
 }
 
 function titleRow(manifest: Manifest, compact: boolean, pageUrl: string | undefined): HTMLElement {

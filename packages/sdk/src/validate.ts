@@ -23,6 +23,7 @@ import {
 	OUTPUT_KINDS,
 	type OutputKind,
 } from "./types.ts";
+import { isSafeLinkHref } from "./links.ts";
 import { SDK_CHANGELOG, SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";
 
 export class ManifestError extends Error {
@@ -383,7 +384,13 @@ export function validateManifest(raw: unknown): Manifest {
 		arr(o.links, "links").forEach((l, i) => {
 			const lo = obj(l, `links[${i}]`);
 			str(lo, "label", `links[${i}].`);
-			str(lo, "href", `links[${i}].`);
+			const href = str(lo, "href", `links[${i}].`);
+		if (!isSafeLinkHref(href)) {
+			fail(
+				`links[${i}].href`,
+				"must be an http, https or mailto URL, or a relative path, with no spaces or control characters",
+			);
+		}
 		});
 	}
 
