@@ -419,3 +419,25 @@ describe("validateManifest: presets on a select", () => {
 		presetFails((i) => { i[1]!.sets = { retries: 1 }; }, "inputs[1].sets", "belongs in an entry of a select's `options`");
 	});
 });
+
+// Textarea highlighting (#153): `lang` names the language passed to the host's highlight hook.
+describe("validateManifest: lang on a textarea", () => {
+	const area = { id: "machine", type: "textarea", label: "Your state machine", default: "" };
+
+	it("accepts a lang on a textarea", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...area, lang: "json" }] });
+		const input = m.inputs[0];
+		assert.equal(input?.type === "textarea" ? input.lang : undefined, "json");
+	});
+	it("refuses lang on any other input, which nothing would paint", () => {
+		failsWith((m) => { m.inputs = [{ id: "name", type: "text", label: "Name", default: "", lang: "json" }]; }, "inputs[0].lang", "only a textarea");
+	});
+	it("refuses a lang that is not a single word", () => {
+		failsWith((m) => { m.inputs = [{ ...area, lang: "state machine" }]; }, "inputs[0].lang", "no spaces");
+		failsWith((m) => { m.inputs = [{ ...area, lang: "" }]; }, "inputs[0].lang", "no spaces");
+		failsWith((m) => { m.inputs = [{ ...area, lang: 7 }]; }, "inputs[0].lang", "no spaces");
+	});
+	it("refuses lang at the top level of the manifest, and says where it belongs", () => {
+		failsWith((m) => { m.lang = "json"; }, "lang", "belongs in an entry of `inputs`");
+	});
+});

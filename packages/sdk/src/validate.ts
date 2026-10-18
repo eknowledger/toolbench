@@ -79,6 +79,11 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	if (o.primary !== undefined && typeof o.primary !== "boolean") fail(`${path}.primary`, "must be a boolean");
 	if (o.dir !== undefined) oneOf(o.dir, ["ltr", "auto"] as const, `${path}.dir`);
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
+	if (o.lang !== undefined) {
+		// A one-line input has no room for structure to see, and nothing would paint it.
+		if (type !== "textarea") fail(`${path}.lang`, `only a textarea is highlighted; on a ${type} input it would be ignored`);
+		if (typeof o.lang !== "string" || !/^\S+$/.test(o.lang)) fail(`${path}.lang`, "must be a language name with no spaces, as passed to the host's highlight hook");
+	}
 
 	switch (type) {
 		case "text":
@@ -328,7 +333,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
 const RUNTIME_KEYS = ["entry", "thread"];
-const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength"];
+const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

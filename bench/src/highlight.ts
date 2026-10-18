@@ -117,6 +117,16 @@ export function hostHighlight(search: string): ((source: string, lang: string) =
 			};
 		case "string":
 			return (() => "<em>not a node</em>") as unknown as (source: string, lang: string) => Node;
+		/*
+		 * A Node whose text is not the source, the way a highlighter that adds line numbers would be. Fine for
+		 * a `code` result; a painted textarea must refuse it, because the caret would land beside the glyph.
+		 */
+		case "reword":
+			return (source: string, lang: string) => {
+				const node = highlight(source, lang);
+				node.insertBefore(document.createTextNode("1 "), node.firstChild);
+				return node;
+			};
 		default:
 			return highlight;
 	}

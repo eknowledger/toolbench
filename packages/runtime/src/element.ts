@@ -77,6 +77,8 @@ let config: ToolHostConfig | undefined;
 
 /** Every connected host's way to restyle itself, so `setHostStyles` reaches hosts that exist already. */
 const live = new Set<() => void>();
+/** The painted-textarea chunk (#153), once a tool that needs it has activated. */
+let painter: typeof import("./paint.ts") | undefined;
 
 /** Defines the element. Call once, with the source your host provides. */
 export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): void {
@@ -149,6 +151,8 @@ export class ToolHost extends HTMLElement {
 	#controls = new Map<string, HTMLElement>();
 	/** The range control beside a number box that asked for `control: "slider"`, kept in step with it. */
 	#sliders = new Map<string, HTMLInputElement>();
+	/** Repaint for each painted textarea (#153), for values written without a keystroke. */
+	#painters = new Map<string, () => void>();
 	#els: {
 		output?: HTMLElement;
 		status?: HTMLElement;
@@ -485,8 +489,17 @@ export class ToolHost extends HTMLElement {
 			// Not fatal, for the same reason as in `#prepare`: `#draw` retries if a chart turns up without it.
 			const lazyKinds = this.#manifest?.kinds.filter(isLazyKind) ?? [];
 			const chart = lazyKinds.length > 0 ? loadRenderers(lazyKinds).catch(() => undefined) : undefined;
+			/*
+			 * The painted textarea, alongside the tool's code and only when it can be used: a tool declaring
+			 * `lang` and a host passing a hook. A failed fetch leaves the plain textarea, which still works.
+			 */
+			const paint =
+				!painter && cfg.highlight && this.#manifest?.inputs.some((input) => input.type === "textarea" && input.lang)
+					? import("./paint.ts").then((module) => void (painter = module), () => undefined)
+					: undefined;
 			this.#loaded = await this.#resolve(cfg);
 			await chart;
+			await paint;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -745,6 +758,7 @@ export class ToolHost extends HTMLElement {
 		const form = el("fieldset", { class: "tb-form" });
 		this.#controls.clear();
 		this.#sliders.clear();
+		this.#painters.clear();
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
@@ -941,6 +955,8 @@ export class ToolHost extends HTMLElement {
 		const errorId = `${id}-err`;
 
 		let control: HTMLElement;
+		// What goes in the row when it is not the control itself: a painted textarea's wrapper.
+		let placed: HTMLElement | undefined;
 		switch (spec.type) {
 			case "textarea": {
 				const area = el("textarea", {
@@ -959,6 +975,13 @@ export class ToolHost extends HTMLElement {
 					this.#edited(spec.id);
 				});
 				control = area;
+				// Painted only when the tool names a language and the host has a highlighter; otherwise plain.
+				const highlight = config?.highlight;
+				if (spec.lang && highlight && painter) {
+					const painted = painter.paintTextarea(area, spec.lang, highlight);
+					placed = painted.wrap;
+					this.#painters.set(spec.id, painted.paint);
+				}
 				break;
 			}
 			case "select": {
@@ -1077,7 +1100,7 @@ export class ToolHost extends HTMLElement {
 			if (desc) row.append(desc);
 		} else {
 			const slider = this.#sliders.get(spec.id);
-			row.append(label, slider ? el("div", { class: "tb-slider-row" }, slider, control) : control);
+			row.append(label, slider ? el("div", { class: "tb-slider-row" }, slider, control) : (placed ?? control));
 			if (desc) row.append(desc);
 		}
 		// The per-input error slot: empty until a result names this input.
@@ -1213,6 +1236,8 @@ export class ToolHost extends HTMLElement {
 			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next ?? "");
 			const slider = this.#sliders.get(spec.id);
 			if (slider) slider.value = String(next ?? "");
+			// Assigning `value` fires no input event, so a painted textarea is repainted here or not at all.
+			this.#painters.get(spec.id)?.();
 		}
 	}
 
