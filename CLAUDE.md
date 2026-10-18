@@ -114,6 +114,7 @@ they pay; give test instruments their own chunk and their own budget line.
 | **Release PRs sit at `BLOCKED`** | GitHub does not trigger workflows for `GITHUB_TOKEN` events, so required checks never attach. Merge with `gh pr merge <n> --squash --admin`; see [releasing.md](docs/releasing.md) |
 | **`tsc -b --watch` can go stale silently** | It wrote `tsconfig.tsbuildinfo` without emitting, so a later `pnpm build` said "up to date" while `dist/` held old styles. The bench bundles `dist/`, and tests that assert classes still passed. Do not run the watcher; if `dist/` looks behind `src/`, `npx tsc -b --force` in each package |
 | **Publishing needs OIDC, not a token** | The npm account's second factor is a passkey, which cannot answer the CLI's one-time-password prompt. A token in CI fails `EOTP` every time |
+| **zsh modifiers after `$var:`** | `"$new:refs/heads/x"` expands `:r` as zsh's remove-extension modifier, so git saw `...efs/heads/x` and reported a refspec that does not match anything. Brace every variable followed by a colon: `"${new}:refs/heads/x"` |
 
 ## 10. Shell
 

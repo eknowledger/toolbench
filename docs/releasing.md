@@ -211,18 +211,36 @@ the resulting merge commit (`8623014`) kept that branch's tree unchanged.
 It is an ordinary merge, so `git push` needs no force. The squash at the end throws the merge commit
 away anyway; it exists so the pull request shows only its own changes and CI runs against them.
 
-**When the stack is open as pull requests, never merge the lower one with `--delete-branch`.** Deleting a
-branch that another pull request targets makes GitHub **close** that pull request rather than retarget it.
-It happened to #165 when #164 merged with `gh pr merge --squash --delete-branch`. In order:
+**When the stack is open as pull requests, merge the lower one without `--delete-branch`.** Who deletes the
+branch decides whether the pull request above it survives:
+
+| The lower branch is deleted by | The pull request based on it |
+|---|---|
+| GitHub's own "Automatically delete head branches", on in this repository | Is **retargeted** to `main` |
+| `gh pr merge --delete-branch`, or `git push --delete` | Is **closed** |
+
+#165 was closed when #164 merged with `--delete-branch`. In 0.9.0, #171 and #172 merged plainly, GitHub
+deleted each branch itself, and #173 was already based on `main` the moment #172 merged. So:
 
 ```sh
-gh pr merge <lower> --squash          # no --delete-branch
-gh pr edit <upper> --base main        # retarget first
+gh pr merge <lower> --squash          # plain: GitHub deletes the branch and retargets
+gh pr view <upper> --json baseRefName # confirm it now says main; if not, gh pr edit <upper> --base main
 # then the two checks and the merge above, on the upper branch, and push
-git push origin --delete <lower-branch>
 ```
 
-If it has already happened, the pull request is recoverable: push the deleted branch back to its last
+⚠️ **After a merge from `main`, the second check is too strict.** The procedure above adds a merge commit to the
+lower branch. A branch stacked on it was made before that commit, so `merge-base --is-ancestor` fails even
+though nothing was lost. It is still safe when both of these hold, because the merge commit then added no
+code:
+
+```sh
+git merge-base --is-ancestor <lower>^1 <upper>                          # has everything before the merge
+test "$(git rev-parse <lower>^{tree})" = "$(git rev-parse <lower>^1^{tree})"  # the merge changed nothing
+```
+
+That was the case for #173 in 0.9.0. If either fails, fall back to a normal `git merge origin/main`.
+
+If a stacked pull request has already been closed, it is recoverable: push the deleted branch back to its last
 commit, reopen the pull request, retarget it to `main`, and delete the branch again.
 
 ## 6. One-time setup
