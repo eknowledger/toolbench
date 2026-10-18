@@ -1,5 +1,44 @@
 # @toolbench/runtime
 
+## 0.8.0
+
+### Minor Changes
+
+- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: style tool output with your own CSS.** Pass `styles` to `defineToolHost` and the runtime adopts
+  your sheets into every tool's shadow root, after its own. Any rule of yours outside a CSS layer wins,
+  whatever its specificity. `setHostStyles()` swaps them on every tool without a reload. The class names
+  and attributes you can rely on are listed in STYLING.md, with four worked examples.
+  ([#157](https://github.com/eknowledger/toolbench/issues/157))
+
+  - Every result part now carries `data-kind`, and every table cell `data-label` with its column's name.
+  - Contract version 5: a tool can name any part or field with `role`, rendered as `data-role`, and mark a
+    field or cell `tone: "muted"`.
+  - **Fixed:** a `good` table cell is now green, like a `good` field
+    ([#156](https://github.com/eknowledger/toolbench/issues/156)), and a wide result no longer clips its
+    whole tool on a narrow screen; it scrolls inside its own box
+    ([#154](https://github.com/eknowledger/toolbench/issues/154)).
+  - ⚠️ Heads-up: the runtime's rules now sit in `@layer toolbench`. If your page already adopts a sheet
+    into a tool's shadow root, its unlayered rules now win over the runtime's even where they are less
+    specific.
+
+- [#165](https://github.com/eknowledger/toolbench/pull/165) [`024405a`](https://github.com/eknowledger/toolbench/commit/024405a4eb68e03bffa8928377f1fe294d98b89d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: link to one part of a result.** Give a part an `id` and call `host.reveal(id)`: the runtime
+  opens a closed card, shows the part if `parts` or `more` hid it, scrolls to it and moves focus there.
+  It resolves `false` for an id the result does not have.
+  ([#147](https://github.com/eknowledger/toolbench/issues/147))
+
+  - The `id` is rendered as `data-part`, and fixtures fail if a result uses one id twice.
+
+### Patch Changes
+
+- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a stylesheet you adopt into a tool's shadow root no longer turns the runtime's styles off.**
+  The runtime's sheet now always comes first and yours is kept after it, whichever was adopted first, so
+  your rules win at equal specificity. ([#157](https://github.com/eknowledger/toolbench/issues/157))
+
+  - A chart's sheet now goes in behind the runtime's and ahead of yours, rather than after yours.
+
+- Updated dependencies [[`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab), [`024405a`](https://github.com/eknowledger/toolbench/commit/024405a4eb68e03bffa8928377f1fe294d98b89d)]:
+  - @toolbench/sdk@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes
