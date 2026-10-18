@@ -1,5 +1,19 @@
 # @toolbench/runtime
 
+## 0.9.0
+
+### Minor Changes
+
+- [#171](https://github.com/eknowledger/toolbench/pull/171) [`a2b3c13`](https://github.com/eknowledger/toolbench/commit/a2b3c13fe00972c37debaacd318236666841476d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: presets on a select.** ([#151](https://github.com/eknowledger/toolbench/issues/151)) A select option can carry `sets`, the values it writes into other inputs when it is chosen, so a "Library" select can fill the read timeout and retries with that library's defaults for the reader to edit. Choosing one behaves like a sample: the result goes stale and the status line names it. The select then follows the form: once the values stop matching it, it shows the preset they do match, or the first option with no `sets`, and says so. A host writing the select through `values` fills nothing. `sets` is validated like a sample's `input`, may not name its own select or another preset select, must differ between options, and on the default option must equal those inputs' defaults. The sample range message now reads "fix the value" rather than "fix the example". This raises the contract to version 6: a tool using `sets` declares `"sdk": 6`, and every older manifest loads unchanged.
+
+- [#173](https://github.com/eknowledger/toolbench/pull/173) [`f6a085a`](https://github.com/eknowledger/toolbench/commit/f6a085a40402c84240e1045e8b7ffba65a4f3fb0) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: highlighted textareas.** ([#153](https://github.com/eknowledger/toolbench/issues/153)) A `textarea` input can declare `lang`, and a host that passes `highlight` to `defineToolHost` paints what the reader types with the same hook `code` results use. The paint sits behind the real textarea, `aria-hidden`, with the same box and font, so the caret, selection, undo, paste and screen reader stay the browser's own. It catches up 250 ms after typing stops and is skipped past 20,000 characters. A missing hook, a hook that throws, or a hook whose text differs from the source leaves the plain textarea. Its code is a chunk of its own, about 1 KB gzipped, fetched only by a tool that declares `lang` on a host with a hook. `lang` is refused on any other input type.
+
+### Patch Changes
+
+- [#172](https://github.com/eknowledger/toolbench/pull/172) [`314d1e3`](https://github.com/eknowledger/toolbench/commit/314d1e37de1f7ebc7b241cbc4ee50f3fc24b3306) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: undo in Chrome took back one character at a time.** Once a result was on screen, every keystroke rewrote the status line, and Chrome ends an undo group whenever a node is inserted anywhere in the page, so typing "abc def" took 7 presses of undo to take back. The status line is now written only when its text changes, and one undo takes back the burst, as it does in Firefox and WebKit.
+- Updated dependencies [[`a2b3c13`](https://github.com/eknowledger/toolbench/commit/a2b3c13fe00972c37debaacd318236666841476d), [`f6a085a`](https://github.com/eknowledger/toolbench/commit/f6a085a40402c84240e1045e8b7ffba65a4f3fb0)]:
+  - @toolbench/sdk@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
