@@ -1,0 +1,23 @@
+{
+	"sdk": 5,
+	"id": "styled-output",
+	"name": "Styled output",
+	"blurb": "A form audit whose result names its parts, so a host stylesheet can find the verdict and the stat tiles by role.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"autoRun": true,
+	"kinds": ["group", "fields", "table", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "fixed",
+			"type": "toggle",
+			"label": "Limits added",
+			"description": "Whether the two free-text fields have been given a length limit.",
+			"primary": true,
+			"default": false
+		}
+	]
+}

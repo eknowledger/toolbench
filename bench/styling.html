@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Toolbench: host stylesheets</title>
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><style>path{stroke:%231a1c22;fill:none}.run{stroke:none;fill:%238a5a00}@media(prefers-color-scheme:dark){path{stroke:%23e7e9ee}.run{fill:%23f0b040}}</style><path d='M9.5 5H6a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h3.5M22.5 5H26a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2h-3.5' stroke-width='2.4' stroke-linecap='round'/><path class='run' d='M13 10.5l8 5.5-8 5.5z'/></svg>" />
+	<link rel="stylesheet" href="/src/bench.css" />
+	<style>
+		.narrow { max-width: 390px; }
+		.toggle { font: inherit; font-size: 0.85rem; padding: 0.25rem 0.75rem; }
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<header class="top">
+			<h1>Host stylesheets</h1>
+			<nav class="modes">
+				<a href="./index.html">card</a>
+				<a href="./tool.html?id=percentiles">page</a>
+				<a href="./article.html">in an article</a>
+				<a href="./charts.html">charts</a>
+				<a href="./styling.html" aria-current="page">styling</a>
+			</nav>
+		</header>
+		<p class="lead">
+			The four example sheets from STYLING.md, passed to <code>defineToolHost({ styles })</code> and applied
+			to real results. Nothing on this page reaches into a shadow root by hand.
+		</p>
+		<p><button type="button" class="toggle" id="toggle-styles" aria-pressed="true">Host styles on</button></p>
+
+		<h2>A verdict and stat tiles</h2>
+		<p class="note">
+			One field named <code>verdict</code>, and two parts named <code>stats</code>, the second grouped. The
+			verdict and stats sheets reach this tool only, through the per-tool form of <code>styles</code>.
+		</p>
+		<tool-host id="audit" tool="styled-output" mode="embed"></tool-host>
+		<tool-host id="audit-fixed" tool="styled-output" mode="embed"></tool-host>
+
+		<h2>Bordered tables, and stacked rows on a narrow tool</h2>
+		<p class="note">
+			The same two sheets on every tool. Each tool below is held to 390px, under the stacked sheet's
+			30rem container query, so its table stacks one row per block with each value under its column name.
+		</p>
+		<div class="narrow">
+			<tool-host id="narrow-audit" tool="styled-output" mode="embed"></tool-host>
+		</div>
+		<div class="narrow">
+			<tool-host tool="percentiles" id="narrow-percentiles" mode="embed" parts="3" data-seed></tool-host>
+		</div>
+	</div>
+	<script type="module" src="/src/styling.ts"></script>
+</body>
+</html>

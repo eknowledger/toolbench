@@ -213,7 +213,7 @@ Three rules follow, and they are not stylistic:
 ### 5.2 Results
 
 ```ts
-export type Output =
+export type Output = (
   | { kind: "fields";   fields: Field[] }
   | { kind: "text";     text: string; mono?: boolean }
   | { kind: "code";     lang: string; source: string }
@@ -223,7 +223,8 @@ export type Output =
   | { kind: "pie";      pie: Pie }
   | { kind: "group";    parts: Output[] }
   | { kind: "bytes";    bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
-  | { kind: "error";    message: string; input?: string; at?: number; len?: number };
+  | { kind: "error";    message: string; input?: string; at?: number; len?: number }
+  ) & { role?: string };   // any part may be named, contract v5
 ```
 
 The union is closed. A tool cannot invent a shape nobody can draw, and the runtime can promise to draw
@@ -398,7 +399,12 @@ would be 40 to 200 KB and would decide how every tool looks. It also emits the c
 `<table>` inside a `<details>`, because a chart is an image and a screen reader gets nothing from it.
 
 **`styles.ts`** is one template string adopted into every shadow root via `adoptedStyleSheets`, so one
-parsed stylesheet serves every instance on the page.
+parsed stylesheet serves every instance on the page. All of it, and every chart sheet, is inside
+`@layer toolbench`, so a host's unlayered rule wins whatever its specificity. It also orders the sheets in
+a root: the runtime's first, a chart's after it, then whatever a host adopted by hand, then the sheets from
+the host's `styles` option, which `setHostStyles` can replace on every live root. [STYLING.md](../STYLING.md)
+is the contract a host sheet is written against: the classes, `data-kind` on every part, `data-role`,
+`data-label` on table cells, and what counts as a breaking change to them.
 
 ### 6.3 What the host owns
 
@@ -409,6 +415,7 @@ Deliberately small, and deliberately not zero:
 | The `ToolSource` | Only the host knows where its tools are and how its bundler resolves them |
 | `tool.worker.ts` | A worker must import tool modules, and a bundler can only follow imports it can see in the host's own module graph |
 | `pageUrl` | Only the host knows its routing |
+| `styles`, optionally | How a result should look on one site is that site's design. The runtime publishes names to select by, not designs |
 | Rendering `help` | Markdown rendering is a host concern, and most hosts already have one |
 | Seeding | Requires running a tool during the host's build, which only the host can do. `seed()` and `serialiseSeed()` in the SDK do the work; wiring them into a build is the host's |
 
@@ -767,12 +774,12 @@ Six layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 90 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 92 |
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 9 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 21 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 125 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 134 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -815,7 +822,10 @@ production build:
   still runs on its page, and is not a live card;
 * the landing page has no stress host, in-page nav stays relative, and each tool links at `tools/<id>/`;
 * labels, `aria-describedby` targets that exist, the status region, bounded number inputs;
-* theming through custom properties only;
+* theming through custom properties, and a host's own sheets: kept after the runtime's in every root,
+  winning over it through the runtime's layer, replaced everywhere by `setHostStyles`, and each of
+  STYLING.md's four examples producing the computed style it exists for;
+* the suite refuses to start when its port is already serving, so it cannot test another build;
 * a host `highlight` hook replaces the `code` text node with the returned Node, and omitting it keeps
   readable plain text.
 
@@ -831,9 +841,9 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 23.4 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, and 0.1 KB with the host `highlight` hook |
+| Runtime plus the bench's own wiring | 24.1 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, and 0.7 KB with host stylesheets and the styling contract |
 | Stylesheet | 0.9 KB | |
-| Worker entry | 4.1 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 4.2 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |
@@ -921,6 +931,11 @@ is here because the guards look arbitrary without it.
 | Run's stale-result cue looked like a focus ring | After a sample click the pressed pill kept focus and Run wore a soft ring hugging its edge, the same family of cue as `:focus-visible`. A keyboard reader could take the halo as "Run is where my keyboard is" and press Enter, which would re-fire the pill | A fill derived from `--tb-accent` that moves away from the surface behind it, darker on white and paler on near-black, not an outline or box-shadow. Browser test asserts the fill changes, that attention draws no ring, and that `:focus-visible` is still a 2px outline when both states are on |
 | A card facade's name hid its visible hint | `aria-label` was `Open ${name}` while the button said "Try it" (or "Open this tool" without a seed). A speech-input user saying "click Try it" matched nothing | The name is `${hint}: ${name}`, from the same string the hint uses. Browser test asserts the accessible name contains the visible hint on a seeded card and an unseeded one |
 | A card title link was 20px tall | `.tb-name` is 1.05rem with no padding, so the `pageUrl` anchor was exactly its text (measured 160×20 against the 24px WCAG 2.5.8 floor) | Block padding and `min-height: 24px` on `.tb-name a`, for every mode that uses the title link. Browser test measures the box |
+| A host's adopted sheet switched the runtime's styles off | A page that assigned `adoptedStyleSheets = [hostSheet]` before connecting a tool got only its own rules: the runtime reinstalled its sheet only while the list was empty. `.tb` reported `container-type: normal` | One `adopt` helper keeps the runtime's sheet first and every other sheet after it, on every paint. Browser tests assign a sheet before connect, and append one before a chart's sheet arrives |
+| A host rule lost to a runtime rule it came after | Stacked table rows kept half their values right-aligned: `.tb-out-table td { text-align: start }` in a later sheet lost to the more specific `td[data-align="end"]` | The runtime's rules are in `@layer toolbench`, which any unlayered host rule beats. Browser test asserts `start` on an end-aligned cell in a narrow tool |
+| A wide table clipped its whole tool on a phone (#154) | At 390px a six-column table set the grid track: frame 348px wide, content 402px, the table's box 386px, so the table could not scroll and the card's edge cut it off | `min-width: 0` on `.tb-output` and `.tb-group`. Browser test asserts the table scrolls inside its box and nothing is wider than the frame |
+| The browser suite tested another checkout's build for over two weeks | A preview left running elsewhere held port 4173. The suite's own server failed on `--strictPort` with its output ignored, and every run used the other bundle | The suite refuses a port that already answers, and fails if its server exits before it is ready, with the server's stderr in the message |
+| The browser suite passed every test in CI and then hung until the job timeout | The preview ran as `npx vite preview` with its stderr piped to the suite. On Linux npx does not pass SIGTERM on, so vite outlived the suite holding that pipe open, and the open stream kept Node's event loop alive. macOS delivered the signal, so it never showed locally | vite's own bin runs directly in a process group of its own, stopped by a group SIGTERM with a SIGKILL two seconds later; the pipe and child are unreferenced once the server is ready |
 | `percentiles` treated a thousands grouping as extra measurements | Pasting `1,204 980 1,100 1,340` was read as seven measurements (1, 204, 980, 1, 100, 1, 340), so the result showed min 1 and mean 232.4 with no error. Every figure on screen was wrong and all of them looked reasonable | A comma between digits is refused as `{ kind: "error" }` naming the token, in the same style as `"18ms" is not a number`. Fixtures assert the refusal and lock `12, 14, 15` as still valid |
 
 ## 15. Limitations
@@ -1064,7 +1079,7 @@ declaration, so browsers without that function get the light palette rather than
 
 | Export | Kind |
 |---|---|
-| `Tool`, `Ctx`, `Output`, `Field`, `Column`, `Cell`, `ByteRange`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `Capability`, `OutputKind`, `InputType` | types |
+| `Tool`, `Ctx`, `Output`, `PartNames`, `Field`, `Column`, `Cell`, `ByteRange`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `TextTone`, `Capability`, `OutputKind`, `InputType` | types |
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
@@ -1077,7 +1092,8 @@ declaration, so browsers without that function get the light palette rather than
 
 | Export | Kind |
 |---|---|
-| `defineToolHost`, `ToolHost`, `ToolHostConfig`, `Mode` | the element. `ToolHostConfig.highlight` is the optional host highlighter for `code` results |
+| `defineToolHost`, `ToolHost`, `ToolHostConfig`, `Mode` | the element. `ToolHostConfig.highlight` is the optional host highlighter for `code` results, and `ToolHostConfig.styles` the host's own stylesheets |
+| `setHostStyles`, `HostStyles`, `HostSheet` | host stylesheets, replaced on every tool at once. See STYLING.md |
 | `RegistrySource`, `ToolSource`, `RegistryEntry`, `ToolNotFoundError` | sources |
 | `Runner`, `RunHooks`, `RunnerOptions`, `isSuperseded` | execution |
 | `ToolTimeoutError`, `ToolCrashError`, `WorkerUnavailableError`, `Request`, `Response` | protocol |

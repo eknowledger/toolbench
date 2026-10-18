@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v4-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-23.4%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v5-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-24.1%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -211,8 +211,8 @@ tools/reverse/
 ```
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
-concrete: the current contract is 3, and declaring 1 opts out of everything added since (`bytes` in v2,
-`samples` in v3). See [docs/versioning.md](docs/versioning.md).
+concrete: the current contract is 5, and declaring 1 opts out of everything added since (`bytes` in v2,
+`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5). See [docs/versioning.md](docs/versioning.md).
 
 **2. Register it.** Once per site:
 
@@ -227,6 +227,8 @@ defineToolHost({
   pageUrl: (id) => `/tools/${id}/`,
   // Optional. Return a Node, never a string: the runtime will not assign innerHTML.
   // highlight: (source, lang) => yourHighlighter(source, lang),
+  // Optional. Your own CSS inside every tool, after the runtime's. See STYLING.md.
+  // styles: [yourSheet],
 });
 ```
 
@@ -447,6 +449,9 @@ tool cannot invent something nobody can render.
 Returning `error` means the input was bad and the tool worked. Throwing means the tool has a bug. The
 two render differently on purpose.
 
+Any part, and any field, may carry a `role`, a name such as `"verdict"` or `"stats"` that the runtime
+renders as `data-role` and gives no meaning, so a [host stylesheet](STYLING.md) can find it by name.
+
 ## Worker mode
 
 A tool whose running time depends on its input sets `"thread": "worker"`. That is the only mode where a
@@ -480,8 +485,8 @@ Two things to know before you spend an afternoon on them:
 ## Theming
 
 The runtime renders inside a shadow root. Your CSS cannot reach in and break a tool, and the tool's CSS
-cannot leak out and break your page. Theming is therefore a list of custom properties, and that list is
-the whole styling API:
+cannot leak out and break your page. Theming is therefore a list of custom properties, set from your
+page; layout and emphasis are a host stylesheet, below:
 
 ```css
 tool-host {
@@ -508,14 +513,32 @@ Defaults use `light-dark()`, so a tool follows the page's colour scheme before a
 anything. The full list is at the top of
 [`packages/runtime/src/styles.ts`](packages/runtime/src/styles.ts).
 
+### Host stylesheets
+
+For anything a custom property cannot say, such as a verdict drawn large, stat tiles, bordered tables or
+table rows that stack on a phone, pass your own CSS and the runtime adopts it into every tool's shadow
+root, after its own:
+
+```ts
+defineToolHost({ source, styles: [".tb-out-table td { border: 1px solid var(--tb-border); }"] });
+```
+
+`styles` takes a `CSSStyleSheet`, CSS text, a list of either, or `{ "*": [...], "tool-id": [...] }` for one
+tool to differ. `setHostStyles(styles)` swaps them on every tool without a reload. The runtime's own rules
+are in `@layer toolbench`, so any rule of yours outside a layer wins, whatever its specificity.
+
+The class names and attributes a host sheet may rely on, `data-kind` on every part, `data-role` where a
+tool named one, and `data-label` on table cells among them, are versioned API, listed in
+[STYLING.md](STYLING.md) with four worked examples.
+
 ## Size and cost
 
 Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 23.4 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.1 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 24.1 KB |
+| Worker entry, only for pages with a worker-mode tool | 4.2 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |
@@ -595,6 +618,7 @@ pnpm coverage       # Node suite coverage: uncovered list, no threshold
 | [docs/architecture.md](docs/architecture.md) | How it works, where the boundaries are, how to change it, how to contribute |
 | [docs/authoring-a-tool.md](docs/authoring-a-tool.md) | Writing, testing and shipping a tool |
 | [docs/versioning.md](docs/versioning.md) | The compatibility policy and how to raise the contract version |
+| [STYLING.md](STYLING.md) | Host stylesheets, and the class names and attributes they may rely on |
 | [docs/releasing.md](docs/releasing.md) | How versions are decided and how a release reaches npm |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the loop, and which opinions are load bearing |
 | [SECURITY.md](SECURITY.md) | The threat model, and what is in scope to report |

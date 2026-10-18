@@ -130,7 +130,9 @@ export function adoptChartStyles(node: Node): void {
 const sheets = new Map<string, CSSStyleSheet>();
 
 /** Adopt a named sheet into the shadow root `node` is drawn into, once per root. See `adoptChartStyles`. */
-export function adoptStyles(node: Node, name: string, css: () => string): void {
+export function adoptStyles(node: Node, name: string, rules: () => string): void {
+	// In the runtime's layer, like its main sheet, so a host's unlayered rule beats a chart's too.
+	const css = () => `@layer toolbench{${rules()}}`;
 	queueMicrotask(() => {
 		const root = node.getRootNode();
 		if (!(root instanceof ShadowRoot)) return;

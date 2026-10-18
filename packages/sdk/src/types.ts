@@ -22,11 +22,24 @@ export interface Field {
 	note?: string;
 	/** Fields sharing a group are rendered together under its name. */
 	group?: string;
-	/** Draws attention without inventing a severity scale. */
-	tone?: Tone;
+	/** Draws attention without inventing a severity scale, or `muted` to let a routine value recede. */
+	tone?: TextTone;
+	/**
+	 * A name for this one field, rendered as `data-role`, so a host stylesheet can find "the verdict"
+	 * without counting rows. The runtime gives it no meaning. Contract version 5.
+	 */
+	role?: string;
 }
 
 export type Tone = "normal" | "warn" | "bad" | "good";
+
+/**
+ * The tones a field value or a table cell can take: every `Tone`, plus `muted` (contract version 5).
+ *
+ * `muted` is for the routine majority of a dense table, so the cells that matter are not buried among
+ * cells coloured like them. Charts and byte ranges keep `Tone`, where a faded mark would read as missing.
+ */
+export type TextTone = Tone | "muted";
 
 export interface Column {
 	label: string;
@@ -35,7 +48,7 @@ export interface Column {
 	mono?: boolean;
 }
 
-export type Cell = string | number | { text: string; mono?: boolean; tone?: Tone };
+export type Cell = string | number | { text: string; mono?: boolean; tone?: TextTone };
 
 /** One line, bar or area on a chart. */
 export interface Series {
@@ -263,8 +276,26 @@ export interface ByteRange {
  *
  * ⚠️ `group` is what lets one tool answer in more than one shape — a decode that produces both a
  * field list and a table is the common case, not the exception.
+ *
+ * Every part may also carry the names in `PartNames`.
  */
-export type Output =
+export type Output = OutputBody & PartNames;
+
+/**
+ * Names any part of a result may carry, whatever its kind. Contract version 5.
+ *
+ * Names, not instructions: the runtime renders them as attributes and attaches no meaning, so a tool that
+ * sets them looks the same on a host that styles nothing, and an older runtime simply ignores them.
+ */
+export interface PartNames {
+	/**
+	 * What this part is to the reader, `"verdict"` or `"stats"` say, rendered as `data-role` on the part's
+	 * root element for host CSS and tests to find it by name rather than by position.
+	 */
+	role?: string;
+}
+
+type OutputBody =
 	| { kind: "fields"; fields: Field[] }
 	| { kind: "text"; text: string; mono?: boolean }
 	| { kind: "code"; lang: string; source: string }

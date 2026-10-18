@@ -11,8 +11,15 @@
  *
  * The defaults follow the page: `light-dark()` picks per the host's colour scheme, so a tool does not
  * glow white inside a dark site before anyone has configured anything.
+ *
+ * ⚠️ Everything is inside `@layer toolbench`, and that is the guarantee STYLING.md makes to a host: any
+ * rule a host adopts into the root outside a layer wins over every rule here, whatever its specificity.
+ * Sheet order alone was not enough. A host sheet after this one still lost to `td[data-align="end"]`
+ * when it wrote the natural `.tb-out-table td { text-align: start }`, so stacked table rows kept half
+ * their cells pinned to the right edge.
  */
 export const STYLES = /* css */ `
+@layer toolbench {
 :host {
   /* ── Theming surface. A host overrides any of these on tool-host, and that is the whole API. ── */
   /* Light values first, as a plain fallback: a browser without light-dark() would otherwise drop the
@@ -224,6 +231,10 @@ export const STYLES = /* css */ `
    as a rendering bug. */
 .tb-status:empty { display: none; }
 .tb-output { display: grid; gap: 0.75rem; }
+/* Grid items default to min-width: auto, so the widest result set the track: at 390px a six-column
+   table made the tool 402px wide inside a 348px frame, and the card clipped the rest (#154). With
+   this the table scrolls inside its own box. */
+.tb-output, .tb-group { min-width: 0; }
 .tb-output[data-state="running"] { opacity: 0.65; }
 /* The form no longer matches what is on screen. Dimmed rather than cleared: the previous answer is
    still the last true one, and throwing it away loses the comparison the reader was making. */
@@ -236,6 +247,7 @@ export const STYLES = /* css */ `
 .tb-field[data-tone="bad"] dd .tb-value { color: var(--tb-bad); }
 .tb-field[data-tone="warn"] dd .tb-value { color: var(--tb-warn); }
 .tb-field[data-tone="good"] dd .tb-value { color: var(--tb-good); }
+.tb-field[data-tone="muted"] dd .tb-value { color: var(--tb-faint); }
 .tb-note { color: var(--tb-faint); margin-left: 0.5ch; }
 .tb-field-group h4 { margin: 0.5rem 0 0.25rem; font-size: 0.75rem; text-transform: none; color: var(--tb-faint); font-weight: 600; }
 .tb-more { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
@@ -287,6 +299,9 @@ export const STYLES = /* css */ `
 .tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
 .tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
 .tb-out-table td[data-tone="warn"] { color: var(--tb-warn); }
+/* good matched a field value and was unstyled on a cell (#156); muted lets the routine cells recede. */
+.tb-out-table td[data-tone="good"] { color: var(--tb-good); }
+.tb-out-table td[data-tone="muted"] { color: var(--tb-faint); }
 
 .tb-out-error {
   display: flex; gap: 0.5rem; align-items: baseline;
@@ -385,6 +400,7 @@ button.tb-facade-hint {
 @container (max-width: 30rem) {
   .tb-field { grid-template-columns: 1fr; gap: 0; }
 }
+}
 `;
 
 /**
@@ -434,7 +450,66 @@ export function adopt(root: ShadowRoot, s: CSSStyleSheet): void {
 	const list = root.adoptedStyleSheets;
 	const rest = list.filter((x) => x !== s);
 	const runtime = rest.filter((x) => ours.has(x));
-	const next = [...(s === sheet ? [s, ...runtime] : [...runtime, s]), ...rest.filter((x) => !ours.has(x))];
-	// Only when something moved: this runs on every paint, and an equal list needs no new assignment.
-	if (next.some((x, i) => x !== list[i])) root.adoptedStyleSheets = next;
+	setSheets(root, [...(s === sheet ? [s, ...runtime] : [...runtime, s]), ...rest.filter((x) => !ours.has(x))]);
+}
+
+// Only when something moved: this runs on every paint, and an equal list needs no new assignment.
+function setSheets(root: ShadowRoot, next: CSSStyleSheet[]): void {
+	const list = root.adoptedStyleSheets;
+	if (next.length !== list.length || next.some((x, i) => x !== list[i])) root.adoptedStyleSheets = next;
+}
+
+/** One host stylesheet: a parsed sheet, or CSS text the runtime parses once and shares. */
+export type HostSheet = CSSStyleSheet | string;
+
+/**
+ * The `styles` a host passes to `defineToolHost` or `setHostStyles`: one sheet, a list, or a map from
+ * tool id to sheets, where `"*"` applies to every tool and comes before the tool's own.
+ */
+export type HostStyles = HostSheet | readonly HostSheet[] | { readonly [toolId: string]: HostSheet | readonly HostSheet[] };
+
+const asList = (v: HostSheet | readonly HostSheet[] | undefined): HostSheet[] => (v === undefined ? [] : Array.isArray(v) ? [...v] : [v as HostSheet]);
+
+/** The host sheets one tool gets, in order. */
+export function hostSheetsFor(styles: HostStyles | undefined, toolId: string): HostSheet[] {
+	if (styles === undefined || typeof styles === "string" || Array.isArray(styles)) return asList(styles as HostSheet | HostSheet[] | undefined);
+	if (typeof CSSStyleSheet === "function" && styles instanceof CSSStyleSheet) return [styles];
+	const map = styles as { readonly [toolId: string]: HostSheet | readonly HostSheet[] };
+	return [...asList(map["*"]), ...asList(map[toolId])];
+}
+
+/** Sheets that came from the `styles` option, so a later call can replace them and nothing else. */
+const given = new WeakSet<CSSStyleSheet>();
+const parsed = new Map<string, CSSStyleSheet>();
+
+/**
+ * Put the host's `styles` into `root`, after every sheet already there, replacing the ones a previous
+ * call put in. A sheet a page adopted by hand is left where it is.
+ *
+ * Where adopted sheets are unavailable, the runtime's own sheet is a `<style>` element, and so is each
+ * of these, appended after it so the order, and so the cascade, is the same.
+ */
+export function applyHostStyles(root: ShadowRoot, wanted: readonly HostSheet[]): void {
+	if (sheet && root.adoptedStyleSheets?.includes(sheet)) {
+		const sheets = wanted.map((w) => {
+			if (typeof w !== "string") return w;
+			let s = parsed.get(w);
+			if (!s) {
+				s = new CSSStyleSheet();
+				s.replaceSync(w);
+				parsed.set(w, s);
+			}
+			return s;
+		});
+		for (const s of sheets) given.add(s);
+		setSheets(root, [...root.adoptedStyleSheets.filter((x) => !given.has(x)), ...sheets]);
+		return;
+	}
+	for (const old of root.querySelectorAll("style[data-tb-host]")) old.remove();
+	for (const w of wanted) {
+		const style = document.createElement("style");
+		style.setAttribute("data-tb-host", "");
+		style.textContent = typeof w === "string" ? w : [...w.cssRules].map((r) => r.cssText).join("\n");
+		root.append(style);
+	}
 }
