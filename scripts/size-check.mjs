@@ -119,8 +119,14 @@ const BUDGETS = [
 	 * that stops a wide result clipping its tool.
 	 *
 	 * #147's `reveal(id)` and `data-part` spent 230 of the headroom, 24,118 to 24,348, inside this ceiling.
+	 * Raised from 24_500 to 25_500 by select presets (#151) and contract v6, in the commit that spent it:
+	 * 24,348 to 25,022 measured, 674 bytes. 355 of them are validation, because `validateManifest` ships in
+	 * this chunk: the payload checker that samples and presets now share, and the four rules a preset adds,
+	 * each with a message naming the field. The other 319 are the runtime, the select writing its option's
+	 * values and following the form after typing, a sample or a host write, with the status line saying so,
+	 * plus the v6 changelog line. 24_500 left 152 bytes after v5, so no version of this fitted under it.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 24_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 25_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -246,6 +252,8 @@ const BUDGETS = [
 	{ label: "bench fixture: discrete-series", pattern: /^tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	// The styling page's fixture (#157, #147): a result that names its parts. 528 measured.
 	{ label: "bench fixture: styled-output", pattern: /^tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// Select presets (#151) on screen for the browser tests. 248 measured.
+	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -271,6 +279,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture slider", pattern: /^worker-tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture discrete-series", pattern: /^worker-tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	{ label: "worker copy: bench fixture styled-output", pattern: /^worker-tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture presets", pattern: /^worker-tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;

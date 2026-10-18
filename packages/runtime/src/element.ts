@@ -32,7 +32,7 @@
  *  - there is always a Run button. Debounce-on-typing alone leaves a keyboard user no way to say
  *    "go now", and is wrong anyway for anything slow.
  */
-import type { InputSpec, InputValues, Manifest, Output, Sample } from "@toolbench/sdk";
+import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -398,6 +398,8 @@ export class ToolHost extends HTMLElement {
 			if (this.#hostWroteValues) Object.assign(overlay, this.#values);
 			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
+			// A prefill that arrived before the manifest follows the same preset rule as one after it.
+			this.#follow(Object.keys(overlay));
 			/*
 			 * ⚠️ Before the first paint, and only when this paint is going to draw a chart.
 			 *
@@ -954,7 +956,7 @@ export class ToolHost extends HTMLElement {
 				area.value = String(this.#values[spec.id] ?? spec.default);
 				area.addEventListener("input", () => {
 					this.#values[spec.id] = area.value;
-					this.#inputChanged();
+					this.#edited(spec.id);
 				});
 				control = area;
 				break;
@@ -968,7 +970,10 @@ export class ToolHost extends HTMLElement {
 				}
 				select.addEventListener("change", () => {
 					this.#values[spec.id] = select.value;
-					this.#inputChanged();
+					// A preset fills the form exactly as a sample does: same write, same stale result, same line.
+					const option = spec.options.find((o) => o.value === select.value);
+					if (option?.sets) this.#fill(option.label, option.sets);
+					else this.#edited(spec.id);
 				});
 				control = select;
 				break;
@@ -978,7 +983,7 @@ export class ToolHost extends HTMLElement {
 				box.checked = Boolean(this.#values[spec.id] ?? spec.default);
 				box.addEventListener("change", () => {
 					this.#values[spec.id] = box.checked;
-					this.#inputChanged();
+					this.#edited(spec.id);
 				});
 				control = box;
 				break;
@@ -1001,7 +1006,7 @@ export class ToolHost extends HTMLElement {
 					this.#values[spec.id] = coerce(spec, input.value);
 					const slider = this.#sliders.get(spec.id);
 					if (slider) slider.value = String(this.#values[spec.id]);
-					this.#inputChanged();
+					this.#edited(spec.id);
 				});
 				control = input;
 				/*
@@ -1024,7 +1029,7 @@ export class ToolHost extends HTMLElement {
 					slider.addEventListener("input", () => {
 						this.#values[spec.id] = coerce(spec, slider.value);
 						input.value = String(this.#values[spec.id]);
-						this.#inputChanged();
+						this.#edited(spec.id);
 					});
 					this.#sliders.set(spec.id, slider);
 				}
@@ -1044,7 +1049,7 @@ export class ToolHost extends HTMLElement {
 				input.value = String(this.#values[spec.id] ?? spec.default);
 				input.addEventListener("input", () => {
 					this.#values[spec.id] = input.value;
-					this.#inputChanged();
+					this.#edited(spec.id);
 				});
 				control = input;
 				break;
@@ -1095,14 +1100,14 @@ export class ToolHost extends HTMLElement {
 		row.append(el("span", { class: "tb-samples-label", id: labelId }, "Try:"));
 		for (const sample of samples) {
 			const button = el("button", { class: "tb-sample", type: "button" }, sample.label);
-			button.addEventListener("click", () => this.#applySample(sample));
+			button.addEventListener("click", () => this.#fill(sample.label, sample.input));
 			row.append(button);
 		}
 		return row;
 	}
 
 	/**
-	 * Fill the form from a sample.
+	 * Fill the form from a sample, or from a preset on a select (#151), which is the same act.
 	 *
 	 * Deliberately the same path a keystroke takes: values in, controls updated, then `#inputChanged`.
 	 * So a normal tool marks its result stale and an `autoRun` tool re-runs, which is what "a sample
@@ -1115,8 +1120,9 @@ export class ToolHost extends HTMLElement {
 	 * form describing something other than what Run will use. Relaxing the card rule means resolving
 	 * that first.
 	 */
-	#applySample(sample: Sample): void {
-		this.#values = applyPartialValues(this.#manifest?.inputs ?? [], this.#values, sample.input);
+	#fill(label: string, partial: InputValues): void {
+		this.#values = applyPartialValues(this.#manifest?.inputs ?? [], this.#values, partial);
+		const note = this.#follow(Object.keys(partial));
 		this.#syncControls();
 		/*
 		 * It is tempting to clear `aria-invalid` here, on the control the last error named. Deliberately
@@ -1132,7 +1138,53 @@ export class ToolHost extends HTMLElement {
 		 * that, and it is the only confirmation a screen-reader user gets that the click did anything. An
 		 * `autoRun` tool is already announcing its own run, so leave that one alone.
 		 */
-		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${sample.label}" — press Run`);
+		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${label}"${note} — press Run`);
+	}
+
+	/**
+	 * A reader changed one control. Any preset select that names it follows the form, and says so.
+	 *
+	 * The announcement is the point: a control the reader did not touch has just changed value, and the
+	 * status line is the only way a screen-reader user hears that.
+	 */
+	#edited(id: string): void {
+		const note = this.#follow([id]);
+		if (note) this.#syncControls();
+		this.#inputChanged();
+		if (note) this.#say(note.slice(2) + (this.#els.output?.hasAttribute("data-stale") ? ". Press Run" : ""));
+	}
+
+	/**
+	 * Point each preset select at the option the form now matches (#151), after `changed` were written.
+	 *
+	 * The select is derived from the values rather than remembered, so it cannot drift from them whichever
+	 * path wrote them: typing, a sample, or the host. Remembering instead, and switching to "Custom" only on
+	 * a keystroke, was mocked up first and a sample walked straight past it, leaving "Library A" above
+	 * values that were not Library A's.
+	 *
+	 * Rules, in order: a select named in `changed` was written on purpose and is left alone, which is how
+	 * a host writes literal values; a select is only reconsidered when `changed` touches an input its
+	 * presets name, so editing an unrelated field never moves it; the current option stays if it still
+	 * matches, which settles a preset whose values another preset's include; otherwise the first matching
+	 * preset, then the first option with no `sets`, otherwise unchanged.
+	 *
+	 * Returns what changed as `; Library now shows "Custom"`, for the caller to put in the status line.
+	 */
+	#follow(changed: string[]): string {
+		let note = "";
+		for (const spec of this.#manifest?.inputs ?? []) {
+			if (spec.type !== "select" || changed.includes(spec.id)) continue;
+			const presets = spec.options.filter((o) => o.sets && changed.some((key) => key in (o.sets as InputValues)));
+			if (presets.length === 0) continue;
+			const matches = (o: SelectOption) => o.sets !== undefined && Object.entries(o.sets).every(([key, value]) => this.#values[key] === value);
+			const current = spec.options.find((o) => o.value === this.#values[spec.id]);
+			if (current && (matches(current) || (!current.sets && !spec.options.some(matches)))) continue;
+			const next = spec.options.find(matches) ?? spec.options.find((o) => !o.sets);
+			if (!next) continue;
+			this.#values[spec.id] = next.value;
+			note += `; ${spec.label} now shows "${next.label}"`;
+		}
+		return note;
 	}
 
 	/**
@@ -1144,9 +1196,12 @@ export class ToolHost extends HTMLElement {
 	 */
 	#applyHostValues(partial: InputValues): void {
 		this.#values = applyPartialValues(this.#manifest?.inputs ?? [], this.#values, partial);
+		// A preset select the host did not name follows the values it did; one it named is taken literally.
+		const note = this.#follow(Object.keys(partial));
 		this.#syncControls();
 		this.#hostWroteValues = true;
 		if (this.#els.output) this.#markStale();
+		if (note) this.#say(note.slice(2));
 	}
 
 	#syncControls(): void {

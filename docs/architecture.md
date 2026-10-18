@@ -245,7 +245,7 @@ export type InputSpec =
   | (InputBase & { type: "text";     default: string; maxLength?: number })
   | (InputBase & { type: "textarea"; default: string; rows?: number; maxLength?: number })
   | (InputBase & { type: "number";   default: number; min: number; max: number; step?: number })
-  | (InputBase & { type: "select";   default: string; options: { value: string; label: string }[] })
+  | (InputBase & { type: "select";   default: string; options: SelectOption[] })
   | (InputBase & { type: "toggle";   default: boolean });
 
 interface InputBase {
@@ -256,7 +256,20 @@ interface InputBase {
   primary?: boolean;      // show this input on a compact card; mark as many as the question needs
   dir?: "ltr" | "auto";   // bytes and code stay left to right inside right-to-left prose
 }
+
+interface SelectOption {
+  value: string;
+  label: string;
+  sets?: InputValues;     // a preset: choosing this option fills those inputs (contract v6)
+}
 ```
+
+A preset is derived state, not remembered state. After any write (typing, a sample, a host `values`), a
+preset select shows the option whose `sets` the form matches, else the first option with no `sets`, else it
+stays put. Remembering the choice and switching to "Custom" on a keystroke was mocked up first, and a sample
+walked straight past it: it filled a read timeout of 120 while the select still said "Library A", whose
+read timeout is 30. A select the write names is taken literally, which is how a host prefills one without
+expanding it.
 
 `min` and `max` are required on a number input rather than optional. They are the only thing standing
 between a bounded computation and an unbounded one, and the element clamps to them before the tool
@@ -277,6 +290,7 @@ The fields, and who reads each one:
 | `runtime.thread` | runner | `"main"` (default) or `"worker"`. |
 | `inputs` | element (form), fixture runner (defaults) | |
 | `samples` | validate, element (the row under the form), fixture runner | Labelled example inputs, each `input` partial. Never drawn on a card. |
+| `inputs[].options[].sets` | validate, element (the select) | A preset: the values choosing that option writes into other inputs. The select then follows the form. Contract version 6. |
 | `kinds` | validate, fixture runner, host | Every kind `run` can return. Must include `"error"`. |
 | `card` | element, validate | `"live"`, `"info"`, `"none"`. Refused when `status` is not `"live"`. |
 | `cardFields` | renderers | How many fields a compact result shows. |
@@ -593,6 +607,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | `kinds` includes `"error"` | `validate.ts` | A tool with no way to reject bad input |
 | Every case's `expect.kind` is declared in `kinds` | `tools/cases.test.ts` | `kinds` drifts into fiction |
 | Every sample fills declared inputs only, with values of the right type inside their bounds, and no two share a label or the same input values | `validate.ts` | A button that fills the form with a value the form itself refuses, or two buttons that do the same thing |
+| Every preset's `sets` passes the sample checks, names neither its own select nor another preset select, differs from its siblings, and on the default option equals the inputs' defaults | `validate.ts` | A choice that writes values the form refuses, rewrites another choice, cannot be told apart from a sibling, or a form that opens contradicting itself |
 | Every declared sample runs without throwing | `tools/cases.test.ts` | The first thing a reader clicks is the first thing to crash |
 | Only a `pure` tool with no assets may be `card: "live"` | `validate.ts` | A landing page card could read files or call the network |
 | Only a `live` tool may be `card: "live"` | `validate.ts`, `element.ts` | A compact slot would present a tool on the way out, or already gone, as current |
@@ -777,12 +792,12 @@ Six layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 93 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 111 |
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 9 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 21 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 138 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 143 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -816,6 +831,9 @@ production build:
   opens, and `run()` after it produces a result;
 * a sample fills the form, sets several inputs at once, leaves the ones it does not name alone, keeps
   focus on the button that was pressed, and draws no row on a card;
+* a select preset fills the inputs it names and leaves the rest, goes stale without running, and passes
+  its own value to `run`; the select then follows typing, a sample and a host write, announces the change
+  in the status region, and is left alone when the host names it;
 * Run attention is a fill change, not a ring, so it cannot be mistaken for `:focus-visible`;
 * all three modes, including two tools in one article with different threading;
 * a tool that spins forever is killed by the timeout, the page stays responsive, and the next run gets a
@@ -844,7 +862,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 24.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, and 0.2 KB with `reveal` |
+| Runtime plus the bench's own wiring | 25.0 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, and 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation) |
 | Stylesheet | 0.9 KB | |
 | Worker entry | 4.2 KB | Only on pages with a worker-mode tool, and only after activation |
 | `percentiles` chunk | 1.3 KB | |

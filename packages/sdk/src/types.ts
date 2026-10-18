@@ -411,8 +411,24 @@ export type InputSpec =
 			 */
 			control?: "slider";
 	  })
-	| (InputBase & { type: "select"; default: string; options: { value: string; label: string }[] })
+	| (InputBase & { type: "select"; default: string; options: SelectOption[] })
 	| (InputBase & { type: "toggle"; default: boolean });
+
+/** One choice in a `select`. */
+export interface SelectOption {
+	value: string;
+	label: string;
+	/**
+	 * A preset: choosing this option writes these values into the other inputs it names, which the reader
+	 * then edits. Partial, keyed by input id, checked like a sample's `input`. `run` still receives the
+	 * select's own value.
+	 *
+	 * The select follows the form afterwards: once the values stop matching this option, it shows the
+	 * preset they do match, or the first option with no `sets` (a "Custom"), or stays put if there is
+	 * none. Contract version 6.
+	 */
+	sets?: InputValues;
+}
 
 export type InputType = InputSpec["type"];
 

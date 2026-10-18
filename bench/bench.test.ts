@@ -3757,6 +3757,124 @@ describe("host code highlight hook", () => {
 
 });
 
+describe("select presets (#151)", () => {
+	/*
+	 * The `presets` fixture's Library select: A sets read 30, retries 2, backoff 200 (the inputs' defaults),
+	 * B sets 60, 3, 500, C sets 10, 0, 0, and Custom sets nothing. Connect is named by no preset. Every
+	 * expected value below is read off that manifest by hand, and the worst-case figure from the fixture's
+	 * formula, (retries + 1) × (connect + read) + backoff doubling: 4 × (5 + 60) + (0.5 + 1 + 2) = 263.5 s.
+	 */
+	async function open(): Promise<Page> {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=presets`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").waitFor();
+		return page;
+	}
+	const form = (page: Page) =>
+		page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> };
+			const root = host.shadowRoot;
+			const value = (id: string) => (root?.querySelector(`#in-${id}`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "";
+			return {
+				shown: { stack: value("stack"), connect: value("connect"), read: value("read"), retries: value("retries"), backoff: value("backoff") },
+				values: host.values,
+				status: root?.querySelector(".tb-status")?.textContent ?? "",
+				stale: Boolean(root?.querySelector(".tb-output[data-stale]")),
+				fields: root?.querySelectorAll(".tb-output .tb-field").length ?? 0,
+			};
+		});
+
+	it("fills the inputs an option names, leaves the rest, and goes stale without running", async () => {
+		const page = await open();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").waitFor({ timeout: 15_000 });
+
+		await page.locator("#host >> #in-stack").selectOption("b");
+		const after = await form(page);
+		assert.deepEqual(after.shown, { stack: "b", connect: "5", read: "60", retries: "3", backoff: "500" }, "the controls show Library B's values, and connect keeps its own");
+		assert.deepEqual(after.values, { stack: "b", connect: 5, read: 60, retries: 3, backoff: 500 }, "and so does what Run will use");
+		assert.equal(after.stale, true, "the answer on screen belongs to Library A's values");
+		assert.equal(after.status, 'filled with "Library B" — press Run', "the status names the option, as it names a sample");
+
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output:not([data-stale])").waitFor();
+		const text = await page.locator("#host >> .tb-output").textContent();
+		assert.match(String(text), /263\.5 s/, `the run used the filled values: ${text}`);
+		assert.match(String(text), /Library\s*b/, "and run() still received the select's own value");
+		await page.close();
+	});
+
+	it("shows Custom once a filled value is edited, and the preset again when it matches", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-stack").selectOption("b");
+
+		await page.locator("#host >> #in-read").fill("45");
+		let now = await form(page);
+		assert.equal(now.shown.stack, "custom", "45 is not Library B's read timeout, so the select may not say Library B");
+		assert.equal(now.values.stack, "custom", "and run() receives what the select shows");
+		assert.equal(now.status, 'Library now shows "Custom"', "a control the reader did not touch changed, so the status says so");
+
+		await page.locator("#host >> #in-read").fill("60");
+		now = await form(page);
+		assert.equal(now.shown.stack, "b", "typed back to Library B's values, the form is Library B again");
+		assert.equal(now.status, 'Library now shows "Library B"');
+
+		await page.locator("#host >> #in-connect").fill("9");
+		now = await form(page);
+		assert.equal(now.shown.stack, "b", "no preset names connect, so editing it must not move the select");
+		assert.doesNotMatch(now.status, /now shows/, "and must not announce a change that did not happen");
+		await page.close();
+	});
+
+	it("follows a sample, which writes values without a keystroke", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-stack").selectOption("b");
+
+		// The defect the mockup found: a sample changed the values and the select kept its old preset.
+		await page.locator('#host >> .tb-sample:text-is("Slow upstream")').click();
+		let now = await form(page);
+		assert.deepEqual([now.shown.stack, now.shown.read, now.shown.retries], ["custom", "120", "1"]);
+		assert.equal(now.status, 'filled with "Slow upstream"; Library now shows "Custom" — press Run');
+
+		await page.locator('#host >> .tb-sample:text-is("Library B\'s values")').click();
+		now = await form(page);
+		assert.equal(now.shown.stack, "b", "a sample that fills Library B's values is Library B");
+		await page.close();
+	});
+
+	it("takes a host's write literally: naming the select does not expand its preset", async () => {
+		const page = await open();
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: object }).values = { stack: "c" };
+		});
+		let now = await form(page);
+		assert.deepEqual(now.values, { stack: "c", connect: 5, read: 30, retries: 2, backoff: 200 }, "a host writes values, not choices");
+		assert.equal(now.shown.stack, "c");
+
+		// A host write that does not name the select is a value change like any other, so the select follows.
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: object }).values = { read: 60, retries: 3, backoff: 500 };
+		});
+		now = await form(page);
+		assert.equal(now.shown.stack, "b");
+		assert.equal(now.status, 'Library now shows "Library B"');
+		await page.close();
+	});
+
+	it("keeps the select a labelled native control, and announces through the status region", async () => {
+		const page = await open();
+		const select = page.getByRole("combobox", { name: "Library" });
+		assert.equal(await select.count(), 1, "the select keeps its <label for>");
+		await select.selectOption("c");
+		await page.getByRole("spinbutton", { name: "Retries" }).fill("4");
+		const status = page.locator("#host").getByRole("status").filter({ hasText: "now shows" });
+		assert.equal(await status.textContent(), 'Library now shows "Custom"', "the change is in a role=status region, not only on screen");
+		assert.equal(await status.getAttribute("aria-live"), "polite");
+		await page.close();
+	});
+});
+
 describe("live demo", () => {
 	it("keeps the stress fixture off the landing page", async () => {
 		const page = await browser.newPage();

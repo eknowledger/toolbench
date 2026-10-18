@@ -1,0 +1,35 @@
+{
+	"sdk": 6,
+	"id": "presets",
+	"name": "Worst-case request time",
+	"blurb": "A select whose options fill other inputs. The library values are illustrative, not any real client's defaults.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "stack",
+			"type": "select",
+			"label": "Library",
+			"description": "Fills the read timeout, retries and backoff. Edit them afterwards.",
+			"default": "a",
+			"options": [
+				{ "value": "a", "label": "Library A", "sets": { "read": 30, "retries": 2, "backoff": 200 } },
+				{ "value": "b", "label": "Library B", "sets": { "read": 60, "retries": 3, "backoff": 500 } },
+				{ "value": "c", "label": "Library C", "sets": { "read": 10, "retries": 0, "backoff": 0 } },
+				{ "value": "custom", "label": "Custom" }
+			]
+		},
+		{ "id": "connect", "type": "number", "label": "Connect timeout", "unit": "s", "description": "No library sets this one.", "default": 5, "min": 0, "max": 300 },
+		{ "id": "read", "type": "number", "label": "Read timeout", "unit": "s", "default": 30, "min": 0, "max": 600 },
+		{ "id": "retries", "type": "number", "label": "Retries", "default": 2, "min": 0, "max": 10, "step": 1 },
+		{ "id": "backoff", "type": "number", "label": "Initial backoff", "unit": "ms", "description": "Doubles after each retry.", "default": 200, "min": 0, "max": 60000 }
+	],
+	"samples": [
+		{ "label": "Slow upstream", "input": { "read": 120, "retries": 1 } },
+		{ "label": "Library B's values", "input": { "read": 60, "retries": 3, "backoff": 500 } }
+	]
+}

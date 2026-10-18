@@ -99,6 +99,17 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 5,
+		/*
+		 * 5 → 6 added inputs only: `sets` on a select option (a preset) and `lang` on a textarea.
+		 *
+		 * Identity on both halves. A v5 option without `sets` is an option that fills nothing, and a v5
+		 * textarea without `lang` is a plain one, which is exactly what each was. Outputs did not change.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {

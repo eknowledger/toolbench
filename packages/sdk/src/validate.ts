@@ -158,6 +158,111 @@ function samplePayloadKey(input: Record<string, unknown>): string {
 }
 
 /**
+ * Values an author wrote for other inputs, checked against those inputs: a sample's `input`, and a
+ * preset's `sets`.
+ *
+ * One checker because the two make the same promise. Both are static data written into the form by
+ * assignment rather than typed, so both walk past the control's own limits, and both are refused when
+ * they name an input that does not exist or hold a value that input would never accept. `what` names
+ * the author's thing in the one message that explains why a clamp is not the answer.
+ */
+function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputSpec>, at: string, what: string): void {
+	for (const key of Object.keys(payload)) {
+		const where = `${at}.${key}`;
+		const spec = byId.get(key);
+		if (!spec) fail(where, `names no input of this tool. Its inputs are: ${[...byId.keys()].join(", ")}`);
+		const value = payload[key];
+		switch (spec.type) {
+			case "text":
+			case "textarea": {
+				if (typeof value !== "string") fail(where, `must be a string, because "${key}" is a ${spec.type} input`);
+				/*
+				 * `maxLength` reaches the browser as the `maxlength` attribute, which constrains typing
+				 * and nothing else. Filling a control from a sample or a preset assigns its value directly
+				 * and walks straight past it, so an over-long value would run the tool on more characters
+				 * than the tool declared it accepts. Rejected for the same reason an out-of-range number is.
+				 */
+				if (spec.maxLength !== undefined && value.length > spec.maxLength) {
+					fail(where, `is ${value.length} characters, over "${key}"'s maxLength of ${spec.maxLength}`);
+				}
+				break;
+			}
+			case "number": {
+				if (typeof value !== "number" || !Number.isFinite(value)) {
+					fail(where, `must be a finite number, because "${key}" is a number input`);
+				}
+				if (value < spec.min || value > spec.max) {
+					fail(where, `is ${value}, outside "${key}"'s min..max (${spec.min}..${spec.max}). ${what} is not a keystroke: fix the value rather than relying on the clamp`);
+				}
+				break;
+			}
+			case "select": {
+				const values = spec.options.map((option) => option.value);
+				if (typeof value !== "string" || !values.includes(value)) {
+					fail(where, `must be one of "${key}"'s option values: ${values.join(", ")}`);
+				}
+				break;
+			}
+			case "toggle": {
+				if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Presets: `sets` on a select's options, checked once every input is known.
+ *
+ * Run after `validateInput` has seen all of them, because a preset names inputs declared after its select
+ * as readily as before. The payload rules are the sample rules. The four below are what a preset adds:
+ *
+ *  - it may not name its own select, which would make choosing an option choose a different one;
+ *  - it may not name a select that has presets of its own. Chained presets would let one choice rewrite a
+ *    second choice's values, and the form would no longer say which choice the values came from;
+ *  - two options of one select may not set the same values, or the select could not tell which one the
+ *    form matches, and it has to, because it shows whichever does;
+ *  - the default option's values must equal those inputs' defaults. The form opens showing that option,
+ *    so anything else opens it contradicting itself.
+ */
+function validatePresets(specs: InputSpec[]): void {
+	const byId = new Map(specs.map((spec) => [spec.id, spec]));
+	specs.forEach((spec, i) => {
+		if (spec.type !== "select") return;
+		const payloads: string[] = [];
+		const at: string[] = [];
+		spec.options.forEach((option, k) => {
+			if (option.sets === undefined) return;
+			const path = `inputs[${i}].options[${k}].sets`;
+			const sets = obj(option.sets, path);
+			if (Object.keys(sets).length === 0) fail(path, "sets no values; omit `sets` instead");
+			if (spec.id in sets) fail(`${path}.${spec.id}`, "names its own select; a preset fills the other inputs");
+			for (const key of Object.keys(sets)) {
+				const target = byId.get(key);
+				if (target?.type === "select" && target.options.some((o) => o.sets !== undefined)) {
+					fail(`${path}.${key}`, "is a select with presets of its own; presets do not chain");
+				}
+			}
+			checkPayload(sets, byId, path, "A preset");
+			if (option.value === spec.default) {
+				for (const [key, value] of Object.entries(sets)) {
+					const target = byId.get(key) as InputSpec;
+					if (target.default !== value) {
+						fail(`${path}.${key}`, `is ${JSON.stringify(value)}, but "${key}" defaults to ${JSON.stringify(target.default)}, and the form opens on this option`);
+					}
+				}
+			}
+			payloads.push(samplePayloadKey(sets));
+			at.push(path);
+		});
+		const repeated = firstRepeat(payloads);
+		if (repeated) {
+			fail(at[repeated.index] as string, `matches ${at[repeated.previous]}; the select could not tell the two apart`);
+		}
+	});
+}
+
+/**
  * Samples, checked against the inputs they claim to fill.
  *
  * ⚠️ Stricter than the runtime's typed-input path, on purpose. A reader's out-of-range number is
@@ -184,49 +289,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
 		const keys = Object.keys(input);
 		if (keys.length === 0) fail(`${at}.input`, "sets no values; a sample that fills nothing is a button that does nothing");
 		payloads.push(samplePayloadKey(input));
-
-		for (const key of keys) {
-			const where = `${at}.input.${key}`;
-			const spec = byId.get(key);
-			if (!spec) fail(where, `names no input of this tool. Its inputs are: ${[...byId.keys()].join(", ")}`);
-			const value = input[key];
-			switch (spec.type) {
-				case "text":
-				case "textarea": {
-					if (typeof value !== "string") fail(where, `must be a string, because "${key}" is a ${spec.type} input`);
-					/*
-					 * `maxLength` reaches the browser as the `maxlength` attribute, which constrains typing
-					 * and nothing else. Filling a control from a sample assigns its value directly and walks
-					 * straight past it, so an over-long sample would run the tool on more characters than the
-					 * tool declared it accepts. Rejected for the same reason an out-of-range number is.
-					 */
-					if (spec.maxLength !== undefined && value.length > spec.maxLength) {
-						fail(where, `is ${value.length} characters, over "${key}"'s maxLength of ${spec.maxLength}`);
-					}
-					break;
-				}
-				case "number": {
-					if (typeof value !== "number" || !Number.isFinite(value)) {
-						fail(where, `must be a finite number, because "${key}" is a number input`);
-					}
-					if (value < spec.min || value > spec.max) {
-						fail(where, `is ${value}, outside "${key}"'s min..max (${spec.min}..${spec.max}). A sample is not a keystroke: fix the example rather than relying on the clamp`);
-					}
-					break;
-				}
-				case "select": {
-					const values = spec.options.map((option) => option.value);
-					if (typeof value !== "string" || !values.includes(value)) {
-						fail(where, `must be one of "${key}"'s option values: ${values.join(", ")}`);
-					}
-					break;
-				}
-				case "toggle": {
-					if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
-					break;
-				}
-			}
-		}
+		checkPayload(input, byId, `${at}.input`, "A sample");
 	});
 
 	const repeatedLabel = firstRepeat(labels);
@@ -272,6 +335,8 @@ function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "
 		if (where !== "manifest" && TOP_LEVEL_KEYS.includes(key) && !(where === "input" && key === "id")) return "the top level of the manifest";
 		if (where !== "runtime" && RUNTIME_KEYS.includes(key)) return "`runtime`";
 		if (where !== "input" && INPUT_KEYS.includes(key) && !TOP_LEVEL_KEYS.includes(key) && !RUNTIME_KEYS.includes(key)) return "an entry of `inputs`";
+		// Written on the select it would be a preset with no option to choose it by.
+		if (key === "sets") return "an entry of a select's `options`";
 		return undefined;
 	};
 	for (const key of Object.keys(o)) {
@@ -349,6 +414,7 @@ export function validateManifest(raw: unknown): Manifest {
 	 * change, so this needs no contract version. A tool that marks everything primary gets a card the size
 	 * of its form, which is its own decision to make and visible the moment it looks at one.
 	 */
+	validatePresets(specs);
 	if (o.samples !== undefined) validateSamples(o.samples, specs);
 
 	// --- output kinds -----------------------------------------------------------------------------
