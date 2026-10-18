@@ -9,6 +9,7 @@ How versions are decided, how a release happens, and the one-time setup it needs
 3. [What counts as which bump](#3-what-counts-as-which-bump)
 4. [The road to 1.0](#4-the-road-to-10)
 5. [How a release runs](#5-how-a-release-runs)
+5b. [A release that lands as a stack](#5b-a-release-that-lands-as-a-stack)
 6. [One-time setup](#6-one-time-setup)
 7. [What gets published](#7-what-gets-published)
 8. [Publishing by hand](#8-publishing-by-hand)
@@ -142,6 +143,59 @@ pnpm changeset
 
 Pick the packages, pick patch or minor, and write one sentence a consumer would want to read. See
 [.changeset/README.md](../.changeset/README.md).
+
+## 5b. A release that lands as a stack
+
+0.7.0 went out as seven pull requests, #131 to #137, each branch built on the one below it. They were
+squash-merged bottom first, one at a time, and then the release PR, #138, versioned them together. Two
+things about that are not obvious, and each cost a CI cycle.
+
+**Every step has to fit the size budgets, not just the tip.** Each squash is a commit on `main`, and CI
+runs `pnpm size` against each one. A later branch that shrinks a chunk does not help an earlier one that
+lands first. In 0.7.0 the tip fitted, but #131 measured 22.6 KB against a runtime budget of 22.0 KB and
+#132 measured 23.3 KB against 22.5 KB. #133 was the branch that moved the chart styles out of the runtime
+chunk (the runtime line fell from 23.3 to 22.5 KB when it merged), so the stack fitted only as a whole.
+Each fix branch fitted alone; nobody had measured them together. Before merging the first, measure every
+branch in the order they will land:
+
+```sh
+for b in release/1-card-fixes release/2-contract-v4 release/3-readout; do
+  git switch -q "$b"
+  pnpm -r --filter "./packages/*" exec tsc -b --force   # the bench bundles dist/, so rebuild it
+  pnpm bench:build >/dev/null && pnpm size || echo "over budget at $b"
+done
+```
+
+A branch that is over gets its budget raised in a commit on that branch, under the rule at the top of
+[scripts/size-check.mjs](../scripts/size-check.mjs): the commit that spends the bytes raises the ceiling
+and says what bought them.
+In 0.7.0 that was "the runtime budget for the card fixes measured together, 22.6 of 23.0 KB".
+
+**After a squash, the next branch conflicts with code it already contains.** The squash commit shares no
+history with the branch above it, so Git sees the same changes made twice. Merging `main` into
+`release/2-contract-v4` after #131 landed reports seven conflicting files, although every line in them
+was identical. Neither resolving them by hand nor rebasing is needed. Two checks make it safe to record
+`main` as merged while keeping the branch's code exactly:
+
+```sh
+git fetch origin
+# 1. main is exactly what the merged branch held. Fails if the squash picked up anything else.
+test "$(git rev-parse origin/main^{tree})" = "$(git rev-parse origin/release/1-card-fixes^{tree})"
+# 2. This branch already contains the merged branch's final commit. Fails if a fix went onto the lower
+#    branch after this one last merged it, and "ours" would then silently drop that fix.
+git merge-base --is-ancestor origin/release/1-card-fixes HEAD
+# Both passed: take main's history and keep this branch's tree.
+git merge -s ours origin/main -m "Merge main (#131, identical to this branch's base)"
+git push
+```
+
+⚠️ `-s ours` discards everything on the other side. Run it only after both checks pass. If either fails,
+do a normal `git merge origin/main` and resolve the conflicts. In 0.7.0, `main` after #131 (`926a15d`)
+had the same tree as #131's last commit (`ff15235`), which `release/2-contract-v4` had already merged, and
+the resulting merge commit (`8623014`) kept that branch's tree unchanged.
+
+It is an ordinary merge, so `git push` needs no force. The squash at the end throws the merge commit
+away anyway; it exists so the pull request shows only its own changes and CI runs against them.
 
 ## 6. One-time setup
 
