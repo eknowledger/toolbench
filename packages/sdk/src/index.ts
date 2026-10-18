@@ -32,6 +32,7 @@ export {
 	type Output,
 	type OutputKind,
 	type Sample,
+	type SelectOption,
 	type Heatmap,
 	type Pie,
 	type Radar,

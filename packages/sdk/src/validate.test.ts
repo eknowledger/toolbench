@@ -311,3 +311,111 @@ describe("validateManifest", () => {
 		assert.deepEqual(validateManifest(m).samples?.[0]?.input, { value: 7 }, "an input the sample does not name is left alone");
 	});
 });
+
+/*
+ * Presets (#151): `sets` on a select option. Every manifest here is written by hand from the rules in
+ * validatePresets' comment, so each test breaks exactly one of them.
+ */
+describe("validateManifest: presets on a select", () => {
+	const presets = () => ({
+		...good(),
+		inputs: [
+			{
+				id: "stack",
+				type: "select",
+				label: "Library",
+				default: "a",
+				options: [
+					{ value: "a", label: "Library A", sets: { read: 30, retries: 2 } },
+					{ value: "b", label: "Library B", sets: { read: 60, retries: 3 } },
+					{ value: "custom", label: "Custom" },
+				],
+			},
+			{ id: "read", type: "number", label: "Read timeout", default: 30, min: 0, max: 600 },
+			{ id: "retries", type: "number", label: "Retries", default: 2, min: 0, max: 10 },
+			{ id: "mode", type: "select", label: "Mode", default: "fast", options: [{ value: "fast", label: "Fast" }, { value: "exact", label: "Exact" }] },
+			{ id: "note", type: "text", label: "Note", default: "", maxLength: 4 },
+		],
+	});
+	const presetFails = (mutate: (inputs: Record<string, any>[]) => void, field: string, contains: string) => {
+		const m = presets();
+		mutate(m.inputs as Record<string, any>[]);
+		assert.throws(
+			() => validateManifest(m),
+			(error: unknown) => {
+				assert.ok(error instanceof ManifestError, `expected a ManifestError, got ${error}`);
+				assert.equal(error.field, field);
+				assert.match(error.message, new RegExp(contains, "i"));
+				return true;
+			},
+		);
+	};
+
+	it("accepts presets that name later inputs, plus an option without one", () => {
+		const m = validateManifest(presets());
+		const stack = m.inputs[0];
+		assert.equal(stack?.type, "select");
+		if (stack?.type === "select") assert.deepEqual(stack.options[1]?.sets, { read: 60, retries: 3 });
+	});
+
+	it("accepts a select whose options all carry presets, with no Custom", () => {
+		const m = presets();
+		(m.inputs[0] as { options: unknown[] }).options.pop();
+		assert.equal(validateManifest(m).inputs.length, 5);
+	});
+
+	it("accepts a preset that sets an ordinary select, a text and a number together", () => {
+		const m = presets();
+		(m.inputs[0] as { options: Record<string, unknown>[] }).options[1]!.sets = { read: 60, mode: "exact", note: "slow" };
+		assert.equal(validateManifest(m).inputs.length, 5);
+	});
+
+	// The sample rules, reached through the shared checker, one arm each.
+	it("rejects a preset naming an input that does not exist, and lists the real ones", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { raed: 60 }; }, "inputs[0].options[1].sets.raed", "names no input.*stack, read, retries, mode, note");
+	});
+	it("rejects a preset number outside its input's range, rather than clamping it", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { read: 900 }; }, "inputs[0].options[1].sets.read", "outside.*A preset is not a keystroke");
+	});
+	it("rejects a preset value of the wrong type", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { retries: "3" }; }, "inputs[0].options[1].sets.retries", "finite number");
+	});
+	it("rejects a preset select value that is not one of that select's options", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { mode: "quick" }; }, "inputs[0].options[1].sets.mode", "option values: fast, exact");
+	});
+	it("rejects a preset string over its input's maxLength", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { note: "too long" }; }, "inputs[0].options[1].sets.note", "maxLength of 4");
+	});
+	it("rejects a preset that sets nothing", () => {
+		presetFails((i) => { i[0]!.options[1].sets = {}; }, "inputs[0].options[1].sets", "sets no values");
+	});
+	it("rejects `sets` that is not an object", () => {
+		presetFails((i) => { i[0]!.options[1].sets = [60]; }, "inputs[0].options[1].sets", "must be an object");
+	});
+
+	// What a preset adds.
+	it("rejects a preset naming its own select", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { stack: "a", read: 60 }; }, "inputs[0].options[1].sets.stack", "own select");
+	});
+	it("rejects a preset naming another select that has presets", () => {
+		presetFails((i) => {
+			i[3]!.options[1].sets = { retries: 5 };
+			i[0]!.options[1].sets = { read: 60, mode: "exact" };
+		}, "inputs[0].options[1].sets.mode", "presets of its own");
+	});
+	it("rejects two options of one select with identical presets, whatever the key order", () => {
+		presetFails((i) => { i[0]!.options[1].sets = { retries: 2, read: 30 }; }, "inputs[0].options[1].sets", String.raw`matches inputs\[0\]\.options\[0\]\.sets`);
+	});
+	it("rejects a default option whose preset disagrees with the inputs' defaults", () => {
+		presetFails((i) => { i[0]!.options[0].sets = { read: 45, retries: 2 }; }, "inputs[0].options[0].sets.read", "defaults to 30");
+	});
+	it("accepts a non-default option whose preset differs from the defaults, which is the point of one", () => {
+		const m = presets();
+		m.inputs[0] = { ...(m.inputs[0] as object), default: "custom" } as (typeof m.inputs)[0];
+		(m.inputs[0] as { options: Record<string, unknown>[] }).options[0]!.sets = { read: 45, retries: 2 };
+		assert.equal(validateManifest(m).inputs.length, 5);
+	});
+	it("refuses `sets` written on the input instead of an option, and says where it belongs", () => {
+		presetFails((i) => { i[1]!.sets = { retries: 1 }; }, "inputs[1].sets", "belongs in an entry of a select's `options`");
+	});
+});

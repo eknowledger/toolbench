@@ -11,6 +11,7 @@ Writing, testing and shipping a tool, start to finish. Read
    - [3b. Retiring a tool](#3b-retiring-a-tool)
 4. [Inputs](#4-inputs)
    - [4b. Sample inputs](#4b-sample-inputs)
+   - [4c. Presets on a select](#4c-presets-on-a-select)
 5. [Results](#5-results)
 6. [Errors](#6-errors)
 7. [Long-running tools](#7-long-running-tools)
@@ -103,8 +104,8 @@ because it has real errors, and it wants two result shapes at once.
 ```
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
-concrete: the current contract is 3 (§3), and declaring 1 opts out of everything added since (`bytes` in
-v2, `samples` in v3).
+concrete: the current contract is 6 (§3), and declaring 1 opts out of everything added since (`bytes` in
+v2, `samples` in v3, through select presets in v6).
 
 `dir: "ltr"` matters more than it looks. Base64 is not prose, and inside a right-to-left page it would
 otherwise be laid out backwards.
@@ -474,6 +475,63 @@ and samples. It does not bound `default`. Keep the default inside the bound your
 the build with the sample's label in the message. An `{ kind: "error" }` result is a **pass**: the
 malformed sample is the one that earns the feature, and rejecting bad input is the tool working. A sample
 that overruns its budget is reported as slow rather than as a crash, so the two diagnoses stay apart.
+
+## 4c. Presets on a select
+
+When the right values for several inputs depend on one earlier choice, make that choice a select whose
+options carry `sets`. Choosing an option writes those values into the form, and the reader edits from
+there. Contract version 6, so declare `"sdk": 6`.
+
+```jsonc
+{
+  "id": "stack", "type": "select", "label": "Library", "default": "a",
+  "options": [
+    { "value": "a", "label": "Library A", "sets": { "read": 30, "retries": 2 } },
+    { "value": "b", "label": "Library B", "sets": { "read": 60, "retries": 3 } },
+    { "value": "custom", "label": "Custom" }
+  ]
+}
+```
+
+**A preset or a sample?** A sample answers "show me an interesting case" and sits under the form. A preset
+answers "start from what I actually run" and sits where the choice is made. If the reader picks it before
+anything else, it is a preset.
+
+### What a choice does
+
+Exactly what a sample click does: the named inputs are written, the others keep what the reader left in
+them, an existing result goes stale (or re-runs, under `autoRun`), and the status line names the option.
+`run` receives the select's own value too, so a tool can branch on it.
+
+### The select follows the form
+
+The select never names a preset the values have left. After any change to an input a preset names, by
+typing, a sample or the host, it shows the option whose `sets` all match the form, else the **first option
+with no `sets`**, else it stays where it was. So ship a "Custom" option: without one, an edited form keeps
+saying "Library B" over values that are not Library B's. Editing an input no preset names never moves the
+select, and when it does move, the status line says so, because a screen-reader user has no other way to
+hear that a control they did not touch changed.
+
+A host writing the select through `values` is taken literally: `{ stack: "b" }` selects Library B and fills
+nothing. A host that wants the values writes them too.
+
+On a card, a primary preset select fills inputs the card may not draw. The select's label then describes
+what Run will use, which is why this is allowed where a sample row is not.
+
+### What validation will hold you to
+
+`sets` is checked with the same rules as a sample's `input`: every key names a declared input, every value
+has that input's type, numbers sit inside `min`..`max`, strings inside `maxLength`, select values are
+options. Clamping is not on offer, for the same reason. On top of those:
+
+* a preset may not name its own select;
+* a preset may not name another select that has presets. Chained presets would let one choice rewrite
+  another's values;
+* two options of one select may not set the same values, compared with keys sorted, because the select
+  could not tell which one the form matches;
+* the default option's `sets` must equal those inputs' `default`s. The form opens on that option;
+* `sets` with no keys is refused, and `sets` written on the input instead of an option is refused with a
+  message saying where it belongs.
 
 ## 5. Results
 

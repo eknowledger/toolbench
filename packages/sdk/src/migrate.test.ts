@@ -240,3 +240,35 @@ describe("the real 1 -> 3 chain", () => {
 		assert.equal(canLoad(SDK_VERSION + 1), false);
 	});
 });
+
+/*
+ * 5 -> 6 (#151, #153): a v5 manifest whose select carries plain options and whose textarea has no `lang`
+ * comes through untouched, because a v6 option without `sets` and a textarea without `lang` mean exactly
+ * what they meant in v5. Written by hand as a v5 author would have written it.
+ */
+describe("the 5 -> 6 step", () => {
+	const v5 = {
+		sdk: 5,
+		id: "v5-form",
+		name: "A v5 form",
+		inputs: [
+			{ id: "mode", type: "select", label: "Mode", default: "fast", options: [{ value: "fast", label: "Fast" }, { value: "exact", label: "Exact" }] },
+			{ id: "body", type: "textarea", label: "Body", default: "" },
+		],
+		kinds: ["fields", "error"],
+	};
+	const step = MIGRATIONS.find((m) => m.from === 5);
+
+	it("exists, and both halves are the identity", () => {
+		assert.ok(step, "a step from 5");
+		assert.deepEqual(step.manifest(v5), v5);
+		const output: Output = { kind: "group", parts: [{ kind: "fields", role: "summary", fields: [{ label: "a", value: "1", tone: "muted" }] }] };
+		assert.deepEqual(step.output(output), output);
+	});
+
+	it("carries a v5 manifest to v6 with nothing changed but sdk", () => {
+		const upgraded = upgradeManifest(v5);
+		assert.equal(upgraded.sdk, 6);
+		assert.deepEqual({ ...upgraded, sdk: 5 }, v5);
+	});
+});
