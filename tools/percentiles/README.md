@@ -18,13 +18,23 @@ different definitions, which happens constantly.
 
 ## Why "averaged p99" is in the output
 
-Percentiles do not average. The tool splits your measurements into four chunks — the way a real system
-splits across hosts, or a dashboard splits across minutes — takes each chunk's p99, and averages
-those. That average is what a great many dashboards display.
+Percentiles do not average. The tool sorts your measurements, splits them into four equal chunks, takes
+each chunk's p99, and averages those. That average is what a great many dashboards display, where the
+chunks are hosts or minutes rather than slices of a sorted list.
 
-Beside it is the true p99 of everything pooled. The difference is usually large and always in the same
-direction: **the averaged figure understates the tail**, because a long tail in one chunk is diluted by
-the quiet ones. If you take one thing from this tool, take that.
+Beside it is the true p99 of everything pooled. The two differ, often by a lot, and **the direction
+depends on where the slow measurements fall**:
+
+- **It understates** when there are more slow measurements than the pooled p99 can ignore and they sit
+  in one chunk: the quiet chunks dilute them. The default input does this, a true p99 of 1200 against an
+  averaged 328.
+- **It overstates** when the slow measurements fit inside the slowest 1% of the pool, which the pooled
+  p99 is allowed to ignore. They still set their own chunk's p99, and that chunk is a quarter of the
+  average. Ninety-nine measurements of `10` and one of `1000` give a true p99 of 10 and an averaged
+  p99 of 257.5.
+
+If you take one thing from this tool, take that: an averaged p99 is not a bound on the real one in
+either direction. It is wrong by an amount, and with a sign, that the number itself cannot tell you.
 
 ## Notes
 
