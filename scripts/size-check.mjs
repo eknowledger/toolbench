@@ -175,7 +175,8 @@ const BUDGETS = [
 	 */
 	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	/*
-	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured.
+	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
+	 * the cases the graph kind's base draws, and 4,210 with every family's.
 	 * Bench-only.
 	 */
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_500, deployOnly: true },
@@ -244,17 +245,26 @@ const BUDGETS = [
 	 */
 	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
 	/*
-	 * The graph kind (#152): a base chunk and two fetched on demand, so a page pays for the graphs it draws.
+	 * The graph kind (#152): a base chunk and nine fetched on demand, so a page pays for the graphs it draws.
 	 *
 	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
-	 * graphs, with its keyboard model, readout and edge table: 17,351 measured. Exactly an 8-character hash after
+	 * graphs, with its keyboard model, readout and edge table: 17,574 measured. Exactly an 8-character hash after
 	 * "graph-", so it cannot match a chunk below, whose names are longer.
 	 *
 	 * The chunks, each fetched by the first graph that needs it and counted as reader cost, because that reader
-	 * downloads it: path highlighting 735, and the repair of a route that had to share 900.
+	 * downloads it: tree and radial placement 1,758; force and manual 896; what those two share 939; straight
+	 * lines and curves 2,631; hexagon, parallelogram, cylinder and document 465; records and crow's feet 971;
+	 * groups and lanes 2,840; path highlighting 737; and the repair of a route that had to share 901.
 	 * Each budget sits above what it measured with room for a fix, not for a feature.
 	 */
 	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_500 },
+	{ label: "graph: tree and radial", pattern: /^graph-tree-[^/]+\.js$/, budget: 2_250 },
+	{ label: "graph: force and manual", pattern: /^graph-force-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph: free placement, shared", pattern: /^graph-free-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph: lines and curves", pattern: /^graph-lines-[^/]+\.js$/, budget: 3_250 },
+	{ label: "graph: more shapes", pattern: /^graph-shapes-[^/]+\.js$/, budget: 750 },
+	{ label: "graph: records and crow's feet", pattern: /^graph-er-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph: groups and lanes", pattern: /^graph-groups-[^/]+\.js$/, budget: 3_500 },
 	{ label: "graph: path highlighting", pattern: /^graph-interact-[^/]+\.js$/, budget: 1_000 },
 	{ label: "graph: repair", pattern: /^graph-repair-[^/]+\.js$/, budget: 1_250 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
@@ -311,13 +321,13 @@ const BUDGETS = [
 	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// A textarea declaring `lang` (#153) on screen for the browser tests. 228 measured.
 	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
-	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,419 measured.
+	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,415 measured.
 	{ label: "bench fixture: graph-families", pattern: /^tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
-	// The graph gallery (#152). 1,091 measured.
+	// The graph gallery (#152). 1,090 measured.
 	{ label: "bench page: graphs", pattern: /^graphs-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	// STYLING.md's four example sheets, the toggle that removes them, and the reveal links (#157, #147). 1,046 measured.
 	{ label: "bench page: styling", pattern: /^styling-[^/]+\.js$/, budget: 1_500, deployOnly: true },
