@@ -1301,7 +1301,13 @@ export class ToolHost extends HTMLElement {
 		// Kept so `#paint` can put it back. The status is what stops a redrawn seed being silent: without
 		// it a repainted seeded host shows the defaults' answer with nothing saying whose inputs it is.
 		this.#status = message;
-		if (this.#els.status) this.#els.status.textContent = message;
+		/*
+		 * ⚠️ Only when it changes. Assigning `textContent` replaces the text node even when the text is the
+		 * same, and Chrome ends its undo group at a node insertion anywhere in the document. Every keystroke
+		 * after a result says "inputs changed" again, so typing "abc def" then took 7 presses of undo to take
+		 * back instead of 2, measured. Firefox and WebKit were unaffected.
+		 */
+		if (this.#els.status && this.#els.status.textContent !== message) this.#els.status.textContent = message;
 	}
 
 	/**

@@ -3757,6 +3757,32 @@ describe("host code highlight hook", () => {
 
 });
 
+describe("typing keeps the browser's own undo", () => {
+	/*
+	 * Chrome ends an undo group whenever a node is inserted anywhere in the document. The status line used
+	 * to reassign its text on every keystroke once a result was on screen, which replaced its text node, so
+	 * each character became its own undo step: 7 presses to take back "abc def" and a newline, where a plain
+	 * textarea takes 1. Firefox and WebKit group the same burst into one step either way.
+	 */
+	it("takes back a typed burst in one undo after a result is on screen", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 15_000 });
+		const area = page.locator("#host >> .tb-textarea");
+		const before = await area.inputValue();
+		await area.click();
+		await area.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+		await page.keyboard.type("abc def\n", { delay: 30 });
+		assert.equal(await area.inputValue(), `abc def\n${before}`);
+		await page.waitForTimeout(400);
+		await page.keyboard.press("ControlOrMeta+z");
+		assert.equal(await area.inputValue(), before, "one undo should take back the whole burst, as it does in a plain textarea");
+		await page.close();
+	});
+});
+
 describe("select presets (#151)", () => {
 	/*
 	 * The `presets` fixture's Library select: A sets read 30, retries 2, backoff 200 (the inputs' defaults),
