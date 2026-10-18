@@ -2571,6 +2571,90 @@ describe("embed mode", () => {
 	});
 });
 
+describe("a host's own stylesheet in the shadow root", () => {
+	/*
+	 * Hosts already adopt a sheet of their own into each tool's shadow root from page script, and the
+	 * runtime used to get on badly with it either way round. It installed its sheet only while the adopted
+	 * list was empty, so a host sheet that arrived first switched the runtime's styles off and the tool drew
+	 * unstyled. And a chart's sheet was appended after the host's, so the chart's rules beat the host's at
+	 * equal specificity. The order that must hold: the runtime's sheet, then a chart's, then the host's.
+	 *
+	 * Each check below reads a computed style rather than the adopted list, because the defect was what the
+	 * reader saw. The equal-specificity property is what proves the order: both sheets set it on the same
+	 * selector, so only the later sheet's value can show.
+	 */
+	type Probe = { containerType: string; runRadius: string; hostLast: boolean; ownFirst: boolean };
+
+	/** Make a host, give it the sheet the way page script would, then connect it. */
+	const connectWithSheet = (page: Page, tool: string, css: string, how: "assign" | "append") =>
+		page.evaluate(
+			({ tool, css, how }) => {
+				const el = document.createElement("tool-host");
+				el.id = "styled";
+				el.setAttribute("tool", tool);
+				el.setAttribute("mode", "embed");
+				const sheet = new CSSStyleSheet();
+				sheet.replaceSync(css);
+				const root = el.shadowRoot as ShadowRoot;
+				root.adoptedStyleSheets = how === "assign" ? [sheet] : [...root.adoptedStyleSheets, sheet];
+				(window as unknown as { hostSheet: CSSStyleSheet }).hostSheet = sheet;
+				document.body.prepend(el);
+			},
+			{ tool, css, how },
+		);
+
+	const probe = (page: Page): Promise<Probe> =>
+		page.evaluate(() => {
+			const root = document.querySelector("#styled")?.shadowRoot as ShadowRoot;
+			const sheets = root.adoptedStyleSheets;
+			const host = (window as unknown as { hostSheet: CSSStyleSheet }).hostSheet;
+			return {
+				containerType: getComputedStyle(root.querySelector(".tb") as Element).containerType,
+				// An autoRun tool has no Run button.
+				runRadius: ((run) => (run ? getComputedStyle(run).borderTopLeftRadius : "no Run button"))(root.querySelector(".tb-run")),
+				hostLast: sheets.indexOf(host) === sheets.length - 1,
+				ownFirst: sheets.length > 1 && sheets[0] !== host,
+			};
+		});
+
+	it("keeps a sheet adopted before the tool connects, and the runtime's styles with it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		// Assigned, not appended: replacing the list is the natural way to write it, and the harsher case.
+		await connectWithSheet(page, "percentiles", ".tb-run { border-radius: 3px; }", "assign");
+		await page.locator("#styled .tb-run").waitFor();
+		const seen = await probe(page);
+		// `.tb` is a query container in the runtime's sheet, and nothing else sets it. "normal" means unstyled.
+		assert.equal(seen.containerType, "inline-size", "the runtime's sheet must still apply");
+		// The runtime sets 8px on `.tb-run`; the host's 3px on the same selector shows only if it comes later.
+		assert.equal(seen.runRadius, "3px", "the host's rule must win at equal specificity");
+		assert.ok(seen.ownFirst && seen.hostLast, "the runtime's sheet first, the host's last");
+
+		// And it survives a repaint, which rebuilds the shadow tree and reapplies the runtime's styles.
+		await page.evaluate(() => document.querySelector("#styled")?.setAttribute("more", "link"));
+		await page.locator("#styled .tb-run").waitFor();
+		assert.deepEqual(await probe(page), seen, "a repaint must leave both sheets where they were");
+		await page.close();
+	});
+
+	it("puts a chart's sheet before the host's, so a host rule still wins over a chart's", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		// `.tb-out-chart { margin: 0 }` is in the chart sheet, which arrives only once a chart is drawn.
+		// histogram sets autoRun, so it draws a chart with no Run button to press.
+		await connectWithSheet(page, "histogram", ".tb-out-chart { margin: 7px; }", "append");
+		await page.locator("#styled .tb-out-chart").waitFor({ timeout: 15_000 });
+		const margin = await page.evaluate(
+			() => getComputedStyle(document.querySelector("#styled")?.shadowRoot?.querySelector(".tb-out-chart") as Element).marginTop,
+		);
+		assert.equal(margin, "7px", "the host's rule must outlast the chart sheet that arrived after it");
+		const seen = await probe(page);
+		assert.equal(seen.containerType, "inline-size");
+		assert.ok(seen.ownFirst && seen.hostLast, "the host's sheet stays last after a chart's is adopted");
+		await page.close();
+	});
+});
+
 describe("failure paths", () => {
 	it("kills a tool that spins forever and says so", async () => {
 		const page = await browser.newPage();

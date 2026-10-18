@@ -808,8 +808,12 @@ export class ToolHost extends HTMLElement {
 	}
 
 	#reapplyStyles(): void {
-		// `fill` on the shadow root clears an appended <style> fallback; adopted sheets survive.
-		if (!("adoptedStyleSheets" in this.#root) || this.#root.adoptedStyleSheets.length === 0) applyStyles(this.#root);
+		/*
+		 * `fill` on the shadow root clears an appended <style> fallback, and adopted sheets survive it. Run
+		 * unconditionally: a host may have replaced the adopted list since the last paint, and the old guard,
+		 * "only while the list is empty", read a host's sheet as ours and drew the tool unstyled.
+		 */
+		applyStyles(this.#root);
 	}
 
 	#reflectStatus(manifest: Manifest): void {

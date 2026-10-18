@@ -392,6 +392,8 @@ button.tb-facade-hint {
  *
  * `adoptedStyleSheets` shares one parsed sheet across every instance on the page, which matters when
  * a page holds a dozen cards. The `<style>` fallback is for anything that lacks it.
+ *
+ * Safe to call on every paint: it changes nothing when the sheet is already in place.
  */
 export function applyStyles(root: ShadowRoot): void {
 	if ("adoptedStyleSheets" in root && typeof CSSStyleSheet === "function") {
@@ -401,7 +403,7 @@ export function applyStyles(root: ShadowRoot): void {
 				s.replaceSync(STYLES);
 				return s;
 			})();
-			root.adoptedStyleSheets = [sheet];
+			adopt(root, sheet);
 			return;
 		} catch {
 			// Fall through: some environments expose the API and refuse construction.
@@ -413,3 +415,26 @@ export function applyStyles(root: ShadowRoot): void {
 }
 
 let sheet: CSSStyleSheet | undefined;
+
+/** Every sheet the runtime has adopted, which is how a host's sheets are told apart from ours. */
+const ours = new WeakSet<CSSStyleSheet>();
+
+/**
+ * Put one of the runtime's sheets into `root`: the main sheet first, any other runtime sheet after the
+ * runtime's own, and every sheet a host adopted after all of them, kept.
+ *
+ * ⚠️ Never assign a fresh list here. Assigning `[sheet]` deleted any sheet a host had adopted, and the
+ * old guard, "only install while the list is empty", meant a host sheet that arrived first left the tool
+ * drawn with none of the runtime's rules: only the host's sheet was in the list. Host
+ * sheets go last so that a host rule wins over ours at equal specificity, which a chart sheet appended
+ * after them would quietly undo.
+ */
+export function adopt(root: ShadowRoot, s: CSSStyleSheet): void {
+	ours.add(s);
+	const list = root.adoptedStyleSheets;
+	const rest = list.filter((x) => x !== s);
+	const runtime = rest.filter((x) => ours.has(x));
+	const next = [...(s === sheet ? [s, ...runtime] : [...runtime, s]), ...rest.filter((x) => !ours.has(x))];
+	// Only when something moved: this runs on every paint, and an equal list needs no new assignment.
+	if (next.some((x, i) => x !== list[i])) root.adoptedStyleSheets = next;
+}
