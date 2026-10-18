@@ -81,6 +81,16 @@ migration chain up to the current version, and hands the result to `validateMani
 declaring a version higher than the runtime supports is refused with a message saying what to upgrade,
 which is a great deal more useful than rendering half of it.
 
+A manifest declaring a version LOWER than a feature it uses is refused too (#170), because the declared
+`sdk` is what a host relies on to refuse a tool it cannot fully run: a v4 runtime loads a `"sdk": 4` tool
+that uses v6's `lang`, ignores the key, and the reader loses the highlighting with nothing saying why.
+`checkManifestFeatures` compares the declared `sdk` with the version that introduced each key, input type,
+capability and kind it uses, from the table in `packages/sdk/src/features.ts`, and the message names the
+field, its version and the `sdk` to declare. ⚠️ `upgradeManifest` runs it first, because the chain then
+stamps the current version over `sdk` and the declaration is gone; so every path that upgrades a manifest
+refuses, a host's own included. The tool-directory harness applies the same rule to every case's `expect`
+and every sample's result.
+
 **On the way out.** `upgradeOutput` runs on every result, on whichever side produced it, before any
 renderer sees it. It takes the tool's declared version so it knows which migrations apply. Renderers
 therefore only ever handle current-shaped data.
@@ -128,7 +138,13 @@ is what a runtime can read, and a runtime can read everything a release ships or
    say what that version added, so a refusal explains itself instead of just failing.
 3. **`packages/sdk/src/migrate.ts`** Add the `Migration` for the boundary you created. Both halves are
    the identity function if the change was additive. If they are not, stop and read §7.
-4. **`packages/sdk/src/validate.ts`** Validate the new thing, and add any invariant it needs. Ask
+4. **`packages/sdk/src/features.ts`** A row for everything the version adds, at the new number, in
+   `LATER` and in the full table in `features.test.ts`. The runtime ships only `LATER`, the rows after
+   version 1, to keep boot small. A test fails on a validator key, input type, capability or kind with no
+   row in the full table, and on `LATER` disagreeing with it, but a new optional field inside
+   an output has nothing to check against: add it to `OUTPUT_SINCE` and teach `outputFeatureProblem` to
+   find it, or a tool can return it under an older `sdk`.
+   **`packages/sdk/src/validate.ts`** Validate the new thing, and add any invariant it needs. Ask
    whether a tool using it may still be a live card; anything touching files or the network may not.
 5. **`packages/runtime`** Add the renderer or the control. The exhaustive switch in `render/index.ts`
    will not compile until you do. ⚠️ It is not the only one: `summarise` in `element.ts` also switches

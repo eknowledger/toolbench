@@ -129,6 +129,16 @@ describe("readToolDirectory rejects", () => {
 			() => fixture("ok", { ...GOOD_MANIFEST, sdk: SDK_VERSION + 1 }, GOOD_CASES),
 			/needs contract version/,
 		],
+		[
+			"a manifest using a feature newer than the sdk it declares (#170)",
+			() => fixture("ok", { ...GOOD_MANIFEST, samples: [{ label: "One", input: { a: "y" } }] }, GOOD_CASES),
+			/ok: samples: is from contract version 3, but the tool declares "sdk": 1.*Declare "sdk": 3\./,
+		],
+		[
+			"a case expecting an output newer than the sdk the manifest declares (#170)",
+			() => fixture("ok", GOOD_MANIFEST, [{ name: "named", input: {}, expect: { kind: "fields", role: "verdict", fields: [] } }]),
+			/case "named" expects output\.role: part role is from contract version 5, but the tool declares "sdk": 1\. Declare "sdk": 5\./,
+		],
 		["cases.json that is not JSON at all", () => {
 			const parent = fixture("ok", GOOD_MANIFEST);
 			writeFileSync(join(parent, "ok", "cases.json"), "{ not json");
@@ -157,6 +167,7 @@ describe("readToolDirectory accepts", () => {
 		assert.ok(tool);
 		assert.equal(tool.id, "ok");
 		assert.equal(tool.manifest.sdk, SDK_VERSION, "an older manifest is upgraded on the way through");
+		assert.equal(tool.declaredSdk, 1, "and what it declared is kept, for checking its outputs against");
 		assert.equal(tool.manifest.runtime.thread, "main", "and defaults are filled in by validation");
 		assert.ok(tool.entry.endsWith(join("ok", "index.ts")), `entry should be an absolute path: ${tool.entry}`);
 		assert.equal(tool.cases.length, 1);
@@ -170,14 +181,14 @@ describe("checkToolDirectory runs the samples a tool declares", () => {
 		 * failing here would push authors into shipping only examples that work, which is the opposite of
 		 * what a reader needs to see.
 		 */
-		const manifest = { ...GOOD_MANIFEST, samples: [{ label: "Malformed input", input: { a: "bad" } }] };
+		const manifest = { ...GOOD_MANIFEST, sdk: 3, samples: [{ label: "Malformed input", input: { a: "bad" } }] };
 		await registeredTest(fixture("ok", manifest, GOOD_CASES, IMPL), "ships samples that run");
 	});
 
 	it("rejects a sample that makes the tool throw, naming the label", async () => {
 		// The throw is what is under test: a sample is the first thing a reader clicks, and until this
 		// check existed a crashing example was invisible until someone clicked it.
-		const manifest = { ...GOOD_MANIFEST, samples: [{ label: "Boom", input: { a: "boom" } }] };
+		const manifest = { ...GOOD_MANIFEST, sdk: 3, samples: [{ label: "Boom", input: { a: "boom" } }] };
 		const parent = fixture("ok", manifest, GOOD_CASES, IMPL);
 		await assert.rejects(registeredTest(parent, "ships samples that run"), (error: unknown) => {
 			assert.ok(error instanceof ToolDirectoryError, `expected ToolDirectoryError, got ${String(error)}`);
@@ -188,10 +199,21 @@ describe("checkToolDirectory runs the samples a tool declares", () => {
 		});
 	});
 
+	it("rejects a sample whose result is newer than the sdk the tool declares (#170)", async () => {
+		// The tool returns a v5 `role` only for this sample's input, so neither the manifest nor the cases show it.
+		const impl = IMPL.replace('return { kind: "fields", fields: [] };', 'return input.a === "named" ? { kind: "fields", role: "verdict", fields: [] } : { kind: "fields", fields: [] };');
+		const manifest = { ...GOOD_MANIFEST, sdk: 3, samples: [{ label: "Named", input: { a: "named" } }] };
+		await assert.rejects(registeredTest(fixture("ok", manifest, GOOD_CASES, impl), "ships samples that run"), (error: unknown) => {
+			assert.ok(error instanceof ToolDirectoryError, `expected ToolDirectoryError, got ${String(error)}`);
+			assert.match(error.message, /sample "Named" returns output\.role: part role is from contract version 5, but the tool declares "sdk": 3/);
+			return true;
+		});
+	});
+
 	it("reports a sample that overruns the timeout as slow, not as a crash", async () => {
 		// A tool that stops when it is told to has not crashed, and saying it threw would send its author
 		// looking for a bug in code that behaved correctly.
-		const manifest = { ...GOOD_MANIFEST, samples: [{ label: "Slow", input: { a: "slow" } }] };
+		const manifest = { ...GOOD_MANIFEST, sdk: 3, samples: [{ label: "Slow", input: { a: "slow" } }] };
 		const parent = fixture("ok", manifest, GOOD_CASES, IMPL);
 		await assert.rejects(registeredTest(parent, "ships samples that run", 20), (error: unknown) => {
 			assert.ok(error instanceof ToolDirectoryError, `expected ToolDirectoryError, got ${String(error)}`);
