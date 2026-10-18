@@ -8,6 +8,7 @@ import "../../src/graph/graph-lines.ts";
 import "../../src/graph/graph-shapes.ts";
 import "../../src/graph/graph-er.ts";
 import "../../src/graph/graph-groups.ts";
+import "../../src/graph/graph-search.ts";
 import "../../src/graph/graph-repair.ts";
 
 export { effective, layout } from "../../src/graph/layout.ts";

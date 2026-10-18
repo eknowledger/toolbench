@@ -148,7 +148,20 @@ export default defineConfig({
 		 *    network panel say which thread actually ran, which is the first thing you want to know
 		 *    when a worker-mode tool misbehaves.
 		 */
-		rollupOptions: { output: { manualChunks: (id: string) => toolChunk(id, "worker-tool-") } },
+		rollupOptions: {
+			output: {
+				manualChunks: (id: string) => toolChunk(id, "worker-tool-"),
+				/*
+				 * ⚠️ Every other chunk of the worker's prefixed too, which is the graph layout and its chunks today
+				 * (#152). A worker that lays out a large graph emits a second copy of the graph's base and of each
+				 * chunk it can fetch, and unprefixed those copies took the names the page's copies have: two files
+				 * called graph-tree-*.js, and size-check refusing both. By file name, not manualChunks: naming the
+				 * graph modules as a manual chunk pulled the SDK's `upgradeOutput` in with them, so the worker
+				 * entry imported the layout statically and every worker-mode tool fetched 13.7 KB of it to run.
+				 */
+				chunkFileNames: (chunk: { name: string }) => (chunk.name.startsWith("worker-") ? "assets/[name]-[hash].js" : "assets/worker-[name]-[hash].js"),
+			},
+		},
 	},
 	build: {
 		rollupOptions: {

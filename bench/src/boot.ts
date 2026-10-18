@@ -20,9 +20,10 @@ const hostHook = hostHighlight(location.search);
 defineToolHost({
 	source,
 	/*
-	 * Only tools declaring `thread: "worker"` ever cause this to be called, and it is called once. A
-	 * host that has no worker-mode tools can leave it out; those tools then run on the main thread with
-	 * a console warning, which is a slower tool rather than a broken page.
+	 * Called for tools declaring `thread: "worker"`, and once for the page by the first graph past a
+	 * hundred nodes, which is laid out in a worker of its own. A host with neither can leave it out:
+	 * worker-mode tools then run on the main thread with a console warning, and a large graph is laid out
+	 * there after a frame, which is a slower page rather than a broken one.
 	 */
 	workerFactory: () => new Worker(new URL("./tool.worker.ts", import.meta.url), { type: "module" }),
 	/*

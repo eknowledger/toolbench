@@ -2,9 +2,12 @@
  * The graph kind (#152), the entry of its base chunk: validates, lays out and draws, synchronously, as every
  * renderer does.
  *
- * A chunk the graph needs and the page has not fetched (a tree placement, records, the repair) keeps `render`
- * synchronous too: this throws `ChartRendererMissing` carrying the load, and the element fetches it and draws
- * again, one frame later.
+ * Two things are not synchronous, and both keep `render` so:
+ *
+ *  - **A chunk the graph needs and the page has not fetched** (a tree placement, records, the search): this
+ *    throws `ChartRendererMissing` carrying the load, the element fetches it and draws again, one frame later.
+ *  - **A large graph**, past `LARGE` nodes, is the large-graph chunk's: the figure comes back at once with the
+ *    edge table open and a line saying the picture is being laid out, and the layout runs off the main thread.
  */
 import { graphProblem, type Graph } from "@toolbench/sdk";
 import { el } from "../dom.ts";
@@ -15,14 +18,22 @@ import { SHAPES } from "./geometry.ts";
 import { collapsedOf, effective, layout } from "./layout.ts";
 import type { GraphLayout } from "./model.ts";
 
+/** Past this many nodes the layout leaves the main thread: measured at 100 nodes, it takes 60 to 620 ms there. */
+export const LARGE = 100;
+
 /** Whether a chunk has registered itself, by what it registers. */
 const has = (c: Chunk): boolean =>
-	({ free: true, tree: !!ext.place.tree, force: !!ext.place.force, lines: !!ext.lines, shapes: !!SHAPES.hexagon, er: !!ext.record, groups: !!ext.compound, interact: !!ext.path, repair: !!ext.repair })[c];
+	({ free: true, tree: !!ext.place.tree, force: !!ext.place.force, lines: !!ext.lines, shapes: !!SHAPES.hexagon, er: !!ext.record, groups: !!ext.compound, interact: !!ext.path, search: !!ext.search, repair: !!ext.repair, large: !!ext.large })[c];
 
 /** Every chunk this graph needs that is not here yet, fetched: what a host awaits before painting a seed. */
 export async function prepareGraph(graph: Graph): Promise<void> {
 	await Promise.all(needs(graph).filter((c) => !has(c)).map(loadChunk));
 }
+
+/** What draws one layout into the figure: the base's, handed to the large-graph chunk. */
+export type Show = (L: GraphLayout, collapsed: Set<string>, relayout: (next: Set<string>) => void) => void;
+/** The large-graph chunk's entry: draws the table now, the picture when a layout off the main thread arrives. */
+export type Large = (graph: Graph, figure: HTMLElement, collapsed: Set<string>, worker: RenderOptions["graphWorker"], show: Show) => void;
 
 export function renderGraph(graph: Graph, options: RenderOptions = {}): HTMLElement {
 	const figure = el("figure", { class: "tb-out-graph tb-graph", "aria-label": summary(graph) });
@@ -37,7 +48,7 @@ export function renderGraph(graph: Graph, options: RenderOptions = {}): HTMLElem
 	if (missing) throw new ChartRendererMissing("graph", () => loadChunk(missing));
 
 	/** Draw `L`, keeping focus in the picture if it was there: replaced under it, focus fell to the page. */
-	const show = (L: GraphLayout, collapsed: Set<string>, relayout: (next: Set<string>) => void) => {
+	const show: Show = (L, collapsed, relayout) => {
 		const root = figure.getRootNode() as Document | ShadowRoot;
 		const focused = figure.contains(root.activeElement ?? null);
 		figure.replaceChildren(...drawLayout(graph, effective(graph, collapsed), L, collapsed, relayout));
@@ -45,18 +56,24 @@ export function renderGraph(graph: Graph, options: RenderOptions = {}): HTMLElem
 		adoptGraphStyles(figure);
 		if (focused) (figure.querySelector(".tb-graph-plot") as HTMLElement | null)?.focus();
 	};
-	/*
-	 * A reader opening or closing a group. A chunk this needs that is not here yet (the repair, say) is
-	 * fetched first rather than thrown, since no host is drawing at this moment to catch it.
-	 */
-	const relayout = (next: Set<string>): void => void layoutLoading(() => layout(graph, { collapsed: next })).then((L) => show(L, next, relayout));
-	const collapsed = collapsedOf(graph);
-	try {
-		show(layout(graph, { collapsed }), collapsed, relayout);
-	} catch (error) {
-		// The repair, asked for by the layout itself once it knows what it left.
-		if (error instanceof GraphChunkMissing) throw new ChartRendererMissing("graph", () => loadChunk(error.chunk));
-		throw error;
+	if (graph.nodes.length > LARGE) {
+		const large = ext.large as Large | undefined;
+		if (!large) throw new ChartRendererMissing("graph", () => import("./graph-large.ts").then(() => undefined));
+		large(graph, figure, collapsedOf(graph), options.graphWorker, show);
+	} else {
+		/*
+		 * A reader opening or closing a group. A chunk this needs that is not here yet (the search, say) is
+		 * fetched first rather than thrown, since no host is drawing at this moment to catch it.
+		 */
+		const relayout = (next: Set<string>): void => void layoutLoading(() => layout(graph, { collapsed: next })).then((L) => show(L, next, relayout));
+		const collapsed = collapsedOf(graph);
+		try {
+			show(layout(graph, { collapsed }), collapsed, relayout);
+		} catch (error) {
+			// The search or the repair, asked for by the layout itself once it knows what it left.
+			if (error instanceof GraphChunkMissing) throw new ChartRendererMissing("graph", () => loadChunk(error.chunk));
+			throw error;
+		}
 	}
 	adoptGraphStyles(figure);
 	return figure;

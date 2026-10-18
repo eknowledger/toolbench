@@ -5,10 +5,12 @@
  *
  * It lives in the bench rather than in `tools/` because it is not an example of a good tool: the graphs are
  * the layout's test data, shared with the Node tests in packages/runtime/test/graph. Beyond the families it
- * has one graph the runtime refuses for a dangling edge, and one past the tool's own limits.
+ * has a graph past the size that is laid out off the main thread, one the runtime refuses for a dangling
+ * edge, and one past the tool's own limits.
  */
 import type { Graph, Output, Tool } from "@toolbench/sdk";
 import { families } from "../../../packages/runtime/test/graph/families.ts";
+import { dag } from "../../../packages/runtime/test/graph/synth.ts";
 
 // A type alias, not an interface: an interface does not satisfy the SDK's index-signature constraint.
 type Input = { case: string };
@@ -18,6 +20,7 @@ export const graphs: Record<string, Graph> = {};
 for (const f of families) for (const v of f.variants ?? [{ label: "", graph: f.graph }]) graphs[v.label ? `${f.id}-${v.label.toLowerCase()}` : f.id] = v.graph;
 const nested = families.find((f) => f.id === "nested")!.graph;
 graphs["nested-collapsed"] = { ...nested, groups: nested.groups!.map((x) => (x.id === "vpc" ? { ...x, collapsed: true } : x)) };
+graphs["large"] = dag(150);
 graphs["dangling"] = { label: "A dangling edge", nodes: [{ id: "a" }, { id: "b" }], edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }] };
 /*
  * A colour that is not a colour: what a plain-JavaScript tool, or one passing a reader's input through, could

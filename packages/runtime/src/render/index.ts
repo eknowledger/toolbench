@@ -169,6 +169,12 @@ export interface RenderOptions {
 	 * `innerHTML`, which this package does not use. Omit it and the source stays readable plain text.
 	 */
 	highlight?: (source: string, lang: string) => Node;
+	/**
+	 * Makes the worker a graph past a hundred nodes is laid out in: the host's `workerFactory`, which the element
+	 * passes on. One worker is made for the page, the first time a large graph needs it. Without it, a large
+	 * graph is laid out on the main thread after a frame, its edge table showing meanwhile.
+	 */
+	graphWorker?: () => Worker;
 }
 
 /** One output area per host, so a fixed id is enough for `aria-controls` inside a shadow root. */

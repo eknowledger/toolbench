@@ -4,11 +4,11 @@
  * The base chunk lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
  * graphs. Everything else is a chunk of its own, fetched for the first graph that needs it: tree and radial
  * placement, force and manual placement, straight lines and curves, the extra shapes, records and crow's
- * feet, groups and lanes, path highlighting, and the repair of a route that had to share. A chunk registers itself into `ext`
+ * feet, groups and lanes, path highlighting, the crossing search, and the repair of a route that had to share. A chunk registers itself into `ext`
  * when imported; code that needs one that is not there throws `GraphChunkMissing`, and the caller loads it
  * and lays out again, the pattern the chart kinds use for their renderers.
  *
- * ⚠️ Nothing here may import the DOM: the layout imports this module, and the layout must run without one.
+ * ⚠️ Nothing here may import the DOM: the worker that lays out a large graph imports this module too.
  */
 import type { Graph, GraphMarker, GraphNode } from "@toolbench/sdk";
 import type { Box, GraphLayout, LaidNode, Pt } from "./model.ts";
@@ -34,16 +34,20 @@ export type Ext = {
 	drawGroups?: unknown;
 	/** Group rectangles round their members, for the free placements. */
 	groupBoxes?: (g: Graph, boxes: Box[]) => GroupBox[];
+	/** The crossing search. */
+	search?: unknown;
 	/** Rerouting what a shared route ran into, and moving a walled-in end to another side. */
 	repair?: { unshare: (rt: never) => void; reattach: unknown };
 	/** Path highlighting, which acts on a drawing. */
 	path?: unknown;
+	/** Drawing a graph too large to lay out on the main thread. */
+	large?: unknown;
 	/** Stylesheets the chunks bring, by chunk, adopted with the graph's own. */
 	css: Record<string, string>;
 };
 export const ext: Ext = { place: {}, css: {} };
 
-export type Chunk = "free" | "tree" | "force" | "lines" | "shapes" | "er" | "groups" | "interact" | "repair";
+export type Chunk = "free" | "tree" | "force" | "lines" | "shapes" | "er" | "groups" | "interact" | "search" | "repair" | "large";
 
 export class GraphChunkMissing extends Error {
 	readonly chunk: Chunk;
@@ -61,20 +65,22 @@ export function need<T>(value: T | undefined, chunk: Chunk): T {
 
 /*
  * One import per chunk, each a literal path a bundler can follow. `free` is shared by tree and force, so it
- * is imported by them rather than listed here, and `interact` acts on a drawing, so the drawing loads it.
+ * is imported by them rather than listed here, and `interact` and `large` act on a drawing, so the drawing
+ * loads them: listed here, the worker's build would carry a copy of each.
  */
-const loaders: Record<Exclude<Chunk, "free" | "interact">, () => Promise<unknown>> = {
+const loaders: Record<Exclude<Chunk, "free" | "interact" | "large">, () => Promise<unknown>> = {
 	tree: () => import("./graph-tree.ts"),
 	force: () => import("./graph-force.ts"),
 	lines: () => import("./graph-lines.ts"),
 	shapes: () => import("./graph-shapes.ts"),
 	er: () => import("./graph-er.ts"),
 	groups: () => import("./graph-groups.ts"),
+	search: () => import("./graph-search.ts"),
 	repair: () => import("./graph-repair.ts"),
 };
 
 export async function loadChunk(chunk: Chunk): Promise<void> {
-	if (chunk !== "free" && chunk !== "interact") await loaders[chunk]();
+	if (chunk !== "free" && chunk !== "interact" && chunk !== "large") await loaders[chunk]();
 }
 
 /** Orthogonal for layered and tree; straight for force and manual; curved for radial. */
@@ -85,8 +91,8 @@ const BASE_SHAPES = new Set(["rect", "rounded", "pill", "circle", "ellipse", "di
 const BASE_MARKS = new Set([undefined, "none", "arrow", "open"]);
 
 /**
- * The chunks a graph needs, decided from the graph alone, before any layout. The repair is not listed: whether
- * a graph needs it depends on what the base layout leaves, so the layout itself asks.
+ * The chunks a graph needs, decided from the graph alone, before any layout. The search and the repair are not
+ * listed: whether a graph needs them depends on what the base layout leaves, so the layout itself asks.
  */
 export function needs(g: Graph): Chunk[] {
 	const out = new Set<Chunk>();

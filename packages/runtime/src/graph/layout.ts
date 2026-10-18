@@ -1,5 +1,5 @@
 /**
- * The layout, start to finish: collapse, size, place, snap, attach, route, repair, finish. A pure function
+ * The layout, start to finish: collapse, size, place, snap, attach, route, search, finish. A pure function
  * of the graph: plain coordinates out, no DOM, the same numbers in every engine and in a worker.
  *
  * A placement or shape the base chunk does not have throws `GraphChunkMissing`; the caller loads the chunk
@@ -8,7 +8,7 @@
 import { graphProblem, type Graph, type GraphMarker } from "@toolbench/sdk";
 import { ext, need, routingOf, type GroupBox, type Placed, type Side } from "./chunks.ts";
 import { badgeBox, HEAD, hyp, mark, oddUp, outline, P, polygon, r1, ROW, shapeOf, textW } from "./geometry.ts";
-import { order, place, type LState, type Placement } from "./layered.ts";
+import { crossings, order, place, type LState, type Placement } from "./layered.ts";
 import type { Box, GraphLayout, LaidEdge, LaidGroup, LaidLane, LaidNode, Pt } from "./model.ts";
 import { assign, type End } from "./ports.ts";
 import { router, type Router } from "./router.ts";
@@ -16,6 +16,8 @@ import { router, type Router } from "./router.ts";
 export type LayoutOptions = {
 	/** Groups drawn closed, overriding each group's own `collapsed`. */
 	collapsed?: ReadonlySet<string>;
+	/** Skip the crossing search whatever the graph: for tests that compare with and without it. */
+	noSearch?: boolean;
 	/** Time spent in each phase, in milliseconds, written here when given. */
 	timings?: Record<string, number>;
 };
@@ -38,8 +40,24 @@ export function nodeSize(n: Graph["nodes"][number]): number[] {
 	return n.shape === "point" ? [24, 24] : [oddUp(Math.max(w!, 5 * P)), oddUp(h!)];
 }
 
-/** One routed attempt: what a repair rebuilds and what `finish` turns into coordinates. */
+/** One routed attempt: what the search compares and what `finish` turns into coordinates. */
 export type Built = { rt: Router; boxes: Box[]; groups: GroupBox[]; lanes: Placement["lanes"]; shapes: string[]; extra: (Pt[] | undefined)[]; moved: number; ends: End[][] };
+/** The search chunk's entry point. */
+export type Search = (g: Graph, st: LState, first: Built, build: (p: Placement) => Built, budget: number, work: { pops: number }) => Built;
+
+/**
+ * Whether the base layout leaves enough crossings for the search to be worth fetching and running: a layered
+ * graph of at most 60 nodes whose order crosses at least once for every two edges. The order's own count,
+ * between layers, which the base has already made: counting the drawn crossings as well cost 0.3 KB here.
+ *
+ * Measured, not chosen. Of the eleven bench families only the bipartite graph is past it, 14 crossings on 16
+ * edges, and the search takes it to 4. Every family below it ends with the same crossings with or without the
+ * search, which spent 79 ms on the dense call graph for none. On seeded layered graphs it saved 2 crossings at
+ * 30 nodes, which is below the threshold and so drawn with 8 rather than 6, none at 40, 2 at 50 and 5 at 60,
+ * then none at 80, 100 or 120 for 108 to 142 ms each. Force layouts never search: it reorders layers, and a
+ * force layout has none.
+ */
+export const wantsSearch = (g: Graph, crossings: number): boolean => (g.layout ?? "layered") === "layered" && g.nodes.length <= 60 && crossings > 0 && 2 * crossings >= g.edges.length;
 
 type Moves = Map<number, { fromSide?: Side; toSide?: Side }>;
 const repair = () => need(ext.repair, "repair");
@@ -129,11 +147,21 @@ export function layout(input: Graph, opts: LayoutOptions = {}): GraphLayout {
 	if (cur.rt.R.some((r) => r?.soft))
 		cur = eight ? (ext.lines!.unwall as (b: Built, again: (skip: Set<number>) => Built) => Built)(cur, (skip) => build(pl, undefined, skip)) : (repair().reattach as unknown as (b: Built, again: (m: Moves) => Built) => Built)(cur, (m) => build(pl, m));
 	t.route = now() - t1;
+	const t2 = now();
+	let searched = false;
+	if (st && !opts.noSearch && wantsSearch(g, crossings(st))) {
+		// The budget, in A* states rather than milliseconds so every machine gives the same answer: four times
+		// what the first routing cost, at most 600,000. Ten times took the bipartite family to the same 4
+		// crossings in 54 ms instead of 20.
+		cur = (need(ext.search, "search") as Search)(g, st, cur, build, Math.min(4 * work.pops, 6e5), work);
+		searched = true;
+	}
+	t.search = now() - t2;
 	t.pops = work.pops;
-	return finish(g, cur);
+	return finish(g, cur, searched);
 }
 
-function finish(g: Graph, c: Built): GraphLayout {
+function finish(g: Graph, c: Built, searched: boolean): GraphLayout {
 	const { rt, boxes } = c;
 	const lines = g.edges.map((_, i) => (rt.R[i] ? rt.pts(i) : c.extra[i]));
 	let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -196,7 +224,7 @@ function finish(g: Graph, c: Built): GraphLayout {
 		return out;
 	});
 	const lanes: LaidLane[] = c.lanes.map((x) => ({ id: x.id, label: x.label, ...mv(x.box), title: mv(x.title) }));
-	return { width: r1(x1 + dx + P), height: r1(y1 + dy + P), nodes, edges, groups, lanes, meta: { moved: c.moved, soft: rt.R.filter((r) => r?.soft).length } };
+	return { width: r1(x1 + dx + P), height: r1(y1 + dy + P), nodes, edges, groups, lanes, meta: { moved: c.moved, soft: rt.R.filter((r) => r?.soft).length, searched } };
 }
 
 type DP = [Pt, Pt | undefined];

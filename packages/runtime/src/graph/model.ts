@@ -46,6 +46,6 @@ export type GraphLayout = {
 	edges: LaidEdge[];
 	groups: LaidGroup[];
 	lanes: LaidLane[];
-	/** For tests and the bench, not drawing: ends a full side moved, and routes that had to share. */
-	meta: { moved: number; soft: number };
+	/** For tests and the bench, not drawing: ends a full side moved, routes that had to share, the search. */
+	meta: { moved: number; soft: number; searched: boolean };
 };

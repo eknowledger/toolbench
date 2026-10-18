@@ -1433,7 +1433,9 @@ function titleRow(manifest: Manifest, compact: boolean, pageUrl: string | undefi
  */
 function withHostHighlight(options: RenderOptions): RenderOptions {
 	const highlight = config?.highlight;
-	return highlight ? { ...options, highlight } : options;
+	// The worker factory too, so a graph too large for the main thread can be laid out in one.
+	const graphWorker = config?.workerFactory;
+	return { ...options, ...(highlight ? { highlight } : {}), ...(graphWorker ? { graphWorker } : {}) };
 }
 
 /**

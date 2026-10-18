@@ -87,7 +87,7 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 | `code` | `.tb-out-code` | `<pre><code class="language-…">` |
 | `bytes` | `.tb-out-bytes` | `.tb-bytes-grid`, `.tb-bytes-row`, `.tb-bytes-offset`, `.tb-bytes-hex`, `.tb-bytes-ascii`, `.tb-byte`, `.tb-bytes-legend`, `.tb-bytes-caption` |
 | every chart kind | `.tb-out-chart`, plus `.tb-out-chart-card` on a card | The chart's own markup. Not covered: see below |
-| `graph` | `.tb-out-graph` | `.tb-graph-plot` (the picture, one tab stop), `.tb-graph-readout`, `.tb-graph-data` (the edge table, a `<details>`), `.tb-graph-message` (why a graph is listed instead of drawn). Inside the picture, the parts below |
+| `graph` | `.tb-out-graph` | `.tb-graph-plot` (the picture, one tab stop), `.tb-graph-readout`, `.tb-graph-data` (the edge table, a `<details>`), `.tb-graph-message` (why a graph is listed instead of drawn, or that it is being laid out). Inside the picture, the parts below |
 | `error` | `.tb-out-error` | `.tb-error-message` |
 
 A chart's internal markup, the SVG and its classes, is not part of this contract. Style a chart through its
