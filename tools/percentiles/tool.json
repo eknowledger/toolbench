@@ -3,7 +3,7 @@
   "id": "percentiles",
   "name": "Percentiles",
   "blurb": "Paste latencies; get p50 to p99.9 — and see why the two common definitions disagree.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "capabilities": ["pure"],
   "runtime": { "entry": "index.ts", "thread": "main" },
   "card": "live",
@@ -54,6 +54,6 @@
     }
   ],
   "links": [
-    { "label": "Why you cannot average percentiles", "href": "https://www.circonus.com/2018/11/the-problem-with-percentiles-aggregation-does-not-work/" }
+    { "label": "Why you cannot average percentiles", "href": "https://www.solarwinds.com/blog/why-percentiles-dont-work-the-way-you-think" }
   ]
 }
