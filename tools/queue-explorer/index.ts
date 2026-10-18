@@ -99,7 +99,7 @@ export function simulate(
 }
 
 const fmt = (value: number, digits = 2) =>
-	Number.isFinite(value) ? value.toFixed(digits) : "—";
+	Number.isFinite(value) ? value.toFixed(digits) : "n/a";
 
 function curve(mu: number, current: number): Chart {
 	/*
@@ -140,7 +140,7 @@ const tool: Tool<Input> = {
 				kind: "error",
 				message:
 					`At ${arrivals} arrivals/s and ${service} ms of service, one server can handle ${fmt(mu, 0)}/s. ` +
-					"The queue never drains, so there is no steady state to report — lower the arrival rate or speed up service.",
+					"The queue never drains, so there is no steady state to report. Lower the arrival rate or speed up service.",
 				input: "arrivals",
 			};
 		}

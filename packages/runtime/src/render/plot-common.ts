@@ -129,7 +129,7 @@ export function adoptChartStyles(node: Node): void {
  * heatmap and a pie.
  */
 export function format(value: number): string {
-	if (!Number.isFinite(value)) return "—";
+	if (!Number.isFinite(value)) return "n/a";
 	const abs = Math.abs(value);
 	// A whole number is written whole: frame 6, not frame 6.00, in the readout and the data table alike.
 	if (Number.isInteger(value) && abs < 1000) return String(value);

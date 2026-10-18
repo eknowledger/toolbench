@@ -1,6 +1,6 @@
 # Percentiles
 
-Paste measurements — latencies, sizes, durations, anything — and get p50 through p99.9.
+Paste measurements (latencies, sizes, durations, anything) and get p50 through p99.9.
 
 ## What the two definitions mean
 
@@ -12,7 +12,7 @@ when that position falls between two measurements.
 - **Linear interpolation** returns a point between the two measurements either side of the position.
   It is what numpy and R return by default.
 
-Neither is wrong, and on a large sample they nearly agree. On a small or skewed sample they do not —
+Neither is wrong, and on a large sample they nearly agree. On a small or skewed sample they do not:
 the table shows the gap for your data. What *is* wrong is comparing two systems whose tools use
 different definitions, which happens constantly.
 

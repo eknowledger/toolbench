@@ -103,7 +103,7 @@ function validateInput(raw: unknown, path: string): InputSpec {
 				fail(`${path}.default`, "a number input needs a finite number default");
 			}
 			if (typeof o.min !== "number" || typeof o.max !== "number") {
-				fail(`${path}.min/max`, "a number input must declare min and max — they are the only guard against a runaway input");
+				fail(`${path}.min/max`, "a number input must declare min and max: they are the only guard against a runaway input");
 			}
 			if (o.min >= o.max) fail(`${path}.min`, `min (${o.min}) must be below max (${o.max})`);
 			if (o.default < o.min || o.default > o.max) {
@@ -372,7 +372,7 @@ export function validateManifest(raw: unknown): Manifest {
 
 	// --- identity ---------------------------------------------------------------------------------
 	const id = str(o, "id", "");
-	if (!ID.test(id)) fail("id", `"${id}" must be lowercase letters, digits and hyphens — it is also a directory name and a URL segment`);
+	if (!ID.test(id)) fail("id", `"${id}" must be lowercase letters, digits and hyphens: it is also a directory name and a URL segment`);
 	str(o, "name", "");
 	const blurb = str(o, "blurb", "");
 	if (blurb.length > 200) fail("blurb", `is ${blurb.length} characters; keep it under 200 so it works as a card line and a page description`);
@@ -434,7 +434,7 @@ export function validateManifest(raw: unknown): Manifest {
 	if (kinds.length === 0) fail("kinds", "declare every output kind `run` can return, so a host can refuse a tool it cannot draw");
 	const outputKinds = kinds.map((k, i) => oneOf(k, OUTPUT_KINDS, `kinds[${i}]`)) as OutputKind[];
 	if (!outputKinds.includes("error")) {
-		fail("kinds", 'must include "error" — every tool can be given bad input, and saying so is part of working correctly');
+		fail("kinds", 'must include "error": every tool can be given bad input, and saying so is part of working correctly');
 	}
 
 	// --- card -------------------------------------------------------------------------------------
@@ -458,7 +458,7 @@ export function validateManifest(raw: unknown): Manifest {
 	 * a reader finds later.
 	 */
 	if (card === "live" && !(capabilities.length === 1 && capabilities[0] === "pure")) {
-		fail("card", 'only a "pure" tool may be a live card — a compact slot must not read files or call networks');
+		fail("card", 'only a "pure" tool may be a live card: a compact slot must not read files or call networks');
 	}
 	if (card === "live" && status !== "live") {
 		fail(
@@ -470,7 +470,7 @@ export function validateManifest(raw: unknown): Manifest {
 	if (o.autoRun === true && thread === "worker") {
 		fail(
 			"autoRun",
-			'is for tools that are instant, and a worker-mode tool is by definition not — it declared thread: "worker" ' +
+			'is for tools that are instant, and a worker-mode tool is by definition not: it declared thread: "worker" ' +
 				"because its running time depends on its input. Leave autoRun off and let the reader press Run.",
 		);
 	}

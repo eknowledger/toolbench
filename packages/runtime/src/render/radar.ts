@@ -134,7 +134,7 @@ export function renderRadar(radar: Radar, options: RenderOptions = {}): HTMLElem
 function table(radar: Radar, series: Radar["series"], unit: string, note: string | undefined): HTMLElement {
 	const head = el("tr", {}, el("th", { scope: "col" }, "Axis"), ...series.map((s) => el("th", { scope: "col" }, unit ? `${s.label} (${unit.trim()})` : s.label)));
 	const rows = radar.axes.map((axis, k) =>
-		el("tr", { "data-i": k }, el("th", { scope: "row" }, axis.label), ...series.map((s) => el("td", {}, s.values[k] === null || s.values[k] === undefined ? "—" : format(s.values[k] as number)))),
+		el("tr", { "data-i": k }, el("th", { scope: "row" }, axis.label), ...series.map((s) => el("td", {}, s.values[k] === null || s.values[k] === undefined ? "n/a" : format(s.values[k] as number)))),
 	);
 	return el(
 		"details",

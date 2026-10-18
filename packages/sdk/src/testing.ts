@@ -122,7 +122,7 @@ export function compare(actual: Output, testCase: Case): string | undefined {
 	const mode = testCase.match ?? "exact";
 	if (mode === "subset") {
 		if (!testCase.why) {
-			return 'match: "subset" requires a `why` — an opt-out of exact matching needs a stated reason.';
+			return 'match: "subset" requires a `why`: an opt-out of exact matching needs a stated reason.';
 		}
 		if (testCase.expect.kind === "fields" && testCase.fieldCount === undefined) {
 			return 'match: "subset" on a fields output requires `fieldCount`, or a dropped field would pass.';

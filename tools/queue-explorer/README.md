@@ -18,7 +18,7 @@ The marked line is where your inputs put you.
   number generator.
 
 They should agree to within a percent or two. If they ever disagree by more than that, one of them is
-wrong — and that is worth knowing, which is why the difference is displayed rather than hidden. More
+wrong, and that is worth knowing, which is why the difference is displayed rather than hidden. More
 samples narrow the gap; it shrinks with the square root of the sample count, so ten times the samples
 buys about three times the precision.
 
