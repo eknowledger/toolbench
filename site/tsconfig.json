@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@toolbench/sdk": ["../packages/sdk/src/index.ts"],
+      "@toolbench/runtime": ["../packages/runtime/src/index.ts"],
+      "@toolbench/runtime/*": ["../packages/runtime/src/*"]
+    }
+  },
+  "include": ["*.ts", "src/**/*.ts", "build/**/*.ts"]
+}

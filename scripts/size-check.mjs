@@ -468,6 +468,50 @@ for (const file of unclaimed) {
 	failed++;
 }
 
+/*
+ * The project site (site/), measured as a page rather than as chunks: everything its landing page loads
+ * from the HTML itself, scripts, module preloads and stylesheets, before any tool code is fetched.
+ *
+ * deployOnly, because no consumer downloads the project's own site. It is watched anyway because the
+ * landing page is where the "tiny" claim is made, and a page that argues for 25 KB while weighing
+ * twice that would undo the argument. 30,701 measured on the system font stack when this line was
+ * added: 24,770 of it is the runtime with the site's tool manifests, the same cost a consumer pays, and
+ * the rest is the page's own script and stylesheet. A web font, if one is ever adopted, is not in this
+ * figure; it would need a line of its own. 33_000 leaves 2.3 KB, about one more page script and its styles.
+ */
+const SITE = join(import.meta.dirname, "..", "site", "dist");
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];
+let siteHtml = null;
+try {
+	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
+} catch {
+	/*
+	 * ⚠️ Missing is a failure in CI and a warning locally. CI builds the site before this script, so a
+	 * missing build there means the step was removed and the line would stop measuring silently. Locally,
+	 * `pnpm bench:build && pnpm size` is the documented loop for runtime work and should not need a site build.
+	 */
+	const message = `No site build at ${SITE}. Run \`pnpm site:build\` to measure the site's landing page.`;
+	if (process.env.CI) {
+		console.error(`✗ ${message}`);
+		failed++;
+	} else console.warn(`⚠ ${message} Skipped locally.`);
+}
+if (siteHtml !== null) {
+	for (const { label, page, budget } of SITE_PAGES) {
+		const text = readFileSync(join(SITE, page), "utf8");
+		const refs = [
+			...[...text.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]),
+			...[...text.matchAll(/<link[^>]*rel="(?:stylesheet|modulepreload)"[^>]*href="([^"]+)"|<link[^>]*href="([^"]+)"[^>]*rel="(?:stylesheet|modulepreload)"/g)].map((m) => m[1] ?? m[2]),
+		];
+		// Asset URLs carry the Pages prefix in a production build; the files sit under dist/assets either way.
+		const files = [...new Set(refs.filter((r) => r.includes("/assets/")).map((r) => r.slice(r.indexOf("/assets/") + 1)))];
+		const size = files.reduce((sum, f) => sum + gzipSync(readFileSync(join(SITE, f))).length, 0);
+		const over = size > budget;
+		if (over) failed++;
+		rows.push({ label, size, budget, over, deployOnly: true });
+	}
+}
+
 const width = Math.max(...rows.map((r) => r.label.length));
 console.log("\nTransfer size, gzipped:\n");
 for (const { label, size, budget, over } of rows) {

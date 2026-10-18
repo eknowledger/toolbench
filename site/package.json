@@ -1,0 +1,19 @@
+{
+  "name": "@toolbench/site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The public project site: landing page, gallery, docs rendered from the repository's markdown, and the chart showcase.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5190 --strictPort"
+  },
+  "dependencies": {
+    "@toolbench/runtime": "workspace:*",
+    "@toolbench/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  }
+}

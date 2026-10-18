@@ -10,7 +10,7 @@
 **Ship small interactive tools on a website.**
 A tool is one function and one JSON file. Toolbench builds the form, runs it, and renders the result.
 
-**[Try it](https://eknowledger.github.io/toolbench/).** The live bench, no clone required.
+**[Try it](https://eknowledger.github.io/toolbench/).** Every example tool, live, no clone required.
 
 <!-- ⚠️ All badges in a group must sit on ONE source line. GitHub renders a single newline as <br>, so
      one badge per line stacks them vertically instead of flowing them inline. -->
@@ -58,26 +58,27 @@ The tool has no idea it is on the web. The website needs no framework.
 
 ## Live demo
 
-The same bench this repository builds is hosted at
-[eknowledger.github.io/toolbench](https://eknowledger.github.io/toolbench/). Four pages,
+The project site is at [eknowledger.github.io/toolbench](https://eknowledger.github.io/toolbench/),
+built from `site/`. The same bench this repository builds is hosted beside it as the playground, at
+[eknowledger.github.io/toolbench/playground](https://eknowledger.github.io/toolbench/playground/). Four pages,
 because the display modes are four different situations and one page would let a bug in
 one hide behind another:
 
 | Page | What it shows |
 |---|---|
-| [Gallery](https://eknowledger.github.io/toolbench/) | The example tools as cards, each loading nothing until it is clicked. Below them, a highlighted code result and the two lifecycle states, `deprecated` and `retired`. |
-| [Full page](https://eknowledger.github.io/toolbench/tool.html?id=percentiles) | One tool on its own route, with its help text and its sample inputs. |
-| [In an article](https://eknowledger.github.io/toolbench/article.html) | Embed mode: two tools inside prose, inheriting the page's type. |
-| [When a tool fails](https://eknowledger.github.io/toolbench/failure.html) | A tool that spins forever, throws, or ignores cancellation, and a `tool` attribute naming an id that does not exist. |
+| [Gallery](https://eknowledger.github.io/toolbench/playground/) | The example tools as cards, each loading nothing until it is clicked. Below them, a highlighted code result and the two lifecycle states, `deprecated` and `retired`. |
+| [Full page](https://eknowledger.github.io/toolbench/playground/tool.html?id=percentiles) | One tool on its own route, with its help text and its sample inputs. |
+| [In an article](https://eknowledger.github.io/toolbench/playground/article.html) | Embed mode: two tools inside prose, inheriting the page's type. |
+| [When a tool fails](https://eknowledger.github.io/toolbench/playground/failure.html) | A tool that spins forever, throws, or ignores cancellation, and a `tool` attribute naming an id that does not exist. |
 
 The badly behaved fixtures are on their own page, and the card grid filters them out along
 with anything not `live`. A first visitor to the demo should not meet a tool whose job is to
 time out, or be offered a retired one as though it were current.
 
-That is a GitHub **project** Pages site, so Vite `base` is `/toolbench/`. Local
-`pnpm bench` and `pnpm bench:build` keep `base` at `/`, which is why
-http://localhost:5180 still works. Set `BENCH_BASE=/toolbench/` to preview the
-deployed layout (the preview is then at http://localhost:4173/toolbench/).
+That is a GitHub **project** Pages site, so the bench's Vite `base` is `/toolbench/playground/`
+and the site's is `/toolbench/`. Local `pnpm bench` and `pnpm bench:build` keep `base` at `/`, which
+is why http://localhost:5180 still works. Set `BENCH_BASE=/toolbench/playground/` to preview the
+deployed layout (the preview is then at http://localhost:4173/toolbench/playground/).
 
 A maintainer enables the site once: **Settings → Pages → Source → GitHub Actions**.
 The workflow is [`.github/workflows/pages.yml`](.github/workflows/pages.yml). Until

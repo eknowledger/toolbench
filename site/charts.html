@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Charts, Toolbench</title>
+  <meta name="description" content="Every chart kind a Toolbench tool can return, drawn live by the runtime, one family per page.">
+  <!-- partial:theme-init -->
+  <link rel="stylesheet" href="./src/base.css">
+  <link rel="stylesheet" href="./src/site.css">
+  <!-- fonts -->
+  <script type="module" src="./src/charts-page.ts"></script>
+</head>
+<body class="site">
+<!-- partial:header -->
+<main id="main">
+  <div class="page-head">
+    <h1>Charts</h1>
+    <p>Every chart a tool can return, drawn by the runtime with no charting library. Each one answers a pointer and the keyboard, and ships its numbers as a table for anyone who cannot see it.</p>
+  </div>
+  <div class="charts">
+    <nav class="families" aria-label="Chart families">
+      <!-- chart-nav -->
+    </nav>
+    <section aria-labelledby="family-title">
+      <div class="family-head">
+        <div>
+          <h2 id="family-title" data-family-name><!-- chart-default:name --></h2>
+          <p data-family-note><!-- chart-default:note --></p>
+        </div>
+        <p class="family-position">Family <span data-family-position><!-- chart-default:position --></span></p>
+      </div>
+      <div class="chart-grid" data-chart-stage></div>
+      <nav class="pager" aria-label="Previous and next family">
+        <a data-family-prev href="#"><small>Previous</small><span data-label></span></a>
+        <a data-family-next href="#"><small>Next</small><span data-label></span></a>
+      </nav>
+    </section>
+  </div>
+  <!-- partial:planned-graphs -->
+</main>
+<!-- partial:footer -->
+</body>
+</html>

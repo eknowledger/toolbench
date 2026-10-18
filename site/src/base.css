@@ -1,0 +1,43 @@
+/* A reset, the theme switch, and the hooks site.css colours. */
+*, *::before, *::after { box-sizing: border-box; }
+:root { color-scheme: light dark; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+body { margin: 0; }
+img, svg { display: block; max-width: 100%; }
+pre, code, kbd { font-family: var(--mono); }
+h1, h2, h3, h4 { text-wrap: balance; }
+p, li, dd, figcaption { text-wrap: pretty; }
+
+.skip {
+  position: absolute; left: 1rem; top: -4rem; z-index: 10;
+  padding: 0.6rem 1rem; background: var(--ink); color: var(--paper);
+}
+.skip:focus { top: 1rem; }
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* Syntax colours: site.css sets --code-* and the spans follow. */
+.t-c { color: var(--code-comment); font-style: italic; }
+.t-s { color: var(--code-string); }
+.t-n { color: var(--code-number); }
+.t-k { color: var(--code-keyword); }
+.t-p { color: var(--code-prop); }
+
+/* The theme switch draws a sun or a moon for the theme it would switch TO. */
+[data-theme-toggle] { cursor: pointer; }
+[data-theme-toggle] .moon { display: none; }
+[data-theme-toggle][data-next="dark"] .moon { display: block; }
+[data-theme-toggle][data-next="dark"] .sun { display: none; }
+
+/* Tool hosts reserve no space until defined; site.css sets a min-block-size where it matters. */
+tool-host { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* The chart stage is filled by a script; holding a screen of room keeps the pager and footer from jumping. */
+[data-chart-stage] { min-block-size: 100vh; }
