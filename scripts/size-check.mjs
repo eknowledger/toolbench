@@ -117,6 +117,8 @@ const BUDGETS = [
 	 * host's sheets in every root; `data-kind`, `data-role` and `data-label` on rendered parts; the runtime's
 	 * sheet inside `@layer toolbench`; and the default sheet's good and muted tones and the `min-width: 0`
 	 * that stops a wide result clipping its tool.
+	 *
+	 * #147's `reveal(id)` and `data-part` spent 230 of the headroom, 24,118 to 24,348, inside this ceiling.
 	 */
 	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 24_500 },
 	/*
@@ -242,13 +244,13 @@ const BUDGETS = [
 	{ label: "bench fixture: retired", pattern: /^tool-retired-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench fixture: slider", pattern: /^tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench fixture: discrete-series", pattern: /^tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
-	// The styling page's fixture (#157): a result that names its parts. 507 measured.
+	// The styling page's fixture (#157, #147): a result that names its parts. 528 measured.
 	{ label: "bench fixture: styled-output", pattern: /^tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
-	// STYLING.md's four example sheets and the toggle that removes them (#157). 970 measured.
+	// STYLING.md's four example sheets, the toggle that removes them, and the reveal links (#157, #147). 1,046 measured.
 	{ label: "bench page: styling", pattern: /^styling-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "bench source links", pattern: /^source-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	/*

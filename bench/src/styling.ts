@@ -59,6 +59,15 @@ defineToolHost({ source, pageUrl: (id) => `./tool.html?id=${encodeURIComponent(i
 const fixed = document.getElementById("audit-fixed") as (HTMLElement & { values: Record<string, boolean> }) | null;
 if (fixed) fixed.values = { fixed: true };
 
+// The links a page would write to point at one part (#147). A real page would read its own fragment.
+for (const link of document.querySelectorAll<HTMLAnchorElement>("a[data-reveal]")) {
+	link.addEventListener("click", (event) => {
+		event.preventDefault();
+		const host = document.getElementById(link.dataset.reveal ?? "") as (HTMLElement & { reveal(id: string): Promise<boolean> }) | null;
+		void host?.reveal(link.dataset.part ?? "");
+	});
+}
+
 const toggle = document.getElementById("toggle-styles");
 let on = true;
 toggle?.addEventListener("click", () => {

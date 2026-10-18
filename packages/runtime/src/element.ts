@@ -144,6 +144,8 @@ export class ToolHost extends HTMLElement {
 	 * working. Cleared only when the tool itself changes.
 	 */
 	#expanded = false;
+	/** Set by `reveal` to draw every part when a plain `parts` cap hid the one asked for. Cleared with `#expanded`. */
+	#uncapped = false;
 	#controls = new Map<string, HTMLElement>();
 	/** The range control beside a number box that asked for `control: "slider"`, kept in step with it. */
 	#sliders = new Map<string, HTMLInputElement>();
@@ -219,6 +221,43 @@ export class ToolHost extends HTMLElement {
 		if (!this.#manifest) return;
 		await this.#activate();
 		await this.#run({ focusResult: options.focus === true });
+	}
+
+	/**
+	 * Bring one part of the result to the reader: the part whose `id` is `id` (#147). Resolves `true` once
+	 * it is on screen with focus on it, `false` if the result has no such part.
+	 *
+	 * Opens whatever stands in the way. A closed card or a not-yet-visible tool is activated first, since
+	 * a link that does nothing is worse than one that opens a card. A tool with nothing on screen at all,
+	 * no seed and no result, runs on its current inputs, because otherwise there is no part to go to. A
+	 * part behind `parts`/`more` is shown: with `more="expand"` the disclosure opens, as if pressed, and
+	 * with a plain cap every part is drawn, since the reader asked for one the cap hid.
+	 */
+	async reveal(id: string): Promise<boolean> {
+		await this.#ready;
+		if (!this.#manifest) return false;
+		await this.#activate();
+		if (this.#shown === undefined && this.#seed === undefined) await this.#run({ focusResult: false });
+		const find = () => this.#els.output?.querySelector<HTMLElement>(`[data-part="${CSS.escape(id)}"]`);
+		let part = find();
+		const shown = this.#shown ?? this.#seed;
+		// Only for a part the result has: an unknown id must not lift a cap the page chose.
+		if ((!part || part.closest("[hidden]")) && shown && hasPart(shown, id)) {
+			this.#expanded = true;
+			this.#uncapped = this.more !== "expand";
+			// Redrawing the seed must not record it as a result, for the reason `#paint` gives.
+			const fromSeed = this.#shown === undefined;
+			this.#draw(shown);
+			if (fromSeed) this.#shown = undefined;
+			part = find();
+		}
+		if (!part) return false;
+		// A part is a div, not a control: tabindex -1 lets it hold focus without joining the tab order.
+		if (!part.hasAttribute("tabindex")) part.setAttribute("tabindex", "-1");
+		// "start", as a fragment link lands: "nearest" left a revealed table pinned to the bottom edge.
+		part.scrollIntoView({ block: "start" });
+		part.focus({ preventScroll: true });
+		return true;
 	}
 
 	get mode(): Mode {
@@ -324,6 +363,7 @@ export class ToolHost extends HTMLElement {
 			this.#shown = undefined;
 			this.#status = "";
 			this.#expanded = false;
+			this.#uncapped = false;
 			this.#ready = this.#prepare();
 		} else {
 			this.#paint();
@@ -1138,7 +1178,7 @@ export class ToolHost extends HTMLElement {
 					output,
 					withHostHighlight({
 						compact,
-						...(this.#partsCap !== undefined ? { cardParts: this.#partsCap } : {}),
+						...(this.#partsCap !== undefined && !this.#uncapped ? { cardParts: this.#partsCap } : {}),
 						...(this.more === "expand" ? { more: "expand" as const, expanded: this.#expanded } : {}),
 						...(manifest?.cardFields !== undefined ? { cardFields: manifest.cardFields } : {}),
 					}),
@@ -1246,6 +1286,10 @@ function lifecycleMark(status: NonNullable<Manifest["status"]>): HTMLElement | n
 	if (status === "deprecated") return el("span", { class: "tb-mark", "data-status": "deprecated" }, "Deprecated");
 	if (status === "retired") return el("span", { class: "tb-mark", "data-status": "retired" }, "Retired");
 	return null;
+}
+
+function hasPart(output: Output, id: string): boolean {
+	return output.id === id || (output.kind === "group" && output.parts.some((part) => hasPart(part, id)));
 }
 
 /** Every kind in an output that is drawn by code of its own (a chart, a heatmap, a pie). */

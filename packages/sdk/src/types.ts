@@ -293,6 +293,12 @@ export interface PartNames {
 	 * root element for host CSS and tests to find it by name rather than by position.
 	 */
 	role?: string;
+	/**
+	 * A name for this one part, unique within the result, rendered as `data-part`, so a page can link
+	 * to it: `host.reveal(id)` opens it if it is collapsed, scrolls to it and moves focus there (#147).
+	 * Where `role` says what kind of part this is, `id` says which one.
+	 */
+	id?: string;
 }
 
 type OutputBody =

@@ -2899,6 +2899,85 @@ describe("host stylesheets and the styling contract (#157, #154, #156)", () => {
 	});
 });
 
+describe("linking to one part with host.reveal (#147)", () => {
+	/*
+	 * The styling page's fixture gives every part an `id`. Three hosts there each show one part of four:
+	 * behind `more="expand"`, behind a plain `parts` cap, and in a closed card. `reveal` must reach the
+	 * hidden part in each, leave focus on it and have it on screen, without the page touching the shadow
+	 * root.
+	 */
+	const reveal = (page: Page, host: string, part: string) =>
+		page.evaluate(
+			async ({ host, part }) => {
+				const el = document.getElementById(host) as HTMLElement & { reveal(id: string): Promise<boolean> };
+				const ok = await el.reveal(part);
+				const node = el.shadowRoot?.querySelector(`[data-part="${part}"]`);
+				const box = node?.getBoundingClientRect();
+				return {
+					ok,
+					focused: el.shadowRoot?.activeElement?.getAttribute("data-part") ?? null,
+					onScreen: box ? box.top < innerHeight && box.bottom > 0 : false,
+					hidden: node ? node.closest("[hidden]") !== null : null,
+					expanded: el.shadowRoot?.querySelector(".tb-disclose")?.getAttribute("aria-expanded") ?? null,
+					form: el.shadowRoot?.querySelector(".tb-form") !== null,
+				};
+			},
+			{ host, part },
+		);
+
+	const open = async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/styling.html`, { waitUntil: "load" });
+		return page;
+	};
+
+	it("opens a part hidden behind a disclosure, as if the button were pressed", async () => {
+		const page = await open();
+		await page.locator("#reveal-expand").scrollIntoViewIfNeeded();
+		await page.locator("#reveal-expand .tb-disclose").waitFor({ timeout: 15_000 });
+		const before = await page.evaluate(() => document.getElementById("reveal-expand")?.shadowRoot?.querySelector('[data-part="fields"]')?.closest("[hidden]") !== null);
+		assert.ok(before, "the table starts hidden behind the disclosure");
+		await page.evaluate(() => scrollTo(0, 0));
+		const seen = await reveal(page, "reveal-expand", "fields");
+		assert.deepEqual(seen, { ok: true, focused: "fields", onScreen: true, hidden: false, expanded: "true", form: true });
+		await page.close();
+	});
+
+	it("draws a part a plain cap left out", async () => {
+		const page = await open();
+		await page.locator("#reveal-capped").scrollIntoViewIfNeeded();
+		await page.locator("#reveal-capped .tb-more").waitFor({ timeout: 15_000 });
+		await page.evaluate(() => scrollTo(0, 0));
+		const seen = await reveal(page, "reveal-capped", "this-run");
+		assert.equal(seen.ok, true);
+		assert.equal(seen.focused, "this-run");
+		assert.equal(seen.onScreen, true);
+		assert.equal(seen.hidden, false);
+		await page.close();
+	});
+
+	it("activates a closed card first, then goes to the part", async () => {
+		const page = await open();
+		await page.locator("#reveal-card .tb-facade").waitFor();
+		const seen = await reveal(page, "reveal-card", "stats");
+		assert.equal(seen.form, true, "the card was opened");
+		assert.equal(seen.ok, true);
+		assert.equal(seen.focused, "stats");
+		assert.equal(seen.onScreen, true);
+		await page.close();
+	});
+
+	it("says false, and moves nothing, for a part the result does not have", async () => {
+		const page = await open();
+		await page.locator("#reveal-capped").scrollIntoViewIfNeeded();
+		await page.locator("#reveal-capped .tb-more").waitFor({ timeout: 15_000 });
+		const seen = await reveal(page, "reveal-capped", "no-such-part");
+		assert.equal(seen.ok, false);
+		assert.equal(seen.focused, null);
+		await page.close();
+	});
+});
+
 describe("failure paths", () => {
 	it("kills a tool that spins forever and says so", async () => {
 		const page = await browser.newPage();

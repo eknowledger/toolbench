@@ -98,6 +98,7 @@ root and the series colour properties. Its insides are drawn geometry and will c
 |---|---|---|
 | `data-kind` | Every part's root | The part's kind |
 | `data-role` | A part's root, or a `.tb-field` | Whatever `role` the tool set. Absent when it set none |
+| `data-part` | A part's root | Whatever `id` the tool set, unique in the result. Absent when it set none. `host.reveal(id)` goes to it |
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |
 | `data-align` | Table cells and headers | `start`, `end` |

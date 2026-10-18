@@ -18,5 +18,5 @@ export const SDK_CHANGELOG: Record<number, string> = {
 	2: "byte-oriented output: the bytes kind, for wire formats and hex dumps, with named highlight ranges.",
 	3: "sample inputs: the optional samples manifest key, a list of labelled example inputs a tool ships with and a host renders under its form.",
 	4: "richer charts and inputs: chart markers (markers: true, shape: \"points\"), and control: \"slider\" on a number input. Later additions in the same release are listed in docs/versioning.md.",
-	5: "names for host stylesheets: an optional role on any output part and on any field, rendered as data-role, and the muted tone on fields and table cells.",
+	5: "names for host stylesheets and links: an optional role on any output part and on any field, rendered as data-role; an optional id on any part, rendered as data-part and opened by host.reveal(id); and the muted tone on fields and table cells.",
 };

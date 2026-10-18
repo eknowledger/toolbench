@@ -48,6 +48,23 @@
 		<div class="narrow">
 			<tool-host tool="percentiles" id="narrow-percentiles" mode="embed" parts="3" data-seed></tool-host>
 		</div>
+
+		<h2>Linking to one part</h2>
+		<p class="note">
+			Each part of this result has an <code>id</code>. A link calls <code>host.reveal(id)</code>, which opens
+			whatever hides the part, scrolls to it and moves focus there. Three hosts, each showing one part: one
+			behind a disclosure, one behind a plain cap, and a closed card.
+		</p>
+		<p>
+			<a href="#reveal-expand" data-reveal="reveal-expand" data-part="fields">The table, behind "Show more"</a> ·
+			<a href="#reveal-capped" data-reveal="reveal-capped" data-part="this-run">This run, behind a cap</a> ·
+			<a href="#reveal-card" data-reveal="reveal-card" data-part="stats">The tiles, in a closed card</a>
+		</p>
+		<tool-host id="reveal-expand" tool="styled-output" mode="embed" parts="1" more="expand"></tool-host>
+		<tool-host id="reveal-capped" tool="styled-output" mode="embed" parts="1"></tool-host>
+		<div class="narrow">
+			<tool-host id="reveal-card" tool="styled-output" mode="card" parts="1"></tool-host>
+		</div>
 	</div>
 	<script type="module" src="/src/styling.ts"></script>
 </body>

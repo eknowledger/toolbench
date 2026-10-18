@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v5-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-24.1%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v5-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-24.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -430,6 +430,15 @@ trustworthy than a reader. An existing result goes stale, the same as typing. Th
 form has opened, so a card can be prefilled. A shareable `?in=…` deep link is then a host feature,
 with no further contract change.
 
+**A page can link to one part of a result.** A tool gives a part an `id`, and `reveal(id)` brings it to
+the reader: it opens a closed card, shows the part if `parts` or `more` hid it, scrolls to it and moves
+focus there. It resolves `false` for an id the result does not have.
+
+```ts
+// The tool returns { kind: "group", parts: [..., { kind: "series", id: "trade", chart }] }
+document.querySelector("#trade-link").addEventListener("click", () => host.reveal("trade"));
+```
+
 ## Result shapes
 
 A tool returns one of a closed set of shapes, so the runtime can draw anything a tool produces and a
@@ -537,7 +546,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 24.1 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 24.3 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.2 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |

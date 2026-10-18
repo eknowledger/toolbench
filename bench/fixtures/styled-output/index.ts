@@ -4,7 +4,7 @@
  * A bench fixture rather than a tool, because it exists to give each of STYLING.md's example sheets
  * something to hold on to: a verdict that is one field, stat tiles both ungrouped and grouped, and a
  * table too wide for a phone with every cell tone, including the unnamed first column whose cells must
- * carry no `data-label`.
+ * carry no `data-label`. Each part also has an `id`, for `host.reveal(id)` (#147).
  */
 import type { Output, Tool } from "@toolbench/sdk";
 
@@ -19,6 +19,7 @@ export default {
 			parts: [
 				{
 					kind: "fields",
+					id: "summary",
 					fields: [
 						{
 							label: "Verdict",
@@ -31,6 +32,7 @@ export default {
 				},
 				{
 					kind: "fields",
+					id: "stats",
 					role: "stats",
 					fields: [
 						{ label: "Fields that are data", value: "6 of 8" },
@@ -40,6 +42,7 @@ export default {
 				},
 				{
 					kind: "table",
+					id: "fields",
 					caption: "Every field, by how much it accepts.",
 					columns: [
 						{ label: "" },
@@ -57,6 +60,7 @@ export default {
 				},
 				{
 					kind: "fields",
+					id: "this-run",
 					role: "stats",
 					fields: [
 						{ label: "Rejected", value: "0", group: "This run" },
