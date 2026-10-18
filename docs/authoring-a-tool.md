@@ -485,7 +485,7 @@ that overruns its budget is reported as slow rather than as a crash, so the two 
 ]}
 ```
 
-`tone` is `"good" | "warn" | "bad"`, for when a number's meaning is not obvious from the number.
+`tone` is `"good" | "warn" | "bad"`, for when a number's meaning is not obvious from the number, or `"muted"` (below).
 `note` is the sentence a reader would otherwise have to work out. `group` puts fields under a heading,
 which is how one result holds two comparable sets: `tools/queue-explorer` uses "Formula" and
 "Simulation" side by side.
@@ -524,6 +524,25 @@ used decoratively implies a distinction the reader cannot see.
 
 Two notes on `group`. Order matters: a **card renders only the first part**, so put the part that works
 alone at the front. And declare every kind you use, `"group"` included.
+
+### Naming parts for a host's stylesheet
+
+Contract version 5 (`"sdk": 5`) adds two things a host's CSS can use. Neither changes how anything looks
+on a host that styles nothing.
+
+* **`role`** on any part, or on any field: a name such as `"verdict"` or `"stats"`, rendered as
+  `data-role`. A host can then draw "the verdict" large without counting rows, which breaks the day you
+  add a field above it. Name what a part *is*, not how it should look: `"verdict"`, not `"big-red"`.
+
+  ```ts
+  { kind: "fields", role: "stats", fields: [{ label: "Checked", value: "8" }, { label: "Risky", value: "2" }] }
+  { kind: "fields", fields: [{ label: "Verdict", value: "2 fields accept any text", tone: "bad", role: "verdict" }] }
+  ```
+
+* **`tone: "muted"`** on a field or a table cell, for the routine majority of a dense table, so the cells
+  that matter are not buried among cells coloured like them. Charts and byte ranges do not take it.
+
+The names a host may select by, and what counts as breaking them, are in [STYLING.md](../STYLING.md).
 
 ## 6. Errors
 

@@ -38,7 +38,7 @@ import { ChartRendererMissing, isLazyKind, loadRenderers, render, unknownOutput,
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
-import { applyStyles } from "./styles.ts";
+import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
 import { applyPartialValues, coerce } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
@@ -65,15 +65,36 @@ export interface ToolHostConfig {
 	 * `innerHTML`, which SECURITY.md forbids. Omit the hook to keep readable preformatted text.
 	 */
 	highlight?: (source: string, lang: string) => Node;
+	/**
+	 * The host's own stylesheets, adopted into every tool's shadow root after the runtime's. A sheet, CSS
+	 * text, a list of either, or `{ "*": [...], "tool-id": [...] }` for one tool to differ. The class
+	 * names and attributes they may rely on are listed in STYLING.md.
+	 */
+	styles?: HostStyles;
 }
 
 let config: ToolHostConfig | undefined;
+
+/** Every connected host's way to restyle itself, so `setHostStyles` reaches hosts that exist already. */
+const live = new Set<() => void>();
 
 /** Defines the element. Call once, with the source your host provides. */
 export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): void {
 	config = options;
 	if (typeof customElements === "undefined") return;
 	if (!customElements.get(tagName)) customElements.define(tagName, ToolHost);
+}
+
+/**
+ * Replace the host's stylesheets on every tool, on the page now and created later, without reloading:
+ * a theme switch, say. `undefined` removes them. Takes what `styles` takes.
+ */
+export function setHostStyles(styles: HostStyles | undefined): void {
+	if (!config) return;
+	config = { ...config };
+	if (styles === undefined) delete config.styles;
+	else config.styles = styles;
+	for (const restyle of live) restyle();
 }
 
 export class ToolHost extends HTMLElement {
@@ -137,8 +158,10 @@ export class ToolHost extends HTMLElement {
 	constructor() {
 		super();
 		this.#root = this.attachShadow({ mode: "open" });
-		applyStyles(this.#root);
+		this.#reapplyStyles();
 	}
+
+	#restyle = (): void => this.#reapplyStyles();
 
 	/**
 	 * A precomputed result to show before anything runs.
@@ -263,6 +286,7 @@ export class ToolHost extends HTMLElement {
 	}
 
 	connectedCallback(): void {
+		live.add(this.#restyle);
 		if (!config) {
 			this.#fatal("No tool source configured. Call defineToolHost({ source }) before using <tool-host>.");
 			return;
@@ -277,6 +301,7 @@ export class ToolHost extends HTMLElement {
 		 * removed rather than the page reloaded, and a worker with no owner survives at a few megabytes
 		 * each. Nothing else in the system will clean it up.
 		 */
+		live.delete(this.#restyle);
 		this.#runner?.dispose();
 		this.#runner = undefined;
 		this.#loaded = undefined;
@@ -808,8 +833,13 @@ export class ToolHost extends HTMLElement {
 	}
 
 	#reapplyStyles(): void {
-		// `fill` on the shadow root clears an appended <style> fallback; adopted sheets survive.
-		if (!("adoptedStyleSheets" in this.#root) || this.#root.adoptedStyleSheets.length === 0) applyStyles(this.#root);
+		/*
+		 * `fill` on the shadow root clears an appended <style> fallback, and adopted sheets survive it. Run
+		 * unconditionally: a host may have replaced the adopted list since the last paint, and the old guard,
+		 * "only while the list is empty", read a host's sheet as ours and drew the tool unstyled.
+		 */
+		applyStyles(this.#root);
+		applyHostStyles(this.#root, hostSheetsFor(config?.styles, this.toolId));
 	}
 
 	#reflectStatus(manifest: Manifest): void {

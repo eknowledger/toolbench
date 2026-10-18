@@ -62,6 +62,16 @@ describe("compare — subset, and its guard rails", () => {
 		assert.equal(compare(actual, testCase), undefined);
 	});
 
+	it("lets a tool name its parts and fields without breaking a subset fixture written before (contract 5)", () => {
+		// The fixture predates `role`. Naming parts is for host CSS, so it must not count as a changed answer.
+		const actual: Output = {
+			kind: "group",
+			parts: [{ kind: "fields", role: "stats", fields: [{ label: "b", value: "2", role: "verdict" }] }],
+		};
+		const testCase: Case = { ...base, match: "subset", why: "composite output", fieldCount: 1, expect: fields(["b", "2"]) };
+		assert.equal(compare(actual, testCase), undefined);
+	});
+
 	it("says what it looked at when no part matches", () => {
 		const actual: Output = { kind: "group", parts: [{ kind: "text", text: "hello" }] };
 		const testCase: Case = { ...base, match: "subset", why: "composite output", fieldCount: 1, expect: fields(["a", "1"]) };

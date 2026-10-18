@@ -41,6 +41,8 @@ export {
 	type Readout,
 	type Series,
 	type Tone,
+	type TextTone,
+	type PartNames,
 	type Tool,
 	type ToolModule,
 } from "./types.ts";

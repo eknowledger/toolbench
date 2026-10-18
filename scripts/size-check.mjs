@@ -111,8 +111,14 @@ const BUDGETS = [
 	 * Raised from 23_000 to 23_500 by the radar, treemap and Venn kinds (#128 to #130): a loader each, their
 	 * cases in the two exhaustive switches, and a screen-reader summary each. 23,079 measured. The renderers
 	 * themselves are chunks of their own, below.
+	 *
+	 * Raised from 23_500 to 24_500 by host stylesheets and the styling contract (#157, #154, #156): 23,437 to
+	 * 24,118 measured, 681 bytes. The `styles` option and `setHostStyles`, which parse, share and order a
+	 * host's sheets in every root; `data-kind`, `data-role` and `data-label` on rendered parts; the runtime's
+	 * sheet inside `@layer toolbench`; and the default sheet's good and muted tones and the `min-width: 0`
+	 * that stops a wide result clipping its tool.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 23_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 24_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -236,10 +242,14 @@ const BUDGETS = [
 	{ label: "bench fixture: retired", pattern: /^tool-retired-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench fixture: slider", pattern: /^tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench fixture: discrete-series", pattern: /^tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
+	// The styling page's fixture (#157): a result that names its parts. 507 measured.
+	{ label: "bench fixture: styled-output", pattern: /^tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
+	// STYLING.md's four example sheets and the toggle that removes them (#157). 970 measured.
+	{ label: "bench page: styling", pattern: /^styling-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "bench source links", pattern: /^source-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	/*
 	 * The worker's own copies. Vite builds the worker in a separate Rollup pass, so every tool
@@ -258,6 +268,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture retired", pattern: /^worker-tool-retired-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture slider", pattern: /^worker-tool-slider-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture discrete-series", pattern: /^worker-tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
+	{ label: "worker copy: bench fixture styled-output", pattern: /^worker-tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 ];
 
 let files;

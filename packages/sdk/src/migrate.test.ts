@@ -216,6 +216,21 @@ describe("the real 1 -> 3 chain", () => {
 		assert.deepEqual(upgradeOutput(output, 1), output);
 	});
 
+	it("leaves a v4 tool's output alone, and a v5 tool's names with it", () => {
+		// Written by hand from the contract: a v4 part has no role, and nothing may invent one.
+		const v4: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "risk", value: "high", tone: "bad" }] }] };
+		assert.deepEqual(upgradeOutput(v4, 4), v4);
+		const v5: Output = {
+			kind: "group",
+			role: "audit",
+			parts: [
+				{ kind: "fields", role: "stats", fields: [{ label: "Verdict", value: "2 at risk", tone: "bad", role: "verdict" }] },
+				{ kind: "table", columns: [{ label: "Risk" }], rows: [[{ text: "routine", tone: "muted" }]] },
+			],
+		};
+		assert.deepEqual(upgradeOutput(v5, 5), v5);
+	});
+
 	it("still refuses a manifest from the future", () => {
 		assert.throws(() => upgradeManifest({ sdk: SDK_VERSION + 1, id: "x" }), /needs contract version/);
 	});

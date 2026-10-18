@@ -166,7 +166,21 @@ export function discloseLabel(hidden: number, expanded: boolean): string {
 	return expanded ? `Hide ${hidden} ${noun}` : `Show ${hidden} more ${noun}`;
 }
 
+/**
+ * Draw one part, and name it on its root element for host CSS: `data-kind` always.
+ *
+ * Here rather than in each renderer, so every path that draws a part (a result, a card's seed, a
+ * degraded chart's remainder) carries the same names. A mockup that added them after the fact missed the
+ * closed card's preview, which is exactly the markup a host styles first.
+ */
 export function render(output: Output, options: RenderOptions = {}): HTMLElement {
+	const node = draw(output, options);
+	node.setAttribute("data-kind", output.kind);
+	if (output.role) node.setAttribute("data-role", output.role);
+	return node;
+}
+
+function draw(output: Output, options: RenderOptions): HTMLElement {
 	switch (output.kind) {
 		case "fields":
 			return renderFields(output.fields, options);
@@ -292,7 +306,7 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 		const rows = groupFields.map((field) =>
 			el(
 				"div",
-				{ class: "tb-field", "data-tone": field.tone ?? "normal" },
+				{ class: "tb-field", "data-tone": field.tone ?? "normal", "data-role": field.role || undefined },
 				el("dt", {}, field.label),
 				el(
 					"dd",
@@ -304,7 +318,9 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 		);
 		sections.push(
 			group
-				? el("section", { class: "tb-field-group" }, el("h4", {}, group), el("dl", {}, ...rows))
+				? // `tb-fields` here too, so one selector reaches every list of fields, grouped or not. A
+					// stat-tile sheet written against `.tb-fields` tiled nothing in a tool that grouped its fields.
+					el("section", { class: "tb-field-group" }, el("h4", {}, group), el("dl", { class: "tb-fields" }, ...rows))
 				: el("dl", { class: "tb-fields" }, ...rows),
 		);
 	}
@@ -376,6 +392,12 @@ function renderTable(
 					{
 						"data-align": column?.align ?? (typeof cell === "number" ? "end" : "start"),
 						"data-tone": ("tone" in value ? value.tone : undefined) ?? "normal",
+						/*
+						 * The column's name on every cell, so host CSS can stack a row on a narrow screen and
+						 * still say what each value is (`content: attr(data-label)`). Omitted for an unnamed
+						 * column, where it would only draw an empty line above the value.
+						 */
+						"data-label": column?.label || undefined,
 						class: mono ? "tb-mono" : "",
 					},
 					value.text,

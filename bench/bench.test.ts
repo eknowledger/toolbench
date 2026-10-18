@@ -17,6 +17,7 @@
  */
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
 
@@ -65,14 +66,48 @@ let browser: Browser;
 let engineName: EngineName;
 
 before(async () => {
-	server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
+	/*
+	 * ⚠️ Refuse a port that is already answering, and fail if our server dies.
+	 *
+	 * With `--strictPort` a taken port makes this server exit at once, and with its output ignored nothing
+	 * said so: the wait below then found the OTHER server ready and the whole suite ran against whatever
+	 * build that was. A preview left running from another checkout held this port for over two weeks, and
+	 * every run in that time tested its bundle instead of the one just built, passing and failing alike.
+	 */
+	const taken = await fetch(`${BASE}/index.html`).then(
+		() => true,
+		() => false,
+	);
+	if (taken) {
+		throw new Error(`Something is already serving on port ${PORT}. Stop it: this suite must test its own build, not whatever that is.`);
+	}
+	let exited: string | undefined;
+	let stderr = "";
+	/*
+	 * ⚠️ vite's own bin, run by this Node, in a process group of its own.
+	 *
+	 * It used to be `npx vite preview`, stopped with SIGTERM to npx. On Linux npx does not pass the signal
+	 * on, so vite outlived the suite, and once its stderr was piped here for the message below, the
+	 * orphan held the write end open and kept this process's event loop alive: every CI leg passed every
+	 * test and then hung until the job timeout cancelled it. macOS delivered the signal, so it never
+	 * showed locally. Running the bin directly removes the process that swallowed the signal, and the
+	 * group kill in `after` reaches anything vite starts as well.
+	 */
+	server = spawn(process.execPath, [join(import.meta.dirname, "node_modules", "vite", "bin", "vite.js"), "preview", "--port", String(PORT), "--strictPort"], {
 		cwd: import.meta.dirname,
-		stdio: "ignore",
-		detached: false,
+		stdio: ["ignore", "ignore", "pipe"],
+		detached: true,
+	});
+	server.stderr?.on("data", (chunk: Buffer) => {
+		stderr += String(chunk);
+	});
+	server.on("exit", (code, signal) => {
+		exited = `code ${code}, signal ${signal}`;
 	});
 	// Wait for the port rather than sleeping: a fixed delay is either flaky or slow.
 	const deadline = Date.now() + 20_000;
 	for (;;) {
+		if (exited) throw new Error(`vite preview exited before it was ready (${exited}):\n${stderr}`);
 		try {
 			const response = await fetch(`${BASE}/index.html`);
 			if (response.ok) break;
@@ -82,13 +117,41 @@ before(async () => {
 		if (Date.now() > deadline) throw new Error("vite preview did not start");
 		await new Promise((r) => setTimeout(r, 150));
 	}
+	/*
+	 * Ready, so stderr has done its job. Unreferenced rather than destroyed: neither the pipe nor the
+	 * child may keep this process alive, but closing our end would leave vite writing its next warning
+	 * into a pipe with no reader.
+	 */
+	(server.stderr as (NodeJS.ReadableStream & { unref?: () => void }) | null)?.unref?.();
+	server.unref();
 	engineName = requestedEngine();
 	browser = await launchBrowser();
 });
 
+/** Stop the server's whole process group: SIGTERM, then SIGKILL if it has not gone within two seconds. */
+async function stopServer(child: ChildProcess | undefined): Promise<void> {
+	const pid = child?.pid;
+	if (!child || pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+	const signal = (name: NodeJS.Signals) => {
+		try {
+			process.kill(-pid, name); // negative: the group `detached` gave it
+		} catch {
+			/* already gone */
+		}
+	};
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const gone = new Promise<boolean>((resolve) => child.once("exit", () => resolve(true)));
+	const late = new Promise<boolean>((resolve) => {
+		timer = setTimeout(() => resolve(false), 2_000);
+	});
+	signal("SIGTERM");
+	if (!(await Promise.race([gone, late]))) signal("SIGKILL");
+	clearTimeout(timer);
+}
+
 after(async () => {
 	await browser?.close();
-	server?.kill("SIGTERM");
+	await stopServer(server);
 });
 
 describe("the engine under test", () => {
@@ -2567,6 +2630,271 @@ describe("embed mode", () => {
 		assert.ok(both.every((t) => t.hasOutput), "both embedded tools should produce a result");
 		assert.ok(both.every((t) => !t.hasTitle), "embed mode omits the title — the prose provides the context");
 		assert.deepEqual(errors, []);
+		await page.close();
+	});
+});
+
+describe("a host's own stylesheet in the shadow root", () => {
+	/*
+	 * Hosts already adopt a sheet of their own into each tool's shadow root from page script, and the
+	 * runtime used to get on badly with it either way round. It installed its sheet only while the adopted
+	 * list was empty, so a host sheet that arrived first switched the runtime's styles off and the tool drew
+	 * unstyled. And a chart's sheet was appended after the host's, so the chart's rules beat the host's at
+	 * equal specificity. The order that must hold: the runtime's sheet, then a chart's, then the host's.
+	 *
+	 * Each check below reads a computed style rather than the adopted list, because the defect was what the
+	 * reader saw. The equal-specificity property is what proves the order: both sheets set it on the same
+	 * selector, so only the later sheet's value can show.
+	 */
+	type Probe = { containerType: string; runRadius: string; hostLast: boolean; ownFirst: boolean };
+
+	/** Make a host, give it the sheet the way page script would, then connect it. */
+	const connectWithSheet = (page: Page, tool: string, css: string, how: "assign" | "append") =>
+		page.evaluate(
+			({ tool, css, how }) => {
+				const el = document.createElement("tool-host");
+				el.id = "styled";
+				el.setAttribute("tool", tool);
+				el.setAttribute("mode", "embed");
+				const sheet = new CSSStyleSheet();
+				sheet.replaceSync(css);
+				const root = el.shadowRoot as ShadowRoot;
+				root.adoptedStyleSheets = how === "assign" ? [sheet] : [...root.adoptedStyleSheets, sheet];
+				(window as unknown as { hostSheet: CSSStyleSheet }).hostSheet = sheet;
+				document.body.prepend(el);
+			},
+			{ tool, css, how },
+		);
+
+	const probe = (page: Page): Promise<Probe> =>
+		page.evaluate(() => {
+			const root = document.querySelector("#styled")?.shadowRoot as ShadowRoot;
+			const sheets = root.adoptedStyleSheets;
+			const host = (window as unknown as { hostSheet: CSSStyleSheet }).hostSheet;
+			return {
+				containerType: getComputedStyle(root.querySelector(".tb") as Element).containerType,
+				// An autoRun tool has no Run button.
+				runRadius: ((run) => (run ? getComputedStyle(run).borderTopLeftRadius : "no Run button"))(root.querySelector(".tb-run")),
+				hostLast: sheets.indexOf(host) === sheets.length - 1,
+				ownFirst: sheets.length > 1 && sheets[0] !== host,
+			};
+		});
+
+	it("keeps a sheet adopted before the tool connects, and the runtime's styles with it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		// Assigned, not appended: replacing the list is the natural way to write it, and the harsher case.
+		await connectWithSheet(page, "percentiles", ".tb-run { border-radius: 3px; }", "assign");
+		await page.locator("#styled .tb-run").waitFor();
+		const seen = await probe(page);
+		// `.tb` is a query container in the runtime's sheet, and nothing else sets it. "normal" means unstyled.
+		assert.equal(seen.containerType, "inline-size", "the runtime's sheet must still apply");
+		// The runtime sets 8px on `.tb-run`; the host's 3px on the same selector shows only if it comes later.
+		assert.equal(seen.runRadius, "3px", "the host's rule must win at equal specificity");
+		assert.ok(seen.ownFirst && seen.hostLast, "the runtime's sheet first, the host's last");
+
+		// And it survives a repaint, which rebuilds the shadow tree and reapplies the runtime's styles.
+		await page.evaluate(() => document.querySelector("#styled")?.setAttribute("more", "link"));
+		await page.locator("#styled .tb-run").waitFor();
+		assert.deepEqual(await probe(page), seen, "a repaint must leave both sheets where they were");
+		await page.close();
+	});
+
+	it("puts a chart's sheet before the host's, so a host rule still wins over a chart's", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/article.html`, { waitUntil: "load" });
+		// `.tb-out-chart { margin: 0 }` is in the chart sheet, which arrives only once a chart is drawn.
+		// histogram sets autoRun, so it draws a chart with no Run button to press.
+		await connectWithSheet(page, "histogram", ".tb-out-chart { margin: 7px; }", "append");
+		await page.locator("#styled .tb-out-chart").waitFor({ timeout: 15_000 });
+		const margin = await page.evaluate(
+			() => getComputedStyle(document.querySelector("#styled")?.shadowRoot?.querySelector(".tb-out-chart") as Element).marginTop,
+		);
+		assert.equal(margin, "7px", "the host's rule must outlast the chart sheet that arrived after it");
+		const seen = await probe(page);
+		assert.equal(seen.containerType, "inline-size");
+		assert.ok(seen.ownFirst && seen.hostLast, "the host's sheet stays last after a chart's is adopted");
+		await page.close();
+	});
+});
+
+describe("host stylesheets and the styling contract (#157, #154, #156)", () => {
+	/*
+	 * The styling page passes STYLING.md's four example sheets to `defineToolHost({ styles })`. Each test
+	 * reads the computed style that sheet exists to produce, so a renamed class, a dropped attribute or a
+	 * cascade change breaks CI rather than a host's site. Expected values come from the sheets themselves:
+	 * 1.35rem at the 16px root is 21.6px, 1.5rem is 24px.
+	 */
+	const open = async (width = 1280) => {
+		const page = await browser.newPage({ viewport: { width, height: 900 } });
+		await page.goto(`${BASE}/styling.html`, { waitUntil: "load" });
+		for (const id of ["audit", "audit-fixed", "narrow-audit", "narrow-percentiles"]) {
+			await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+		}
+		for (const id of ["audit", "audit-fixed", "narrow-audit"]) {
+			await page.locator(`#${id} .tb-output [data-kind="table"]`).waitFor({ timeout: 15_000 });
+		}
+		await page.locator("#narrow-percentiles .tb-output [data-kind='table']").waitFor({ timeout: 15_000 });
+		return page;
+	};
+
+	/**
+	 * A computed length, to a hundredth of a pixel. Firefox stores font sizes in 1/64 px, so 1.35rem
+	 * computes to 21.5938px there and 21.6px elsewhere: an exact string compare fails one engine for
+	 * nothing.
+	 */
+	const assertPx = (value: string, px: number) => assert.ok(Math.abs(Number.parseFloat(value) - px) < 0.01, `expected ${px}px, got ${value}`);
+
+	/** Computed style of the first match inside one host's shadow root, with an optional pseudo-element. */
+	const style = (page: Page, host: string, selector: string, prop: string, pseudo?: string) =>
+		page.evaluate(
+			({ host, selector, prop, pseudo }) => {
+				const node = document.getElementById(host)?.shadowRoot?.querySelector(selector);
+				if (!node) return `no ${selector} in #${host}`;
+				return getComputedStyle(node, pseudo ?? null).getPropertyValue(prop);
+			},
+			{ host, selector, prop, ...(pseudo ? { pseudo } : {}) },
+		);
+
+	it("names every part by kind, a part or a field by role, and every named column's cells", async () => {
+		const page = await open();
+		const names = await page.evaluate(() => {
+			const root = document.getElementById("audit")?.shadowRoot as ShadowRoot;
+			const group = root.querySelector(".tb-output > [data-kind]") as Element;
+			const firstRow = [...root.querySelectorAll("tbody tr:first-child td")];
+			return {
+				group: group.getAttribute("data-kind"),
+				parts: [...group.children].map((part) => [part.getAttribute("data-kind"), part.getAttribute("data-role")]),
+				verdictField: root.querySelectorAll('.tb-field[data-role="verdict"]').length,
+				labels: firstRow.map((td) => td.getAttribute("data-label")),
+				// Grouped fields carry the same class as ungrouped ones, so one selector reaches both.
+				groupedFieldLists: root.querySelectorAll(".tb-field-group dl.tb-fields").length,
+			};
+		});
+		assert.equal(names.group, "group");
+		assert.deepEqual(names.parts, [
+			["fields", null],
+			["fields", "stats"],
+			["table", null],
+			["fields", "stats"],
+		]);
+		assert.equal(names.verdictField, 1, "the verdict is one field, named on the field");
+		// The first column has no label, so its cells carry none: an empty attribute would draw an empty line.
+		assert.deepEqual(names.labels, [null, "Type", "Accepts", "Risk", "Bytes", "Checked by"]);
+		assert.equal(names.groupedFieldLists, 1);
+		await page.close();
+	});
+
+	it("names the parts of a closed card's seeded preview too", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		await page.locator('tool-host[tool="percentiles"][mode="card"][data-seed] .tb-facade').first().waitFor();
+		const kinds = await page.evaluate(() => {
+			// The seeded one: the gallery also draws an unseeded card per tool, which has no result to name.
+			const card = document.querySelector('tool-host[tool="percentiles"][mode="card"][data-seed]');
+			return [...(card?.shadowRoot?.querySelectorAll(".tb-facade [data-kind]") ?? [])].map((n) => n.getAttribute("data-kind"));
+		});
+		assert.ok(kinds.includes("fields"), `the facade's seed must carry data-kind, got ${JSON.stringify(kinds)}`);
+		await page.close();
+	});
+
+	it("draws the verdict sheet: one field, large, in its tone", async () => {
+		const page = await open();
+		assertPx(await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "font-size"), 21.6);
+		assert.equal(await style(page, "audit", '.tb-field[data-role="verdict"]', "display"), "block");
+		// The field that is not the verdict keeps the runtime's size.
+		assertPx(await style(page, "audit", '.tb-field:not([data-role]) .tb-value', "font-size"), 13.6);
+		assert.equal(await style(page, "audit", '.tb-field[data-role="verdict"]', "border-top-color"), await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "color"), "a bad verdict is bordered in its own tone");
+		assert.equal(await style(page, "audit-fixed", '.tb-field[data-role="verdict"]', "border-top-color"), await style(page, "audit-fixed", '.tb-field[data-role="verdict"] .tb-value', "color"), "and so is a good one");
+		await page.close();
+	});
+
+	it("draws the stats sheet as tiles, label above value, grouped or not", async () => {
+		const page = await open();
+		const tiles = await page.evaluate(() => {
+			const root = document.getElementById("audit")?.shadowRoot as ShadowRoot;
+			return [...root.querySelectorAll('[data-role="stats"] .tb-fields')].map((list) => {
+				const tile = list.querySelector(".tb-field") as Element;
+				const dt = (tile.querySelector("dt") as Element).getBoundingClientRect();
+				const dd = (tile.querySelector("dd") as Element).getBoundingClientRect();
+				return {
+					columns: getComputedStyle(list).gridTemplateColumns.split(" ").length,
+					tileColumns: getComputedStyle(tile).gridTemplateColumns.split(" ").length,
+					stacked: dt.bottom <= dd.top,
+					value: getComputedStyle(tile.querySelector(".tb-value") as Element).fontSize,
+				};
+			});
+		});
+		assert.equal(tiles.length, 2, "the ungrouped stats part and the grouped one");
+		for (const tile of tiles) {
+			assert.ok(tile.columns >= 2, `the tiles sit side by side, got ${tile.columns} column(s)`);
+			assert.equal(tile.tileColumns, 1, "each tile is one column");
+			assert.ok(tile.stacked, "the label sits above the value");
+			assertPx(tile.value, 24);
+		}
+		await page.close();
+	});
+
+	it("draws the bordered sheet, and the default sheet colours good and muted cells", async () => {
+		const page = await open();
+		assert.equal(await style(page, "audit", "td", "border-left-width"), "1px");
+		assert.equal(await style(page, "audit", "td", "border-left-style"), "solid");
+		// Both read --tb-good and --tb-faint, so they must match a good field value and a note respectively.
+		assert.equal(await style(page, "audit", 'td[data-tone="good"]', "color"), await style(page, "audit-fixed", '.tb-field[data-tone="good"] .tb-value', "color"));
+		assert.equal(await style(page, "audit", 'td[data-tone="muted"]', "color"), await style(page, "audit", ".tb-note", "color"));
+		assert.notEqual(await style(page, "audit", 'td[data-tone="muted"]', "color"), await style(page, "audit", 'td[data-tone="normal"]', "color"));
+		await page.close();
+	});
+
+	it("stacks table rows in a narrow tool, with the natural selector beating the runtime's", async () => {
+		const page = await open();
+		assert.equal(await style(page, "narrow-audit", "thead", "display"), "none");
+		assert.equal(await style(page, "audit", "thead", "display"), "table-header-group", "a wide tool keeps its header");
+		/*
+		 * The runtime sets `td[data-align="end"] { text-align: end }`, more specific than the host's
+		 * `.tb-out-table td`. Only the runtime's layer lets the host win here, so this is the layer's test.
+		 */
+		assert.equal(await style(page, "narrow-audit", 'td[data-align="end"]', "text-align"), "start");
+		assert.equal(await style(page, "narrow-audit", 'td[data-label="Bytes"]', "content", "::before"), '"Bytes"');
+		assert.equal(await style(page, "narrow-percentiles", 'td[data-label="Linear"]', "content", "::before"), '"Linear"');
+		await page.close();
+	});
+
+	it("gives shared sheets to every tool and a tool's own sheets to that tool only", async () => {
+		const page = await open();
+		const counts = await page.evaluate(() =>
+			Object.fromEntries(["audit", "narrow-percentiles"].map((id) => [id, document.getElementById(id)?.shadowRoot?.adoptedStyleSheets.length])),
+		);
+		// The runtime's sheet, then the two shared ones; the fixture also gets its two of its own.
+		assert.deepEqual(counts, { audit: 5, "narrow-percentiles": 3 });
+		await page.close();
+	});
+
+	it("replaces the host's sheets everywhere with setHostStyles, and puts them back", async () => {
+		const page = await open();
+		await page.click("#toggle-styles");
+		assertPx(await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "font-size"), 13.6);
+		assert.equal(await style(page, "narrow-audit", "thead", "display"), "table-header-group");
+		const off = await page.evaluate(() => document.getElementById("audit")?.shadowRoot?.adoptedStyleSheets.length);
+		assert.equal(off, 1, "only the runtime's sheet is left");
+		await page.click("#toggle-styles");
+		assertPx(await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "font-size"), 21.6);
+		await page.close();
+	});
+
+	it("keeps a wide table inside a 390px tool rather than clipping the tool (#154)", async () => {
+		const page = await open(390);
+		// Without the host sheets, so the table is a real table again and wider than the phone.
+		await page.click("#toggle-styles");
+		const box = await page.evaluate(() => {
+			const root = document.getElementById("narrow-audit")?.shadowRoot as ShadowRoot;
+			const frame = root.querySelector(".tb") as HTMLElement;
+			const scroller = root.querySelector(".tb-out-table") as HTMLElement;
+			return { frame: frame.clientWidth, frameScroll: frame.scrollWidth, table: scroller.clientWidth, tableScroll: scroller.scrollWidth };
+		});
+		assert.ok(box.tableScroll > box.table, `the table is wider than its box and scrolls in it: ${JSON.stringify(box)}`);
+		assert.ok(box.table <= box.frame, `and the box fits the tool: ${JSON.stringify(box)}`);
+		assert.equal(box.frameScroll, box.frame, `nothing pushes the tool wider than itself: ${JSON.stringify(box)}`);
 		await page.close();
 	});
 });

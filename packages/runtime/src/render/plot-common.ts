@@ -10,6 +10,8 @@
  * drawn into a shadow root adopts them there. The series colour TOKENS stay in the runtime's sheet,
  * because a host themes with them before any chart exists.
  */
+import { adopt } from "../styles.ts";
+
 export const CHART_STYLES = /* css */ `
 /* ── chart ────────────────────────────────────────────────────────────────────────────────── */
 .tb-out-chart { margin: 0; }
@@ -128,7 +130,9 @@ export function adoptChartStyles(node: Node): void {
 const sheets = new Map<string, CSSStyleSheet>();
 
 /** Adopt a named sheet into the shadow root `node` is drawn into, once per root. See `adoptChartStyles`. */
-export function adoptStyles(node: Node, name: string, css: () => string): void {
+export function adoptStyles(node: Node, name: string, rules: () => string): void {
+	// In the runtime's layer, like its main sheet, so a host's unlayered rule beats a chart's too.
+	const css = () => `@layer toolbench{${rules()}}`;
 	queueMicrotask(() => {
 		const root = node.getRootNode();
 		if (!(root instanceof ShadowRoot)) return;
@@ -140,7 +144,8 @@ export function adoptStyles(node: Node, name: string, css: () => string): void {
 					sheet.replaceSync(css());
 					sheets.set(name, sheet);
 				}
-				if (!root.adoptedStyleSheets.includes(sheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+				// After the runtime's own sheet and before any host sheet, so a host rule still wins. See `adopt`.
+				adopt(root, sheet);
 				return;
 			} catch {
 				// Fall through, as the runtime's own sheet does.

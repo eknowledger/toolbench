@@ -161,6 +161,7 @@ export default defineConfig({
 				article: resolve(import.meta.dirname, "article.html"),
 				failure: resolve(import.meta.dirname, "failure.html"),
 				charts: resolve(import.meta.dirname, "charts.html"),
+				styling: resolve(import.meta.dirname, "styling.html"),
 			},
 		},
 	},
