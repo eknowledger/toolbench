@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Toolbench: graphs</title>
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><style>path{stroke:%231a1c22;fill:none}.run{stroke:none;fill:%238a5a00}@media(prefers-color-scheme:dark){path{stroke:%23e7e9ee}.run{fill:%23f0b040}}</style><path d='M9.5 5H6a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h3.5M22.5 5H26a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2h-3.5' stroke-width='2.4' stroke-linecap='round'/><path class='run' d='M13 10.5l8 5.5-8 5.5z'/></svg>" />
+	<link rel="stylesheet" href="/src/bench.css" />
+</head>
+<body>
+	<div class="wrap">
+		<header class="top">
+			<h1>Graphs</h1>
+			<nav class="modes">
+				<a href="./index.html">card</a>
+				<a href="./tool.html?id=percentiles">page</a>
+				<a href="./article.html">in an article</a>
+				<a href="./charts.html">charts</a>
+				<a href="./graphs.html" aria-current="page">graphs</a>
+			</nav>
+		</header>
+		<p class="lead">
+			The graph families the layout is held to, each one case of the bench fixture
+			<code>graph-families</code>, so every figure is a real <code>graph</code> result drawn by the
+			runtime. Point at a node to see its edges, or tab to a picture and follow the edges with the arrow
+			keys. Every picture also lists its edges as a table.
+		</p>
+
+		<div id="gallery"></div>
+
+		<p class="footnote">
+			The graphs are the layout's test data, in <code>packages/runtime/test/graph/families.ts</code>: the
+			Node tests hold every one to no overlaps, a ceiling on crossings, centred ports and 50 ms.
+		</p>
+	</div>
+	<script type="module" src="/src/graphs.ts"></script>
+</body>
+</html>

@@ -34,7 +34,7 @@ import { el } from "../dom.ts";
  * The kinds drawn by code of their own, fetched only when one is drawn: the series chart, the heatmap and
  * the pie (#121, #123), each its own chunk, so a page pays for the kinds it draws and no others.
  */
-export const LAZY_KINDS = ["series", "heatmap", "pie", "radar", "treemap", "venn"] as const;
+export const LAZY_KINDS = ["series", "heatmap", "pie", "radar", "treemap", "venn", "graph"] as const;
 export type LazyKind = (typeof LAZY_KINDS)[number];
 
 type Drawer = (output: Output, options: RenderOptions) => HTMLElement;
@@ -64,14 +64,25 @@ const loaders: Record<LazyKind, () => Promise<Drawer>> = {
 		const { renderVenn } = await import("./venn.ts");
 		return (output, options) => renderVenn((output as Extract<Output, { kind: "venn" }>).venn, options);
 	},
+	graph: async () => {
+		const { renderGraph } = await import("../graph/graph.ts");
+		return (output, options) => renderGraph((output as Extract<Output, { kind: "graph" }>).graph, options);
+	},
 };
 
 export class ChartRendererMissing extends Error {
 	readonly kind: LazyKind;
-	constructor(kind: LazyKind = "series") {
+	/**
+	 * What fetches the missing code. The renderer by default; a renderer with chunks of its own (the graph
+	 * kind's placements, shapes and search) passes the one it found missing, and the host loads and redraws
+	 * the same way.
+	 */
+	readonly load: () => Promise<void>;
+	constructor(kind: LazyKind = "series", load?: () => Promise<void>) {
 		super(`the ${kind} renderer has not loaded yet`);
 		this.name = "ChartRendererMissing";
 		this.kind = kind;
+		this.load = load ?? (() => loadRenderers([kind]));
 	}
 }
 
@@ -92,6 +103,16 @@ export async function loadRenderers(kinds: readonly string[]): Promise<void> {
 }
 
 export const loadChartRenderer = (): Promise<void> => loadRenderers(["series"]);
+
+/**
+ * Everything `output` needs to be drawn without a miss: its kinds' renderers, and for a graph the chunks that
+ * graph needs. What a host awaits before painting a seed, which has no chance to load and draw again.
+ */
+export async function prepareOutput(output: Output): Promise<void> {
+	const parts = output.kind === "group" ? output.parts : [output];
+	await loadRenderers(parts.map((part) => part.kind));
+	await Promise.all(parts.map(async (part) => (part.kind === "group" ? prepareOutput(part) : part.kind === "graph" ? (await import("../graph/graph.ts")).prepareGraph(part.graph) : undefined)));
+}
 
 /** Whether a `series` can be drawn right now, without loading anything. */
 export function chartRendererReady(): boolean {
@@ -197,6 +218,7 @@ function draw(output: Output, options: RenderOptions): HTMLElement {
 		case "radar":
 		case "treemap":
 		case "venn":
+		case "graph":
 			return lazy(output.kind, output, options);
 		case "group": {
 			/*

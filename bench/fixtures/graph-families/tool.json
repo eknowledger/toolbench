@@ -1,0 +1,63 @@
+{
+	"sdk": 7,
+	"id": "graph-families",
+	"name": "Graph families",
+	"blurb": "Draws each graph family the layout is held to, so the runtime's answer to each is on screen.",
+	"version": "1.0.0",
+	"capabilities": [
+		"pure"
+	],
+	"runtime": {
+		"entry": "index.ts",
+		"thread": "main"
+	},
+	"autoRun": true,
+	"card": "live",
+	"kinds": [
+		"graph",
+		"error"
+	],
+	"tags": [
+		"bench"
+	],
+	"inputs": [
+		{
+			"id": "case",
+			"type": "select",
+			"label": "Graph",
+			"description": "One family each, the graphs the layout's tests hold it to.",
+			"primary": true,
+			"default": "state-orthogonal",
+			"options": [
+				{
+					"value": "state-orthogonal",
+					"label": "State machine, orthogonal"
+				},
+				{
+					"value": "deps-orthogonal",
+					"label": "Dependency DAG, orthogonal"
+				},
+				{
+					"value": "calls-orthogonal",
+					"label": "Dense call graph, orthogonal"
+				},
+				{
+					"value": "bipartite",
+					"label": "Bipartite"
+				},
+				{
+					"value": "dangling",
+					"label": "A dangling edge, refused"
+				},
+				{
+					"value": "limits",
+					"label": "Past the tool's own limits"
+				},
+				{
+					"value": "injected",
+					"label": "An unknown colour, drawn in the default"
+				}
+			]
+		}
+	]
+}

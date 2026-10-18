@@ -60,6 +60,14 @@ jobs:
         # than an intention. See docs/versioning.md.
         run: pnpm test
 
+      - name: Graph layout at 250 and 500 nodes
+        # Out of `pnpm test` because these graphs took it from under a second to 25 (#152), and run here on
+        # every pull request because overlaps at these sizes are what the layout once got wrong. Floor leg only:
+        # the layout has no Node-version dependence a second run would find, and it is the slowest step. A
+        # failure fails this job, so the required "types and unit tests" context reports it.
+        if: matrix.floor
+        run: pnpm test:graph-scale
+
       - name: Node coverage (report only, no threshold)
         # Same suite as the step above, with V8 coverage. ⚠️ Do not add --test-coverage-lines,
         # --test-coverage-branches, or --test-coverage-functions: those flags fail the job on a

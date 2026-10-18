@@ -266,9 +266,44 @@ describe("the 5 -> 6 step", () => {
 		assert.deepEqual(step.output(output), output);
 	});
 
-	it("carries a v5 manifest to v6 with nothing changed but sdk", () => {
+	// The current version rather than 6: every later step is also the identity, and pinning 6 broke at 7.
+	it("carries a v5 manifest forward with nothing changed but sdk", () => {
 		const upgraded = upgradeManifest(v5);
-		assert.equal(upgraded.sdk, 6);
+		assert.equal(upgraded.sdk, SDK_VERSION);
 		assert.deepEqual({ ...upgraded, sdk: 5 }, v5);
+	});
+});
+
+/*
+ * 6 -> 7 (#152): the graph kind. A v6 manifest cannot name it and a v6 tool cannot return it, so both halves
+ * are the identity, and a v6 tool's output, written by hand as a v6 author would have, passes through unchanged.
+ */
+describe("the 6 -> 7 step", () => {
+	const v6 = {
+		sdk: 6,
+		id: "v6-presets",
+		name: "A v6 tool",
+		inputs: [{ id: "stack", type: "select", label: "Stack", default: "a", options: [{ value: "a", label: "A", sets: { timeout: 30 } }, { value: "b", label: "B" }] }],
+		kinds: ["fields", "table", "error"],
+	};
+	const step = MIGRATIONS.find((m) => m.from === 6);
+
+	it("exists, and both halves are the identity", () => {
+		assert.ok(step, "a step from 6");
+		assert.deepEqual(step.manifest(v6), v6);
+		const output: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "timeout", value: "30 s" }] }, { kind: "table", columns: [{ label: "try" }], rows: [["1"]] }] };
+		assert.deepEqual(step.output(output), output);
+		assert.deepEqual(upgradeOutput(output, 6), output);
+	});
+
+	it("carries a v6 manifest forward with nothing changed but sdk", () => {
+		const upgraded = upgradeManifest(v6);
+		assert.equal(upgraded.sdk, SDK_VERSION);
+		assert.deepEqual({ ...upgraded, sdk: 6 }, v6);
+	});
+
+	it("leaves a v7 graph alone", () => {
+		const graph: Output = { kind: "graph", graph: { label: "Two", nodes: [{ id: "a" }, { id: "b" }], edges: [{ from: "a", to: "b" }] } };
+		assert.deepEqual(upgradeOutput(graph, 7), graph);
 	});
 });

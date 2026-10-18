@@ -142,9 +142,11 @@ toolbench/
 │   │       ├── seed.ts             build-time seeding, and safe serialisation for a script tag
 │   │       ├── fixtures.ts         the tool-directory walk. Node-only, exported at ./fixtures
 │   │       ├── testing.ts          fixture runner and result comparison
+│   │       ├── graph.ts            graphProblem, the graph kind's structural rules
 │   │       ├── version.ts          SDK_VERSION, supported versions, changelog
 │   │       └── index.ts            public surface
 │   └── runtime/                    @toolbench/runtime   no dependencies, no framework
+│       ├── test/graph/             the graph families, seeded graphs and geometric checks the tests use
 │       └── src/
 │           ├── element.ts          <tool-host>: modes, form, states, accessibility
 │           ├── runner.ts           execution: sequencing, abort, timeout, progress
@@ -155,6 +157,7 @@ toolbench/
 │           ├── dom.ts              three element helpers, so no framework is needed
 │           ├── render/index.ts     renderer dispatch, fields, table, text, code, error, group
 │           ├── render/chart.ts     the series renderer, SVG plus a data table
+│           ├── graph/              the graph kind: layout, routing, drawing, and its chunks
 │           ├── register.ts         side-effecting entry for pages without a bundler
 │           └── index.ts            public surface
 ├── tools/
@@ -164,12 +167,14 @@ toolbench/
 │   ├── queue-explorer/             pure, worker, group of series and fields, plus convergence tests
 │   ├── utf8-bytes/                 pure, main thread, group of fields and bytes
 │   ├── regex-explainer/            pure, worker with a 2 s timeout, text and code
-│   └── histogram/                  pure, main thread, bare series, bar shape, no primary input
+│   ├── histogram/                  pure, main thread, bare series, bar shape, no primary input
+│   └── build-order/                pure, main thread, group of fields and a graph
 ├── bench/
 │   ├── index.html                  card mode, theming, lifecycle status
 │   ├── failure.html                the failing tool, off the landing page
 │   ├── tool.html                   page mode
 │   ├── article.html                embed mode, two tools in prose
+│   ├── graphs.html                 the eleven graph families, one figure each
 │   ├── failure.html                stress fixture, kept off the front page
 │   ├── bench.test.ts               the runtime driven by Chrome against the built bench
 │   ├── fixtures/stress/            a tool that misbehaves on purpose
@@ -221,6 +226,7 @@ export type Output = (
   | { kind: "series";   chart: Chart }
   | { kind: "heatmap";  heatmap: Heatmap }
   | { kind: "pie";      pie: Pie }
+  | { kind: "graph";    graph: Graph }          // contract v7: nodes and edges the runtime lays out
   | { kind: "group";    parts: Output[] }
   | { kind: "bytes";    bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
   | { kind: "error";    message: string; input?: string; at?: number; len?: number }
@@ -418,6 +424,46 @@ runtime. It renders a message saying the page needs a newer runtime, never a bla
 **`render/chart.ts`** draws SVG. It has no charting dependency, which is a deliberate trade: a library
 would be 40 to 200 KB and would decide how every tool looks. It also emits the chart's numbers as a
 `<table>` inside a `<details>`, because a chart is an image and a screen reader gets nothing from it.
+
+**`graph/`** is the `graph` kind (#152), and it is the one renderer that decides where things go rather
+than only drawing where the tool put them. Its base chunk, `graph/graph.ts` and what it imports, validates
+the graph against the SDK's `graphProblem`, lays it out and draws it, synchronously, as every renderer does.
+The layout is a pure function from the graph to plain coordinates and SVG path strings (`graph/model.ts`),
+with no DOM, which is what lets a worker run it and Node test it:
+
+1. **Place.** Layered placement in `layered.ts`: cycles broken in input order, ranks by longest path with
+   pinned ranks honoured, ranks doubled so a label gets a layer of its own, long edges as chains of dummies,
+   then barycentre and median sweeps with transposition for the order, and pool-adjacent-violators for the
+   coordinates.
+2. **Attach.** `ports.ts` puts each end on the side facing the other end, one end at the side's midpoint,
+   several packed symmetrically 16px apart in the order of what they reach, never at a corner, and a shape's
+   own outline limits a side: a diamond's left side has room only at its vertex.
+3. **Route.** `router.ts` finds each edge on a grid of pitch 8 between its two fixed ports, by A* with
+   libavoid's penalties: a crossing 1000, a bend 35, a segment running backwards 60. The grid makes "no
+   overlap" structural: a grid edge has one owner, a vertex a route turns at is that route's, and node
+   interiors, rings, labels, titles and every port's own lane are blocked to everyone else.
+4. **Repair and finish.** A route that could only be found by sharing goes to the repair chunk; then corners
+   are rounded and the drawing is made.
+
+Everything optional is a chunk of its own, fetched for the first graph that needs it (`graph/chunks.ts`):
+`graph-interact` for path highlighting, and `graph-repair`. A renderer that finds one missing throws `ChartRendererMissing` carrying the
+load, and the element fetches it and draws again, the pattern the chart kinds use. Whether the repair is
+needed is only known after the base layout, so the layout itself asks for it and the drawing starts again with
+it.
+
+⚠️ **Determinism is a property of the code, not of the engine.** `Math.sin`, `Math.cos`, `Math.atan2`,
+`Math.hypot` and `**` are not correctly rounded, so engines differ in the last bit, and a layout is a long
+chain of comparisons in which a last bit decides an order. The layout uses only `+ - * /` and `Math.sqrt`,
+which IEEE 754 fixes: an ellipse by its rational parametrisation rather than by sine and cosine. Every budget that bounds a search is counted in A*
+states, never in milliseconds, so a slow machine draws the same picture as a fast one. A browser test compares
+every family's drawing with the layout Node computes.
+
+**Accessibility is the drawing's, not a later pass.** The picture is one tab stop, a `role="group"` with
+the graph's summary as its name; the arrow along the flow follows the selected edge out of the focused
+node, the arrow against it goes back, the arrows across choose among the outgoing edges, and a live region
+says where focus is and what is selected. Every edge is a row of a table in a `<details>`, and a node with
+no edges a row saying so. A redraw under the reader, when a group is opened or closed, puts focus back on
+the new picture, so it never falls to the shadow root.
 
 **`styles.ts`** is one template string adopted into every shadow root via `adoptedStyleSheets`, so one
 parsed stylesheet serves every instance on the page. All of it, and every chart sheet, is inside
@@ -794,16 +840,17 @@ numbers, and the report says which files it never loaded for that reason.
 
 ## 12. Testing strategy
 
-Six layers. Each catches something the others structurally cannot.
+Seven layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 127 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 11 |
-| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 21 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 145 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the families the base draws and on seeded layered graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family, and the same layout twice | 32 |
+| `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 156 |
+| `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 2 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 162 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -858,6 +905,10 @@ production build:
 * theming through custom properties, and a host's own sheets: kept after the runtime's in every root,
   winning over it through the runtime's layer, replaced everywhere by `setHostStyles`, and each of
   STYLING.md's four examples producing the computed style it exists for;
+* every graph family drawn through the element is the drawing Node lays out, in all three engines; every part carries `data-kind` and its `data-role`; the edge table
+  is a closed `<details>` with a row per edge and one for a node with none; the arrow keys follow the edges
+  and the live region says so, with focus on the picture rather than the shadow root; and a plain layered
+  graph fetches the graph's base chunk and nothing else of it;
 * the suite refuses to start when its port is already serving, so it cannot test another build;
 * a host `highlight` hook replaces the `code` text node with the returned Node, and omitting it keeps
   readable plain text.
@@ -874,10 +925,11 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 25.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), and 0.1 KB with the link and code-class checks (132 bytes) |
+| Runtime plus the bench's own wiring | 26.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, and 462 for the build-order manifest the bench inlines) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.0 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook. 956 bytes |
-| Worker entry | 4.3 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 4.7 KB | Only on pages with a worker-mode tool, and only after activation |
+| Graph kind, base chunk | 17.4 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Two chunks beside it, path highlighting (0.7 KB) and the repair of a route that had to share (0.9 KB), are fetched by the first graph that needs one. Each has its own line in `size-check.mjs` |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |
@@ -974,6 +1026,7 @@ is here because the guards look arbitrary without it.
 | One undo took back one character in Chrome | Once a result was on screen, every keystroke re-sent "inputs changed" to the status line, and assigning `textContent` replaces the text node even when the text is the same. Chrome ends an undo group at a node insertion anywhere in the document, so typing `abc def` and a newline into a textarea took 7 presses of undo to take back instead of 1. Firefox and WebKit grouped it as one either way. Found while measuring the textarea highlighting overlay, which has the same hazard | The status line is written only when its text changes. Browser test types a burst after a run and asserts one undo restores it, on all three engines; it fails without the guard |
 | A manifest link could run script in the host page | The validator checked only that `links[].href` was a string, and the element wrote it straight into `<a href>`. A manifest from any `ToolSource` carrying `javascript:alert(document.cookie)` rendered a link that ran in the host's origin when a reader followed it. A check matching the scheme as text was no fix: the URL parser strips tab and newline anywhere and leading controls and space, so `java\tscript:` reads as a relative path to a pattern and as `javascript:` to the browser | `isSafeLinkHref` in the SDK refuses control characters and spaces, then asks `URL` for the protocol and allows only `http:`, `https:` and `mailto:`. The validator refuses anything else by field, and the element renders a refused link as its label in plain text, for a source that never validated. Node tests cover each bypass |
 | A code result could add any class to its element | `lang` became `class="language-<lang>"` verbatim, and a class attribute is a list, so `json tb-hidden` wrote a class the tool chose, which a host's or the runtime's stylesheet then applied | `languageClass` writes the class only for one token of word characters, `+`, `#`, `.` and `-`. A Node test covers spaces, tabs and newlines |
+| A graph's colour was written into an inline style | A node or edge `color` became `style="--c:var(--tb-<color>)"`. The union is closed only to TypeScript, so a tool could send `x);background:url(https://example.com/?leak)`, and the element carried a background rule fetched from another origin | A colour is a `data-color` attribute, written only for a value on `GRAPH_COLORS`, and the graph's stylesheet maps each to `--c`; an unknown one is drawn in the default colour. `graphProblem` refuses it in fixtures. A browser test renders the string and asserts no style carries it, the stroke is the default and no request leaves for that origin |
 
 ## 15. Limitations
 
@@ -1108,7 +1161,7 @@ declaration, so browsers without that function get the light palette rather than
 | `--tb-accent-text` | `--tb-accent` | Accent-coloured text: links, the card's hint, a hovered sample, annotation labels. Set it when the accent is too bright to be text on your surface |
 | `--tb-accent-ink` | `--tb-bg` | Text on an accent fill: the Run button's label, a marked byte. Set it dark when the accent is bright |
 | `--tb-bad`, `--tb-warn`, `--tb-good` | `#a3242c`, `#8a5a00`, `#1c6b3c` | Result tones and errors |
-| `--tb-s1` to `--tb-s6` | see `styles.ts` | Chart series |
+| `--tb-s1` to `--tb-s8` | see `styles.ts` | Chart series use the first six; a graph's `color` can name all eight |
 | `--tb-radius` | `10px` | Corner radius |
 | `--tb-font`, `--tb-mono` | system stacks | Type |
 | `--tb-gap` | `0.75rem` | Vertical rhythm inside the tool |
@@ -1121,6 +1174,8 @@ declaration, so browsers without that function get the light palette rather than
 | Export | Kind |
 |---|---|
 | `Tool`, `Ctx`, `Output`, `PartNames`, `Field`, `Column`, `Cell`, `ByteRange`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `TextTone`, `Capability`, `OutputKind`, `InputType` | types |
+| `Graph`, `GraphNode`, `GraphEdge`, `GraphGroup`, `GraphLane`, `GraphRow`, `GraphShape`, `GraphSide`, `GraphMarker`, `GraphColor` | types, contract v7 |
+| `graphProblem` | why a graph cannot be drawn, or undefined: the structural rules the fixture runner and the runtime share |
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `isSafeLinkHref` | whether a link target may be offered to a reader |

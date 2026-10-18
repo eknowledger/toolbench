@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v6-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-25.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-26.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -150,6 +150,20 @@ same data as a table inside a `<details>`, automatically. The tool author does n
 <tr>
 <td width="50%"><img src="assets/screenshots/chart-light.png" alt="A line chart with two axes, a legend and an annotation, above a disclosure showing the same data as a table"></td>
 <td width="50%"><img src="assets/screenshots/chart-dark.png" alt="The same chart and data table in a dark theme"></td>
+</tr>
+</table>
+
+### A graph is laid out for you
+
+A `graph` result says what is connected, and the runtime decides where everything goes: ranks, ports
+centred on the side facing the other end, orthogonal edges that never share a stretch of line, labels clear
+of everything. The same graph gives the same picture in Chrome, Firefox, WebKit and Node. Every edge is also
+in a table under the picture, and the picture can be walked with the arrow keys.
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/graph-light.png" alt="The build-order tool: fields giving the build order, the number of rounds and the longest chain, above a dependency graph drawn bottom to top with each package's round as a badge and the longest chain highlighted"></td>
+<td width="50%"><img src="assets/screenshots/graph-dark.png" alt="The same build-order result in a dark theme"></td>
 </tr>
 </table>
 
@@ -483,6 +497,7 @@ tool cannot invent something nobody can render.
 | `fields` | Label and value pairs, optionally grouped under headings |
 | `table` | Columns and rows, with alignment and per-cell emphasis |
 | `series` | A chart with axes, legend and annotations. Ships the same numbers as a table for readers who cannot see it |
+| `graph` | Nodes and edges the runtime lays out: flowcharts, state machines, dependency graphs, call graphs. Every edge is also listed in a table, and the picture follows the arrow keys |
 | `text` | Prose or preformatted output |
 | `code` | Source, with a language tag. The runtime renders preformatted text. A host that already has a highlighter passes `highlight?: (source, lang) => Node` to `defineToolHost` |
 | `bytes` | Raw bytes as a reader of a wire format wants them: offsets, hex, a printable gutter, and named ranges that can wrap a row |
@@ -580,12 +595,14 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.5 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.3 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 26.5 KB |
+| Worker entry, only for pages with a worker-mode tool | 4.7 KB |
+| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.4 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |
 | `histogram` tool chunk | 0.8 KB |
+| `build-order` tool chunk | 1.2 KB |
 | A page with no tool on it | 0 bytes |
 | A card nobody opens | 0 bytes of tool code |
 

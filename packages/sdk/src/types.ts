@@ -256,6 +256,185 @@ export interface Venn {
 }
 
 /**
+ * A colour for a node, edge or group: a tone, or one of the eight series colours, always a theme token and
+ * never a raw value, so dark mode and a host's theme keep working. Contract version 7.
+ */
+export type GraphColor = Tone | "accent" | "muted" | "series-1" | "series-2" | "series-3" | "series-4" | "series-5" | "series-6" | "series-7" | "series-8";
+
+/**
+ * Every `GraphColor`, as data: the union is closed only to TypeScript, so the runtime and the fixture runner
+ * check a value against this list. The first four are the tones.
+ */
+export const GRAPH_COLORS: readonly GraphColor[] = ["normal", "warn", "bad", "good", "accent", "muted", "series-1", "series-2", "series-3", "series-4", "series-5", "series-6", "series-7", "series-8"];
+
+/**
+ * A node's outline. `rect`, `rounded`, `pill`, `circle`, `ellipse`, `diamond` and `point` are drawn by the
+ * graph renderer itself; `hexagon`, `parallelogram`, `cylinder` and `document` by a chunk fetched for the
+ * first graph that uses one; `record` draws `rows`. Contract version 7.
+ */
+export type GraphShape = "rect" | "rounded" | "pill" | "circle" | "ellipse" | "diamond" | "hexagon" | "parallelogram" | "cylinder" | "document" | "record" | "point";
+
+export type GraphSide = "left" | "right" | "top" | "bottom";
+
+/**
+ * What an edge end looks like. `arrow` and `open` for direction; `diamond`, `circle` and `bar` for UML;
+ * the crow's-foot cardinalities `one` to `zero-or-many` for entity-relationship diagrams. Contract version 7.
+ */
+export type GraphMarker =
+	| "none"
+	| "arrow"
+	| "open"
+	| "diamond"
+	| "open-diamond"
+	| "circle"
+	| "open-circle"
+	| "bar"
+	| "one"
+	| "only-one"
+	| "zero-or-one"
+	| "many"
+	| "one-or-many"
+	| "zero-or-many";
+
+/** One row of a `record` node: a column of a table, with a port of its own an edge can name. */
+export type GraphRow = {
+	/** Unique within the node; what `fromPort` and `toPort` name. */
+	id: string;
+	label: string;
+	/** Right-aligned and muted: a column type, a value. */
+	detail?: string;
+	/** A short tag before the label, such as PK or FK. */
+	tag?: string;
+};
+
+export type GraphNode = {
+	/** Unique within the graph. What edges, `highlight` and the edge table name. */
+	id: string;
+	/** Default: the id. */
+	label?: string;
+	/** A second, muted line under the label. */
+	note?: string;
+	/** Default `rounded`. */
+	shape?: GraphShape;
+	/** Status: the border and tint of the tone. Wins over `color`. */
+	tone?: Tone;
+	/** Category: a series colour or a named token. */
+	color?: GraphColor;
+	/** A few characters over the top-right corner: a count, a version. */
+	badge?: string;
+	/** The rows of a `record` node. */
+	rows?: GraphRow[];
+	/** The innermost group this node belongs to. Groups nest through `parent`. */
+	group?: string;
+	/** Layered layouts only: the swimlane. */
+	lane?: string;
+	/** Layered layouts only: pin this node to a rank, 0 being the first. */
+	rank?: number;
+	/** `manual` layout: the centre. `force` layout: pins the node here. */
+	x?: number;
+	y?: number;
+	/** Rendered as `data-role`, for host stylesheets. The runtime gives it no meaning. */
+	role?: string;
+};
+
+export type GraphEdge = {
+	from: string;
+	to: string;
+	/** A row id on a `record` node: the edge attaches at that row. */
+	fromPort?: string;
+	toPort?: string;
+	/** The side of the node the edge must use. Default: the side facing the other end. */
+	fromSide?: GraphSide;
+	toSide?: GraphSide;
+	label?: string;
+	/** Where along the edge the label sits. Default `middle`. */
+	labelAt?: "start" | "middle" | "end";
+	/** Default `solid`. */
+	line?: "solid" | "dashed" | "dotted";
+	/** Default `normal`. */
+	width?: "thin" | "normal" | "thick";
+	tone?: Tone;
+	color?: GraphColor;
+	/** At `to`. Default `arrow` when the graph is directed, else `none`. */
+	head?: GraphMarker;
+	/** At `from`. Default `none`. */
+	tail?: GraphMarker;
+	role?: string;
+};
+
+export type GraphGroup = {
+	id: string;
+	label: string;
+	/** The enclosing group. Groups nest to any depth; a cycle of parents is refused. */
+	parent?: string;
+	/** Drawn as one node standing for its members until a reader opens it. Default false. */
+	collapsed?: boolean;
+	color?: GraphColor;
+	role?: string;
+};
+
+/** A swimlane: a straight band across a layered layout. A group may not span two. */
+export type GraphLane = { id: string; label: string; role?: string };
+
+/**
+ * Nodes and edges, laid out and drawn by the runtime (#152, contract version 7): flowcharts, state machines,
+ * dependency graphs, org charts, networks, entity-relationship diagrams.
+ *
+ * The tool says what is connected and the runtime decides where everything goes, deterministically: the same
+ * graph gives the same picture in every engine. Every edge is also listed in a table under the picture, and the
+ * picture can be walked with the keyboard, so the graph is never only a picture.
+ *
+ * Nothing here is a hard limit. Sizes, nesting depth and counts are the tool's decision; `limits` lets a tool
+ * say where its own graph stops being worth drawing.
+ */
+export type Graph = {
+	/** What the graph is: "Order lifecycle". The figure's accessible name. */
+	label: string;
+	/**
+	 * Default `layered`: ranks along `direction`, for anything with a flow. `tree` and `radial` for a
+	 * hierarchy, `force` for a network with no direction, `manual` to place every node at its `x` and `y`.
+	 */
+	layout?: "layered" | "tree" | "radial" | "force" | "manual";
+	/** Default `LR` for layered, `TB` for tree. */
+	direction?: "LR" | "RL" | "TB" | "BT";
+	/**
+	 * Default `orthogonal` for layered and tree, `straight` for force and manual, `spline` for radial. An edge
+	 * a straight line cannot draw without crossing a node is drawn as a polyline instead.
+	 */
+	routing?: "orthogonal" | "spline" | "straight" | "polyline";
+	/** Default true. */
+	directed?: boolean;
+	/**
+	 * Default `none`: no two edges ever share a stretch of line. `source` lets the edges leaving one node share
+	 * a trunk, the bus of an org chart; `target` the edges arriving at one.
+	 */
+	merge?: "none" | "source" | "target";
+	/** Force layout only. Default 1. The same seed gives the same picture everywhere. */
+	seed?: number;
+	/** Default `normal`. */
+	spacing?: "compact" | "normal" | "loose";
+	nodes: GraphNode[];
+	edges: GraphEdge[];
+	groups?: GraphGroup[];
+	lanes?: GraphLane[];
+	/** A path to emphasise, as node ids in order. */
+	highlight?: string[];
+	/**
+	 * The tool's own limits. Past either, the runtime shows the edge table and says why instead of drawing.
+	 * No default: without one, any size is drawn.
+	 */
+	limits?: { nodes?: number; edges?: number };
+	interaction?: {
+		/** Whether a reader can collapse and open groups. Default true. */
+		collapse?: boolean;
+		/** What pointing at or focusing a node emphasises. Default `neighbours`. */
+		focus?: "neighbours" | "none";
+		/** Whether picking two nodes highlights the shortest path between them. Default true. */
+		paths?: boolean;
+	};
+};
+
+/**
  * A run of bytes worth calling out inside a `bytes` output: a header field, a length prefix, the
  * region an error points at.
  *
@@ -328,6 +507,8 @@ type OutputBody =
 	| { kind: "treemap"; treemap: Treemap }
 	/** The overlap of two or three sets (#130, contract version 4). */
 	| { kind: "venn"; venn: Venn }
+	/** Nodes and edges, laid out by the runtime, with every edge also in a table (#152, contract version 7). */
+	| { kind: "graph"; graph: Graph }
 	| { kind: "group"; parts: Output[] }
 	/**
 	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
@@ -367,6 +548,7 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 	"radar",
 	"treemap",
 	"venn",
+	"graph",
 ];
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,363 @@
+[
+  {
+    "name": "the default eight packages: rounds, order and the longest chain worked out by hand",
+    "input": {
+      "deps": "app: api-client, ui-kit\nadmin: api-client, ui-kit, auth\napi-client: http, schema\nui-kit: icons\nauth: http\nhttp: core\nschema: core\nicons: core"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "fields",
+          "fields": [
+            {
+              "label": "Build order",
+              "value": "core, http, schema, icons, api-client, ui-kit, auth, app, admin",
+              "role": "verdict"
+            },
+            {
+              "label": "Rounds",
+              "value": "4",
+              "note": "up to 3 at once"
+            },
+            {
+              "label": "Longest chain",
+              "value": "core → http → api-client → app",
+              "note": "4 packages"
+            }
+          ]
+        },
+        {
+          "kind": "graph",
+          "graph": {
+            "label": "Package dependencies",
+            "direction": "BT",
+            "nodes": [
+              {
+                "id": "app",
+                "badge": "4"
+              },
+              {
+                "id": "admin",
+                "badge": "4"
+              },
+              {
+                "id": "api-client",
+                "badge": "3"
+              },
+              {
+                "id": "ui-kit",
+                "badge": "3"
+              },
+              {
+                "id": "auth",
+                "badge": "3"
+              },
+              {
+                "id": "http",
+                "badge": "2"
+              },
+              {
+                "id": "schema",
+                "badge": "2"
+              },
+              {
+                "id": "icons",
+                "badge": "2"
+              },
+              {
+                "id": "core",
+                "badge": "1"
+              }
+            ],
+            "edges": [
+              {
+                "from": "api-client",
+                "to": "app"
+              },
+              {
+                "from": "ui-kit",
+                "to": "app"
+              },
+              {
+                "from": "api-client",
+                "to": "admin"
+              },
+              {
+                "from": "ui-kit",
+                "to": "admin"
+              },
+              {
+                "from": "auth",
+                "to": "admin"
+              },
+              {
+                "from": "http",
+                "to": "api-client"
+              },
+              {
+                "from": "schema",
+                "to": "api-client"
+              },
+              {
+                "from": "icons",
+                "to": "ui-kit"
+              },
+              {
+                "from": "http",
+                "to": "auth"
+              },
+              {
+                "from": "core",
+                "to": "http"
+              },
+              {
+                "from": "core",
+                "to": "schema"
+              },
+              {
+                "from": "core",
+                "to": "icons"
+              }
+            ],
+            "highlight": [
+              "core",
+              "http",
+              "api-client",
+              "app"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "a diamond: two packages in round 2 share one dependency, and the chain takes the first",
+    "input": {
+      "deps": "app: left, right\nleft: base\nright: base"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "fields",
+          "fields": [
+            {
+              "label": "Build order",
+              "value": "base, left, right, app",
+              "role": "verdict"
+            },
+            {
+              "label": "Rounds",
+              "value": "3",
+              "note": "up to 2 at once"
+            },
+            {
+              "label": "Longest chain",
+              "value": "base → left → app",
+              "note": "3 packages"
+            }
+          ]
+        },
+        {
+          "kind": "graph",
+          "graph": {
+            "label": "Package dependencies",
+            "direction": "BT",
+            "nodes": [
+              {
+                "id": "app",
+                "badge": "3"
+              },
+              {
+                "id": "left",
+                "badge": "2"
+              },
+              {
+                "id": "right",
+                "badge": "2"
+              },
+              {
+                "id": "base",
+                "badge": "1"
+              }
+            ],
+            "edges": [
+              {
+                "from": "left",
+                "to": "app"
+              },
+              {
+                "from": "right",
+                "to": "app"
+              },
+              {
+                "from": "base",
+                "to": "left"
+              },
+              {
+                "from": "base",
+                "to": "right"
+              }
+            ],
+            "highlight": [
+              "base",
+              "left",
+              "app"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "a cycle has no build order: the fields say so and the graph marks the cycle along its arrows",
+    "input": {
+      "deps": "a: b\nb: c\nc: a"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "fields",
+          "fields": [
+            {
+              "label": "Build order",
+              "value": "none",
+              "note": "a cycle",
+              "tone": "bad",
+              "role": "verdict"
+            },
+            {
+              "label": "Cycle",
+              "value": "a → b → c → a"
+            }
+          ]
+        },
+        {
+          "kind": "graph",
+          "graph": {
+            "label": "Package dependencies",
+            "direction": "BT",
+            "nodes": [
+              {
+                "id": "a"
+              },
+              {
+                "id": "b"
+              },
+              {
+                "id": "c"
+              }
+            ],
+            "edges": [
+              {
+                "from": "b",
+                "to": "a"
+              },
+              {
+                "from": "c",
+                "to": "b"
+              },
+              {
+                "from": "a",
+                "to": "c"
+              }
+            ],
+            "highlight": [
+              "a",
+              "c",
+              "b",
+              "a"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "a single package with no dependencies builds alone in one round",
+    "input": {
+      "deps": "solo"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "fields",
+          "fields": [
+            {
+              "label": "Build order",
+              "value": "solo",
+              "role": "verdict"
+            },
+            {
+              "label": "Rounds",
+              "value": "1",
+              "note": "up to 1 at once"
+            },
+            {
+              "label": "Longest chain",
+              "value": "solo",
+              "note": "1 package"
+            }
+          ]
+        },
+        {
+          "kind": "graph",
+          "graph": {
+            "label": "Package dependencies",
+            "direction": "BT",
+            "nodes": [
+              {
+                "id": "solo",
+                "badge": "1"
+              }
+            ],
+            "edges": [],
+            "highlight": [
+              "solo"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "a dependency with a space in it is refused, pointing at the name",
+    "input": {
+      "deps": "app: api client"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "\"api client\" is not a package name.",
+      "input": "deps",
+      "at": 5,
+      "len": 10
+    }
+  },
+  {
+    "name": "a package that depends on itself is refused, pointing at the second mention",
+    "input": {
+      "deps": "a: a"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "\"a\" depends on itself.",
+      "input": "deps",
+      "at": 3,
+      "len": 1
+    }
+  },
+  {
+    "name": "nothing but blank lines is no packages",
+    "input": {
+      "deps": "\n\n"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "No packages. Write one per line, as name: dependency, dependency.",
+      "input": "deps"
+    }
+  }
+]

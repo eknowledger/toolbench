@@ -17,6 +17,7 @@ Writing, testing and shipping a tool, start to finish. Read
 7. [Long-running tools](#7-long-running-tools)
 8. [Fixtures](#8-fixtures)
 9. [Charts](#9-charts)
+   - [9b. Graphs](#9b-graphs)
 10. [Help text](#10-help-text)
 11. [Checklist](#11-checklist)
 12. [Common mistakes](#12-common-mistakes)
@@ -838,6 +839,47 @@ Three more kinds, each its own output and its own chunk, from contract version 4
 * **Venn:** two or three sets. Two are drawn exactly. Three cannot in general be drawn exactly with
   circles, so every region carries its count and the caption says the areas are approximate. Give each
   overlap as the full intersection: `[0, 1]` includes what is also in set 2.
+
+## 9b. Graphs
+
+Contract version 7 (`"sdk": 7`) adds `graph`: you say what is connected, and the runtime decides where
+everything goes. `tools/build-order` is the example.
+
+```ts
+{ kind: "graph", graph: {
+    label: "Package dependencies",          // the figure's name, and the table's caption
+    direction: "BT",                        // LR (default), RL, TB or BT
+    nodes: [{ id: "core", badge: "1" }, { id: "http", badge: "2" }, { id: "app", badge: "3" }],
+    edges: [{ from: "core", to: "http" }, { from: "http", to: "app", label: "uses" }],
+    highlight: ["core", "http", "app"],     // a path to emphasise, as node ids in order
+} }
+```
+
+What you choose, with its default:
+
+* **`layout`**: `layered`, ranks along `direction`, for anything with a flow. Edges are `orthogonal`.
+* **Nodes**: `label` (the id if you give none), a muted `note`, a `shape` (`rounded` by default; `rect`,
+  `pill`, `circle`, `ellipse`, `diamond` or `point`), a `tone` for status or a `color` for category, a short
+  `badge`, and a fixed `rank`.
+* **Edges**: a `label` and where it sits (`labelAt`), `line` (`dashed`, `dotted`), `width` (`thin`,
+  `thick`), `tone` or `color`, an `arrow` or `open` marker at either end (`head`, `tail`), and a side to leave
+  or arrive on (`fromSide`, `toSide`). No two edges ever share a stretch of line.
+
+What the runtime does for you, so you do not have to:
+
+* **Every edge is also a row in a table**, under the picture in a `<details>`, and a node with no edges is a
+  row saying so. A reader who cannot see the picture still has the whole graph.
+* **The picture is one tab stop.** The arrow along the flow follows an edge out of the focused node, the
+  arrow against it goes back, the arrows across it choose among the edges, and a live region says where
+  focus is. Space on two nodes highlights the shortest path between them.
+* **The same graph gives the same picture** in every engine and in Node, so a screenshot or a test never
+  depends on the browser.
+
+The structural rules hold in your fixtures as well as on the page: ids are unique, every edge,
+port, group, lane and highlighted node names something that exists, groups do not nest in a circle, and a
+group's members share one lane. A case whose output breaks one fails, because the runtime would list that
+graph rather than draw it. Nothing about size is refused unless you say so: `limits: { nodes: 200 }` makes a
+larger graph a table and a sentence saying why.
 
 ## 10. Help text
 

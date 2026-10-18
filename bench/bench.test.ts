@@ -20,6 +20,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
+import type { GraphLayout } from "../packages/runtime/src/graph/model.ts";
+import { layout } from "../packages/runtime/test/graph/all.ts";
+import { graphs } from "./fixtures/graph-families/index.ts";
 
 const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
@@ -4119,6 +4122,176 @@ describe("a textarea painted by the host's highlighter (#153)", () => {
 			await page.close();
 		});
 	}
+});
+
+describe("graphs (#152)", () => {
+	/*
+	 * The graph kind in a real browser: the eleven families drawn through the element, the chunks a page
+	 * fetches, the keyboard and the screen reader, and the same picture in every engine as in Node.
+	 */
+	type Host = HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+	const ready = (page: Page) =>
+		page.waitForFunction(() => [...document.querySelectorAll("tool-host")].every((h) => h.shadowRoot?.querySelector(".tb-graph-plot, .tb-graph-message:not([role=status])")), undefined, { timeout: 60_000 });
+
+	/**
+	 * What a layout draws, as one string: every node's outline, every edge's line, markers and label box. The
+	 * browser builds it from the DOM, Node from the layout, so equal strings mean the same picture.
+	 */
+	const drawn = (L: GraphLayout) =>
+		L.nodes.map((n) => n.outline).join("|") +
+		"#" +
+		L.edges.map((e) => [e.d, e.tail?.d ?? "", e.head?.d ?? "", e.label ? `${e.label.x},${e.label.y},${e.label.w},${e.label.h}` : ""].join(";")).join("|");
+
+	it("draws every family as the same picture Node lays out", async () => {
+		const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+		const errors: string[] = [];
+		page.on("pageerror", (e) => errors.push(String(e)));
+		await page.goto(`${BASE}/graphs.html`, { waitUntil: "load" });
+		await ready(page);
+		const inBrowser = await page.evaluate(() =>
+			Object.fromEntries(
+				[...document.querySelectorAll<HTMLElement>("tool-host[data-case]")].map((h) => {
+					const root = h.shadowRoot!;
+					const nodes = [...root.querySelectorAll(".tb-graph-node > .tb-graph-shape")].map((p) => p.getAttribute("d"));
+					const edges = [...root.querySelectorAll(".tb-graph-edge")].map((g) => {
+						const bg = g.querySelector(".tb-graph-label-bg");
+						const end = (e: string) => g.querySelector(`[data-end="${e}"]`)?.getAttribute("d") ?? "";
+						return [g.querySelector(".tb-graph-line")?.getAttribute("d"), end("tail"), end("head"), bg ? ["x", "y", "width", "height"].map((a) => bg.getAttribute(a)).join(",") : ""].join(";");
+					});
+					return [h.dataset.case!, nodes.length ? `${nodes.join("|")}#${edges.join("|")}` : "refused"];
+				}),
+			),
+		);
+		// The unknown-colour case is the security test's, below, and not on the page.
+		const cases = Object.keys(graphs).filter((id) => id !== "injected");
+		assert.deepEqual(Object.keys(inBrowser).sort(), [...cases].sort(), "a figure per case");
+		for (const id of cases) {
+			const want = id === "dangling" || id === "limits" ? "refused" : drawn(layout(graphs[id]!));
+			assert.equal(inBrowser[id], want, `${id} draws what Node lays out`);
+		}
+		assert.deepEqual(errors, []);
+		await page.close();
+	});
+
+	it("names every part for a host stylesheet, and lists every edge in a closed table", async () => {
+		const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+		await page.goto(`${BASE}/graphs.html`, { waitUntil: "load" });
+		await ready(page);
+		const read = await page.evaluate(() => {
+			const deps = document.querySelector<HTMLElement>('tool-host[data-case="deps-orthogonal"]')!.shadowRoot!;
+			return {
+				kinds: [...new Set([...deps.querySelectorAll("svg [data-kind]")].map((x) => x.getAttribute("data-kind")))].sort(),
+				dev: deps.querySelectorAll('.tb-graph-edge[data-kind="edge"][data-role="dev-dependency"]').length,
+				devOnly: deps.querySelectorAll('.tb-graph-node[data-kind="node"][data-role="dev-only"]').length,
+				part: deps.querySelector(".tb-out-graph")?.getAttribute("data-kind"),
+				open: deps.querySelector("details")?.open,
+				rows: deps.querySelectorAll("details tbody tr").length,
+				summary: deps.querySelector("details summary")?.textContent,
+				caption: deps.querySelector("details caption")?.textContent,
+				label: deps.querySelector(".tb-out-graph")?.getAttribute("aria-label"),
+				plot: [deps.querySelector(".tb-graph-plot")?.getAttribute("role"), deps.querySelector(".tb-graph-plot")?.getAttribute("tabindex")],
+				refused: document.querySelector<HTMLElement>('tool-host[data-case="dangling"]')!.shadowRoot!.querySelector(".tb-graph-message")?.textContent,
+			};
+		});
+		// Written by hand from the dependency family: every node has a badge, two edges and one node a role.
+		assert.deepEqual(read.kinds, ["badge", "edge", "node"]);
+		assert.equal(read.dev, 2, "the two dev-only edges carry their role");
+		assert.equal(read.devOnly, 1, "and the dev-only package its own");
+		assert.equal(read.part, "graph");
+		assert.equal(read.open, false, "the table starts closed");
+		assert.equal(read.rows, 16, "one row per edge");
+		assert.equal(read.summary, "Show the edges as a table");
+		assert.equal(read.caption, "Graph, Package build order: 11 nodes, 16 edges");
+		assert.equal(read.label, "Graph, Package build order: 11 nodes, 16 edges");
+		assert.deepEqual(read.plot, ["group", "0"], "one tab stop for the picture");
+		assert.equal(read.refused, 'A dangling edge: an edge names "c", which is not a node, so it is listed below instead of drawn.');
+		await page.close();
+	});
+
+	it("follows the edges with the arrow keys and says so, with focus on the picture", async () => {
+		const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+		await page.goto(`${BASE}/graphs.html`, { waitUntil: "load" });
+		await ready(page);
+		const state = page.locator('tool-host[data-case="state-orthogonal"]');
+		const live = () => state.evaluate((h) => h.shadowRoot!.querySelector(".tb-graph-plot ~ .tb-sr")?.textContent);
+		await state.locator(".tb-graph-plot").focus();
+		// Every sentence below written by hand from the state machine's edges, in the order the graph lists them.
+		assert.equal(await live(), "init, 0 in, 1 out, selected edge to cart, 1 of 1");
+		await page.keyboard.press("ArrowRight");
+		assert.equal(await live(), "cart, 2 in, 2 out, selected begin to checkout, 1 of 2");
+		await page.keyboard.press("ArrowDown");
+		assert.equal(await live(), "cart, 2 in, 2 out, selected abandon to cancelled, 2 of 2");
+		await page.keyboard.press("ArrowRight");
+		assert.equal(await live(), "cancelled, 3 in, 0 out");
+		await page.keyboard.press("ArrowLeft");
+		assert.equal(await live(), "cart, 2 in, 2 out, selected begin to checkout, 1 of 2");
+		const focus = () => state.evaluate((h) => [document.activeElement === h, h.shadowRoot!.activeElement?.className]);
+		assert.deepEqual(await focus(), [true, "tb-graph-plot"], "focus is on the picture, not the shadow root");
+		await page.close();
+	});
+
+	it("fetches only the base chunk for a plain layered graph, and announces the result", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => scripts.push(request.url()));
+		await page.goto(`${BASE}/tool.html?id=build-order`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		// The page host runs its defaults as soon as it is visible.
+		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
+		// An allowlist: the base and nothing else of the graph kind, so a chunk that should not have loaded fails.
+		const graphChunks = scripts.filter((url) => /\/assets\/graph[^/]*\.js$/.test(url)).map((url) => url.replace(/^.*\/assets\//, "").replace(/-[A-Za-z0-9_-]{8}\.js$/, ""));
+		assert.deepEqual(graphChunks, ["graph"]);
+		const said = await page.evaluate(() => document.querySelector("#host")!.shadowRoot!.querySelector(".tb-announce")?.textContent);
+		assert.equal(said, "3 fields, Graph, Package dependencies: 9 nodes, 12 edges");
+		await page.close();
+	});
+
+	it("draws a colour it does not know as the default, and never puts the string into a style", async () => {
+		/*
+		 * `color` is a closed union only to TypeScript: a plain-JavaScript tool, or one passing a reader's input
+		 * through, can send anything. Interpolated into an inline style, this one added a background fetched from
+		 * another origin. Every request the page makes is logged, so a fetch would show here whatever the engine.
+		 */
+		const page = await browser.newPage();
+		const requests: string[] = [];
+		page.on("request", (request) => requests.push(request.url()));
+		await page.goto(`${BASE}/tool.html?id=graph-families`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as Host;
+			host.values = { case: "injected" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
+		await page.waitForTimeout(500);
+		const read = await page.evaluate(() => {
+			const root = document.querySelector("#host")!.shadowRoot!;
+			const styled = [...root.querySelectorAll("[style]")].map((x) => x.getAttribute("style") ?? "").filter((s) => s.includes("example.com") || s.includes("background"));
+			const stroke = (id: string) => getComputedStyle(root.querySelector(`.tb-graph-node[data-id="${id}"] > .tb-graph-shape`)!).stroke;
+			const edge = root.querySelector(".tb-graph-edge")!;
+			return { styled, a: stroke("a"), b: stroke("b"), color: [root.querySelector('.tb-graph-node[data-id="a"]')!.getAttribute("data-color"), edge.getAttribute("data-color")] };
+		});
+		assert.deepEqual(read.styled, [], "no style carries the string");
+		assert.equal(read.a, read.b, "the node with the unknown colour is stroked like the one with none");
+		assert.deepEqual(read.color, [null, null], "and carries no data-color");
+		assert.deepEqual(requests.filter((url) => url.includes("example.com")), [], "nothing is fetched from another origin");
+		await page.close();
+	});
+
+	it("lists a node with no edges as one, so a reader of the table alone still finds it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=build-order`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(async () => {
+			const host = document.querySelector("#host") as Host;
+			host.values = { deps: "solo" };
+			await host.run();
+		});
+		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
+		const rows = await page.evaluate(() => [...document.querySelector("#host")!.shadowRoot!.querySelectorAll(".tb-graph-data tbody tr")].map((tr) => [...tr.children].map((c) => c.textContent)));
+		assert.deepEqual(rows, [["solo", "no edges"]]);
+		await page.close();
+	});
 });
 
 describe("live demo", () => {

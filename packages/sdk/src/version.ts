@@ -4,10 +4,10 @@
  * Every tool declares `sdk: <n>` in its manifest, and the runtime supports every version it has
  * ever shipped. Raising this number is a deliberate act with a checklist — see docs/versioning.md.
  */
-export const SDK_VERSION = 6;
+export const SDK_VERSION = 7;
 
 /** Every contract version this SDK can read. Never shrinks. */
-export const SUPPORTED_SDK_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6];
+export const SUPPORTED_SDK_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
 /**
  * What each contract version added. Kept as data so the runtime can explain itself: when a tool
@@ -20,4 +20,5 @@ export const SDK_CHANGELOG: Record<number, string> = {
 	4: "richer charts and inputs: chart markers (markers: true, shape: \"points\"), and control: \"slider\" on a number input. Later additions in the same release are listed in docs/versioning.md.",
 	5: "names for host stylesheets and links: an optional role on any output part and on any field, rendered as data-role; an optional id on any part, rendered as data-part and opened by host.reveal(id); and the muted tone on fields and table cells.",
 	6: "presets and highlighted inputs: an optional sets on a select option, the values choosing it writes into other inputs, with the select following the form afterwards; and an optional lang on a textarea, painted through the host's highlight hook.",
+	7: "graphs: the graph output kind, nodes and edges the runtime lays out and draws, with groups, swimlanes, records and crow's-foot ends, every edge also listed in a table.",
 };

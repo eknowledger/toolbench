@@ -35,7 +35,7 @@
 import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
 import { isSafeLinkHref } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { ChartRendererMissing, isLazyKind, loadRenderers, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -423,8 +423,10 @@ export class ToolHost extends HTMLElement {
 			 * renderer it does not yet need is still a working card; a seed that needed it degrades in
 			 * `#paint` to the parts that can be drawn.
 			 */
-			const needed = this.mode !== "card" ? manifest.kinds.filter(isLazyKind) : lazyKindsIn(this.#seed);
+			const needed = this.mode !== "card" ? manifest.kinds.filter(isLazyKind) : [];
 			if (needed.length > 0) await loadRenderers(needed).catch(() => undefined);
+			// The seed's own needs, a graph's chunks among them: a seed is painted with no chance to load and redraw.
+			if (this.#seed) await prepareOutput(this.#seed).catch(() => undefined);
 			this.#paint();
 
 			/*
@@ -1272,7 +1274,7 @@ export class ToolHost extends HTMLElement {
 				 * preload. Load and draw again rather than telling a reader the shape cannot be drawn, which
 				 * would be false. One frame late is the cost of a manifest that understated itself.
 				 */
-				void loadRenderers([error.kind]).then(
+				void error.load().then(
 					() => this.#draw(output),
 					() => fill(target, degraded(output, (rest) => render(rest, { compact }))),
 				);
@@ -1468,6 +1470,11 @@ function summarise(output: Output, brief = false): string {
 			return `treemap, ${output.treemap.root.children?.length ?? 0} groups`;
 		case "venn":
 			return `Venn diagram, ${output.venn.sets.length} sets`;
+		case "graph": {
+			// What the figure says of itself, so a screen reader hears the same name the picture carries.
+			const { label, nodes, edges } = output.graph;
+			return `Graph, ${label}: ${nodes.length} node${nodes.length === 1 ? "" : "s"}, ${edges.length} edge${edges.length === 1 ? "" : "s"}`;
+		}
 		case "bytes": {
 			// The named ranges are the useful part: "84 bytes" tells a screen-reader user nothing they
 			// can act on, whereas the field names are the reason they ran the tool.
