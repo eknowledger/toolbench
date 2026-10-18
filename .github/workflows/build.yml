@@ -121,6 +121,19 @@ jobs:
           pnpm test:bench
 
       - name: Check documented test counts
+        # The Count column in docs/architecture.md §12 is checked here rather than trusted. Before 0.7.0
+        # three of its cells were wrong at once because the script only ran when someone remembered it.
+        #
+        # One leg is enough: the browser suite registers the same tests on every engine, so the count is
+        # a property of the suite and three legs would give one answer three times. It sits in a browser
+        # leg, not in tests.yml, because the script measures the browser layer by running it and that
+        # needs the built bench downloaded above.
+        #
+        # ⚠️ This runs the Chromium suite a second time (the script counts by running, it does not read
+        # the previous step's output) and the whole Node suite twice more: 44 s on a laptop. This leg
+        # finished 40 s before Firefox on the last main run, so wall clock moves little. Folding it into
+        # the step above would save that time but bury the browser suite's own output, which the script
+        # captures and only prints the tail of on failure.
         if: matrix.browser == 'chromium'
         env:
           PLAYWRIGHT_BROWSER: chromium
