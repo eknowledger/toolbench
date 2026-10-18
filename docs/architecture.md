@@ -780,7 +780,8 @@ almost every pull request and collided in four consecutive rebases, five pull re
 correcting the browser count to a different value that was right against the `main` it was written on. It also
 sums the Node rows and compares them against `pnpm test`: if tests live somewhere no row covers, the table is
 describing a subset and the script says so rather than letting a number be corrected. That is how the missing
-`scripts/*.test.ts` row was found.
+`scripts/*.test.ts` row was found. CI runs it on the Chromium leg of `build.yml`, so a count that drifts
+fails the required check rather than waiting for someone to notice.
 
 `pnpm coverage` runs the Node rows of that table with Node's built-in test coverage (the same
 collector as `--experimental-test-coverage`) and prints the uncovered lines and branches. It does not
