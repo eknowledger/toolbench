@@ -160,8 +160,16 @@ const BUDGETS = [
 	 * `validateManifest` are. The first version carried every key at every version and a general walker, 654
 	 * bytes; the full table now lives in the test that keeps the two in step. The output half is the fixture
 	 * harness's and tree-shaking leaves it out of this chunk. 27_500 would have left the build 201 over.
+	 *
+	 * Raised from 28_000 to 28_500 by a tool's own textarea grammar (#163), in the commit that spent it:
+	 * 27,701 to 28,252 measured, 551 bytes. Most of it is validation, because `validateManifest` ships here:
+	 * the four grammar keys and their caps as one rule table, the refusal of any other key with the reason a
+	 * pattern is not allowed, and a message naming the field for each; written as a branch per key it was 85
+	 * bytes larger. The rest is the textarea's grammar checks, deciding to fetch the paint chunk for a grammar
+	 * as well as for a hook, its row in the version table and the v7 changelog line. The tokeniser is in the
+	 * paint chunk, never here. 28_000 would have left the build 252 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -187,14 +195,19 @@ const BUDGETS = [
 	 * Main copy raised from 4_000 to 5_000 by the highlighted-input fixture (#153): 3,441 to 4,123 measured,
 	 * because its default is 842 characters of JSON, long enough to scroll and to wrap, which is what the
 	 * overlay has to survive. Bench-only. The worker copy still fits its line.
+	 *
+	 * Raised from 5_000 to 5_500 by the grammar fixture (#163): 4,686 to 5,141 measured, its two textareas'
+	 * defaults and grammars. Bench-only.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_500, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
 	 * Bench-only.
+	 *
+	 * Raised from 4_500 to 5_000 by the grammar fixture (#163): 4,237 to 4,649 measured. Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_500, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -257,8 +270,12 @@ const BUDGETS = [
 	 * The painted textarea (#153): the layer, its debounced repaint and its own sheet. A chunk of its own,
 	 * fetched on activation only by a tool declaring `lang` on a host that passes a highlight hook, so every
 	 * other page pays nothing for it. Reader cost, because that reader does download it. 956 measured.
+	 *
+	 * Raised from 1_500 to 2_000 by the tool-defined grammar (#163): 955 to 1,500 measured, 545 bytes for the
+	 * tokeniser, the hook-first order and four token colours. Here rather than in boot by design, so only a
+	 * page whose tool declares `lang` pays for it. 1,500 would have left none.
 	 */
-	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
+	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 2_000 },
 	/*
 	 * What a Copy button does (#155): the clipboard write, the tab-separated form of a table with spreadsheet
 	 * quoting and its guard against a pasted formula, the fallback that selects the text, and the words for
@@ -369,6 +386,8 @@ const BUDGETS = [
 	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,871 measured.
 	{ label: "bench fixture: graph-families", pattern: /^tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
+	// A textarea painted by its tool's own grammar (#163), beside one the host's hook paints. 446 measured.
+	{ label: "bench fixture: grammar-input", pattern: /^tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -400,6 +419,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture highlighted-input", pattern: /^worker-tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: build-order", pattern: /^worker-tool-build-order-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
+	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 ];
 
 let files;

@@ -494,10 +494,11 @@ export class ToolHost extends HTMLElement {
 			const chart = lazyKinds.length > 0 ? loadRenderers(lazyKinds).catch(() => undefined) : undefined;
 			/*
 			 * The painted textarea, alongside the tool's code and only when it can be used: a tool declaring
-			 * `lang` and a host passing a hook. A failed fetch leaves the plain textarea, which still works.
+			 * `lang`, and something to paint it with, a host's hook or the tool's own grammar (#163). A failed
+			 * fetch leaves the plain textarea, which still works.
 			 */
 			const paint =
-				!painter && cfg.highlight && this.#manifest?.inputs.some((input) => input.type === "textarea" && input.lang)
+				!painter && this.#manifest?.inputs.some((input) => input.type === "textarea" && input.lang && (cfg.highlight || input.grammar))
 					? import("./paint.ts").then((module) => void (painter = module), () => undefined)
 					: undefined;
 			this.#loaded = await this.#resolve(cfg);
@@ -993,10 +994,10 @@ export class ToolHost extends HTMLElement {
 					this.#edited(spec.id);
 				});
 				control = area;
-				// Painted only when the tool names a language and the host has a highlighter; otherwise plain.
+				// Painted only when the tool names a language and there is a highlighter or a grammar for it; otherwise plain.
 				const highlight = config?.highlight;
-				if (spec.lang && highlight && painter) {
-					const painted = painter.paintTextarea(area, spec.lang, highlight);
+				if (spec.lang && (highlight || spec.grammar) && painter) {
+					const painted = painter.paintTextarea(area, spec.lang, highlight, spec.grammar);
 					placed = painted.wrap;
 					this.#painters.set(spec.id, painted.paint);
 				}

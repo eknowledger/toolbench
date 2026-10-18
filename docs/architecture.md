@@ -374,7 +374,9 @@ opt-in and has to justify itself:
   runtime bundling a highlighter. The hook returns a `Node`, not a string. The same hook paints a
   textarea that declares `lang`, from `paint.ts`, a chunk of its own: a `<pre>` with the textarea's box
   and font sits behind it, `aria-hidden`, and the textarea's text goes transparent while the paint is
-  current, so caret, selection, undo and the accessible name stay the real textarea's.
+  current, so caret, selection, undo and the accessible name stay the real textarea's. A tool's own
+  `grammar` for that `lang` is tokenised in the same chunk, with no regular expression, and paints when
+  there is no hook or the hook hands back plain text.
 
 **`runner.ts`** executes. Its whole job is the difference between "call a function" and "call a
 function that might not come back":
@@ -670,6 +672,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | Every preset's `sets` passes the sample checks, names neither its own select nor another preset select, differs from its siblings, and on the default option equals the inputs' defaults | `validate.ts` | A choice that writes values the form refuses, rewrites another choice, cannot be told apart from a sibling, or a form that opens contradicting itself |
 | Every `links[].href` resolves to `http:`, `https:` or `mailto:`, with no spaces or control characters | `links.ts`, used by `validate.ts` and `element.ts` | A manifest link runs script in the host page |
 | `lang` appears only on a textarea, as one word | `validate.ts` | A key that promises colour on an input nothing paints |
+| A `grammar` sits beside a `lang` on a textarea, has only its four keys, every list capped, and no patterns | `validate.ts`, and a tokeniser in `paint.ts` that runs no regular expression | A tool ships a pattern that backtracks for seconds on a pasted line and freezes the page it is embedded in |
 | Every declared sample runs without throwing | `tools/cases.test.ts` | The first thing a reader clicks is the first thing to crash |
 | Only a `pure` tool with no assets may be `card: "live"` | `validate.ts` | A landing page card could read files or call the network |
 | Only a `live` tool may be `card: "live"` | `validate.ts`, `element.ts` | A compact slot would present a tool on the way out, or already gone, as current |
@@ -854,13 +857,13 @@ Seven layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 161 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 167 |
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 114 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 23 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 174 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 183 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -903,6 +906,9 @@ production build:
   keeps one undo for the burst, a sample repaints it, 20,001 characters stays plain, and a hook that throws,
   returns a string or returns different text leaves the plain textarea; the `paint` chunk is fetched only
   when a tool and its host can use it;
+* a tool's grammar paints its exact tokens with no hook or under a hook that does not know its `lang`, a
+  hook that does know it wins, the accessibility tree equals the unpainted textarea's, a click puts the
+  caret on the glyph, every token keeps 4.5:1 in both themes, and the paint runs no regular expression;
 * Run attention is a fill change, not a ring, so it cannot be mistaken for `:focus-visible`;
 * all three modes, including two tools in one article with different threading;
 * a tool that spins forever is killed by the timeout, the page stays responsive, and the next run gets a
@@ -939,12 +945,12 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 27.7 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), and 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes) |
+| Runtime plus the bench's own wiring | 28.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), and 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk) |
 | Stylesheet | 0.9 KB | |
-| Painted textarea | 1.0 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook. 956 bytes |
+| Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
 | Worker entry | 4.8 KB | Only on pages with a worker-mode tool, and only after activation |
-| Graph kind, base chunk | 17.9 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Eleven chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one, and a graph past 100 nodes also fetches the worker's copy of the layout. Each has its own line in `size-check.mjs` |
+| Graph kind, base chunk | 17.8 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Eleven chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one, and a graph past 100 nodes also fetches the worker's copy of the layout. Each has its own line in `size-check.mjs` |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |

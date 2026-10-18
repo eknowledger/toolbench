@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-27.7%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -459,8 +459,21 @@ one highlighter:
 The paint sits behind the real textarea, so the caret, selection, undo, paste and the screen reader are the
 browser's own, and it is `aria-hidden`. It catches up 250 ms after typing stops, showing plain text until
 then, and stays plain past 20,000 characters. With no hook, a hook that throws, or a hook whose text is not
-the source, the textarea is the plain one. Its code is a chunk of its own, about 1 KB, fetched only by a tool
-that declares `lang` on a host with a hook. `lang` is refused on any other input type. Contract version 6.
+the source, the textarea is the plain one, unless the tool brings a grammar (below). Its code is a chunk of
+its own, about 1.5 KB, fetched only by a tool that declares `lang` on a host with a hook, or with a grammar.
+`lang` is refused on any other input type. Contract version 6.
+
+**A tool can bring a grammar for its own notation**, the language no host highlighter knows. Beside
+`lang`, a `grammar` lists keywords, a comment prefix, operators and string delimiters, and the runtime
+paints the textarea with them the same way, in the same lazily fetched chunk:
+
+```jsonc
+{ "id": "machine", "type": "textarea", "label": "Machine", "lang": "doors",
+  "grammar": { "keywords": ["state", "on"], "comment": "#", "operators": ["->", ":"], "strings": "\"" } }
+```
+
+There are no patterns, so a tool cannot ship a regular expression that freezes the page, and validation
+caps every list. A host hook that paints the `lang` still wins. Contract version 7.
 
 **A host can prefill the form** without putting those examples in the tool, and without reaching into
 the shadow root. `values` fills inputs the way typing does. It does not run the tool. `run()` is
@@ -599,9 +612,9 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 27.7 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 28.3 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.8 KB |
-| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.9 KB |
+| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.8 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |

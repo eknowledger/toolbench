@@ -348,6 +348,24 @@ Things the validator will hold you to, and why:
   textarea, so the help text still has to explain the syntax. The paint catches up 250 ms after typing
   stops and is skipped past 20,000 characters. Pick the name your host's highlighter uses (`json`, `yaml`);
   it must be one word, and `lang` on any other input type is refused.
+* **A `grammar` beside `lang` for a notation no host knows** (contract version 7): a state-machine syntax,
+  a packet filter. The runtime tokenises it and paints it the same way, behind the real textarea:
+
+  ```jsonc
+  "lang": "doors",
+  "grammar": { "keywords": ["state", "on"], "comment": "#", "operators": ["->", ":"], "strings": "\"" }
+  ```
+
+  Four keys and nothing else. `keywords` are whole words, case-sensitive, at most 64 of up to 32 letters,
+  digits or `_`. `comment` starts a comment that runs to the end of its line. `operators` are literal, the
+  longest match winning, at most 32 of up to 4 characters. `strings` lists the characters that open a
+  string, each closed by itself, a backslash escaping. Comment, operators and string delimiters are ASCII
+  punctuation. There is no pattern key, and any other key is refused, because a regular expression a tool
+  ships could backtrack for seconds on a line the reader pasted and freeze the page it is embedded in.
+  A host's hook still goes first: when it paints your `lang`, its paint is used, and when it hands back
+  plain text, which is how a hook says it does not know the language, or there is no hook, the grammar
+  paints. The tokeniser lives in the same lazily fetched chunk, so a page without a painted textarea pays
+  nothing for it. `grammar` without `lang`, or off a textarea, is refused.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and

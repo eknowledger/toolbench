@@ -590,6 +590,12 @@ export type InputSpec =
 			 * that cannot paint it, the textarea is the plain one. Contract version 6.
 			 */
 			lang?: string;
+			/**
+			 * The tool's own notation for `lang`, so a textarea is painted where no host highlighter knows the
+			 * language: a state-machine syntax, a packet filter (#163). Requires `lang`. A host hook that paints
+			 * `lang` still wins. Contract version 7.
+			 */
+			grammar?: TextareaGrammar;
 	  })
 	| (InputBase & {
 			type: "number";
@@ -606,6 +612,27 @@ export type InputSpec =
 	  })
 	| (InputBase & { type: "select"; default: string; options: SelectOption[] })
 	| (InputBase & { type: "toggle"; default: boolean });
+
+/**
+ * A textarea language a tool defines itself (#163), tokenised by the runtime and painted behind the real
+ * textarea the way a host's highlighter is.
+ *
+ * Deliberately small, and data only: there is no pattern field, so a tool cannot ship a regular expression
+ * that backtracks for seconds on a line a reader pasted. Validation caps every list. Contract version 7.
+ */
+export interface TextareaGrammar {
+	/** Whole words drawn as keywords, case-sensitive: letters, digits and `_`. At most 64, each 32 characters or fewer. */
+	keywords?: string[];
+	/** What starts a comment that runs to the end of its line, `#` or `//`: ASCII punctuation, at most 4 characters. */
+	comment?: string;
+	/** Literal operators, `->` or `|`, the longest match winning: ASCII punctuation. At most 32, each 4 characters or fewer. */
+	operators?: string[];
+	/**
+	 * The characters that open a string, each closed by itself, `"` or `"'`. A backslash escapes the next
+	 * character, and a string ends at the end of its line. At most 4.
+	 */
+	strings?: string;
+}
 
 /** One choice in a `select`. */
 export interface SelectOption {
