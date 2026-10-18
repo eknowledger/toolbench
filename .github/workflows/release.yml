@@ -95,13 +95,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d  # v1.9.0
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51  # v2.1.2
         with:
-          version: pnpm changeset version
-          commit: "chore: version packages"
-          title: "Release: version packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ⚠️ v2 ignores a GITHUB_TOKEN env var and the v1 input names (`version`, `commit`,
+          # `title`, `publish`). An unknown input is only a warning in Actions, so a half-migrated
+          # step still runs, on the action's defaults: a PR titled "Version Packages".
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm changeset version
+          commit-message: "chore: version packages"
+          pr-title: "Release: version packages"
 
   # ── Nothing pending: publish, after a human says so ──────────────────────────────────────────────
   publish:
@@ -136,13 +138,19 @@ jobs:
 
       - name: Publish
         id: changesets
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d  # v1.9.0
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51  # v2.1.2
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           # `pnpm release` builds first, then publishes. Building inside the release script rather
           # than relying on the step above means a manual `pnpm release` cannot publish stale dist.
-          publish: pnpm release
+          #
+          # ⚠️ v2 learns what was published from a file named by CHANGESETS_OUTPUT, which it sets in
+          # this script's environment, not from stdout. `pnpm release` passes its environment down to
+          # `changeset publish`, so it works as written. A script that drops the environment (`env -i`,
+          # a container) would publish to npm and then create no git tag and no GitHub release, with
+          # only a warning in the log.
+          publish-script: pnpm release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No npm credential. Both packages have a trusted publisher pinned to this repository, this
           # workflow, and the npm-publish environment, so authentication is the OIDC token minted by
           # `id-token: write` below. That is also the only path that works here: the account requires
@@ -153,7 +161,8 @@ jobs:
         if: always()
         env:
           PUBLISHED: ${{ steps.changesets.outputs.published }}
-          PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+          # v2 renamed the outputs to kebab-case. The v1 name would read as empty, without an error.
+          PACKAGES: ${{ steps.changesets.outputs.published-packages }}
         run: |
           {
             if [ "$PUBLISHED" = "true" ]; then
