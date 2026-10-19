@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.4%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -244,6 +244,9 @@ defineToolHost({
   // highlight: (source, lang) => yourHighlighter(source, lang),
   // Optional. Your own CSS inside every tool, after the runtime's. See STYLING.md.
   // styles: [yourSheet],
+  // Optional. A graph wider than its tool: "fit" (default) or "scroll", and whether the reader
+  // gets a button to switch. See "A graph wider than its tool" below.
+  // wide: "fit", wideToggle: true,
 });
 ```
 
@@ -363,6 +366,28 @@ no Run, no status line) and the page drives it with the `values` setter and `run
 
 With `controls="none"` the host does not mark a result stale when values change either: whoever owns the
 control that changed it owns saying so. Neither attribute changes a card.
+
+### A graph wider than its tool
+
+A graph is laid out at the size its labels need, which is often wider than the column it sits in. By
+default it is **scaled down to fit**, never up, keeping its proportions. While it is scaled, a small
+button above the drawing's top-right corner shows it at full size in a plot that scrolls, and switches
+back. Toggling keeps the reader's place: the focused node, the selection and a highlighted path all
+survive it. The button disappears whenever the graph fits, so it reappears only when it would do
+something, for instance after the page narrows.
+
+| Option | Where | Values |
+|---|---|---|
+| `wide` | `defineToolHost`, or the element's `wide` attribute, which wins | `fit` (default), `scroll`: always full size, the plot scrolls |
+| `wideToggle` | `defineToolHost`, or the element's `wide-toggle` attribute, which wins | `true` (default), `false`: no button |
+
+```html
+<tool-host tool="build-order" mode="embed" wide="scroll"></tool-host>
+<tool-host tool="build-order" mode="embed" wide-toggle="false"></tool-host>
+```
+
+The button is `part="wide-toggle"`, a real `<button>` with `aria-pressed` and a 24px target. Restyling it
+is in [STYLING.md](STYLING.md#inside-a-graph).
 
 A card is a facade: markup with no behaviour and no download. If your site renders HTML ahead of time,
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
@@ -612,9 +637,9 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 28.4 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 28.5 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.9 KB |
-| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.9 KB |
+| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.5 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |

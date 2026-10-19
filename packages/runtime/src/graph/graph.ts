@@ -13,7 +13,7 @@ import { graphProblem, type Graph } from "@toolbench/sdk";
 import { el } from "../dom.ts";
 import { ChartRendererMissing, type RenderOptions } from "../render/index.ts";
 import { ext, GraphChunkMissing, layoutLoading, loadChunk, needs, type Chunk } from "./chunks.ts";
-import { adoptGraphStyles, drawLayout, edgeTable, summary } from "./draw.ts";
+import { adoptGraphStyles, drawLayout, edgeTable, summary, type Wide } from "./draw.ts";
 import { SHAPES } from "./geometry.ts";
 import { collapsedOf, effective, layout } from "./layout.ts";
 import type { GraphLayout } from "./model.ts";
@@ -47,11 +47,13 @@ export function renderGraph(graph: Graph, options: RenderOptions = {}): HTMLElem
 	const missing = needs(graph).find((c) => !has(c));
 	if (missing) throw new ChartRendererMissing("graph", () => loadChunk(missing));
 
+	// Fit or full size, one state for the figure, so opening a group does not undo the reader's choice.
+	const wide: Wide = { fit: options.wide !== "scroll", toggle: options.wideToggle !== false };
 	/** Draw `L`, keeping focus in the picture if it was there: replaced under it, focus fell to the page. */
 	const show: Show = (L, collapsed, relayout) => {
 		const root = figure.getRootNode() as Document | ShadowRoot;
 		const focused = figure.contains(root.activeElement ?? null);
-		figure.replaceChildren(...drawLayout(graph, effective(graph, collapsed), L, collapsed, relayout));
+		figure.replaceChildren(...drawLayout(graph, effective(graph, collapsed), L, collapsed, relayout, wide));
 		// Again, because the chunks this layout fetched may have brought sheets of their own.
 		adoptGraphStyles(figure);
 		if (focused) (figure.querySelector(".tb-graph-plot") as HTMLElement | null)?.focus();
