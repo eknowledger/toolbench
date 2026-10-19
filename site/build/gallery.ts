@@ -29,6 +29,9 @@ type Feature = {
 };
 type Group = { id: string; title: string; text: string; features: Feature[] };
 
+/** A refusal has no live tool to show, so its card shows the validator's message, computed with its code. */
+const REFUSALS = new Map<string, string>();
+
 /** JSON with short arrays of plain values on one line, so a result reads as data rather than as a column. */
 export function compactJson(value: unknown, indent = ""): string {
 	if (Array.isArray(value)) {
@@ -84,6 +87,25 @@ async function output(dir: string, values: Record<string, unknown>, label = "Wha
 	const result = await mod.default.run({ ...defaults, ...values }, { signal: new AbortController().signal, progress() {} });
 	return { label, lang: "json", text: compactJson(result) };
 }
+
+/**
+ * What the SDK's validator says about a manifest, run at build time, so the gallery shows the real message
+ * rather than one typed to look like it.
+ */
+async function refusal(dir: string, change: (m: Record<string, unknown>) => void, label: string): Promise<{ manifest: Code; message: string }> {
+	const sdk = (await import(join(ROOT, "packages/sdk/src/index.ts"))) as { validateManifest(m: unknown): unknown; upgradeManifest(m: unknown): unknown };
+	const m = structuredClone(manifest(dir)) as unknown as Record<string, unknown>;
+	change(m);
+	try {
+		sdk.validateManifest(sdk.upgradeManifest(m));
+	} catch (error) {
+		return { manifest: { label, lang: "json", text: compactJson(m) }, message: (error as Error).message };
+	}
+	throw new Error(`${label}: the validator accepted a manifest the gallery shows it refusing`);
+}
+
+const refusalBox = (title: string, message: string) =>
+	`<div class="refusal"><p class="refusal-title">${escapeHtml(title)}</p><pre class="refusal-message">${escapeHtml(message)}</pre></div>`;
 
 /** The bench fixture that draws every chart, one case per kind. */
 const CHARTS: { id: string; title: string; text: string }[] = [
@@ -195,6 +217,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/highlighted-input`, "config"), region("site/src/gallery-host.ts", "highlight")],
 			},
 			{
+				id: "grammar-input",
+				title: "A textarea with its own grammar",
+				text: "A tool can ship the <code>grammar</code> for a notation of its own: keywords, a comment marker, operators and strings. It is painted with no host highlighter at all, and a host highlighter that knows the <code>lang</code> still wins.",
+				demo: `<tool-host tool="grammar-input" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/grammar-input`, "machine")],
+			},
+			{
 				id: "autorun",
 				title: "Update as the reader types",
 				text: "<code>\"autoRun\": true</code> runs on every edit. Off by default, and refused for worker tools, because it only suits a tool that is genuinely instant.",
@@ -239,6 +268,19 @@ export const GROUPS: Group[] = [
     </div>`,
 				code: (demo) => [demo, keys("site/examples/legacy-converter", "status"), keys("site/examples/old-converter", "status", "links")],
 			},
+			{
+				id: "refused",
+				title: "A manifest the validator refuses",
+				text: "A tool is checked before anything runs. A manifest that uses a feature newer than the contract it declares is refused, and so is a link that is not <code>http</code>, <code>https</code>, <code>mailto</code> or relative. Each message names the field and says what to do.",
+				wide: true,
+				demo: "",
+				code: async () => {
+					const sdk = await refusal(`${FIX}/grammar-input`, (m) => (m.sdk = 5), "bench/fixtures/grammar-input/tool.json, declaring sdk 5");
+					const link = await refusal("tools/histogram", (m) => (m.links = [{ label: "Spec", href: "java\tscript:alert(document.cookie)" }]), "tools/histogram/tool.json, with a tab inside a link's scheme");
+					REFUSALS.set("refused", `<div class="demo-grid">${refusalBox("A grammar, declaring contract 5", sdk.message)}${refusalBox("A link with a tab inside its scheme", link.message)}</div>`);
+					return [sdk.manifest, link.manifest];
+				},
+			},
 		],
 	},
 	{
@@ -259,6 +301,13 @@ export const GROUPS: Group[] = [
 				text: "A <code>code</code> result is preformatted text with a language. A host that has a highlighter passes it once, and every tool's code is painted with it.",
 				demo: `<tool-host tool="regex-explainer" mode="embed" data-run></tool-host>`,
 				code: () => [region("site/src/gallery-host.ts", "highlight")],
+			},
+			{
+				id: "copy",
+				title: "Copy a result",
+				text: "Every code and table result has a Copy button. Code copies exactly as drawn. A table copies as tab-separated rows that paste into a spreadsheet as cells, and a cell that would run as a formula there is copied as text.",
+				demo: `<tool-host tool="percentiles" mode="embed" data-run></tool-host>`,
+				code: async () => [await output("tools/percentiles", {})],
 			},
 		],
 	},
@@ -300,7 +349,7 @@ export const GROUPS: Group[] = [
 ];
 
 type Tab = { name: string; codes: Code[] };
-type Card = { id: string; title: string; meta: string; text?: string; live: string; tabs: Tab[]; wide?: boolean; tool?: string };
+type Card = { id: string; title: string; meta: string; text?: string; live: string; liveName?: string; tabs: Tab[]; wide?: boolean; tool?: string };
 
 const basename = (label: string) => label.split(/[/,]/).filter(Boolean).at(-1)?.trim() ?? label;
 
@@ -326,7 +375,7 @@ function tabsFor(codes: Code[]): Tab[] {
  * in it keeps the reader's inputs and result.
  */
 function card(c: Card): string {
-	const all = [{ name: "Live", codes: [] as Code[] }, ...c.tabs];
+	const all = [{ name: c.liveName ?? "Live", codes: [] as Code[] }, ...c.tabs];
 	const tab = (t: Tab, k: number) =>
 		`<button type="button" role="tab" id="${c.id}-tab-${k}" aria-controls="${c.id}-panel-${k}" aria-selected="${k === 0}" tabindex="${k === 0 ? 0 : -1}">${escapeHtml(t.name)}</button>`;
 	const panel = (t: Tab, k: number) =>
@@ -432,7 +481,7 @@ export async function galleryFeatures(): Promise<string> {
 		const cards: string[] = [];
 		for (const f of g.features) {
 			const codes = await f.code(markup(f.demo));
-			cards.push(card({ id: f.id, title: f.title, meta: g.title, text: f.text, live: f.demo, tabs: tabsFor(codes), ...(f.wide ? { wide: true } : {}) }));
+			cards.push(card({ id: f.id, title: f.title, meta: g.title, text: f.text, live: REFUSALS.get(f.id) ?? f.demo, ...(REFUSALS.has(f.id) ? { liveName: "Message" } : {}), tabs: tabsFor(codes), ...(f.wide ? { wide: true } : {}) }));
 		}
 		out.push(`
 <section class="group" id="${g.id}" aria-labelledby="${g.id}-h">

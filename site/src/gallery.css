@@ -86,3 +86,8 @@
 .graph-size[aria-pressed="true"] .i-fit { display: inline; }
 .graph-size:hover { border-color: var(--ink); }
 .graph-size[hidden] { display: none; }
+
+/* A refusal is the validator's own message, shown the way a tool's error is: a bad-tone rule and plain text. */
+.refusal { border: 1px solid var(--line); border-left: 3px solid light-dark(#cf222e, #f85149); border-radius: 8px; padding: 0.75rem 1rem; background: var(--panel); min-width: 0; }
+.refusal-title { margin: 0 0 0.4rem; font-weight: 700; }
+.refusal-message { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.8125rem/1.5 var(--mono, ui-monospace, monospace); color: var(--ink); }
