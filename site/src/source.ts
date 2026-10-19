@@ -5,7 +5,7 @@
  *
  * The markup is `<details data-source="tool-id">` with a `.source-body` inside; this fills the body.
  */
-import { highlight } from "../build/highlight.ts";
+import { codeBlock } from "../build/highlight.ts";
 
 const files = {
 	"tool.json": import.meta.glob("../../tools/*/tool.json", { query: "?raw", import: "default" }),
@@ -42,19 +42,13 @@ async function fill(details: HTMLDetailsElement): Promise<void> {
 		panel.setAttribute("role", "tabpanel");
 		panel.setAttribute("aria-labelledby", tab.id);
 		panel.className = "source-panel";
-		const pre = document.createElement("pre");
-		pre.className = "code";
-		pre.tabIndex = 0;
-		pre.setAttribute("aria-label", `${name}, ${text.split("\n").length} lines`);
-		const code = document.createElement("code");
-		// The highlighter escapes every character it emits, so this is markup we produced, not the file's.
-		code.innerHTML = highlight(text, name.endsWith(".ts") ? "ts" : "json");
-		pre.append(code);
+		// The code block is markup we produced: the highlighter escapes every character of the file.
+		panel.innerHTML = codeBlock(text, name.endsWith(".ts") ? "ts" : "json", `tools/${id}/${name}`);
 		const link = document.createElement("a");
 		link.href = `${REPO}/${id}/${name}`;
 		link.className = "source-link";
 		link.textContent = `Open ${name} on GitHub`;
-		panel.append(pre, link);
+		panel.append(link);
 		buttons.push(tab);
 		panels.push(panel);
 	}

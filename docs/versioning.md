@@ -103,13 +103,17 @@ newer runtime" rather than nothing at all.
 part that turns the policy into an enforced constraint: a change that breaks an older tool fails the
 build, whatever anyone intended.
 
+```mermaid
+flowchart LR
+    accTitle: How a tool's contract version is migrated
+    M["tool.json<br/>declares sdk N"] --> Q{"N above what<br/>the runtime supports?"}
+    Q -->|yes| X["refused, naming what to upgrade"]
+    Q -->|no| UM["upgradeManifest<br/>one step per version"] --> VM["validateManifest<br/>rules and invariants"] --> CM["Manifest, current shape"]
+    R["tool.run result<br/>shaped for sdk N"] --> UO["upgradeOutput<br/>the same chain"] --> RD["render<br/>exhaustive switch"] --> D["DOM"]
 ```
-tool.json  ──►  upgradeManifest  ──►  validateManifest  ──►  Manifest (current)
-                (chain of steps)      (rules + invariants)
 
-tool.run() ──►  upgradeOutput    ──►  render            ──►  DOM
-                (chain of steps)      (exhaustive switch)
-```
+A manifest and every result are walked up the same chain of migrations to the current shape before
+anything validates or draws them, and a manifest newer than the runtime is refused.
 
 The chain holds six steps today, `1 → 2` to `6 → 7`, and all twelve of their halves are the identity
 function.

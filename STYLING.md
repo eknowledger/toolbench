@@ -11,6 +11,17 @@ one of two ways:
 This document is about the second, and it is versioned API: the class names and attributes listed here
 are a contract, under the rule in [What may change](#what-may-change).
 
+```mermaid
+flowchart LR
+    accTitle: How host styles layer inside a tool
+    P["custom properties on tool-host<br/>--tb-accent, --tb-font and the rest"] -->|inherited across the shadow boundary| L["@layer toolbench<br/>the runtime's own rules"]
+    H["defineToolHost styles<br/>for every tool, or per tool id"] -->|adopted after the runtime's sheet| U["your sheets<br/>outside any layer"]
+    U -->|win over| L
+```
+
+Custom properties reach the runtime's rules by inheritance, and your sheets sit in the same shadow root
+after them, outside its layer, so they win.
+
 ## Passing a stylesheet
 
 ```ts

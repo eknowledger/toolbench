@@ -3,15 +3,20 @@
  * published package names, a registry built from a directory glob, a worker for the tools that ask
  * for one, and a host stylesheet. Nothing here reaches into the runtime's internals.
  */
-import { defineToolHost, RegistrySource, type RegistryEntry } from "@toolbench/runtime";
+import { defineToolHost, RegistrySource, type HostStyles, type RegistryEntry } from "@toolbench/runtime";
 import { registry } from "./registry.ts";
 import "./theme.ts";
+import "./copy.ts";
 
 export type BootOptions = {
-	/** CSS adopted into every tool's shadow root, after the runtime's own. */
+	/** The site's own sheet, applied to every tool after the runtime's. */
 	styles?: string;
+	/** More sheets for particular tools, by id. */
+	perTool?: Record<string, string[]>;
 	/** Extra tools for one page only, so other pages do not carry their manifests. */
 	extra?: Record<string, RegistryEntry>;
+	/** The host's highlighter, for code results and textareas that declare a `lang`. */
+	highlight?: (source: string, lang: string) => Node;
 };
 
 /*
@@ -23,13 +28,18 @@ const COMMON = /* css */ `
 :host([controls="none"]) .tb-body { padding: 0; }
 `;
 
-export function boot({ styles = "", extra }: BootOptions = {}): void {
-	styles = COMMON + styles;
+export function boot({ styles = "", perTool, extra, highlight }: BootOptions = {}): void {
+	// "*" applies to every tool, so a page's own "*" sheets join the site's rather than replacing them.
+	const every = [COMMON + styles, ...(perTool?.["*"] ?? [])];
+	const all: HostStyles = perTool ? { ...perTool, "*": every } : every;
 	defineToolHost({
 		source: new RegistrySource({ ...registry, ...extra }),
+		// #region worker
 		workerFactory: () => new Worker(new URL("./tool.worker.ts", import.meta.url), { type: "module" }),
+		// #endregion
 		// Relative, so the same pages work at / locally and under a sub-path on Pages.
 		pageUrl: (id) => `./gallery.html#${encodeURIComponent(id)}`,
-		...(styles ? { styles: [styles] } : {}),
+		styles: all,
+		...(highlight ? { highlight } : {}),
 	});
 }

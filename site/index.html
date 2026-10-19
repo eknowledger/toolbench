@@ -16,7 +16,10 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="hero-copy">
-      <h1 id="hero-title">Small interactive tools for any web page.</h1>
+      <div class="hero-title">
+        <h1 id="hero-title"><!-- partial:mark-large --><span>Toolbench</span></h1>
+        <p class="hero-sub">Small interactive tools for any web page.</p>
+      </div>
       <div class="hero-side">
         <p class="lede">Write one function and one JSON file. Toolbench builds the form, runs the function, and draws the answer as fields, tables, charts or bytes.</p>
         <div class="hero-actions">
@@ -39,6 +42,14 @@
       </div>
     </div>
     <p class="rig-caption">Every control in the tool was built from lines in its manifest. Click into one and those lines light up. The chart redraws as you type, because this tool is fast enough to run on every keystroke.</p>
+  </section>
+
+  <section class="band band-stats" aria-labelledby="stats-title">
+    <div class="band-head">
+      <h2 id="stats-title">By the numbers</h2>
+      <p>Each figure is read from the repository when this page is built: the size from the size check, the tests from the test-count table, the rest from the source.</p>
+    </div>
+    <!-- stats -->
   </section>
 
   <section class="band" aria-labelledby="write-title">
@@ -94,7 +105,6 @@
         <pre class="code install-cmd"><code id="install-cmd">pnpm add @toolbench/sdk @toolbench/runtime</code></pre>
         <button type="button" class="button copy" data-copy="#install-cmd">Copy</button>
       </div>
-      <p class="copy-status" role="status"></p>
       <ol class="steps">
         <li><strong>Write the tool.</strong> A directory with <code>tool.json</code>, <code>index.ts</code>, known answers in <code>cases.json</code>, and a README.</li>
         <li><strong>Register it.</strong> One call to <code>defineToolHost</code>, once per site.</li>

@@ -2,8 +2,7 @@
  * The site's host stylesheet: what a custom property cannot say. Adopted into every tool's shadow
  * root after the runtime's own rules, and outside its layer, so these win.
  */
-import type { RegistryEntry } from "@toolbench/runtime";
-import { boot } from "./host.ts";
+import { boot, type BootOptions } from "./host.ts";
 
 const STYLES = /* css */ `
 /* The Run button carries the mark's triangle: the one shape on this site that means "this runs". */
@@ -18,6 +17,6 @@ const STYLES = /* css */ `
 .tb-label { color: var(--tb-fg); font-weight: 700; }
 `;
 
-export function bootSite(extra?: Record<string, RegistryEntry>): void {
-	boot({ styles: STYLES, ...(extra ? { extra } : {}) });
+export function bootSite(options: Omit<BootOptions, "styles"> = {}): void {
+	boot({ ...options, styles: STYLES });
 }

@@ -474,10 +474,10 @@ for (const file of unclaimed) {
  *
  * deployOnly, because no consumer downloads the project's own site. It is watched anyway because the
  * landing page is where the "tiny" claim is made, and a page that argues for 25 KB while weighing
- * twice that would undo the argument. 30,701 measured on the system font stack when this line was
- * added: 24,770 of it is the runtime with the site's tool manifests, the same cost a consumer pays, and
+ * twice that would undo the argument. 31,240 measured on the system font stack when this line was
+ * added: 24,808 of it is the runtime with the site's tool manifests, the same cost a consumer pays, and
  * the rest is the page's own script and stylesheet. A web font, if one is ever adopted, is not in this
- * figure; it would need a line of its own. 33_000 leaves 2.3 KB, about one more page script and its styles.
+ * figure; it would need a line of its own. 33_000 leaves 1.8 KB, about one more page script and its styles.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
 const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];

@@ -1,17 +1,14 @@
-# Publish the project site on GitHub Pages, with the bench beside it as the playground.
+# Publish the project site, site/, on GitHub Pages at https://eknowledger.github.io/toolbench/.
 #
-# Two builds, one artifact:
-#   https://eknowledger.github.io/toolbench/             site/, the project site
-#   https://eknowledger.github.io/toolbench/playground/  bench/, the test bench, unchanged
-#
-# Each build is told its own prefix (`SITE_BASE`, `BENCH_BASE`) so its assets resolve under the
-# project Pages path, then the bench's output is copied under the site's as `playground/`.
+# The build is told the project Pages prefix (`SITE_BASE`) so its assets resolve under it. The bench in
+# bench/ is not published: it is the browser suite's fixture, and the site's gallery shows everything it
+# did, with the code beside it.
 #
 # Enabling Pages itself is a maintainer click: Settings → Pages → Source →
 # GitHub Actions. Until that is set, the deploy job fails and the URL 404s.
 #
-# Pull requests build with the Pages prefixes (so a missing prefix fails here) and run the site's
-# checks, but do not deploy. A fork PR must not publish the upstream site.
+# Pull requests build with the Pages prefix (so a missing prefix fails here) and run the site's checks,
+# but do not deploy. A fork PR must not publish the upstream site.
 name: pages
 
 on:
@@ -30,7 +27,7 @@ permissions:
 
 jobs:
   build:
-    name: site and playground for Pages
+    name: site for Pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -42,65 +39,46 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build the packages
-        # ⚠️ Before the bench and the site, and not for completeness. Both import the packages through
-        # their names, which resolve to packages/*/dist, and this repository does not keep dist in git.
-        # Without this step the bench's config fails to load with "Failed to resolve entry for package
-        # @toolbench/sdk", which names the package and not the missing build.
+        # ⚠️ Before the site, and not for completeness. It imports the packages through their names,
+        # which resolve to packages/*/dist, and this repository does not keep dist in git. Without this
+        # step the build fails with "Failed to resolve entry for package", which names the package and
+        # not the missing build.
         run: pnpm build
+
+      - name: Install Chromium
+        # For the site's browser checks, and for the build itself if a diagram in the docs changed
+        # without its drawing being committed: the build draws it rather than failing.
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Build the site for the Pages root
         env:
           SITE_BASE: /toolbench/
+          CHROME_CHANNEL: chromium
         run: pnpm site:build
 
-      - name: Build the bench for the playground path
-        # Local `pnpm bench:build` keeps base `/` so :4173 and the browser suite stay put. This job is
-        # the one that would 404 without the prefix.
-        env:
-          BENCH_BASE: /toolbench/playground/
-        run: pnpm bench:build
-
-      - name: Confirm each prefix landed in its markup
-        # An allowlist: each built index must request assets under its own prefix, and in-page
-        # navigation must stay relative so the prefix is not required twice.
+      - name: Confirm the prefix landed in the markup
+        # An allowlist: the built index must request assets under the prefix, and in-page navigation must
+        # stay relative so the prefix is not required twice.
         run: |
-          grep -F '/toolbench/playground/assets/' bench/dist/index.html
-          grep -F 'href="./tool.html' bench/dist/index.html
-          grep -F 'href="./failure.html' bench/dist/index.html
-          test -f bench/dist/failure.html
-          test -f bench/dist/tool.html
-          test -f bench/dist/article.html
           grep -F '/toolbench/assets/' site/dist/index.html
           grep -F 'href="./gallery.html"' site/dist/index.html
-          grep -F 'href="./playground/"' site/dist/index.html
+          grep -F 'href="./docs.html"' site/dist/index.html
 
-      - name: Put the bench under the site as the playground
-        run: |
-          rm -rf _site
-          cp -R site/dist _site
-          cp -R bench/dist _site/playground
-          test -f _site/index.html
-          test -f _site/playground/index.html
-
-      - name: Check the site's links, and that every gallery tool runs
-        # The link check reads the built HTML; the gallery check opens each tool in Chromium. With
-        # SITE_PLAYGROUND set, the playground link is checked against the assembled artifact too.
+      - name: Check the site's links, its figures, and that every example runs
+        # The link and figure checks read the built HTML; the rest open the pages in Chromium.
         env:
           SITE_BASE: /toolbench/
-          SITE_PLAYGROUND: ${{ github.workspace }}/_site/playground
           CHROME_CHANNEL: chromium
-        run: |
-          pnpm exec playwright install --with-deps chromium
-          pnpm test:site
+        run: pnpm test:site
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6.0.0
         if: github.ref == 'refs/heads/main'
 
-      - name: Upload the site and the playground
+      - name: Upload the site
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:
-          path: _site
+          path: site/dist
 
   deploy:
     name: publish to Pages

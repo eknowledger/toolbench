@@ -10,5 +10,5 @@
       "@toolbench/runtime/*": ["../packages/runtime/src/*"]
     }
   },
-  "include": ["*.ts", "src/**/*.ts", "build/**/*.ts"]
+  "include": ["*.ts", "src/**/*.ts", "build/**/*.ts", "examples/*/index.ts"]
 }

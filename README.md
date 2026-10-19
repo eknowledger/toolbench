@@ -10,7 +10,7 @@
 **Ship small interactive tools on a website.**
 A tool is one function and one JSON file. Toolbench builds the form, runs it, and renders the result.
 
-**[Try it](https://eknowledger.github.io/toolbench/).** Every example tool, live, no clone required.
+**[Try it](https://eknowledger.github.io/toolbench/gallery.html).** Every feature, live, no clone required.
 
 <!-- ⚠️ All badges in a group must sit on ONE source line. GitHub renders a single newline as <br>, so
      one badge per line stacks them vertically instead of flowing them inline. -->
@@ -58,27 +58,20 @@ The tool has no idea it is on the web. The website needs no framework.
 
 ## Live demo
 
-The project site is at [eknowledger.github.io/toolbench](https://eknowledger.github.io/toolbench/),
-built from `site/`. The same bench this repository builds is hosted beside it as the playground, at
-[eknowledger.github.io/toolbench/playground](https://eknowledger.github.io/toolbench/playground/). Four pages,
-because the display modes are four different situations and one page would let a bug in
-one hide behind another:
+The project site, built from `site/`, is at
+[eknowledger.github.io/toolbench](https://eknowledger.github.io/toolbench/). Its
+[gallery](https://eknowledger.github.io/toolbench/gallery.html) runs every feature beside the code
+that produces it:
 
-| Page | What it shows |
+| Section | What it shows |
 |---|---|
-| [Gallery](https://eknowledger.github.io/toolbench/playground/) | The example tools as cards, each loading nothing until it is clicked. Below them, a highlighted code result and the two lifecycle states, `deprecated` and `retired`. |
-| [Full page](https://eknowledger.github.io/toolbench/playground/tool.html?id=percentiles) | One tool on its own route, with its help text and its sample inputs. |
-| [In an article](https://eknowledger.github.io/toolbench/playground/article.html) | Embed mode: two tools inside prose, inheriting the page's type. |
-| [When a tool fails](https://eknowledger.github.io/toolbench/playground/failure.html) | A tool that spins forever, throws, or ignores cancellation, and a `tool` attribute naming an id that does not exist. |
+| [Display modes](https://eknowledger.github.io/toolbench/gallery.html#modes) | A tool on its own page, a card that loads nothing until it is opened, and a tool inside an article |
+| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a highlighted textarea, and `autoRun` |
+| [Running and failing](https://eknowledger.github.io/toolbench/gallery.html#running) | Worker mode with a timeout, a tool that spins, throws or rejects its input, and the `deprecated` and `retired` states |
+| [Charts](https://eknowledger.github.io/toolbench/gallery.html#charts) | Every chart kind, each with the result that draws it |
 
-The badly behaved fixtures are on their own page, and the card grid filters them out along
-with anything not `live`. A first visitor to the demo should not meet a tool whose job is to
-time out, or be offered a retired one as though it were current.
-
-That is a GitHub **project** Pages site, so the bench's Vite `base` is `/toolbench/playground/`
-and the site's is `/toolbench/`. Local `pnpm bench` and `pnpm bench:build` keep `base` at `/`, which
-is why http://localhost:5180 still works. Set `BENCH_BASE=/toolbench/playground/` to preview the
-deployed layout (the preview is then at http://localhost:4173/toolbench/playground/).
+The bench in `bench/` is the browser suite's fixture rather than a demo, and is not published. It runs
+locally with `pnpm bench`, on http://localhost:5180.
 
 A maintainer enables the site once: **Settings → Pages → Source → GitHub Actions**.
 The workflow is [`.github/workflows/pages.yml`](.github/workflows/pages.yml). Until
@@ -369,6 +362,24 @@ A card is a facade: markup with no behaviour and no download. If your site rende
 give the card a **seed**: the tool's result for its default inputs, computed during your build. The card
 then shows a real result with no JavaScript at all.
 
+```mermaid
+stateDiagram-v2
+    accTitle: A card's lifecycle, from facade to result
+    [*] --> Facade: the page loads
+    Facade: Facade, markup only, optionally seeded
+    Facade --> Loading: the reader opens it
+    Loading --> Ready: its code arrives and the form is drawn
+    Ready --> Running: Run
+    Running --> Result: the tool returns a result
+    Running --> Failed: bad input, a crash, or a timeout
+    Result --> Stale: an input changes
+    Failed --> Stale: an input changes
+    Stale --> Running: Run
+```
+
+A card costs only its markup until it is opened, and after its first run every edit returns it to stale
+until the reader presses Run again.
+
 Compute it with `seed()` rather than writing it by hand. A hand-written seed is correct on the day it is
 typed and drifts silently afterwards, showing a confidently wrong answer to every reader who does not
 press Run. That is not hypothetical: the seed in this repository's own bench was hardcoded and had drifted
@@ -398,6 +409,27 @@ seed than a failed build.
 ## How a tool runs
 
 The reader decides. Nothing runs on its own.
+
+```mermaid
+sequenceDiagram
+    accTitle: How a tool is loaded and run
+    participant R as Reader
+    participant E as tool-host
+    participant C as The tool's code
+    R->>E: opens a card, or scrolls a tool into view
+    E->>C: imports the tool's own chunk, once
+    C-->>E: the run function
+    E-->>R: the form, built from tool.json
+    R->>E: presses Run
+    E->>C: run(input, ctx)
+    C-->>E: a result: fields, a table, a chart, bytes
+    E-->>R: the result, drawn and announced
+    R->>E: changes an input
+    E-->>R: the result dims as stale, and waits for Run
+```
+
+Opening a tool only loads it: the tool runs when the reader presses Run, and an edit marks the last
+result stale rather than replacing it.
 
 * Opening a card, or scrolling a tool into view, loads its code and shows the form. It does not run
   the tool.
@@ -546,6 +578,26 @@ defineToolHost({
   workerFactory: () => new Worker(new URL("./tool.worker.ts", import.meta.url), { type: "module" }),
 });
 ```
+
+```mermaid
+sequenceDiagram
+    accTitle: Worker mode and the timeout
+    participant E as tool-host
+    participant W as Worker
+    E->>W: run, with the reader's input
+    E->>E: start the timer, timeoutMs, 5000 by default
+    alt the tool finishes in time
+        W-->>E: the result
+        E->>E: draw it and clear the timer
+    else the timer fires first
+        E->>W: terminate()
+        E->>E: report that the run did not finish and was stopped
+        Note over E,W: the next run starts a fresh worker
+    end
+```
+
+A worker-mode run either returns before its timeout or is terminated, and the page stays responsive in
+both cases.
 
 Two things to know before you spend an afternoon on them:
 

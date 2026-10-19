@@ -38,6 +38,3 @@ tool-host { display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
-
-/* The chart stage is filled by a script; holding a screen of room keeps the pager and footer from jumping. */
-[data-chart-stage] { min-block-size: 100vh; }

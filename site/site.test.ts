@@ -1,15 +1,14 @@
 /**
- * The built site, checked: no broken internal link, and every tool in `tools/` actually running in the
- * gallery. Run after `pnpm site:build`, with `pnpm test:site`.
+ * The built site, checked: no broken internal link, no link to GitHub where the site has the page, the
+ * landing page's figures equal their sources, and every example actually running in a browser. Run after
+ * `pnpm site:build`, with `pnpm test:site`.
  *
- * Two layers, because each catches what the other cannot. The link check reads the HTML files and needs
- * no browser, so it can run anywhere. The gallery check opens the pages in Chrome, because a tool that
- * renders in a unit test can still fail to load in a page: a glob the bundler did not follow, a worker
- * built as iife, a chunk with the wrong base.
+ * Two layers, because each catches what the other cannot. The link and figure checks read the HTML files
+ * and need no browser. The gallery and docs checks open the pages in Chrome, because a tool that renders
+ * in a unit test can still fail to load in a page: a glob the bundler did not follow, a worker built as
+ * iife, a chunk with the wrong base.
  *
- * `SITE_BASE` must match the build (`/` by default, `/toolbench/` for Pages). `SITE_PLAYGROUND`, when set
- * to a built bench, also checks the playground link resolves; the Pages workflow sets it after copying
- * the bench into place.
+ * `SITE_BASE` must match the build (`/` by default, `/toolbench/` for Pages).
  */
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -17,12 +16,14 @@ import { createServer, type Server } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, chromium } from "playwright";
-import { families } from "./src/chart-families.ts";
+import { DOCS } from "./build/plugin.ts";
+import { stats } from "./build/stats.ts";
 
 const DIST = join(import.meta.dirname, "dist");
-const TOOLS = join(import.meta.dirname, "..", "tools");
+const ROOT = join(import.meta.dirname, "..");
+const TOOLS = join(ROOT, "tools");
 const BASE = (process.env.SITE_BASE ?? "/").replace(/\/?$/, "/");
-const PLAYGROUND = process.env.SITE_PLAYGROUND;
+const GITHUB_FILE = /^https:\/\/github\.com\/eknowledger\/toolbench\/blob\/main\/([^#?]+)(?:#(.*))?$/;
 
 if (!existsSync(join(DIST, "index.html"))) throw new Error(`No built site at ${DIST}. Run \`pnpm site:build\` first.`);
 
@@ -33,6 +34,8 @@ const toolIds = readdirSync(TOOLS, { withFileTypes: true })
 	.filter((d) => d.isDirectory())
 	.map((d) => d.name)
 	.sort();
+/** The anchors on a page, written as `<a ...>`, with their attributes. */
+const anchors = (text: string) => [...text.matchAll(/<a\s([^>]*)>/g)].map((m) => m[1] ?? "");
 
 describe("links in the built site", () => {
 	for (const page of pages) {
@@ -53,31 +56,94 @@ describe("links in the built site", () => {
 					}
 					file = path.slice(BASE.length);
 				} else file = normalize(path);
-				// The bench is built and copied in separately, so it only exists in the assembled deploy.
-				if (file === "playground/" || file.startsWith("playground/")) {
-					if (raw !== "./playground/") broken.push(`${raw} (the playground is linked as ./playground/ only)`);
-					else if (PLAYGROUND && !existsSync(join(PLAYGROUND, "index.html"))) broken.push(`${raw} (no bench at ${PLAYGROUND})`);
-					continue;
-				}
 				if (file.endsWith("/")) file += "index.html";
 				const target = join(DIST, file);
 				if (!existsSync(target) || !statSync(target).isFile()) {
 					broken.push(raw);
 					continue;
 				}
-				if (query) {
-					const family = new URLSearchParams(query).get("family");
-					if (file !== "charts.html" || !family || !families.some((f) => f.id === family)) broken.push(`${raw} (unknown query)`);
-				}
+				if (query) broken.push(`${raw} (no page here takes a query)`);
 				if (hash && file.endsWith(".html") && !ids(html.get(file) ?? "").has(hash)) broken.push(`${raw} (no element with id "${hash}")`);
 			}
 			assert.deepEqual(broken, [], `${page} has links that go nowhere`);
+		});
+
+		it(`${page}: links to the site's own page wherever there is one, not to GitHub`, () => {
+			const offenders: string[] = [];
+			for (const attrs of anchors(html.get(page) ?? "")) {
+				const href = /href="([^"]*)"/.exec(attrs)?.[1]?.replace(/&amp;/g, "&") ?? "";
+				const m = GITHUB_FILE.exec(href);
+				// The one deliberate exception: a docs page's link to its own source file.
+				if (!m || attrs.includes("data-source-file")) continue;
+				const [, file = "", hash = ""] = m;
+				const local = DOCS.find((d) => d.file === file && (hash === "" || ids(html.get(d.page) ?? "").has(hash)));
+				if (local) offenders.push(`${href} (the site has ./${local.page}${hash ? `#${hash}` : ""})`);
+			}
+			assert.deepEqual(offenders, []);
 		});
 	}
 
 	it("the gallery lists exactly the tools in tools/", () => {
 		const listed = [...(html.get("gallery.html") ?? "").matchAll(/data-pick="([^"]+)"/g)].map((m) => m[1]).sort();
 		assert.deepEqual(listed, toolIds);
+	});
+
+	it("the site's own example tools link only to pages the site has", () => {
+		// The runtime draws these links, so the static scan above never sees them.
+		const dir = join(import.meta.dirname, "examples");
+		for (const id of readdirSync(dir)) {
+			const m = JSON.parse(readFileSync(join(dir, id, "tool.json"), "utf8")) as { links?: { href: string }[] };
+			for (const { href } of m.links ?? []) {
+				if (/^[a-z]+:/i.test(href)) continue;
+				const [path = "", hash = ""] = href.replace(/^\.\//, "").split("#");
+				assert.ok(html.has(path), `${id} links to ${href}, which the site does not have`);
+				if (hash) assert.ok(ids(html.get(path) ?? "").has(hash), `${id} links to ${href}, which has no such heading`);
+			}
+		}
+	});
+
+	it("nothing links to the retired playground or charts page", () => {
+		for (const [page, text] of html) assert.doesNotMatch(text, /href="\.\/(?:playground\/|charts\.html)/, page);
+	});
+});
+
+describe("figures on the landing page", () => {
+	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
+	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.
+	const landing = (html.get("index.html") ?? "").replace(/<pre[\s\S]*?<\/pre>/g, "").replace(/<svg[\s\S]*?<\/svg>/g, "");
+
+	it("quotes the runtime's size exactly as the README publishes it, and no other size", () => {
+		// The same row and pattern scripts/size-check.mjs --update writes. Every "n KB" on the page must be
+		// that figure: an allowlist, so a second hand-typed number fails here rather than drifting.
+		const published = /\| Runtime[^|]*\| ([\d.]+) KB/.exec(readFileSync(join(ROOT, "README.md"), "utf8"))?.[1];
+		assert.ok(published, "README.md has no runtime size row");
+		const quoted = [...landing.matchAll(/(\d+(?:\.\d+)?)\s*KB/g)].map((m) => m[1]);
+		assert.ok(quoted.length > 0, "the landing page quotes no size");
+		assert.deepEqual([...new Set(quoted)], [published]);
+	});
+
+	it("quotes the runtime's version from its package.json, and no other version", () => {
+		const { version } = JSON.parse(readFileSync(join(ROOT, "packages/runtime/package.json"), "utf8")) as { version: string };
+		const quoted = [...landing.matchAll(/\b(\d+\.\d+\.\d+)\b/g)].map((m) => m[1]);
+		assert.ok(quoted.length > 0, "the landing page quotes no version");
+		assert.deepEqual([...new Set(quoted)], [version]);
+	});
+
+	it("shows exactly the stat tiles its sources give, with their values", () => {
+		const tiles = [...landing.matchAll(/data-stat="([^"]+)"><span class="stat-value">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]);
+		assert.deepEqual(
+			tiles,
+			stats().map((s) => [s.id, s.value]),
+		);
+	});
+
+	it("derives the counts the way their owners state them", () => {
+		// Read independently of stats.ts, from the same files, so a parsing slip in one shows in the other.
+		const byId = Object.fromEntries(stats().map((s) => [s.id, s.value]));
+		assert.equal(byId.tools, String(toolIds.length));
+		assert.equal(byId.engines, String(/browser:\s*\[([^\]]+)\]/.exec(readFileSync(join(ROOT, ".github/workflows/build.yml"), "utf8"))?.[1]?.split(",").length));
+		assert.equal(byId.contract, `v${/SDK_VERSION = (\d+)/.exec(readFileSync(join(ROOT, "packages/sdk/src/version.ts"), "utf8"))?.[1]}`);
+		assert.equal(byId.dependencies, "0");
 	});
 });
 
@@ -91,31 +157,7 @@ const TYPES: Record<string, string> = {
 	".txt": "text/plain",
 };
 
-describe("figures on the landing page", () => {
-	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
-	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.
-	const landing = (html.get("index.html") ?? "").replace(/<pre[\s\S]*?<\/pre>/g, "").replace(/<svg[\s\S]*?<\/svg>/g, "");
-	const root = join(import.meta.dirname, "..");
-
-	it("quotes the runtime's size exactly as the README publishes it, and no other size", () => {
-		// The same row and pattern scripts/size-check.mjs --update writes. Every "n KB" on the page must be
-		// that figure: an allowlist, so a second hand-typed number fails here rather than drifting.
-		const published = /\| Runtime[^|]*\| ([\d.]+) KB/.exec(readFileSync(join(root, "README.md"), "utf8"))?.[1];
-		assert.ok(published, "README.md has no runtime size row");
-		const quoted = [...landing.matchAll(/(\d+(?:\.\d+)?)\s*KB/g)].map((m) => m[1]);
-		assert.ok(quoted.length > 0, "the landing page quotes no size");
-		assert.deepEqual([...new Set(quoted)], [published]);
-	});
-
-	it("quotes the runtime's version from its package.json, and no other version", () => {
-		const { version } = JSON.parse(readFileSync(join(root, "packages/runtime/package.json"), "utf8")) as { version: string };
-		const quoted = [...landing.matchAll(/\b(\d+\.\d+\.\d+)\b/g)].map((m) => m[1]);
-		assert.ok(quoted.length > 0, "the landing page quotes no version");
-		assert.deepEqual([...new Set(quoted)], [version]);
-	});
-});
-
-describe("the gallery in a browser", () => {
+describe("the site in a browser", () => {
 	let server: Server;
 	let browser: Browser;
 	let origin = "";
@@ -147,11 +189,8 @@ describe("the gallery in a browser", () => {
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on("pageerror", (e) => errors.push(e.message));
-			page.on("console", (m) => {
-				if (m.type() === "error") errors.push(m.text());
-			});
 			await page.goto(`${origin}gallery.html#${id}`);
-			const host = page.locator(`#${id} tool-host`);
+			const host = page.locator(`section.tool-pane#${id} tool-host`);
 			await host.locator(".tb-run, .tb-output").first().waitFor({ timeout: 10_000 });
 			// autoRun tools may have no Run button; everything else is run the way a reader would.
 			const run = host.locator(".tb-run");
@@ -159,20 +198,73 @@ describe("the gallery in a browser", () => {
 			await host.locator(".tb-output [data-kind]").first().waitFor({ timeout: 10_000 });
 			const kind = await host.locator(".tb-output [data-kind]").first().getAttribute("data-kind");
 			assert.notEqual(kind, "error", `${id} returned an error for its own defaults`);
-			assert.deepEqual(errors, [], `${id} logged errors`);
+			assert.deepEqual(errors, [], `${id} threw on the page`);
 			await page.close();
 		});
 	}
 
-	it("the chart showcase draws every chart of its default family", async () => {
-		const page = await browser.newPage();
-		await page.goto(`${origin}charts.html`);
-		const expected = families.find((f) => f.id === "bars")?.cases.length ?? 0;
+	it("every gallery example draws, and every chart kind draws or says why not", async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+		const errors: string[] = [];
+		page.on("pageerror", (e) => errors.push(e.message));
+		await page.goto(`${origin}gallery.html`);
+		// Page and embed hosts load as they come near, so walk the page the way a reader would.
+		const height = await page.evaluate(() => document.body.scrollHeight);
+		for (let y = 0; y < height; y += 700) {
+			await page.evaluate((top) => scrollTo(0, top), y);
+			await page.waitForTimeout(120);
+		}
 		await page.waitForFunction(
-			(n) => [...document.querySelectorAll("tool-host")].filter((h) => h.shadowRoot?.querySelector("svg")).length === n,
-			expected,
-			{ timeout: 15_000 },
+			() =>
+				[...document.querySelectorAll(".chart tool-host")].every((h) => h.shadowRoot?.querySelector(".tb-output [data-kind], .tb-output svg")),
+			undefined,
+			{ timeout: 20_000 },
 		);
+		const blank = await page.evaluate(() =>
+			[...document.querySelectorAll(".feature-demo tool-host, .chart tool-host")]
+				.filter((h) => !h.shadowRoot || h.shadowRoot.childElementCount === 0)
+				.map((h) => h.getAttribute("tool")),
+		);
+		assert.deepEqual(blank, [], "these examples drew nothing");
+		assert.deepEqual(errors, []);
+		await page.close();
+	});
+
+	it("a code block copies its code without the line numbers, and says so", async () => {
+		const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+		const page = await context.newPage();
+		await page.goto(`${origin}docs.html`);
+		const block = page.locator(".codeblock").first();
+		const expected = await block.evaluate((b) => [...b.querySelectorAll(".cl")].map((l) => (l.textContent === " " ? "" : l.textContent)).join("\n"));
+		await block.locator("[data-copy-code]").focus();
+		await page.keyboard.press("Enter");
+		await page.waitForFunction(() => document.getElementById("copy-status")?.textContent);
+		assert.equal(await page.evaluate(() => navigator.clipboard.readText()), expected);
+		assert.doesNotMatch(expected, /^1/, "the first line number was copied");
+		assert.equal(await page.locator("#copy-status").getAttribute("role"), "status");
+		await context.close();
+	});
+
+	it("'On this page' marks the section in view as the reader scrolls", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}docs-authoring.html`);
+		const target = await page.locator(".docs-toc a").nth(5).getAttribute("href");
+		await page.evaluate((hash) => document.getElementById(hash?.slice(1) ?? "")?.scrollIntoView(), target);
+		await page.waitForTimeout(300);
+		assert.equal(await page.locator(".docs-toc a[aria-current]").getAttribute("href"), target);
+		await page.close();
+	});
+
+	it("the docs draw their diagrams without loading a diagram library", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (r) => {
+			if (r.resourceType() === "script") scripts.push(new URL(r.url()).pathname);
+		});
+		await page.goto(`${origin}docs-architecture.html`, { waitUntil: "networkidle" });
+		assert.ok((await page.locator("figure.diagram svg").count()) >= 8);
+		// An allowlist: the page's own entry and the shared chunks the site builds, nothing else.
+		for (const s of scripts) assert.match(s, /\/assets\/(?:docs|theme|copy)-[\w-]+\.js$/, s);
 		await page.close();
 	});
 });

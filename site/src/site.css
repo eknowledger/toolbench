@@ -89,8 +89,10 @@ main { display: block; }
 /* ── hero ── */
 .hero { max-width: var(--wrap); margin: 0 auto; padding: clamp(2.5rem, 6vw, 4.5rem) var(--gutter) 2rem; }
 .hero-copy { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 2rem 4rem; align-items: end; }
-.hero h1 { margin: 0; font-size: clamp(2.5rem, 5.4vw, 4.25rem); line-height: 1.02; font-weight: 700; letter-spacing: -0.02em; max-width: 13ch; }
-.lede { margin: 0 0 1.5rem; font-size: 1.1875rem; color: var(--muted); max-width: 34rem; }
+.hero h1 { margin: 0; display: flex; align-items: center; gap: clamp(0.75rem, 2vw, 1.25rem); font-size: clamp(3.25rem, 9vw, 6.5rem); line-height: 1; font-weight: 700; letter-spacing: -0.03em; }
+.mark-large { width: 0.9em; height: 0.9em; }
+.hero-sub { margin: 1rem 0 0; font-size: clamp(1.4rem, 2.8vw, 2.2rem); line-height: 1.2; font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
+.lede { margin: 0 0 1.5rem; font-size: 1.1875rem; color: var(--muted); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .button {
   display: inline-flex; align-items: center; gap: 0.5rem; min-height: 46px; padding: 0 1.15rem;
@@ -125,12 +127,18 @@ main { display: block; }
 .rig-tool { padding: 1.1rem; }
 /* Reserve the tool's drawn height so the page does not jump when the runtime arrives. Measured. */
 #hero-tool { min-block-size: 39rem; }
-.rig-caption { margin: 1rem 0 0; color: var(--muted); font-size: 0.9375rem; max-width: 46rem; }
+.rig-caption { margin: 1rem 0 0; color: var(--muted); font-size: 0.9375rem; }
 
 /* ── bands ── */
 .band { max-width: var(--wrap); margin: 0 auto; padding: clamp(3rem, 7vw, 5rem) var(--gutter) 0; display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 1.5rem 4rem; }
+.band-stats { grid-template-columns: minmax(0, 1fr); }
+.band-stats .band-head { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 0.5rem 4rem; align-items: baseline; }
+.stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem 1.1rem; display: grid; gap: 0.2rem; align-content: start; }
+.stat-value { font-size: clamp(1.9rem, 3.4vw, 2.6rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.stat-label { color: var(--muted); }
 .band-head h2 { margin: 0 0 0.75rem; font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.12; letter-spacing: -0.02em; font-weight: 700; }
-.band-head p { margin: 0; color: var(--muted); max-width: 30rem; }
+.band-head p { margin: 0; color: var(--muted); }
 
 .snippets { display: grid; gap: 1.25rem; min-width: 0; }
 .snippet { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
@@ -141,7 +149,7 @@ main { display: block; }
 .spec { margin: 0; border-top: 2px solid var(--ink); }
 .spec-row { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 0.25rem 2rem; padding: 1.15rem 0; border-bottom: 1px solid var(--line); }
 .spec dt { font-weight: 700; font-size: 1.1875rem; letter-spacing: -0.01em; }
-.spec dd { margin: 0; color: var(--muted); max-width: 40rem; }
+.spec dd { margin: 0; color: var(--muted); }
 .spec dd strong { color: var(--ink); font-weight: 700; }
 
 .install { display: grid; gap: 1.25rem; min-width: 0; }
@@ -168,7 +176,7 @@ main { display: block; }
 /* ── gallery ── */
 .page-head { max-width: var(--wrap); margin: 0 auto; padding: clamp(2rem, 5vw, 3.5rem) var(--gutter) 1.5rem; }
 .page-head h1 { margin: 0 0 0.5rem; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.02em; line-height: 1.05; font-weight: 700; }
-.page-head p { margin: 0; color: var(--muted); max-width: 44rem; font-size: 1.125rem; }
+.page-head p { margin: 0; color: var(--muted); font-size: 1.125rem; }
 .gallery { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: 2rem; align-items: start; }
 .tool-index { position: sticky; top: 76px; }
 .tool-index ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
@@ -217,11 +225,11 @@ main { display: block; }
 .prose h1 { font-size: clamp(2rem, 3.6vw, 2.75rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 0.75rem; font-weight: 700; }
 .prose h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 3rem 0 0.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); line-height: 1.2; scroll-margin-top: 80px; }
 .prose h3 { font-size: 1.2rem; margin: 2rem 0 0.5rem; scroll-margin-top: 80px; }
-.prose p, .prose li { max-width: 44rem; }
+/* Long-form docs prose keeps a reading measure; everything else fills its area. */
+.prose p, .prose li { max-width: 46rem; }
 .prose li + li { margin-top: 0.35rem; }
 .prose a { color: var(--ink); text-decoration-color: var(--amber-text); }
 .prose :not(pre) > code { font-size: 0.88em; background: var(--sunk); border-radius: 4px; padding: 0.05em 0.2em; }
-.prose pre { background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; overflow-x: auto; font-size: 0.8125rem; line-height: 1.6; }
 .prose .table-wrap { overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--line); border-radius: 10px; }
 .prose table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 .prose th, .prose td { text-align: left; vertical-align: top; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line-soft); }
@@ -230,29 +238,6 @@ main { display: block; }
 .prose blockquote { margin: 1rem 0; padding: 0.25rem 1rem; border-left: 3px solid var(--amber); color: var(--muted); }
 .prose hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
 
-/* ── charts ── */
-.charts { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 2.5rem; align-items: start; }
-.families { position: sticky; top: 76px; }
-.family-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
-.family-list a { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0.8rem; border-radius: 8px; text-decoration: none; }
-.family-list a:hover { background: var(--panel); }
-.family-list a[aria-current="page"] { background: var(--panel); box-shadow: inset 3px 0 0 var(--amber), 0 0 0 1px var(--line); }
-.family-name { font-weight: 400; }
-.family-count { color: var(--muted); font-size: 0.875rem; white-space: nowrap; }
-.family-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 1.25rem; }
-.family-head h2 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
-.family-head p { margin: 0.35rem 0 0; color: var(--muted); max-width: 40rem; }
-.family-position { color: var(--muted); font-size: 0.9375rem; }
-/* One chart per row: a chart's labels are sized to its own width, and two to a row made them unreadable. */
-.chart-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
-.chart-figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.25rem 0.75rem; display: flex; flex-direction: column-reverse; gap: 0.5rem; justify-content: flex-end; min-block-size: 26rem; }
-.chart-figure figcaption { font-weight: 700; font-size: 1rem; }
-.pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; }
-.pager a { display: grid; gap: 0.1rem; padding: 0.8rem 1rem; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; text-decoration: none; min-width: 12rem; }
-.pager a:hover { border-color: var(--ink); }
-.pager a[data-family-next] { text-align: right; margin-left: auto; }
-.pager small { color: var(--muted); font-size: 0.8125rem; }
-.pager [data-label] { font-weight: 700; }
 .planned { grid-column: 1 / -1; border: 2px dashed var(--line); border-radius: 14px; padding: clamp(1.5rem, 4vw, 3rem); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; align-items: center; }
 .planned h3 { margin: 0 0 0.5rem; font-size: 1.35rem; }
 .planned p { margin: 0 0 0.75rem; color: var(--muted); }
@@ -268,12 +253,11 @@ main { display: block; }
  * Code wraps rather than running off the side. A sideways scroll inside a box on a phone hid the end of
  * every long line, and readers took the visible part for the whole statement.
  */
-.snippet pre, .install-cmd, .prose pre, .trace, .source-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.install-cmd, .trace, .codeblock pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .trace .line { padding-left: 1.1rem; }
 
 /* ── small screens ── */
 @media (max-width: 860px) {
-  .pager a { min-width: 0; flex: 1 1 0; }
 }
 @media (max-width: 1100px) {
   .docs { grid-template-columns: 14rem minmax(0, 1fr); }
@@ -292,6 +276,8 @@ main { display: block; }
   .trace { max-height: 22rem; }
   #hero-tool { min-block-size: 41rem; }
   .spec-row { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .band-stats .band-head { grid-template-columns: minmax(0, 1fr); }
   .steps { grid-template-columns: minmax(0, 1fr); }
   .gallery, .docs, .charts { grid-template-columns: minmax(0, 1fr); }
   .tool-index, .families, .docs-nav { position: static; max-height: none; padding: 0; }
@@ -301,12 +287,53 @@ main { display: block; }
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts div:nth-child(3) { border-left: 0; }
   .facts div:nth-child(n+3) { border-top: 1px solid var(--line); }
-  .family-list { display: flex; overflow-x: auto; gap: 0.4rem; padding-bottom: 0.25rem; }
-  .family-list a { white-space: nowrap; border: 1px solid var(--line); background: var(--panel); }
-  .chart-figure { min-block-size: 19rem; padding: 0.75rem; }
   .planned { grid-template-columns: minmax(0, 1fr); }
   .docs-nav ul { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.25rem; }
   .docs-nav a { white-space: nowrap; }
   .docs-nav h2 { display: none; }
   .prose { margin-top: 1rem; }
 }
+
+
+/* ── code blocks: the language on the left, Copy on the right, line numbers in the gutter ── */
+.codeblock { margin: 1.25rem 0; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.feature-code .codeblock, .snippets .codeblock, .chart-code .codeblock { margin: 0; }
+.snippets .codeblock { background: var(--panel); }
+.codeblock-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.3rem 0.4rem 0.3rem 0.75rem; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 0.8125rem; }
+.codeblock-lang { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
+.codeblock-icon { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.25rem; padding: 0 0.25rem; border-radius: 4px; background: var(--ink); color: var(--panel); font: 700 0.6875rem/1 var(--mono); }
+.codeblock-copy { flex: none; min-height: 28px; min-width: 3.5rem; padding: 0 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.codeblock-copy:hover { border-color: var(--ink); }
+.codeblock pre { tab-size: 2; margin: 0; padding: 0.75rem 1rem 0.75rem 0; font-size: 0.8125rem; line-height: 1.6; counter-reset: line; overflow: auto; }
+.codeblock pre:focus-visible { outline-offset: -3px; }
+.codeblock code { display: block; }
+/*
+ * The number is generated content with an empty alternative, so it is not text: it cannot be selected,
+ * is not copied, and is not read aloud. Each line hangs past it, so a wrapped line keeps its indent.
+ */
+.cl { display: block; position: relative; padding-left: 3.4rem; counter-increment: line; }
+.cl::before { content: counter(line); content: counter(line) / ""; position: absolute; left: 0; width: 2.6rem; text-align: right; color: var(--faint); user-select: none; -webkit-user-select: none; }
+
+/* ── diagrams, drawn at build time, coloured by the site's theme ── */
+:root {
+  --d-node: var(--panel);
+  --d-surface: var(--sunk);
+  --d-bg: var(--panel);
+  --d-ink: var(--ink);
+  --d-muted: var(--muted);
+  --d-border: var(--ink);
+  --d-line: var(--muted);
+  --d-accent: var(--amber-text);
+  --d-accent-wash: var(--amber-wash);
+}
+.diagram { margin: 1.5rem 0; padding: 1rem; background: var(--d-surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+/* ── task lists ── */
+.prose ul.tasks { list-style: none; padding-left: 0; }
+/* The label stays inline text, so code and bold inside an item flow as prose; the box hangs in the margin. */
+.prose li.task label { display: block; position: relative; padding-left: 1.75rem; }
+.prose li.task input { position: absolute; left: 0; top: 0.3em; margin: 0; width: 1rem; height: 1rem; accent-color: var(--ink); }
+
+/* ── "On this page": the section in view ── */
+.docs-toc a[aria-current] { color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--amber); padding-left: 0.6rem; margin-left: -0.6rem; }

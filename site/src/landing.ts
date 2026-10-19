@@ -25,24 +25,3 @@ hero?.addEventListener("focusin", (event) => {
 	light(control ? control.id.slice(3) : null);
 });
 hero?.addEventListener("focusout", () => light(null));
-
-/*
- * Copy the install command. A real button, so it is keyboard operable for free, and the result goes to a
- * status region so a screen reader hears that it worked, or why it did not.
- */
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
-	button.addEventListener("click", async () => {
-		const text = document.querySelector(button.dataset.copy ?? "")?.textContent ?? "";
-		const status = document.querySelector(".copy-status");
-		try {
-			await navigator.clipboard.writeText(text);
-			if (status) status.textContent = "Copied the install command.";
-			button.textContent = "Copied";
-		} catch {
-			if (status) status.textContent = "Copying is blocked here. Select the command and copy it by hand.";
-		}
-		setTimeout(() => {
-			button.textContent = "Copy";
-		}, 2000);
-	});
-}

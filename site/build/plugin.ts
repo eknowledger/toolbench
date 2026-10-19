@@ -8,8 +8,9 @@
  *   <!-- doc-title:STYLING.md -->              that page's title
  *   <!-- readme-block:0 -->                    the README's first fenced block, highlighted
  *   <!-- trace:tools/histogram/tool.json -->   a manifest, each input's lines tagged with its id
- *   <!-- gallery -->                           every tool in tools/
- *   <!-- chart-nav -->, <!-- chart-default:x -->  the chart families
+ *   <!-- gallery -->                           every tool in tools/, with its source
+ *   <!-- gallery-features -->, <!-- gallery-index -->  every runtime feature, live, beside its code
+ *   <!-- stats -->                             the landing page's figures, each read from its source
  *   <!-- version -->                           the runtime's version, from packages/runtime/package.json
  *   <!-- runtime-kb -->                        the runtime's gzipped size, as size-check.mjs publishes it
  *   <!-- fonts -->                             the web font, only when built with SITE_FONT=atkinson
@@ -19,9 +20,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import type { Plugin } from "vite";
-import { DEFAULT_FAMILY, families } from "../src/chart-families.ts";
-import { escapeHtml, highlight } from "./highlight.ts";
+import { diagram, mermaidBlocks, prepareDiagrams } from "./diagrams.ts";
+import { galleryFeatures, galleryIndex } from "./gallery.ts";
+import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
+import { stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const GITHUB = "https://github.com/eknowledger/toolbench";
@@ -45,7 +48,15 @@ export const DOCS: Doc[] = [
 	},
 	{ file: "docs/authoring-a-tool.md", page: "docs-authoring.html", title: "Authoring a tool", summary: "The walkthrough for a first tool, then the manifest, inputs, results and fixtures in full." },
 	{ file: "STYLING.md", page: "docs-styling.html", title: "Styling", summary: "Host stylesheets, and the class names and attributes they may rely on." },
+	{
+		file: "docs/authoring-a-tool.md",
+		page: "docs-charts.html",
+		title: "Chart reference",
+		summary: "Every chart a tool can return, and what each one needs from the data.",
+		sections: ["9. Charts"],
+	},
 	{ file: "docs/versioning.md", page: "docs-versioning.html", title: "Versioning", summary: "The compatibility promise, and how the contract version rises." },
+	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it." },
 	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report." },
 ];
 
@@ -70,7 +81,7 @@ function source(doc: Doc): string {
 const cache = new Map<string, Rendered>();
 
 function rendered(doc: Doc): Rendered {
-	const hit = cache.get(doc.file);
+	const hit = cache.get(doc.page);
 	if (hit) return hit;
 	const text = source(doc);
 	// Which anchors this page will have, so a link to a heading the site did not render goes to GitHub.
@@ -79,21 +90,21 @@ function rendered(doc: Doc): Rendered {
 		if (/^(?:[a-z]+:|\/\/)/i.test(href)) return href;
 		const [path = "", hash = ""] = href.split("#");
 		const target = path === "" ? doc.file : normalize(join(dirname(doc.file), path));
-		const page = DOCS.find((d) => d.file === target);
-		if (page && (hash === "" || slugsOf(page).has(hash))) {
-			if (page === doc) return `#${hash}`;
-			return hash ? `./${page.page}#${hash}` : `./${page.page}`;
-		}
+		// This page first, then whichever site page renders that file and has that heading.
+		if (target === doc.file && hash && slugsOf(doc).has(hash)) return `#${hash}`;
+		const page = DOCS.find((d) => d.file === target && (hash === "" || slugsOf(d).has(hash)));
+		if (page) return hash ? `./${page.page}#${hash}` : `./${page.page}`;
 		return `${BLOB}/${target}${hash ? `#${hash}` : ""}`;
 	};
-	const out = renderMarkdown(text, { linkFor, dropContents: true });
-	cache.set(doc.file, out);
+	const out = renderMarkdown(text, { linkFor, dropContents: true, diagram });
+	cache.set(doc.page, out);
 	return out;
 }
 
-function docFor(file: string): Doc {
-	const doc = DOCS.find((d) => d.file === file);
-	if (!doc) throw new Error(`site/build/plugin.ts: no docs page for ${file}`);
+/** A docs page by its file name, `docs-charts.html`, which is unique where a markdown file need not be. */
+function docFor(page: string): Doc {
+	const doc = DOCS.find((d) => d.page === page);
+	if (!doc) throw new Error(`site/build/plugin.ts: no docs page ${page}`);
 	return doc;
 }
 
@@ -122,14 +133,13 @@ function docPage(doc: Doc): string {
     <ul>${nav}</ul>
     <h2>Elsewhere</h2>
     <ul>
-      <li><a href="${BLOB}/docs/architecture.md">Architecture</a></li>
       <li><a href="${BLOB}/CONTRIBUTING.md">Contributing</a></li>
       <li><a href="${BLOB}/ROADMAP.md">Roadmap</a></li>
     </ul>
   </nav>
   <article class="prose">
     <h1>${escapeHtml(doc.title)}</h1>
-    <p class="doc-meta">${escapeHtml(doc.summary)} From <a href="${BLOB}/${doc.file}">${escapeHtml(doc.file)}</a>, rendered when this site was built. <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a></p>
+    <p class="doc-meta">${escapeHtml(doc.summary)} From <a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a>, rendered when this site was built. <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a></p>
     ${html}
   </article>
   <nav class="docs-toc" aria-label="On this page">
@@ -160,7 +170,7 @@ function readmeBlock(n: number): string {
 	const named = /^\/\/\s*(\S+\.\w+)\s*$/.exec(first);
 	const label = named ? named[1] : lang === "html" ? "page.html" : lang;
 	const shown = named ? body.split("\n").slice(1).join("\n") : body;
-	return `<figure class="snippet"><figcaption>${escapeHtml(label ?? "")}</figcaption><pre class="code" data-lang="${lang}"><code>${highlight(shown, lang)}</code></pre></figure>`;
+	return codeBlock(shown, lang, label);
 }
 
 /**
@@ -279,21 +289,17 @@ function gallery(): string {
 </div>`;
 }
 
-function chartNav(): string {
-	return `<ol class="family-list">${families
-		.map(
-			(f) =>
-				`<li><a href="./charts.html?family=${f.id}" data-family="${f.id}"><span class="family-name">${escapeHtml(f.name)}</span><span class="family-count">${
-					f.planned ? "Coming soon" : `${f.cases.length} ${f.cases.length === 1 ? "chart" : "charts"}`
-				}</span></a></li>`,
-		)
-		.join("")}</ol>`;
-}
-
 /*
  * The web font is opt-in at build time, so the two builds can be measured against each other. The files
  * are subsets made by `site/build/subset-font.py`: the site's characters, at 400 and 700 only.
  */
+/** The landing page's figures: one tile each, every value read from the file that owns it. */
+function statTiles(): string {
+	return `<ul class="stats" role="list">${stats()
+		.map((t) => `<li class="stat" data-stat="${t.id}"><span class="stat-value">${escapeHtml(t.value)}</span><span class="stat-label">${escapeHtml(t.label)}</span></li>`)
+		.join("")}</ul>`;
+}
+
 function fonts(): string {
 	if (process.env.SITE_FONT !== "atkinson") return "";
 	return `<link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -304,19 +310,23 @@ function fonts(): string {
 export function siteContent(): Plugin {
 	return {
 		name: "toolbench-site-content",
+		// Draw any diagram the cache lacks before a page asks for it. In dev and in the build alike.
+		async buildStart() {
+			await prepareDiagrams(DOCS.flatMap((d) => mermaidBlocks(source(d))));
+		},
 		configureServer(server) {
 			// The markdown lives outside the Vite root, so tell the watcher, and reload the page on an edit.
 			for (const d of DOCS) server.watcher.add(join(ROOT, d.file));
 			server.watcher.on("change", (file) => {
 				if (file.endsWith(".md") || file.endsWith("tool.json")) {
 					cache.clear();
-					server.ws.send({ type: "full-reload" });
+					void prepareDiagrams(DOCS.flatMap((d) => mermaidBlocks(source(d)))).then(() => server.ws.send({ type: "full-reload" }));
 				}
 			});
 		},
 		transformIndexHtml: {
 			order: "pre",
-			handler(html, ctx) {
+			async handler(html, ctx) {
 				// Partials first, so a partial may itself contain directives.
 				for (let depth = 0; depth < 4 && /<!--\s*partial:/.test(html); depth++) {
 					html = html.replace(/<!--\s*partial:([\w-]+)\s*-->/g, (_, name: string) =>
@@ -329,6 +339,8 @@ export function siteContent(): Plugin {
 				html = html.replace(/<a([^>]*?)data-nav href="\.\/([\w.-]+)"/g, (whole, pre: string, href: string) =>
 					href === section ? `<a${pre}data-nav aria-current="page" href="./${href}"` : whole,
 				);
+				// The one directive that runs tools, so the one that is awaited.
+				if (html.includes("<!-- gallery-features -->")) html = html.replace("<!-- gallery-features -->", await galleryFeatures());
 				return html.replace(/<!--\s*([\w-]+)(?::([^\s]+))?\s*-->/g, (whole, name: string, arg = "") => {
 					switch (name) {
 						case "doc":
@@ -341,16 +353,10 @@ export function siteContent(): Plugin {
 							return trace(arg);
 						case "gallery":
 							return gallery();
-						case "chart-nav":
-							return chartNav();
-						// The default family's words, in the static markup, so the script that draws the
-						// figures does not also move the heading block when it arrives.
-						case "chart-default": {
-							const k = families.findIndex((f) => f.id === DEFAULT_FAMILY);
-							const f = families[k];
-							if (!f) return "";
-							return arg === "note" ? escapeHtml(f.note) : arg === "position" ? `${k + 1} of ${families.length}` : escapeHtml(f.name);
-						}
+						case "gallery-index":
+							return galleryIndex();
+						case "stats":
+							return statTiles();
 						case "runtime-kb":
 							return runtimeKb();
 						case "version":

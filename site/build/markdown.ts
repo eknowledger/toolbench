@@ -11,7 +11,7 @@
  * Headings get GitHub's slugs, so a link written for github.com (`#4b-sample-inputs`) lands on the
  * same heading here, and links between the docs are rewritten to the site's pages by `linkFor`.
  */
-import { escapeHtml, highlight } from "./highlight.ts";
+import { codeBlock, escapeHtml } from "./highlight.ts";
 
 export type Heading = { depth: number; text: string; slug: string };
 export type Rendered = { html: string; title: string; headings: Heading[] };
@@ -20,6 +20,8 @@ export type RenderOptions = {
 	linkFor?: (href: string) => string;
 	/** Drop a hand-written "Contents" list: the site draws its own navigation from the headings. */
 	dropContents?: boolean;
+	/** A ```mermaid block, drawn. Without this a diagram renders as its source. */
+	diagram?: (source: string) => string;
 };
 
 /** GitHub's heading slug: lower case, punctuation dropped, spaces to hyphens. */
@@ -128,8 +130,7 @@ export function renderMarkdown(source: string, opts: RenderOptions = {}): Render
 				}
 				i++;
 				const code = body.join("\n");
-				const label = lang ? ` data-lang="${lang}"` : "";
-				out.push(`<pre class="code"${label}><code>${lang ? highlight(code, lang) : escapeHtml(code)}</code></pre>`);
+				out.push(lang === "mermaid" && opts.diagram ? opts.diagram(code) : codeBlock(code, lang));
 				continue;
 			}
 			const h = /^(#{1,6})\s+(.*)$/.exec(line);
@@ -217,10 +218,19 @@ export function renderMarkdown(source: string, opts: RenderOptions = {}): Render
 					.map((it) => {
 						// A tight item is one paragraph and possibly a nested block: no <p> around the first line.
 						const [first, ...rest] = splitFirstParagraph(it.lines);
-						return `<li>${inline(first.join(" "), opts)}${rest.length ? blocks(rest) : ""}</li>`;
+						const text = first.join(" ");
+						const nested = rest.length ? blocks(rest) : "";
+						// A task item, "- [ ] x" or "- [x] x": a checkbox nobody can tick, labelled by its own text.
+						const task = /^\[( |x|X)\]\s+(.*)$/.exec(text);
+						if (task) {
+							const checked = task[1] !== " " ? " checked" : "";
+							return `<li class="task"><label><input type="checkbox" disabled${checked}> ${inline(task[2] ?? "", opts)}</label>${nested}</li>`;
+						}
+						return `<li>${inline(text, opts)}${nested}</li>`;
 					})
 					.join("");
-				out.push(`<${tag}${startAttr}>${body}</${tag}>`);
+				const tasks = body.includes('<li class="task">') ? ' class="tasks"' : "";
+				out.push(`<${tag}${startAttr}${tasks}>${body}</${tag}>`);
 				continue;
 			}
 			// Paragraph.
