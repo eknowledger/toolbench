@@ -23,7 +23,7 @@
 .gallery-nav > ol > li { margin-bottom: 0.6rem; }
 .gallery-nav > ol > li > a { font-weight: 700; color: var(--ink); }
 .gallery-nav ol ol { margin: 0.25rem 0 0 0.6rem; }
-.gallery-nav a { display: block; padding: 0.15rem 0; text-decoration: none; color: var(--muted); }
+.gallery-nav a { display: block; padding: 0.15rem 0 0.15rem 0.6rem; text-decoration: none; color: var(--muted); }
 .gallery-nav a:hover { color: var(--ink); text-decoration: underline; }
 .gallery-main { min-width: 0; }
 
@@ -79,13 +79,6 @@
 .card-code .codeblock { margin: 0 0 0.75rem; }
 .card-code pre { overflow: visible; }
 .card-live tool-host { min-block-size: 8rem; }
-
-/* Above the drawing, not over it: an overlaid button would hide the corner of a graph that fills the card. */
-.graph-size { display: grid; place-items: center; margin: 0 0 0.5rem auto; width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
-.graph-size .i-fit, .graph-size[aria-pressed="true"] .i-expand { display: none; }
-.graph-size[aria-pressed="true"] .i-fit { display: inline; }
-.graph-size:hover { border-color: var(--ink); }
-.graph-size[hidden] { display: none; }
 
 /* A refusal is the validator's own message, shown the way a tool's error is: a bad-tone rule and plain text. */
 .refusal { border: 1px solid var(--line); border-left: 3px solid light-dark(#cf222e, #f85149); border-radius: 8px; padding: 0.75rem 1rem; background: var(--panel); min-width: 0; }

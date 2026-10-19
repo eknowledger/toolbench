@@ -28,12 +28,6 @@ const COMMON = /* css */ `
 :host([controls="none"]) .tb-body { padding: 0; }
 /* A graph narrower than its card sits in the middle rather than against the left edge, the way a figure would. */
 .tb-graph-plot svg { margin-inline: auto; }
-/* A gallery graph fits its card until the reader asks for full size, so the whole drawing is always in view.
-   The runtime sizes the SVG inline, so only !important reaches it; the viewBox keeps the proportions. */
-:host([data-fit]) .tb-graph-plot svg { max-width: 100% !important; height: auto !important; }
-/* A graph wider than its card scrolls. macOS hides overlay scrollbars until a scroll starts, so without a
-   drawn bar the right of the graph read as cut off rather than scrollable. */
-.tb-graph-plot { scrollbar-width: thin; scrollbar-color: var(--tb-faint) transparent; padding-bottom: 6px; }
 `;
 
 export function boot({ styles = "", perTool, extra, highlight }: BootOptions = {}): void {

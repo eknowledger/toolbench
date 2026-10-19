@@ -40,37 +40,3 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-reveal]
 }
 // #endregion
 
-/*
- * A graph wider than its card is drawn shrunk to fit, with a button for the drawing at its own size, which
- * then scrolls. The button appears only when there is something to enlarge, and is measured again whenever
- * the card changes width, since collapsing the sidebar can make a graph fit.
- */
-for (const button of document.querySelectorAll<HTMLButtonElement>(".graph-size")) {
-	const graph = button.nextElementSibling as Host | null;
-	if (!graph) continue;
-	const measure = () => {
-		const svg = graph.shadowRoot?.querySelector<SVGSVGElement>(".tb-graph-plot svg");
-		const plot = svg?.parentElement;
-		if (!svg || !plot) return;
-		const natural = Number(svg.getAttribute("width"));
-		const wider = natural > plot.clientWidth + 1;
-		button.hidden = !wider && button.getAttribute("aria-pressed") === "false";
-	};
-	button.addEventListener("click", () => {
-		const full = button.getAttribute("aria-pressed") !== "true";
-		button.setAttribute("aria-pressed", String(full));
-		const label = full ? "Fit to card" : "Show at full size";
-		button.setAttribute("aria-label", label);
-		button.title = label;
-		graph.toggleAttribute("data-fit", !full);
-		measure();
-	});
-	new ResizeObserver(measure).observe(graph);
-	// The drawing arrives after the run resolves and the graph chunk loads, so watch the shadow root for it.
-	const watch = () => {
-		if (!graph.shadowRoot) return requestAnimationFrame(watch);
-		new MutationObserver(measure).observe(graph.shadowRoot, { childList: true, subtree: true });
-		measure();
-	};
-	watch();
-}

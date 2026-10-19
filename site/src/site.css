@@ -220,7 +220,7 @@ main { display: block; }
 .docs-nav a { display: block; padding: 0.4rem 0.75rem; border-radius: 8px; text-decoration: none; color: var(--muted); font-weight: 700; }
 .docs-nav a:hover { color: var(--ink); }
 .docs-toc ol ol { margin: 0 0 0.25rem; padding-left: 0.75rem; }
-.docs-toc a { display: block; padding: 0.2rem 0; text-decoration: none; color: var(--muted); }
+.docs-toc a { display: block; padding: 0.2rem 0 0.2rem 0.6rem; text-decoration: none; color: var(--muted); }
 .docs-toc a:hover { color: var(--ink); text-decoration: underline; }
 .prose { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: clamp(1.25rem, 4vw, 3rem); margin: 2rem 0 0; min-width: 0; }
 .prose > :first-child { margin-top: 0; }
@@ -348,13 +348,13 @@ main { display: block; }
 /*
  * Every sidebar marks where the reader is the same way: the docs list marks the page, "On this page" and the
  * gallery mark the section in view. The left docs list had a grey fill and a white bar while "On this page" had
- * an amber bar, so the same idea read as two. The negative margin pays for the padding, so the marked text
- * does not move.
+ * an amber bar, so the same idea read as two. Each link in these lists carries the room for the bar in its own
+ * padding, rather than the marked one borrowing it with a negative margin: the lists scroll, a scroller clips
+ * what hangs outside it, and a top-level link's bar was cut away entirely.
  */
 .docs-toc a[aria-current],
 .gallery-nav a[aria-current],
-.docs-nav a[aria-current="page"] { color: var(--ink); font-weight: 700; background: none; box-shadow: inset 3px 0 0 var(--amber); padding-left: 0.6rem; margin-left: -0.6rem; border-radius: 0; }
-.docs-nav a[aria-current="page"] { padding-left: 0.75rem; margin-left: 0; }
+.docs-nav a[aria-current="page"] { color: var(--ink); font-weight: 700; background: none; box-shadow: inset 3px 0 0 var(--amber); border-radius: 0; }
 
 /* ── the browsers tile ── */
 .stat-browsers { align-content: space-between; }

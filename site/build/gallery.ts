@@ -446,8 +446,7 @@ async function charts(): Promise<string> {
 	for (const g of GRAPHS) {
 		const result = await output(`${FIX}/graph-families`, { case: g.id }, "run() returns");
 		const live = `<tool-host tool="graph-families" mode="embed" controls="none" data-values='{"case":"${g.id}"}' data-run></tool-host>`;
-		const fit = `<button type="button" class="graph-size" aria-pressed="false" aria-label="Show at full size" title="Show at full size" hidden><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="i-expand"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></g><g class="i-fit"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></g></svg></button>${live.replace("<tool-host ", "<tool-host data-fit ")}`;
-		graphs.push(card({ id: `graph-${g.id}`, title: g.title, meta: "graph", text: escapeHtml(g.text), live: fit, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
+		graphs.push(card({ id: `graph-${g.id}`, title: g.title, meta: "graph", text: escapeHtml(g.text), live, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
 	}
 	const cards: string[] = [];
 	for (const c of CHARTS) {

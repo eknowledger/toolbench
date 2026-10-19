@@ -309,8 +309,9 @@ describe("the site in a browser", () => {
 				const name = await card.locator("h3").innerText();
 				assert.ok(fit.drawn <= fit.plot + 1, `${name}: drawn ${fit.drawn}px in a ${fit.plot}px plot`);
 				assert.ok(fit.frameScroll <= fit.frame, `${name}: the frame overflows, ${fit.frameScroll} > ${fit.frame}`);
-				const button = card.locator(".graph-size");
-				assert.equal(await button.isVisible(), fit.natural > fit.plot + 1, `${name}: Full size should show exactly when the graph is wider than its card`);
+				// The runtime's own expand and fit toggle, in the tool's shadow root.
+				const button = card.locator("tool-host .tb-graph-wide");
+				assert.equal(await button.isVisible(), fit.natural > fit.plot + 1, `${name}: the expand toggle should show exactly when the graph is wider than its card`);
 				if (fit.natural <= fit.plot + 1) continue;
 				wide++;
 				await button.click();
@@ -348,7 +349,15 @@ describe("the site in a browser", () => {
 	it("every sidebar marks where the reader is, one link, with the same amber bar", async () => {
 		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 		const bar = (selector: string) =>
-			page.locator(selector).evaluateAll((links) => links.map((a) => ({ shadow: getComputedStyle(a).boxShadow, weight: getComputedStyle(a).fontWeight, fill: getComputedStyle(a).backgroundColor })));
+			page.locator(selector).evaluateAll((links) =>
+				links.map((a) => {
+					// A bar drawn outside the list's scroll box is clipped away, which is how a top-level link lost it.
+					let box = a.parentElement;
+					while (box && !/auto|scroll|hidden/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+					const clipped = box ? a.getBoundingClientRect().left < box.getBoundingClientRect().left - 0.5 : false;
+					return { shadow: getComputedStyle(a).boxShadow, weight: getComputedStyle(a).fontWeight, fill: getComputedStyle(a).backgroundColor, clipped };
+				}),
+			);
 		await page.goto(`${origin}docs-authoring.html`);
 		await page.evaluate(() => document.querySelectorAll(".prose h2[id]")[2]?.scrollIntoView());
 		await page.waitForTimeout(300);
@@ -364,7 +373,11 @@ describe("the site in a browser", () => {
 		}
 		const gallery = await bar(".gallery-nav a[aria-current]");
 		assert.equal(await page.locator(".gallery-nav a[aria-current]").getAttribute("href"), "#samples");
-		for (const [name, marked] of [["docs list", docsNav], ["On this page", toc], ["gallery", gallery]] as const) {
+		// And a top-level gallery entry, whose bar the scroll box used to clip.
+		await page.evaluate(() => document.getElementById("graphs")?.scrollIntoView());
+		await page.waitForTimeout(300);
+		const topLevel = await bar(".gallery-nav a[aria-current]");
+		for (const [name, marked] of [["docs list", docsNav], ["On this page", toc], ["gallery", gallery], ["a top-level gallery entry", topLevel]] as const) {
 			assert.equal(marked.length, 1, `${name}: ${marked.length} links marked`);
 			assert.deepEqual(marked[0], toc[0], `${name} marks the current link differently from On this page`);
 		}
