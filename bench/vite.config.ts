@@ -63,6 +63,8 @@ function toolChunk(id: string, prefix: string): string | null {
 	 * not land in the chunk whose size the README quotes.
 	 */
 	if (/\/bench\/src\/highlight\.ts$/.test(id)) return "bench-highlight";
+	// The host-option switches for the browser tests (#198), by the same argument.
+	if (/\/bench\/src\/host-options\.ts$/.test(id)) return "bench-host-options";
 	return null;
 }
 

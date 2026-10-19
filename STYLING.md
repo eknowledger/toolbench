@@ -128,6 +128,16 @@ path carries the class `tb-path`, and while a reader points at or focuses a node
 `tb-hot` and its neighbours `tb-near`. A row of the edge table for a node with no edges carries
 `data-orphan`.
 
+A graph scaled to fit carries a button above its drawing, `.tb-graph-wide` in a `.tb-graph-bar`, with
+`aria-pressed="true"` while the graph is at full size (#198). It also carries `part="wide-toggle"`, so the
+page's own stylesheet can reach it from outside the shadow root, where a `styles` sheet would use the class:
+
+```css
+/* In the page's stylesheet, not in `styles`: ::part is how a page reaches into the shadow root. */
+tool-host::part(wide-toggle) { border-radius: 999px; color: var(--tb-accent-text); }
+tool-host::part(wide-toggle):hover { border-color: var(--tb-accent); }
+```
+
 ```css
 /* Decisions in a flowchart, drawn heavier: the tool set role: "decision" on them. */
 .tb-graph-node[data-role="decision"] > .tb-graph-shape { stroke-width: 2.5; }

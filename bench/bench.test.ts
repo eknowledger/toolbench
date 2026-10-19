@@ -5066,3 +5066,180 @@ describe("a result wider than its tool scrolls inside it, and is never clipped (
 		}
 	}
 });
+
+describe("a wide graph fits its plot, and the reader can show it at full size (#198)", () => {
+	/*
+	 * The wide-output fixture's graph is an eight-stage chain laid out left to right, far wider than a phone.
+	 * Every expectation follows from the spec rather than from what the runtime draws: scaled down to the
+	 * plot and never up, the viewBox's proportions kept, a button only while scaling happens, and the frame
+	 * never wider than itself in either state.
+	 */
+	type Box = { natural: number; ratio: number; svgW: number; svgH: number; plot: number; plotScroll: number; frame: number; frameScroll: number; button: null | { hidden: boolean; pressed: string | null; label: string | null; w: number; h: number; bottom: number; part: string | null }; svgTop: number };
+	async function open(width: number, attrs: Record<string, string> = {}, query = "", graphCase = "graph"): Promise<Page> {
+		const page = await browser.newPage({ viewport: { width: Math.max(width + 100, 800), height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=wide-output${query}`, { waitUntil: "load" });
+		await page.evaluate(
+			async ({ width, attrs, graphCase }) => {
+				await customElements.whenDefined("tool-host");
+				const box = document.createElement("div");
+				box.id = "narrow";
+				box.style.cssText = `width:${width}px;margin:16px`;
+				document.body.prepend(box);
+				const host = document.createElement("tool-host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+				host.id = "wide";
+				host.setAttribute("tool", "wide-output");
+				host.setAttribute("mode", "embed");
+				host.setAttribute("controls", "none");
+				for (const [k, v] of Object.entries(attrs)) host.setAttribute(k, v);
+				box.append(host);
+				host.values = { case: graphCase };
+				await host.run();
+				await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			},
+			{ width, attrs, graphCase },
+		);
+		return page;
+	}
+	const measure = (page: Page) =>
+		page.evaluate((): Box => {
+			const root = document.getElementById("wide")?.shadowRoot as ShadowRoot;
+			const plot = root.querySelector(".tb-graph-plot") as HTMLElement;
+			const pic = plot.querySelector("svg") as SVGSVGElement;
+			const frame = root.querySelector(".tb") as HTMLElement;
+			const [, , vw, vh] = (pic.getAttribute("viewBox") ?? "0 0 0 0").split(" ").map(Number) as [number, number, number, number];
+			const r = pic.getBoundingClientRect();
+			const b = root.querySelector<HTMLElement>("[part='wide-toggle']");
+			const br = b?.getBoundingClientRect();
+			return {
+				natural: vw,
+				ratio: vh / vw,
+				svgW: r.width,
+				svgH: r.height,
+				plot: plot.clientWidth,
+				plotScroll: plot.scrollWidth,
+				frame: frame.clientWidth,
+				frameScroll: frame.scrollWidth,
+				svgTop: r.top,
+				button: b && br ? { hidden: b.offsetParent === null, pressed: b.getAttribute("aria-pressed"), label: b.getAttribute("aria-label"), w: br.width, h: br.height, bottom: br.bottom, part: b.getAttribute("part") } : null,
+			};
+		});
+	const fits = (m: Box, why: string) => {
+		assert.ok(m.frameScroll <= m.frame + 1, `${why}: the frame does not overflow, ${m.frame}/${m.frameScroll}`);
+		assert.ok(m.svgW <= m.plot + 1, `${why}: the drawing is no wider than its plot, ${m.svgW} in ${m.plot}`);
+	};
+	const scaled = (m: Box) => {
+		assert.ok(m.svgW < m.natural, `drawn smaller than its natural ${m.natural}px: ${m.svgW}`);
+		assert.ok(Math.abs(m.svgH / m.svgW - m.ratio) < 0.01, `proportions kept: ${m.svgH / m.svgW} against ${m.ratio}`);
+		fits(m, "fitted");
+	};
+	const full = (m: Box) => {
+		assert.ok(Math.abs(m.svgW - m.natural) < 1, `drawn at its natural ${m.natural}px: ${m.svgW}`);
+		assert.ok(m.plotScroll > m.plot, `and the plot scrolls: ${m.plot}/${m.plotScroll}`);
+		assert.ok(m.frameScroll <= m.frame + 1, `the frame does not overflow at full size, ${m.frame}/${m.frameScroll}`);
+	};
+
+	it("fits a wide graph by default, and offers the button, above the drawing and 24px or more", async () => {
+		const page = await open(390);
+		const m = await measure(page);
+		scaled(m);
+		assert.ok(m.button && !m.button.hidden, "a scaled graph offers the button");
+		assert.equal(m.button.pressed, "false");
+		assert.equal(m.button.label, "Show at full size");
+		assert.ok(m.button.w >= 24 && m.button.h >= 24, `a 24px target: ${m.button.w}x${m.button.h}`);
+		assert.ok(m.button.bottom <= m.svgTop + 0.5, `outside the drawing, so it covers no node: button ends at ${m.button.bottom}, drawing starts at ${m.svgTop}`);
+		await page.close();
+	});
+
+	it("never scales a graph up, and offers no button for one that fits", async () => {
+		const page = await open(1700);
+		const m = await measure(page);
+		assert.ok(Math.abs(m.svgW - m.natural) < 1, `drawn at its natural ${m.natural}px in a ${m.plot}px plot: ${m.svgW}`);
+		assert.ok(!m.button || m.button.hidden, "no button when nothing was scaled");
+		await page.close();
+	});
+
+	it("toggles to full size and back, keeping the graph's focus, selection and keyboard", async () => {
+		const page = await open(390);
+		const hot = () => page.evaluate(() => [...(document.getElementById("wide")?.shadowRoot?.querySelectorAll(".tb-graph-node.tb-hot") ?? [])].map((n) => n.getAttribute("data-id")));
+		const focused = () => page.evaluate(() => document.getElementById("wide")?.shadowRoot?.activeElement?.className ?? null);
+		await page.locator("#wide >> .tb-graph-plot").focus();
+		await page.keyboard.press("ArrowRight");
+		const before = await hot();
+		assert.deepEqual(before, ["decode"], "the keyboard moved from the first stage to the second");
+		await page.locator("#wide >> [part='wide-toggle']").click();
+		full(await measure(page));
+		assert.equal((await measure(page)).button?.pressed, "true");
+		assert.equal(await focused(), "tb-graph-plot", "a click on the button leaves focus in the graph");
+		assert.deepEqual(await hot(), before, "and the selection where it was");
+		await page.keyboard.press("ArrowRight");
+		assert.deepEqual(await hot(), ["validate"], "and the arrow keys still walk the graph");
+		// From the keyboard: the button is a control of its own, and Enter and Space both press it.
+		await page.locator("#wide >> [part='wide-toggle']").focus();
+		await page.keyboard.press("Enter");
+		scaled(await measure(page));
+		await page.keyboard.press(" ");
+		full(await measure(page));
+		await page.close();
+	});
+
+	it("keeps the path highlight across the toggle", async () => {
+		const page = await open(390);
+		const path = () => page.evaluate(() => document.getElementById("wide")?.shadowRoot?.querySelectorAll(".tb-graph-plot .tb-path").length ?? 0);
+		await page.locator("#wide >> .tb-graph-plot").focus();
+		await page.keyboard.press(" ");
+		await page.keyboard.press("End");
+		await page.keyboard.press(" ");
+		await page.waitForFunction(() => (document.getElementById("wide")?.shadowRoot?.querySelectorAll(".tb-graph-plot .tb-path").length ?? 0) > 0);
+		const lit = await path();
+		await page.locator("#wide >> [part='wide-toggle']").click();
+		assert.equal(await path(), lit, "the same path is lit at full size");
+		await page.close();
+	});
+
+	it("hides the button once the host widens enough to draw the graph whole", async () => {
+		const page = await open(390);
+		assert.ok((await measure(page)).button?.hidden === false);
+		await page.setViewportSize({ width: 1800, height: 900 });
+		await page.evaluate(() => ((document.getElementById("narrow") as HTMLElement).style.width = "1700px"));
+		await page.waitForFunction(() => document.getElementById("wide")?.shadowRoot?.querySelector<HTMLElement>("[part='wide-toggle']")?.offsetParent === null);
+		const m = await measure(page);
+		assert.ok(Math.abs(m.svgW - m.natural) < 1, `natural size once there is room: ${m.svgW} of ${m.natural}`);
+		await page.close();
+	});
+
+	it("draws at full size under wide=\"scroll\", with the button pressed", async () => {
+		const page = await open(390, { wide: "scroll" });
+		const m = await measure(page);
+		full(m);
+		assert.equal(m.button?.pressed, "true");
+		await page.close();
+	});
+
+	it("hides the button under wide-toggle=\"false\", and still fits", async () => {
+		const page = await open(390, { "wide-toggle": "false" });
+		const m = await measure(page);
+		scaled(m);
+		assert.ok(!m.button || m.button.hidden, "no button");
+		await page.close();
+	});
+
+	it("takes defineToolHost({ wide: \"scroll\" }), and lets the attribute override it", async () => {
+		const page = await open(390, {}, "&wide=scroll");
+		full(await measure(page));
+		await page.close();
+		const back = await open(390, { wide: "fit" }, "&wide=scroll");
+		scaled(await measure(back));
+		await back.close();
+	});
+
+	it("takes defineToolHost({ wideToggle: false }), and lets the attribute override it", async () => {
+		const page = await open(390, {}, "&wideToggle=false");
+		const m = await measure(page);
+		scaled(m);
+		assert.ok(!m.button || m.button.hidden, "no button");
+		await page.close();
+		const back = await open(390, { "wide-toggle": "true" }, "&wideToggle=false");
+		assert.ok((await measure(back)).button?.hidden === false, "the attribute brings it back");
+		await back.close();
+	});
+});

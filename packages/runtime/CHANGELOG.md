@@ -1,5 +1,13 @@
 # @toolbench/runtime
 
+## 0.10.1
+
+### Patch Changes
+
+- [#195](https://github.com/eknowledger/toolbench/pull/195) [`76e95be`](https://github.com/eknowledger/toolbench/commit/76e95be9a8d7e37596d37656299fe2d3f563a688) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a result wider than its tool scrolls instead of being cut off.** A wide graph, a long code line, a hex dump or a chart's data table was clipped at the tool's right edge with no way to reach the rest; each now scrolls inside the tool, and unbroken text such as a digest or a URL wraps. ([#194](https://github.com/eknowledger/toolbench/issues/194))
+- Updated dependencies []:
+  - @toolbench/sdk@0.10.1
+
 ## 0.10.0
 
 ### Minor Changes
