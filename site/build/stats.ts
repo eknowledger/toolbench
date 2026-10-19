@@ -29,6 +29,13 @@ export function chartTypes(): string[] {
 	return [...shapes, ...members("OUTPUT_KINDS").filter((k) => !NOT_CHARTS.has(k))];
 }
 
+/** The layouts a graph result can ask for, from the union on the graph type's `layout`. */
+export function graphLayouts(): string[] {
+	const union = /layout\?:\s*((?:"[a-z]+"\s*\|?\s*)+);/.exec(read(TYPES))?.[1]?.match(/"([a-z]+)"/g)?.map((s) => s.slice(1, -1));
+	if (!union?.length) throw new Error(`${TYPES} has no graph layout union`);
+	return union;
+}
+
 /** The engines build.yml runs the browser suite in, as the browsers a reader knows them by. */
 export function browsers(): string[] {
 	const names: Record<string, string> = { chromium: "Chrome", firefox: "Firefox", webkit: "Safari" };
@@ -57,11 +64,6 @@ export function stats(): Stat[] {
 		{ id: "kinds", value: String(members("OUTPUT_KINDS").length), label: "result kinds" },
 		{ id: "inputs", value: String(members("INPUT_TYPES").length), label: "input types" },
 	];
-	/*
-	 * The graph layouts tile, waiting for the graph result kind. It appears once the SDK exports a
-	 * GRAPH_LAYOUTS list, with no change here; until then there is nothing true to show.
-	 */
-	const layouts = members("GRAPH_LAYOUTS");
-	if (layouts.length) out.push({ id: "layouts", value: String(layouts.length), label: "graph layouts" });
+	out.push({ id: "layouts", value: String(graphLayouts().length), label: "graph layouts" });
 	return out;
 }

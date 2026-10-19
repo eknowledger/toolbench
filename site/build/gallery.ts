@@ -379,7 +379,26 @@ function toolCards(): string {
 </section>`;
 }
 
+/** A few graph families from the bench's graph-families fixture, one card each. */
+const GRAPHS: { id: string; title: string; text: string }[] = [
+	{ id: "flowchart", title: "Flowchart", text: "Layered, with decisions and orthogonal routing." },
+	{ id: "state-spline", title: "State machine", text: "States and transitions, with spline routing." },
+	{ id: "deps-orthogonal", title: "Dependency graph", text: "What depends on what, ranked along the flow." },
+	{ id: "org", title: "Org chart", text: "A tree, top down." },
+	{ id: "network-straight", title: "Network", text: "A force layout for links with no direction." },
+	{ id: "er", title: "Entity-relationship", text: "Records with rows, and crow's feet at the ends." },
+	{ id: "mind", title: "Mind map", text: "A radial layout around one idea." },
+	{ id: "lanes", title: "Swimlanes", text: "Each node in its lane, in order across them." },
+	{ id: "nested", title: "Nested groups", text: "Groups inside groups, each one able to close." },
+];
+
 async function charts(): Promise<string> {
+	const graphs: string[] = [];
+	for (const g of GRAPHS) {
+		const result = await output(`${FIX}/graph-families`, { case: g.id }, "run() returns");
+		const live = `<tool-host tool="graph-families" mode="embed" controls="none" data-values='{"case":"${g.id}"}' data-run></tool-host>`;
+		graphs.push(card({ id: `graph-${g.id}`, title: g.title, meta: "graph", text: escapeHtml(g.text), live, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
+	}
 	const cards: string[] = [];
 	for (const c of CHARTS) {
 		const result = await output(`${FIX}/discrete-series`, { case: c.id }, "run() returns");
@@ -400,16 +419,7 @@ async function charts(): Promise<string> {
     <h2 id="graphs-h">Graphs</h2>
     <p>Nodes and edges: what depends on what, where a flow goes, how a tree branches.</p>
   </div>
-  <div class="planned">
-    <div>
-      <h3>Graphs are on the way</h3>
-      <p>A result kind for nodes and edges is being built now. Its examples will appear here when it ships, each with the result that draws it, like every chart above.</p>
-      <p><a href="https://github.com/eknowledger/toolbench/issues/152">Follow the work in issue 152</a></p>
-    </div>
-    <svg viewBox="0 0 320 200" role="img" aria-label="An outline of a small graph: five nodes joined by edges">
-      <g fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 6" stroke-linecap="round"><path d="M60 100 L150 45 M60 100 L150 155 M150 45 L255 70 M150 155 L255 130 M150 45 L150 155 M255 70 L255 130"/></g>
-      <g stroke="currentColor" stroke-width="2.5"><circle cx="60" cy="100" r="16"/><circle cx="150" cy="45" r="16"/><circle cx="150" cy="155" r="16"/><circle cx="255" cy="70" r="16"/><circle cx="255" cy="130" r="16"/></g>
-    </svg>
+  <div class="cards">${graphs.join("")}
   </div>
 </section>`;
 }
@@ -439,6 +449,7 @@ export async function galleryFeatures(): Promise<string> {
 /** The title of a gallery group or feature by its id, for links into the gallery from the docs. */
 export function galleryTitle(id: string): string | undefined {
 	if (id === "charts") return "every chart kind";
+	if (id === "graphs") return "graph layouts and families";
 	for (const g of GROUPS) {
 		if (g.id === id) return g.title;
 		const f = g.features.find((x) => x.id === id);

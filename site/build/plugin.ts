@@ -51,9 +51,9 @@ export const DOCS: Doc[] = [
 	{
 		file: "docs/authoring-a-tool.md",
 		page: "docs-charts.html",
-		title: "Chart reference",
-		summary: "Every chart a tool can return, and what each one needs from the data.",
-		sections: ["9. Charts"],
+		title: "Charts and graphs",
+		summary: "Every chart and graph a tool can return, and what each one needs from the data.",
+		sections: ["9. Charts", "9b. Graphs"],
 	},
 	{ file: "docs/versioning.md", page: "docs-versioning.html", title: "Versioning", summary: "The compatibility promise, and how the contract version rises." },
 	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it." },

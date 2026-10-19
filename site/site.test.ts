@@ -17,7 +17,7 @@ import { extname, join, normalize } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, chromium } from "playwright";
 import { DOCS } from "./build/plugin.ts";
-import { browsers, chartTypes, stats } from "./build/stats.ts";
+import { browsers, chartTypes, graphLayouts, stats } from "./build/stats.ts";
 
 const DIST = join(import.meta.dirname, "dist");
 const ROOT = join(import.meta.dirname, "..");
@@ -145,6 +145,8 @@ describe("figures on the landing page", () => {
 		// Seven series shapes and five chart kinds of their own, as the SDK's types state them today.
 		assert.deepEqual(chartTypes(), ["line", "area", "bar", "points", "step", "band", "box", "heatmap", "pie", "radar", "treemap", "venn"]);
 		assert.equal(byId.charts, String(chartTypes().length));
+		assert.deepEqual(graphLayouts(), ["layered", "tree", "radial", "force", "manual"]);
+		assert.equal(byId.layouts, "5");
 	});
 
 	it("names the browsers the suite runs in, and labels them for a screen reader", () => {

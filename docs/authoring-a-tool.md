@@ -932,6 +932,8 @@ group's members share one lane. A case whose output breaks one fails, because th
 graph rather than draw it. Nothing about size is refused unless you say so: `limits: { nodes: 200 }` makes a
 larger graph a table and a sentence saying why.
 
+<!-- site: gallery graphs -->
+
 ## 10. Help text
 
 `README.md` in the tool directory, referenced by `help`. The host renders it beside or below the tool.
