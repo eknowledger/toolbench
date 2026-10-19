@@ -490,9 +490,15 @@ for (const file of unclaimed) {
  * manifests, the same cost a consumer pays, and 7,078 the page's own script and stylesheet. The line
  * was drafted at 33_000 against 31,240, before the graph kind (#181 to #183) grew the runtime by about
  * 0.9 KB; turning off Vite's modulepreload polyfill took 0.2 KB back. 33_000 would have left 204 bytes.
+ *
+ * Raised to 35_000 when the site moved onto 0.10.1, measured at 34,610: the runtime with the site's
+ * manifests is now 27,571, up 1,853 from the Copy action, byte colours, the declared-sdk check, the
+ * grammar and the fix that lets a wide result scroll, all spent in the runtime and paid by every consumer
+ * too. The page's own script and stylesheet are 7,039, 39 fewer than before. 34_000 would have been 610
+ * bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 35_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
