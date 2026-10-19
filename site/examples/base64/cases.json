@@ -1,0 +1,77 @@
+[
+  {
+    "name": "decodes the canonical example",
+    "input": {
+      "source": "SGVsbG8sIHdvcmxkIQ==",
+      "view": "ascii"
+    },
+    "expect": {
+      "kind": "group",
+      "parts": [
+        {
+          "kind": "fields",
+          "fields": [
+            {
+              "label": "Bytes",
+              "value": "13"
+            },
+            {
+              "label": "Padding",
+              "value": "present"
+            },
+            {
+              "label": "Alphabet",
+              "value": "standard"
+            }
+          ]
+        },
+        {
+          "kind": "table",
+          "caption": "Sixteen bytes per row",
+          "columns": [
+            {
+              "label": "Offset",
+              "align": "end"
+            },
+            {
+              "label": "ASCII",
+              "mono": true
+            }
+          ],
+          "rows": [
+            [
+              "0",
+              "Hello, world!"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects a character outside the alphabet, and says where",
+    "input": {
+      "source": "SGVs*bG8=",
+      "view": "hex"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "\"*\" is not a Base64 character.",
+      "input": "source",
+      "at": 4,
+      "len": 1
+    }
+  },
+  {
+    "name": "empty input is an error, not an empty result",
+    "input": {
+      "source": "   ",
+      "view": "hex"
+    },
+    "expect": {
+      "kind": "error",
+      "message": "Nothing to decode.",
+      "input": "source"
+    }
+  }
+]

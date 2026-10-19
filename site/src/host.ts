@@ -38,7 +38,7 @@ export function boot({ styles = "", perTool, extra, highlight }: BootOptions = {
 		workerFactory: () => new Worker(new URL("./tool.worker.ts", import.meta.url), { type: "module" }),
 		// #endregion
 		// Relative, so the same pages work at / locally and under a sub-path on Pages.
-		pageUrl: (id) => `./gallery.html#${encodeURIComponent(id)}`,
+		pageUrl: (id) => `./gallery.html#tool-${encodeURIComponent(id)}`,
 		styles: all,
 		...(highlight ? { highlight } : {}),
 	});

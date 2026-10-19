@@ -17,7 +17,7 @@ import { extname, join, normalize } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, chromium } from "playwright";
 import { DOCS } from "./build/plugin.ts";
-import { stats } from "./build/stats.ts";
+import { browsers, chartTypes, stats } from "./build/stats.ts";
 
 const DIST = join(import.meta.dirname, "dist");
 const ROOT = join(import.meta.dirname, "..");
@@ -84,7 +84,7 @@ describe("links in the built site", () => {
 	}
 
 	it("the gallery lists exactly the tools in tools/", () => {
-		const listed = [...(html.get("gallery.html") ?? "").matchAll(/data-pick="([^"]+)"/g)].map((m) => m[1]).sort();
+		const listed = [...(html.get("gallery.html") ?? "").matchAll(/data-tool="([^"]+)"/g)].map((m) => m[1]).sort();
 		assert.deepEqual(listed, toolIds);
 	});
 
@@ -137,13 +137,20 @@ describe("figures on the landing page", () => {
 		);
 	});
 
-	it("derives the counts the way their owners state them", () => {
-		// Read independently of stats.ts, from the same files, so a parsing slip in one shows in the other.
+	it("derives the figures the way their owners state them", () => {
+		// Read independently of stats.ts where possible, so a parsing slip in one shows in the other.
 		const byId = Object.fromEntries(stats().map((s) => [s.id, s.value]));
-		assert.equal(byId.tools, String(toolIds.length));
-		assert.equal(byId.engines, String(/browser:\s*\[([^\]]+)\]/.exec(readFileSync(join(ROOT, ".github/workflows/build.yml"), "utf8"))?.[1]?.split(",").length));
 		assert.equal(byId.contract, `v${/SDK_VERSION = (\d+)/.exec(readFileSync(join(ROOT, "packages/sdk/src/version.ts"), "utf8"))?.[1]}`);
 		assert.equal(byId.dependencies, "0");
+		// Seven series shapes and five chart kinds of their own, as the SDK's types state them today.
+		assert.deepEqual(chartTypes(), ["line", "area", "bar", "points", "step", "band", "box", "heatmap", "pie", "radar", "treemap", "venn"]);
+		assert.equal(byId.charts, String(chartTypes().length));
+	});
+
+	it("names the browsers the suite runs in, and labels them for a screen reader", () => {
+		assert.deepEqual(browsers(), ["Chrome", "Firefox", "Safari"]);
+		const tile = /data-stat="browsers" aria-label="([^"]+)"/.exec(landing)?.[1];
+		assert.equal(tile, "Tested in Chrome, Firefox and Safari");
 	});
 });
 
@@ -189,8 +196,8 @@ describe("the site in a browser", () => {
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on("pageerror", (e) => errors.push(e.message));
-			await page.goto(`${origin}gallery.html#${id}`);
-			const host = page.locator(`section.tool-pane#${id} tool-host`);
+			await page.goto(`${origin}gallery.html#tool-${id}`);
+			const host = page.locator(`#tool-${id} .card-live tool-host`);
 			await host.locator(".tb-run, .tb-output").first().waitFor({ timeout: 10_000 });
 			// autoRun tools may have no Run button; everything else is run the way a reader would.
 			const run = host.locator(".tb-run");
@@ -216,17 +223,57 @@ describe("the site in a browser", () => {
 		}
 		await page.waitForFunction(
 			() =>
-				[...document.querySelectorAll(".chart tool-host")].every((h) => h.shadowRoot?.querySelector(".tb-output [data-kind], .tb-output svg")),
+				[...document.querySelectorAll("[id^='chart-'] .card-live tool-host")].every((h) => h.shadowRoot?.querySelector(".tb-output [data-kind], .tb-output svg")),
 			undefined,
 			{ timeout: 20_000 },
 		);
 		const blank = await page.evaluate(() =>
-			[...document.querySelectorAll(".feature-demo tool-host, .chart tool-host")]
+			[...document.querySelectorAll(".card-live tool-host")]
 				.filter((h) => !h.shadowRoot || h.shadowRoot.childElementCount === 0)
 				.map((h) => h.getAttribute("tool")),
 		);
 		assert.deepEqual(blank, [], "these examples drew nothing");
 		assert.deepEqual(errors, []);
+		await page.close();
+	});
+
+	it("a card's tabs follow the ARIA pattern from the keyboard", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#tool-histogram`);
+		const card = page.locator("#tool-histogram");
+		const tabs = card.locator("[role=tab]");
+		const names = await tabs.allTextContents();
+		assert.deepEqual(names, ["Live", "tool.json", "index.ts", "Embed"]);
+		await tabs.first().focus();
+		await page.keyboard.press("ArrowRight");
+		assert.equal(await page.evaluate(() => document.activeElement?.textContent), "tool.json");
+		assert.equal(await tabs.nth(1).getAttribute("aria-selected"), "true");
+		assert.equal(await tabs.nth(0).getAttribute("tabindex"), "-1");
+		assert.equal(await card.locator("#tool-histogram-panel-1").isVisible(), true);
+		await page.keyboard.press("End");
+		assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Embed");
+		await page.keyboard.press("ArrowRight");
+		assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Live", "Right from the last tab wraps to the first");
+		await page.keyboard.press("Home");
+		assert.equal(await tabs.nth(0).getAttribute("aria-selected"), "true");
+		await page.close();
+	});
+
+	it("a card keeps its size and its tool's state across a tab switch", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#tool-utf8-bytes`);
+		const card = page.locator("#tool-utf8-bytes");
+		const host = card.locator(".card-live tool-host");
+		await host.locator(".tb-textarea").fill("state kept");
+		await host.locator(".tb-run").click();
+		await host.locator(".tb-output [data-kind]").first().waitFor();
+		const before = await card.boundingBox();
+		await card.locator("[role=tab]", { hasText: "index.ts" }).click();
+		const during = await card.boundingBox();
+		assert.equal(during?.height, before?.height, "the card changed height when the tab changed");
+		await card.locator("[role=tab]", { hasText: "Live" }).click();
+		assert.equal(await host.locator(".tb-textarea").inputValue(), "state kept");
+		assert.ok(await host.locator(".tb-output [data-kind]").count(), "the result was lost");
 		await page.close();
 	});
 
@@ -264,7 +311,7 @@ describe("the site in a browser", () => {
 		await page.goto(`${origin}docs-architecture.html`, { waitUntil: "networkidle" });
 		assert.ok((await page.locator("figure.diagram svg").count()) >= 8);
 		// An allowlist: the page's own entry and the shared chunks the site builds, nothing else.
-		for (const s of scripts) assert.match(s, /\/assets\/(?:docs|theme|copy)-[\w-]+\.js$/, s);
+		for (const s of scripts) assert.match(s, /\/assets\/(?:docs|theme|copy|panels)-[\w-]+\.js$/, s);
 		await page.close();
 	});
 });

@@ -1,22 +1,40 @@
 /**
- * The figures the landing page shows off, each read from the file that owns it at build time. None is
- * typed into the page, so none can be right on the day it is written and wrong a release later.
+ * The figures on the landing page, each read at build time from the file that owns it, so none can be
+ * right on the day it is written and wrong a release later.
  *
  * Imported by the build and by site.test.ts, which checks every tile on the built page against these.
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
+const TYPES = "packages/sdk/src/types.ts";
 
-export type Stat = { id: string; value: string; label: string; source: string };
+export type Stat = { id: string; value: string; label: string };
 
-/** A number exported as a literal from the SDK's source, read as text so the build needs no compiled SDK. */
-function arrayLength(file: string, name: string): number {
-	const m = new RegExp(`export const ${name}[^=]*=\\s*\\[([\\s\\S]*?)\\]`).exec(read(file));
-	if (!m?.[1]) throw new Error(`${file} has no array ${name}`);
-	return [...m[1].matchAll(/"[^"]+"/g)].length;
+/** The string members of an array exported as a literal from the SDK, read as text so no build is needed. */
+function members(name: string): string[] {
+	const m = new RegExp(`export const ${name}[^=]*=\\s*\\[([\\s\\S]*?)\\]`).exec(read(TYPES));
+	return m?.[1] ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1] ?? "") : [];
+}
+
+/** Result kinds that are not charts. Every other kind in OUTPUT_KINDS is a chart of its own. */
+const NOT_CHARTS = new Set(["fields", "text", "code", "table", "series", "group", "error", "bytes", "graph"]);
+
+export function chartTypes(): string[] {
+	// A series chart draws in any of its shapes, and each of the other chart kinds is one more type.
+	const shapes = /shape\?:\s*((?:"[a-z]+"\s*\|?\s*)+);/.exec(read(TYPES))?.[1]?.match(/"([a-z]+)"/g)?.map((s) => s.slice(1, -1));
+	if (!shapes?.length) throw new Error(`${TYPES} has no series shape union`);
+	return [...shapes, ...members("OUTPUT_KINDS").filter((k) => !NOT_CHARTS.has(k))];
+}
+
+/** The engines build.yml runs the browser suite in, as the browsers a reader knows them by. */
+export function browsers(): string[] {
+	const names: Record<string, string> = { chromium: "Chrome", firefox: "Firefox", webkit: "Safari" };
+	const matrix = /browser:\s*\[([^\]]+)\]/.exec(read(".github/workflows/build.yml"))?.[1]?.split(",").map((s) => s.trim());
+	if (!matrix?.length) throw new Error(".github/workflows/build.yml has no browser matrix");
+	return matrix.map((e) => names[e] ?? e);
 }
 
 export function stats(): Stat[] {
@@ -31,29 +49,19 @@ export function stats(): Stat[] {
 	const contract = /export const SDK_VERSION = (\d+)/.exec(read("packages/sdk/src/version.ts"))?.[1];
 	if (!contract) throw new Error("packages/sdk/src/version.ts has no SDK_VERSION");
 
-	const engines = /browser:\s*\[([^\]]+)\]/.exec(read(".github/workflows/build.yml"))?.[1]?.split(",").map((s) => s.trim()).filter(Boolean);
-	if (!engines?.length) throw new Error(".github/workflows/build.yml has no browser matrix");
-
-	// The Count column of the testing table in docs/architecture.md §12, which `pnpm test:counts --update` owns.
-	const arch = read("docs/architecture.md");
-	const table = /\| Layer \| Where it runs \| What it covers \| Count \|\n\|[-|]+\|\n((?:\|.*\|\n)+)/.exec(arch)?.[1];
-	if (!table) throw new Error("docs/architecture.md has no testing table with a Count column");
-	const tests = table
-		.trim()
-		.split("\n")
-		.map((row) => Number(/\|\s*(\d+)\s*\|\s*$/.exec(row)?.[1] ?? Number.NaN));
-	if (tests.some(Number.isNaN)) throw new Error("a row of the testing table has no count");
-
-	const tools = readdirSync(join(ROOT, "tools"), { withFileTypes: true }).filter((d) => d.isDirectory()).length;
-
-	return [
-		{ id: "runtime", value: `${runtimeKb} KB`, label: "runtime, gzipped", source: "README.md, written by scripts/size-check.mjs" },
-		{ id: "dependencies", value: String(external.length), label: external.length === 1 ? "dependency" : "dependencies", source: "packages/*/package.json" },
-		{ id: "contract", value: `v${contract}`, label: "contract, every older version still runs", source: "packages/sdk/src/version.ts" },
-		{ id: "kinds", value: String(arrayLength("packages/sdk/src/types.ts", "OUTPUT_KINDS")), label: "result kinds", source: "OUTPUT_KINDS" },
-		{ id: "inputs", value: String(arrayLength("packages/sdk/src/types.ts", "INPUT_TYPES")), label: "input types", source: "INPUT_TYPES" },
-		{ id: "engines", value: String(engines.length), label: "browser engines tested", source: ".github/workflows/build.yml" },
-		{ id: "tests", value: String(tests.reduce((a, b) => a + b, 0)), label: "tests", source: "docs/architecture.md, written by scripts/test-counts.mjs" },
-		{ id: "tools", value: String(tools), label: "example tools", source: "tools/" },
+	const out: Stat[] = [
+		{ id: "runtime", value: `${runtimeKb} KB`, label: "runtime, gzipped" },
+		{ id: "dependencies", value: String(external.length), label: external.length === 1 ? "dependency" : "dependencies" },
+		{ id: "contract", value: `v${contract}`, label: "contract, and every older one still runs" },
+		{ id: "charts", value: String(chartTypes().length), label: "chart types" },
+		{ id: "kinds", value: String(members("OUTPUT_KINDS").length), label: "result kinds" },
+		{ id: "inputs", value: String(members("INPUT_TYPES").length), label: "input types" },
 	];
+	/*
+	 * The graph layouts tile, waiting for the graph result kind. It appears once the SDK exports a
+	 * GRAPH_LAYOUTS list, with no change here; until then there is nothing true to show.
+	 */
+	const layouts = members("GRAPH_LAYOUTS");
+	if (layouts.length) out.push({ id: "layouts", value: String(layouts.length), label: "graph layouts" });
+	return out;
 }

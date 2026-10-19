@@ -728,7 +728,8 @@ execute with no build step. Any bundler for the host site; the examples use Vite
 | `packages/sdk` | The contract: types, manifest validation, version migration, fixture runner. No dependencies, no DOM. |
 | `packages/runtime` | `<tool-host>`: the element, the form, the renderers, the runner, the worker protocol. |
 | `tools/` | Three example tools (`percentiles`, `queue-explorer`, `utf8-bytes`), with fixtures and help. |
-| `bench/` | The test bench, also the live demo: three display modes, both threading modes, host theming, and a tool that fails on purpose (on its own page). |
+| `bench/` | The test bench, which the browser suite runs against: three display modes, both threading modes, host theming, and a tool that fails on purpose (on its own page). Local only, with `pnpm bench`. |
+| `site/` | The project site and its gallery, published to GitHub Pages. |
 | `docs/` | Architecture, authoring, versioning. |
 
 ```sh

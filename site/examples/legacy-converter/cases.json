@@ -1,0 +1,21 @@
+[
+  {
+    "name": "still runs, and repeats its input",
+    "input": {
+      "value": 1
+    },
+    "expect": {
+      "kind": "fields",
+      "fields": [
+        {
+          "label": "state",
+          "value": "still runs"
+        },
+        {
+          "label": "value",
+          "value": "1"
+        }
+      ]
+    }
+  }
+]

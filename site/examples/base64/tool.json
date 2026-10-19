@@ -1,0 +1,50 @@
+{
+  "sdk": 1,
+  "id": "base64",
+  "name": "Base64 decoder",
+  "blurb": "Decodes Base64 and shows what the bytes actually are, including where it breaks.",
+  "version": "1.0.0",
+  "capabilities": [
+    "pure"
+  ],
+  "runtime": {
+    "entry": "index.ts",
+    "thread": "main"
+  },
+  "kinds": [
+    "group",
+    "fields",
+    "table",
+    "error"
+  ],
+  "card": "live",
+  "cardFields": 3,
+  "inputs": [
+    {
+      "id": "source",
+      "type": "textarea",
+      "label": "Base64",
+      "description": "Standard or URL-safe alphabet. Padding optional.",
+      "primary": true,
+      "dir": "ltr",
+      "rows": 3,
+      "default": "SGVsbG8sIHdvcmxkIQ=="
+    },
+    {
+      "id": "view",
+      "type": "select",
+      "label": "Show bytes as",
+      "default": "hex",
+      "options": [
+        {
+          "value": "hex",
+          "label": "Hex"
+        },
+        {
+          "value": "ascii",
+          "label": "ASCII"
+        }
+      ]
+    }
+  ]
+}

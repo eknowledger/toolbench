@@ -5,3 +5,4 @@ dist/
 bench/dist/
 test-results/
 docs/plans/
+site/.diagram-tools/

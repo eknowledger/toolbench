@@ -62,7 +62,9 @@ output, one fixture, and an `error` return with a fixture for it. Those last two
 skip, which is why the template includes them rather than leaving them as an exercise.
 
 The rest of this section is what you replace that starter with. A Base64 decoder is a good first tool
-because it has real errors, and it wants two result shapes at once.
+because it has real errors, and it wants two result shapes at once. This is where it ends up:
+
+<!-- site: embed base64 -->
 
 ### Step 1: the manifest
 
@@ -161,8 +163,8 @@ export default {
           kind: "table",
           caption: "Sixteen bytes per row",
           columns: [
-            { key: "offset", label: "Offset", align: "end" },
-            { key: "bytes", label: view === "hex" ? "Hex" : "ASCII", mono: true },
+            { label: "Offset", align: "end" },
+            { label: view === "hex" ? "Hex" : "ASCII", mono: true },
           ],
           rows: rowsOf(bytes, view),
         },
@@ -207,10 +209,10 @@ Four decisions worth copying:
           "kind": "table",
           "caption": "Sixteen bytes per row",
           "columns": [
-            { "key": "offset", "label": "Offset", "align": "end" },
-            { "key": "bytes", "label": "ASCII", "mono": true }
+            { "label": "Offset", "align": "end" },
+            { "label": "ASCII", "mono": true }
           ],
-          "rows": [[{ "value": "0" }, { "value": "Hello, world!" }]]
+          "rows": [["0", "Hello, world!"]]
         }
       ]
     }
@@ -316,6 +318,8 @@ a tool that claims to be gone and then runs anyway.
 
 Do not keep `card: "live"` on either. Validation refuses it. A compact slot that opens a retired tool,
 or that presents a deprecated one as current, is a field that lies.
+
+<!-- site: gallery lifecycle -->
 
 ## 4. Inputs
 
@@ -507,6 +511,8 @@ the build with the sample's label in the message. An `{ kind: "error" }` result 
 malformed sample is the one that earns the feature, and rejecting bad input is the tool working. A sample
 that overruns its budget is reported as slow rather than as a crash, so the two diagnoses stay apart.
 
+<!-- site: gallery samples -->
+
 ## 4c. Presets on a select
 
 When the right values for several inputs depend on one earlier choice, make that choice a select whose
@@ -563,6 +569,8 @@ options. Clamping is not on offer, for the same reason. On top of those:
 * the default option's `sets` must equal those inputs' `default`s. The form opens on that option;
 * `sets` with no keys is refused, and `sets` written on the input instead of an option is refused with a
   message saying where it belongs.
+
+<!-- site: gallery presets -->
 
 ## 5. Results
 
@@ -670,6 +678,8 @@ ellipsis, because the truncated half is the half that says what to fix.
 console, and does not pretend the input was at fault. Do not catch your own bugs and report them as
 input errors; that sends the reader off to fix something that was never broken.
 
+<!-- site: gallery failures -->
+
 ## 7. Long-running tools
 
 If the running time depends on an input, declare a worker and honour the signal:
@@ -700,6 +710,8 @@ run({ samples }, ctx) {
 * **Worker mode is a stability boundary, not a security one.** It exists so a runaway loop can be
   terminated without freezing the page. It shares the page's origin and cookies.
 * **`autoRun` is refused here.** A tool that declared a worker did so because it can be slow.
+
+<!-- site: gallery worker -->
 
 ## 8. Fixtures
 
@@ -866,6 +878,8 @@ Three more kinds, each its own output and its own chunk, from contract version 4
 * **Venn:** two or three sets. Two are drawn exactly. Three cannot in general be drawn exactly with
   circles, so every region carries its count and the caption says the areas are approximate. Give each
   overlap as the full intersection: `[0, 1]` includes what is also in set 2.
+
+<!-- site: gallery charts -->
 
 ## 9b. Graphs
 

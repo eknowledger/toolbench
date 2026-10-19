@@ -9,7 +9,7 @@
  * The examples use the tools in `tools/` and, read only, the bench's fixtures, which exist to put one
  * runtime feature on screen each. The site owns no tools of its own.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { codeBlock, escapeHtml } from "./highlight.ts";
 
@@ -148,7 +148,7 @@ export const GROUPS: Group[] = [
 			{
 				id: "answer-first",
 				title: "The answer first",
-				text: "<code>layout=\"answer-first\"</code> leads with the result and puts the controls underneath, for a tool that opens a page about something else. This page presses Run once, through <code>host.run()</code>.",
+				text: "<code>layout=\"answer-first\"</code> leads with the result and puts the controls underneath, for a tool that opens a page about something else.",
 				demo: `<tool-host tool="percentiles" mode="embed" layout="answer-first" data-run></tool-host>`,
 				code: (demo) => [demo, region("site/src/gallery.ts", "run")],
 			},
@@ -265,12 +265,12 @@ export const GROUPS: Group[] = [
 	{
 		id: "host",
 		title: "Fitting it to your site",
-		text: "The tools live in shadow roots: your CSS cannot break them, and theirs cannot break your page. These are the ways in.",
+		text: "The tools live in shadow roots: your CSS cannot break them, and theirs cannot break your page.",
 		features: [
 			{
 				id: "theming",
 				title: "Theming with custom properties",
-				text: "A dozen <code>--tb-*</code> properties set colours, type and radius. The same tool, once in this site's theme and once in another.",
+				text: "A dozen <code>--tb-*</code> properties set colours, type and radius.",
 				wide: true,
 				demo: `<div class="demo-grid">
       <tool-host tool="utf8-bytes" mode="card"></tool-host>
@@ -299,36 +299,100 @@ export const GROUPS: Group[] = [
 	},
 ];
 
-function feature(f: Feature, codes: Code[]): string {
+type Tab = { name: string; codes: Code[] };
+type Card = { id: string; title: string; meta: string; text?: string; live: string; tabs: Tab[]; wide?: boolean; tool?: string };
+
+const basename = (label: string) => label.split(/[/,]/).filter(Boolean).at(-1)?.trim() ?? label;
+
+/**
+ * Sort a feature's code into the card's tabs: the manifest, the function or host code, and the embed
+ * snippet. Only tabs with something in them are drawn.
+ */
+function tabsFor(codes: Code[]): Tab[] {
+	const manifest = codes.filter((c) => c.lang === "json" && c.label.includes("tool.json"));
+	const embed = codes.filter((c) => c.lang === "html");
+	const code = codes.filter((c) => !manifest.includes(c) && !embed.includes(c));
+	const tabs: Tab[] = [];
+	if (manifest.length) tabs.push({ name: "tool.json", codes: manifest });
+	if (code.length) tabs.push({ name: code[0]?.label.startsWith("What run") || code[0]?.label === "run() returns" ? "Result" : basename(code[0]?.label ?? "Code"), codes: code });
+	if (embed.length) tabs.push({ name: "Embed", codes: embed.map((c) => ({ ...c, label: "Embed" })) });
+	return tabs;
+}
+
+/**
+ * One gallery card: a heading, then tabs (the ARIA tabs pattern, driven by src/tabs.ts). The Live panel
+ * sizes the card; a code panel fills the same box and scrolls inside it, so switching tabs never moves
+ * the grid. The Live panel is only made invisible when another tab is chosen, never removed, so the tool
+ * in it keeps the reader's inputs and result.
+ */
+function card(c: Card): string {
+	const all = [{ name: "Live", codes: [] as Code[] }, ...c.tabs];
+	const tab = (t: Tab, k: number) =>
+		`<button type="button" role="tab" id="${c.id}-tab-${k}" aria-controls="${c.id}-panel-${k}" aria-selected="${k === 0}" tabindex="${k === 0 ? 0 : -1}">${escapeHtml(t.name)}</button>`;
+	const panel = (t: Tab, k: number) =>
+		k === 0
+			? `<div class="card-panel card-live" role="tabpanel" id="${c.id}-panel-0" aria-labelledby="${c.id}-tab-0">${c.live}</div>`
+			: `<div class="card-panel card-code" role="tabpanel" id="${c.id}-panel-${k}" aria-labelledby="${c.id}-tab-${k}" tabindex="0" hidden>${t.codes.map((x) => codeBlock(x.text, x.lang, x.label)).join("")}</div>`;
 	return `
-  <section class="feature${f.wide ? " feature-wide" : ""}" id="${f.id}" aria-labelledby="${f.id}-h">
-    <div class="feature-head">
-      <h3 id="${f.id}-h"><a href="#${f.id}">${escapeHtml(f.title)}</a></h3>
-      <p>${f.text}</p>
-    </div>
-    <div class="feature-demo">${f.demo}</div>
-    <div class="feature-code">${codes.map((c) => codeBlock(c.text, c.lang, c.label)).join("")}</div>
-  </section>`;
+  <article class="card${c.wide ? " card-wide" : ""}" id="${c.id}" aria-labelledby="${c.id}-h"${c.tool ? ` data-tool="${c.tool}"` : ""}>
+    <header class="card-head"><h3 id="${c.id}-h"><a href="#${c.id}">${escapeHtml(c.title)}</a></h3><span class="card-meta">${escapeHtml(c.meta)}</span></header>
+    ${c.text ? `<p class="card-text">${c.text}</p>` : ""}
+    <div class="card-tabs" role="tablist" aria-label="${escapeHtml(c.title)}">${all.map(tab).join("")}</div>
+    <div class="card-panels">${all.map(panel).join("")}</div>
+  </article>`;
+}
+
+const KIND_WORDS: Record<string, string> = { fields: "fields", table: "a table", series: "a chart", text: "text", code: "code", bytes: "bytes" };
+function list(words: string[]): string {
+	return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
+/** The example tools in tools/, one card each, with the whole manifest and the whole function. */
+function toolCards(): string {
+	const dirs = readdirSync(join(ROOT, "tools"), { withFileTypes: true })
+		.filter((d) => d.isDirectory())
+		.map((d) => d.name);
+	const cards = dirs
+		.map((id) => ({ id, m: manifest(`tools/${id}`) as Manifest & { name: string; kinds: string[] } }))
+		.sort((a, b) => a.m.name.localeCompare(b.m.name))
+		.map(({ id, m }) => {
+			const embed = `<tool-host tool="${id}" mode="embed"></tool-host>`;
+			return card({
+				id: `tool-${id}`,
+				tool: id,
+				title: m.name,
+				text: escapeHtml((m as unknown as { blurb: string }).blurb),
+				meta: `Returns ${list(m.kinds.map((k) => KIND_WORDS[k]).filter((k): k is string => Boolean(k)))}`,
+				live: embed,
+				tabs: [
+					{ name: "tool.json", codes: [{ label: `tools/${id}/tool.json`, lang: "json", text: read(`tools/${id}/tool.json`).replace(/\n$/, "") }] },
+					{ name: "index.ts", codes: [{ label: `tools/${id}/index.ts`, lang: "ts", text: read(`tools/${id}/index.ts`).replace(/\t/g, "  ").replace(/\n$/, "") }] },
+					{ name: "Embed", codes: [markup(embed)] },
+				],
+			});
+		});
+	return `
+<section class="group" id="tools" aria-labelledby="tools-h">
+  <div class="group-head"><h2 id="tools-h">Example tools</h2></div>
+  <div class="cards">${cards.join("")}
+  </div>
+</section>`;
 }
 
 async function charts(): Promise<string> {
-	const figures: string[] = [];
+	const cards: string[] = [];
 	for (const c of CHARTS) {
-		const result = await output(`${FIX}/discrete-series`, { case: c.id }, "The result that draws it");
-		figures.push(`
-    <figure class="chart" id="chart-${c.id}">
-      <figcaption><strong>${escapeHtml(c.title)}.</strong> ${escapeHtml(c.text)}</figcaption>
-      <tool-host tool="discrete-series" mode="embed" controls="none" data-values='{"case":"${c.id}"}' data-run></tool-host>
-      <details class="chart-code"><summary>The result that draws it</summary>${codeBlock(result.text, "json", "run() returns")}</details>
-    </figure>`);
+		const result = await output(`${FIX}/discrete-series`, { case: c.id }, "run() returns");
+		const live = `<tool-host tool="discrete-series" mode="embed" controls="none" data-values='{"case":"${c.id}"}' data-run></tool-host>`;
+		cards.push(card({ id: `chart-${c.id}`, title: c.title, meta: "chart", text: escapeHtml(c.text), live, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
 	}
 	return `
 <section class="group" id="charts" aria-labelledby="charts-h">
   <div class="group-head">
     <h2 id="charts-h">Charts</h2>
-    <p>Every chart kind, drawn by the runtime with no charting library. Each answers a pointer and the keyboard, and carries its numbers as a table. Under each is the result the tool returned, which is all a tool ever writes.</p>
+    <p>Every chart kind, drawn by the runtime with no charting library. Each answers a pointer and the keyboard, and carries its numbers as a table.</p>
   </div>
-  <div class="chart-grid">${figures.join("")}
+  <div class="cards">${cards.join("")}
   </div>
 </section>
 <section class="group" id="graphs" aria-labelledby="graphs-h">
@@ -352,19 +416,35 @@ async function charts(): Promise<string> {
 
 /** The whole gallery body. */
 export async function galleryFeatures(): Promise<string> {
-	const out: string[] = [];
+	const out: string[] = [toolCards()];
 	for (const g of GROUPS) {
-		const sections: string[] = [];
-		for (const f of g.features) sections.push(feature(f, await f.code(markup(f.demo))));
+		const cards: string[] = [];
+		for (const f of g.features) {
+			const codes = await f.code(markup(f.demo));
+			cards.push(card({ id: f.id, title: f.title, meta: g.title, text: f.text, live: f.demo, tabs: tabsFor(codes), ...(f.wide ? { wide: true } : {}) }));
+		}
 		out.push(`
 <section class="group" id="${g.id}" aria-labelledby="${g.id}-h">
   <div class="group-head">
     <h2 id="${g.id}-h">${escapeHtml(g.title)}</h2>
     <p>${g.text}</p>
-  </div>${sections.join("")}
+  </div>
+  <div class="cards">${cards.join("")}
+  </div>
 </section>`);
 	}
 	return out.join("") + (await charts());
+}
+
+/** The title of a gallery group or feature by its id, for links into the gallery from the docs. */
+export function galleryTitle(id: string): string | undefined {
+	if (id === "charts") return "every chart kind";
+	for (const g of GROUPS) {
+		if (g.id === id) return g.title;
+		const f = g.features.find((x) => x.id === id);
+		if (f) return f.title;
+	}
+	return undefined;
 }
 
 /** The gallery's own contents list, groups and their features. */
@@ -382,4 +462,3 @@ export function galleryIndex(): string {
 		)
 		.join("")}</ol>`;
 }
-

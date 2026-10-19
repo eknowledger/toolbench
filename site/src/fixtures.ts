@@ -6,6 +6,7 @@
  * Left out: `json-code`, which duplicates what the regex explainer's code result already shows, and
  * `deprecated` and `retired`, whose links point at bench pages; site/examples/ has the site's own.
  */
+import { examples } from "./examples.ts";
 import { entries } from "./registry.ts";
 
 export const fixtures = {
@@ -14,8 +15,5 @@ export const fixtures = {
 		import.meta.glob(["../../bench/fixtures/*/index.ts", "!**/json-code/*", "!**/deprecated/*", "!**/retired/*"]) as Record<string, () => Promise<unknown>>,
 	),
 	// The site's own examples, for what a fixture cannot show here. See site/examples/.
-	...entries(
-		import.meta.glob("../examples/*/tool.json", { eager: true, import: "default" }) as Record<string, unknown>,
-		import.meta.glob("../examples/*/index.ts") as Record<string, () => Promise<unknown>>,
-	),
+	...examples,
 };

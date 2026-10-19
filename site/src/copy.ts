@@ -47,3 +47,6 @@ document.addEventListener("click", (event) => {
 		void copy(button, text, "the install command");
 	}
 });
+
+// A module, so its names stay its own.
+export {};

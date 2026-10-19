@@ -45,15 +45,11 @@ jobs:
         # not the missing build.
         run: pnpm build
 
-      - name: Install Chromium
-        # For the site's browser checks, and for the build itself if a diagram in the docs changed
-        # without its drawing being committed: the build draws it rather than failing.
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Build the site for the Pages root
+        # No browser: the docs' diagrams are read from site/build/diagrams/, drawn by `pnpm site:diagrams`
+        # and committed. A diagram edited without redrawing fails this step and names that command.
         env:
           SITE_BASE: /toolbench/
-          CHROME_CHANNEL: chromium
         run: pnpm site:build
 
       - name: Confirm the prefix landed in the markup
@@ -69,7 +65,9 @@ jobs:
         env:
           SITE_BASE: /toolbench/
           CHROME_CHANNEL: chromium
-        run: pnpm test:site
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:site
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6.0.0
         if: github.ref == 'refs/heads/main'

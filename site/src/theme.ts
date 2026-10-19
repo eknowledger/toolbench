@@ -52,3 +52,6 @@ document.addEventListener("click", (event) => {
 	}
 	apply(next);
 });
+
+// A module, so its names stay its own.
+export {};

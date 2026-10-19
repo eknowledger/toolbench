@@ -17,14 +17,14 @@
  *
  * `transformIndexHtml` runs in dev and in the build alike, so the dev server shows what ships.
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import type { Plugin } from "vite";
-import { diagram, mermaidBlocks, prepareDiagrams } from "./diagrams.ts";
-import { galleryFeatures, galleryIndex } from "./gallery.ts";
+import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
+import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
-import { stats } from "./stats.ts";
+import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const GITHUB = "https://github.com/eknowledger/toolbench";
@@ -96,12 +96,34 @@ function rendered(doc: Doc): Rendered {
 		if (page) return hash ? `./${page.page}#${hash}` : `./${page.page}`;
 		return `${BLOB}/${target}${hash ? `#${hash}` : ""}`;
 	};
-	const out = renderMarkdown(text, { linkFor, dropContents: true, diagram });
+	const out = renderMarkdown(text, { linkFor, dropContents: true, diagram, marker });
 	cache.set(doc.page, out);
 	return out;
 }
 
+/**
+ * What a `<!-- site: ... -->` line in the docs becomes. `embed id` puts the tool on the page, live;
+ * `gallery id` links to the gallery example that shows the feature the section describes.
+ */
+function marker(kind: string, arg: string): string {
+	if (kind === "embed") {
+		const name = (JSON.parse(read(`site/examples/${arg}/tool.json`)) as { name: string }).name;
+		return `<figure class="live-embed"><tool-host tool="${escapeHtml(arg)}" mode="page" data-run></tool-host><figcaption>The ${escapeHtml(name)} this walkthrough builds, running.</figcaption></figure>`;
+	}
+	if (kind === "gallery") {
+		const title = galleryTitle(arg);
+		if (!title) throw new Error(`a docs marker links to gallery#${arg}, which the gallery does not have`);
+		return `<p class="see-live"><a href="./gallery.html#${escapeHtml(arg)}"><span class="live-dot" aria-hidden="true"></span>See it live: ${escapeHtml(title)}</a></p>`;
+	}
+	throw new Error(`unknown docs marker "site: ${kind}"`);
+}
+
 /** A docs page by its file name, `docs-charts.html`, which is unique where a markdown file need not be. */
+/** Every ```mermaid block the site renders, for the build's check and for `pnpm site:diagrams`. */
+export function diagramSources(): string[] {
+	return DOCS.flatMap((d) => mermaidBlocks(source(d)));
+}
+
 function docFor(page: string): Doc {
 	const doc = DOCS.find((d) => d.page === page);
 	if (!doc) throw new Error(`site/build/plugin.ts: no docs page ${page}`);
@@ -128,23 +150,26 @@ function docPage(doc: Doc): string {
 	).join("");
 	const { html } = rendered(doc);
 	return `
-  <nav class="docs-nav" aria-label="Documentation">
-    <h2>Documentation</h2>
-    <ul>${nav}</ul>
-    <h2>Elsewhere</h2>
-    <ul>
-      <li><a href="${BLOB}/CONTRIBUTING.md">Contributing</a></li>
-      <li><a href="${BLOB}/ROADMAP.md">Roadmap</a></li>
-    </ul>
+  <nav class="docs-nav panel" aria-label="Documentation">
+    ${panelBar("docs-nav")}
+    <div class="panel-body" id="docs-nav-body">
+      <ul>${nav}</ul>
+      <h2>Elsewhere</h2>
+      <ul>
+        <li><a href="${BLOB}/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="${BLOB}/ROADMAP.md">Roadmap</a></li>
+      </ul>
+    </div>
   </nav>
   <article class="prose">
     <h1>${escapeHtml(doc.title)}</h1>
-    <p class="doc-meta">${escapeHtml(doc.summary)} From <a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a>, rendered when this site was built. <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a></p>
+    <p class="doc-meta">${escapeHtml(doc.summary)}</p>
+    <p class="doc-links"><a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a></p>
     ${html}
   </article>
-  <nav class="docs-toc" aria-label="On this page">
-    <h2>On this page</h2>
-    ${toc(doc)}
+  <nav class="docs-toc panel" aria-label="On this page">
+    ${panelBar("docs-toc")}
+    <div class="panel-body" id="docs-toc-body">${toc(doc)}</div>
   </nav>`;
 }
 
@@ -214,90 +239,56 @@ function trace(path: string): string {
 	return `<pre class="code trace" data-lang="json" tabindex="0" aria-label="${escapeHtml(path)}"><code>${body}</code></pre>`;
 }
 
-type ToolInfo = { id: string; name: string; thread: string; returns: string[]; version: string; inputs: number };
-
-const KIND_WORDS: Record<string, string> = {
-	fields: "fields",
-	table: "a table",
-	series: "a chart",
-	text: "text",
-	code: "code",
-	bytes: "bytes",
-	heatmap: "a heatmap",
-	pie: "a pie",
-};
-
-function tools(): ToolInfo[] {
-	return readdirSync(join(ROOT, "tools"), { withFileTypes: true })
-		.filter((d) => d.isDirectory())
-		.map((d) => {
-			const m = JSON.parse(read(`tools/${d.name}/tool.json`)) as {
-				id: string;
-				name: string;
-				version: string;
-				runtime: { thread?: string };
-				kinds: string[];
-				inputs: unknown[];
-			};
-			return {
-				id: m.id,
-				name: m.name,
-				version: m.version,
-				thread: m.runtime.thread === "worker" ? "a worker" : "the page",
-				returns: m.kinds.map((k) => KIND_WORDS[k]).filter((k): k is string => Boolean(k)),
-				inputs: m.inputs.length,
-			};
-		})
-		.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 function list(words: string[]): string {
 	if (words.length < 2) return words.join("");
 	return `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 }
 
-/** A list of every tool beside one tool at full size, with its facts and its source. */
-function gallery(): string {
-	const all = tools();
-	return `
-<div class="gallery">
-  <nav class="tool-index" aria-label="Tools">
-    <ul>${all
-			.map(
-				(t) => `
-      <li><a href="#${t.id}" data-pick="${t.id}"><span class="tool-index-name">${escapeHtml(t.name)}</span><span class="tool-index-meta">Returns ${list(t.returns)}</span></a></li>`,
-			)
-			.join("")}
-    </ul>
-  </nav>
-  <div class="tool-panes">${all
-		.map(
-			(t) => `
-    <section class="tool-pane" id="${t.id}" aria-label="${escapeHtml(t.name)}">
-      <tool-host tool="${t.id}" mode="page"></tool-host>
-      <dl class="facts">
-        <div><dt>Runs in</dt><dd>${t.thread}</dd></div>
-        <div><dt>Returns</dt><dd>${list(t.returns)}</dd></div>
-        <div><dt>Inputs</dt><dd>${t.inputs}</dd></div>
-        <div><dt>Version</dt><dd>${t.version}</dd></div>
-      </dl>
-      <details class="source" data-source="${t.id}"><summary>View source</summary><div class="source-body"><p class="source-loading">Loading the files.</p></div></details>
-    </section>`,
-		)
-		.join("")}
-  </div>
-</div>`;
+const PANELS: Record<string, string> = { "docs-nav": "Documentation", "docs-toc": "On this page", "gallery-nav": "In the gallery" };
+
+/** A sidebar's heading and the button that collapses it. See src/panels.ts. */
+function panelBar(name: string): string {
+	const title = PANELS[name] ?? name;
+	return `<div class="panel-bar"><h2 class="panel-title">${escapeHtml(title)}</h2><button type="button" class="panel-toggle" data-panel-toggle="${name}" aria-expanded="true" aria-controls="${name}-body"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden">${escapeHtml(title)}</span></button></div>`;
 }
 
-/*
- * The web font is opt-in at build time, so the two builds can be measured against each other. The files
- * are subsets made by `site/build/subset-font.py`: the site's characters, at 400 and 700 only.
- */
 /** The landing page's figures: one tile each, every value read from the file that owns it. */
 function statTiles(): string {
-	return `<ul class="stats" role="list">${stats()
+	const tiles = stats()
 		.map((t) => `<li class="stat" data-stat="${t.id}"><span class="stat-value">${escapeHtml(t.value)}</span><span class="stat-label">${escapeHtml(t.label)}</span></li>`)
-		.join("")}</ul>`;
+		.join("");
+	// The browsers the suite runs in, as their icons and names: a picture, where a count would say little.
+	const names = browsers();
+	const icons = names
+		.map((n) => `<li><svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true" focusable="false">${BROWSER_ICONS[n] ?? ""}</svg><span>${escapeHtml(n)}</span></li>`)
+		.join("");
+	const label = `Tested in ${list(names)}`;
+	return `<ul class="stats" role="list">${tiles}<li class="stat stat-browsers" data-stat="browsers" aria-label="${escapeHtml(label)}"><ul class="browser-icons" role="list">${icons}</ul><span class="stat-label">tested on every change</span></li></ul>`;
+}
+
+/** Plain line drawings, one per browser: recognisable at a glance, and the name sits beside each. */
+const BROWSER_ICONS: Record<string, string> = {
+	Chrome: '<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 8h8.7M8.6 14 4.2 6.5M15.4 14l-4.3 7.9"/></g>',
+	Firefox: '<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M6.2 5.8c.4 3.2 2.6 5.3 5.6 5.3 2.4 0 4 1.7 4 3.8 0 2.4-2 4.2-4.6 4.2-3 0-5.4-2.4-5.4-5.4"/><path d="M14.2 2.4c1.3 1.8 1.2 4-.4 5.6"/></g>',
+	Safari: '<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/><path d="m16 8-2.6 5.4L8 16l2.6-5.4Z"/></g>',
+};
+
+/**
+ * The mark, drawn from the repository's own logo files so it cannot drift from them: the shapes from
+ * assets/logo.svg, and each colour from that file for the light theme and from assets/logo-dark.svg for
+ * the dark one. The site once drew the brackets in its own ink and the triangle in one amber for both
+ * themes, which is not the logo: dark brackets where the dark logo has light ones.
+ */
+function logo(large: boolean): string {
+	const light = read("assets/logo.svg");
+	const dark = read("assets/logo-dark.svg");
+	const paths = (svg: string) => [...svg.matchAll(/<path\b([^>]*)\/>/g)].map((m) => m[1] ?? "");
+	const attr = (p: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(p)?.[1] ?? "";
+	const [bracketL, runL] = paths(light);
+	const [bracketD, runD] = paths(dark);
+	if (!bracketL || !runL || !bracketD || !runD) throw new Error("assets/logo.svg and logo-dark.svg must each have the bracket path and the triangle path");
+	const size = large ? 64 : 28;
+	return `<svg class="mark${large ? " mark-large" : ""}" viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true" focusable="false"><path d="${attr(bracketL, "d")}" fill="none" stroke-width="${attr(bracketL, "stroke-width")}" stroke-linecap="round" style="stroke: ${attr(bracketL, "stroke")}; stroke: light-dark(${attr(bracketL, "stroke")}, ${attr(bracketD, "stroke")})"/><path d="${attr(runL, "d")}" style="fill: ${attr(runL, "fill")}; fill: light-dark(${attr(runL, "fill")}, ${attr(runD, "fill")})"/></svg>`;
 }
 
 function fonts(): string {
@@ -310,9 +301,9 @@ function fonts(): string {
 export function siteContent(): Plugin {
 	return {
 		name: "toolbench-site-content",
-		// Draw any diagram the cache lacks before a page asks for it. In dev and in the build alike.
-		async buildStart() {
-			await prepareDiagrams(DOCS.flatMap((d) => mermaidBlocks(source(d))));
+		// The build only reads drawings. A diagram edited without `pnpm site:diagrams` fails here, by name.
+		buildStart() {
+			checkDiagrams(diagramSources());
 		},
 		configureServer(server) {
 			// The markdown lives outside the Vite root, so tell the watcher, and reload the page on an edit.
@@ -320,7 +311,7 @@ export function siteContent(): Plugin {
 			server.watcher.on("change", (file) => {
 				if (file.endsWith(".md") || file.endsWith("tool.json")) {
 					cache.clear();
-					void prepareDiagrams(DOCS.flatMap((d) => mermaidBlocks(source(d)))).then(() => server.ws.send({ type: "full-reload" }));
+					server.ws.send({ type: "full-reload" });
 				}
 			});
 		},
@@ -351,8 +342,6 @@ export function siteContent(): Plugin {
 							return readmeBlock(Number(arg));
 						case "trace":
 							return trace(arg);
-						case "gallery":
-							return gallery();
 						case "gallery-index":
 							return galleryIndex();
 						case "stats":
@@ -363,6 +352,10 @@ export function siteContent(): Plugin {
 							return escapeHtml((JSON.parse(read("packages/runtime/package.json")) as { version: string }).version);
 						case "fonts":
 							return fonts();
+						case "panel-bar":
+							return panelBar(arg);
+						case "logo":
+							return logo(arg === "large");
 						default:
 							return whole;
 					}

@@ -850,15 +850,16 @@ build: {
   applies to the worker's build. Skipping it leaves the worker's copies anonymous, which is how a
   duplicate copy of every tool went unnoticed for a while.
 * **`base` must be `/toolbench/` on the Pages build.** A project Pages site is not at the origin root,
-  and without the prefix the HTML loads while every `/assets/...` request 404s. Local `pnpm bench`
-  keeps `/` unless `BENCH_BASE` is set. In-page nav is relative (`./tool.html`) for the same reason.
+  and without the prefix the HTML loads while every `/assets/...` request 404s. The published build is
+  the project site, with `SITE_BASE=/toolbench/`; the bench keeps `/` unless `BENCH_BASE` is set. In-page
+  nav is relative (`./tool.html`) in both, for the same reason.
 
 ### 11.4 Artifacts
 
 | Command | Output |
 |---|---|
 | `pnpm build` | `packages/*/dist`: ESM plus `.d.ts` and source maps. No bundling; consumers bundle. |
-| `pnpm bench:build` | `bench/dist`: four HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk, the chart renderer, and two bench-only chunks for the theme switch and the fixture manifests. Per-tool chunks and the fixture chunk are emitted twice, once for the worker pass, which §13 explains. Local builds keep Vite `base` at `/`; the Pages deploy sets `BENCH_BASE=/toolbench/` so assets resolve under the project path. |
+| `pnpm bench:build` | `bench/dist`: four HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk, the chart renderer, and two bench-only chunks for the theme switch and the fixture manifests. Per-tool chunks and the fixture chunk are emitted twice, once for the worker pass, which §13 explains. Vite `base` stays at `/`: the bench is not published. |
 
 ### 11.5 CI
 
@@ -866,7 +867,7 @@ Four workflows, split so each badge answers one question:
 
 * `tests.yml`: typecheck, every Node-runnable test, and the coverage report.
 * `build.yml`: packages, published contents, the bench, transfer budgets, and the browser suite on Chromium, Firefox and WebKit.
-* `pages.yml`: builds the bench with `BENCH_BASE=/toolbench/` and, on `main`, publishes it to GitHub Pages. Enabling Pages, under Settings then Pages then Source: GitHub Actions, is a maintainer click; the workflow is already in the tree.
+* `pages.yml`: builds the project site in `site/` with `SITE_BASE=/toolbench/`, checks its links and examples, and, on `main`, publishes it to GitHub Pages. The bench is not published. Enabling Pages, under Settings then Pages then Source: GitHub Actions, is a maintainer click; the workflow is already in the tree.
 * `release.yml`: version pull requests and the npm publish, after a human at both gates.
 
 ⚠️ `types and unit tests` and `packages, bench, browser` are required status checks on `main`, so renaming

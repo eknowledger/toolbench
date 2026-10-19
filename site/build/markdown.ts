@@ -22,6 +22,11 @@ export type RenderOptions = {
 	dropContents?: boolean;
 	/** A ```mermaid block, drawn. Without this a diagram renders as its source. */
 	diagram?: (source: string) => string;
+	/**
+	 * A `<!-- site: kind arg -->` line: an HTML comment, so GitHub shows nothing, and the site draws what
+	 * it names in its place. Without this the comment passes through, invisible, as on GitHub.
+	 */
+	marker?: (kind: string, arg: string) => string;
 };
 
 /** GitHub's heading slug: lower case, punctuation dropped, spaces to hyphens. */
@@ -141,6 +146,12 @@ export function renderMarkdown(source: string, opts: RenderOptions = {}): Render
 			}
 			if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
 				out.push("<hr>");
+				i++;
+				continue;
+			}
+			const marker = /^<!--\s*site:\s*(\w+)\s+(\S+)\s*-->\s*$/.exec(line);
+			if (marker && opts.marker) {
+				out.push(opts.marker(marker[1] ?? "", marker[2] ?? ""));
 				i++;
 				continue;
 			}
