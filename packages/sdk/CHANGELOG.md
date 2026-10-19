@@ -1,5 +1,38 @@
 # @toolbench/sdk
 
+## 0.10.0
+
+### Minor Changes
+
+- [#181](https://github.com/eknowledger/toolbench/pull/181) [`dde82c6`](https://github.com/eknowledger/toolbench/commit/dde82c61e23eb4624304e1f92305b20557c06b87) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: graphs.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) A tool can return `{ kind: "graph", graph }`, nodes and edges, and the runtime lays it out and draws it: ranks along a direction, ports centred on the side facing the other end, orthogonal edges that never share a stretch of line, labels clear of everything, and the same picture in every browser. Every edge is also listed in a table under the picture, and the picture is one tab stop that follows the edges with the arrow keys.
+  
+  * Nodes take a label, a note, a shape, a tone or colour, a badge and a fixed rank; edges a label, a line style and width, markers, and a side to leave or arrive on. A path can be highlighted, and a tool can set its own `limits`, past which the graph is listed instead of drawn.
+  * The graph kind is a chunk of its own, fetched only by a page that draws a graph.
+  * This raises the contract to version 7: a tool returning a graph declares `"sdk": 7`, and every older manifest loads unchanged. `graphProblem` in the SDK checks a graph's structure, and the fixture runner fails a case whose graph the runtime would refuse.
+
+- [#192](https://github.com/eknowledger/toolbench/pull/192) [`31d4db5`](https://github.com/eknowledger/toolbench/commit/31d4db5dd1a1d6c867e41a91f1a5b7c221ce2f78) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a tool's `sdk` now has to cover what it uses.** ([#170](https://github.com/eknowledger/toolbench/issues/170)) A manifest declaring `"sdk": 4` that used v6's `lang` used to validate, and a v4 runtime then loaded it and silently dropped the highlighting. Now it is refused: `inputs[0].lang: is from contract version 6, but the tool declares "sdk": 4 ... Declare "sdk": 6.`
+  
+  - `upgradeManifest` checks before it stamps the current version, so every path that loads a manifest refuses, a host's own included. `validateManifest` checks a manifest validated as written. The `@toolbench/sdk/fixtures` harness also checks every case's expected output and every sample's result.
+  - New: `checkManifestFeatures(raw)` and `outputFeatureProblem(output, sdk)`, the same checks on their own.
+  - ⚠️ Heads-up: a manifest that under-declares its `sdk` now fails to load. Raise its `sdk` to the version the message names. Every tool and fixture in this repository already declared enough.
+
+- [#193](https://github.com/eknowledger/toolbench/pull/193) [`10678a9`](https://github.com/eknowledger/toolbench/commit/10678a9872cf10465c7ee11fd1774e22cc7d0451) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a tool can ship a grammar for its own textarea language.** ([#163](https://github.com/eknowledger/toolbench/issues/163)) Beside `lang`, a textarea's `grammar` lists `keywords`, a `comment` prefix, `operators` and `strings` delimiters, and the runtime paints what the reader types with them, so a notation no host highlighter knows is highlighted anyway.
+  
+  - No patterns: a tool cannot ship a regular expression that freezes the page, any other key is refused, and every list is capped.
+  - A host `highlight` hook that paints the `lang` still wins. The paint is the same as `lang`'s: behind the real textarea, `aria-hidden`, so the caret, selection, undo and screen reader are the browser's own.
+  - The tokeniser is in the lazily fetched paint chunk, now about 1.5 KB, which a tool with a grammar fetches even on a host with no hook. Contract version 7.
+
+### Patch Changes
+
+- [#186](https://github.com/eknowledger/toolbench/pull/186) [`f88acbe`](https://github.com/eknowledger/toolbench/commit/f88acbec9fa7c89be2b88ce9858ea25995b13073) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: no em dashes in what the runtime and the SDK write.** ([#42](https://github.com/eknowledger/toolbench/issues/42))
+  
+  - The status line now reads "inputs changed. Press Run", "filled with "…". Press Run" and "showing the default result. Press Run to try your own".
+  - A bytes legend entry reads "U+00E9 é: 2 bytes at 0x0001".
+  - A missing value in a chart's data table, readout or share reads "n/a".
+  - Validation messages use a colon where they used an em dash.
+  - The example tools' own wording changed too, so their output did: `percentiles` 1.3.0 ("No measurements yet. Paste some numbers.", and its notes on the mean and the averaged p99) and `queue-explorer` 1.1.0 ("...no steady state to report. Lower the arrival rate or speed up service."). Minor versions, because a consumer could match on that output.
+  - ⚠️ Heads-up: a host or a test matching any of these strings exactly needs the new wording.
+
 ## 0.9.1
 
 ### Patch Changes
