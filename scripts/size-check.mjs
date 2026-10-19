@@ -473,14 +473,17 @@ for (const file of unclaimed) {
  * from the HTML itself, scripts, module preloads and stylesheets, before any tool code is fetched.
  *
  * deployOnly, because no consumer downloads the project's own site. It is watched anyway because the
- * landing page is where the "tiny" claim is made, and a page that argues for 25 KB while weighing
- * twice that would undo the argument. 31,240 measured on the system font stack when this line was
- * added: 24,808 of it is the runtime with the site's tool manifests, the same cost a consumer pays, and
- * the rest is the page's own script and stylesheet. A web font, if one is ever adopted, is not in this
- * figure; it would need a line of its own. 33_000 leaves 1.8 KB, about one more page script and its styles.
+ * landing page is where the "tiny" claim is made, and a page that argues for its runtime size while
+ * weighing twice that would undo the argument. A web font, if one is ever adopted, is not in this
+ * figure; it would need a line of its own.
+ *
+ * 34_000, measured at 32,796 on the system font stack: 25,718 is the runtime with the site's tool
+ * manifests, the same cost a consumer pays, and 7,078 the page's own script and stylesheet. The line
+ * was drafted at 33_000 against 31,240, before the graph kind (#181 to #183) grew the runtime by about
+ * 0.9 KB; turning off Vite's modulepreload polyfill took 0.2 KB back. 33_000 would have left 204 bytes.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

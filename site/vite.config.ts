@@ -32,8 +32,14 @@ function pages(): Record<string, string> {
 
 /** Name each tool's file after the tool, so the network panel says which tool a request was. */
 function chunk(id: string, prefix: string): string | null {
-	const match = /\/(?:tools|fixtures)\/([^/]+)\/index\.ts$/.exec(id);
-	return match ? `${prefix}${match[1]}` : null;
+	const match = /\/(?:tools|fixtures|examples)\/([^/]+)\/index\.ts$/.exec(id);
+	if (match) return `${prefix}${match[1]}`;
+	/*
+	 * The sidebars and the card tabs are shared by the docs and the gallery, so Rollup would fold them into
+	 * the chunk every page shares, and the landing page, which has neither, would download them.
+	 */
+	if (/\/site\/src\/(?:panels|tabs)\.ts$/.test(id)) return "site-panels";
+	return null;
 }
 
 export default defineConfig({
@@ -42,6 +48,11 @@ export default defineConfig({
 	// ⚠️ Vite defaults workers to iife, which cannot split one file per tool: fine in dev, fails the build.
 	worker: { format: "es", rollupOptions: { output: { manualChunks: (id: string) => chunk(id, "worker-tool-") } } },
 	build: {
+		/*
+		 * No modulepreload polyfill. Every browser the runtime supports either preloads natively or simply
+		 * fetches the module when it is imported, and the polyfill was 0.4 KB in the chunk every page loads.
+		 */
+		modulePreload: { polyfill: false },
 		rollupOptions: {
 			input: pages(),
 			output: { manualChunks: (id: string) => chunk(id, "tool-") },
