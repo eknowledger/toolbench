@@ -72,6 +72,13 @@ export interface ToolHostConfig {
 	 * names and attributes they may rely on are listed in STYLING.md.
 	 */
 	styles?: HostStyles;
+	/**
+	 * A graph wider than its plot: `fit` (default) scales it down to the plot's width, `scroll` draws it at
+	 * its natural size in a plot that scrolls. A tool's `wide` attribute overrides it.
+	 */
+	wide?: "fit" | "scroll";
+	/** Whether a scaled graph offers the reader a button to switch between the two. Default true. */
+	wideToggle?: boolean;
 }
 
 let config: ToolHostConfig | undefined;
@@ -101,7 +108,7 @@ export function setHostStyles(styles: HostStyles | undefined): void {
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -717,7 +724,7 @@ export class ToolHost extends HTMLElement {
 				this.#seed
 					? renderOrDegrade(
 							this.#seed,
-							withHostHighlight({
+							withHostHighlight(this, {
 								compact,
 								// No Copy either: nothing here can announce whether it worked, and the preview's job is to open.
 								copy: false,
@@ -1275,7 +1282,7 @@ export class ToolHost extends HTMLElement {
 				target,
 				render(
 					output,
-					withHostHighlight({
+					withHostHighlight(this, {
 						compact,
 						...(this.#partsCap !== undefined && !this.#uncapped ? { cardParts: this.#partsCap } : {}),
 						...(this.more === "expand" ? { more: "expand" as const, expanded: this.#expanded } : {}),
@@ -1447,11 +1454,20 @@ function titleRow(manifest: Manifest, compact: boolean, pageUrl: string | undefi
  * Thread the host highlighter into a render call without writing `highlight: undefined`.
  * `exactOptionalPropertyTypes` refuses that, and omitting the key is what "no hook" means.
  */
-function withHostHighlight(options: RenderOptions): RenderOptions {
+function withHostHighlight(host: HTMLElement, options: RenderOptions): RenderOptions {
 	const highlight = config?.highlight;
 	// The worker factory too, so a graph too large for the main thread can be laid out in one.
 	const graphWorker = config?.workerFactory;
-	return { ...options, ...(highlight ? { highlight } : {}), ...(graphWorker ? { graphWorker } : {}) };
+	// How a wide graph is drawn (#198): the element's attribute, else the host's default. Unknown values are ignored.
+	const wide = host.getAttribute("wide");
+	const toggle = host.getAttribute("wide-toggle");
+	return {
+		...options,
+		...(highlight ? { highlight } : {}),
+		...(graphWorker ? { graphWorker } : {}),
+		wide: wide === "fit" || wide === "scroll" ? wide : (config?.wide ?? "fit"),
+		wideToggle: toggle === "true" || toggle === "false" ? toggle === "true" : (config?.wideToggle ?? true),
+	};
 }
 
 /**

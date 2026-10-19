@@ -26,6 +26,11 @@ ${GRAPH_COLORS.slice(1).map((c) => `[data-color="${c}"]{--c:var(--tb-${c.startsW
 .tb-graph-plot:focus{outline:none}
 .tb-graph-plot:focus-visible{outline:2px solid var(--tb-accent);outline-offset:4px}
 .tb-graph-plot svg{display:block;max-width:none;user-select:none;-webkit-user-select:none}
+.tb-graph-bar{display:flex;justify-content:flex-end;margin-bottom:.25rem}.tb-graph-bar[hidden]{display:none}
+.tb-graph-wide{display:grid;place-items:center;min-width:24px;min-height:24px;padding:3px;color:var(--tb-muted);background:var(--tb-bg);border:1px solid var(--tb-border);border-radius:6px;cursor:pointer}
+.tb-graph-wide:hover{color:var(--tb-fg);border-color:var(--tb-muted)}.tb-graph-wide:focus-visible{outline:2px solid var(--tb-accent);outline-offset:2px}
+.tb-graph-wide svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tb-graph-wide[aria-pressed=false]>:last-child,.tb-graph-wide[aria-pressed=true]>:first-child{display:none}
 .tb-graph-title{fill:var(--tb-muted);font:600 11px var(--tb-font)}
 .tb-graph-line{fill:none;stroke:var(--c,var(--tb-faint));stroke-width:1.5;stroke-linejoin:round}
 [data-width=thin]>.tb-graph-line{stroke-width:1}[data-width=thick]>.tb-graph-line{stroke-width:3}
@@ -107,11 +112,15 @@ export type DrawGroups = (pic: SVGSVGElement, g: Graph, L: GraphLayout, title: (
  * The picture, readout, live region and table for one layout. `g` is the graph as laid out, with closed groups
  * standing in for their members; `reopen` and `close` change which groups are closed and draw again.
  */
-export function drawLayout(input: Graph, g: Graph, L: GraphLayout, collapsed: ReadonlySet<string>, setCollapsed: (next: Set<string>) => void): Node[] {
+/** How a wide graph is drawn (#198): `fit` scales it to the plot, else it is drawn at full size. Shared by every layout of one figure. */
+export type Wide = { fit: boolean; toggle: boolean };
+// The two-diagonal-arrows expand and collapse icons, in a 24-unit box.
+const ICONS = ["M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7", "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"];
+
+export function drawLayout(input: Graph, g: Graph, L: GraphLayout, collapsed: ReadonlySet<string>, setCollapsed: (next: Set<string>) => void, wide: Wide = { fit: false, toggle: false }): Node[] {
 	const plot = el("div", { class: "tb-graph-plot", tabindex: 0, role: "group", "aria-roledescription": "graph", "aria-label": `${summary(g)}. Arrow keys follow the edges.` });
-	// Its natural size, set inline: a sheet's "svg { width: 100% }" stretched a narrow graph to three times its
-	// size. A wide graph scrolls rather than shrinking its text past reading.
-	const pic = svg("svg", { viewBox: `0 0 ${L.width} ${L.height}`, width: L.width, height: L.height, style: `width:${L.width}px;height:${L.height}px`, "aria-hidden": "true" });
+	// Its size, set inline by apply() below: a sheet's "svg { width: 100% }" stretched a narrow graph to three times its size.
+	const pic = svg("svg", { viewBox: `0 0 ${L.width} ${L.height}`, width: L.width, height: L.height, "aria-hidden": "true" });
 	const toggle = input.interaction?.collapse ?? true;
 	// Lanes and groups are the groups chunk's to draw, which a graph with either has already fetched.
 	if (L.lanes.length || L.groups.length) (ext.drawGroups as DrawGroups)(pic, g, L, (t, s) => text("tb-graph-title", t.x + 4, t.y + t.h / 2 + 1, s, "start"), names, toggle && ((id) => setCollapsed(new Set([...collapsed, id]))));
@@ -139,6 +148,24 @@ export function drawLayout(input: Graph, g: Graph, L: GraphLayout, collapsed: Re
 		return node;
 	});
 	plot.append(pic);
+	/*
+	 * Fit or full size (#198), by the inline style that sets the natural size, so no sheet needs !important.
+	 * Fitted, the drawing is at most the plot's width and never more than its own: scaled down, never up, and
+	 * height:auto keeps the viewBox's proportions. Only the style changes, so a toggle keeps every class the
+	 * reader's focus, selection and path put on the drawing.
+	 */
+	const button = el("button", { type: "button", class: "tb-graph-wide", part: "wide-toggle", "aria-label": "Show at full size" }, ...ICONS.map((d) => svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d }))));
+	const bar = el("div", { class: "tb-graph-bar", hidden: true }, button);
+	const apply = () => {
+		pic.style.cssText = wide.fit ? `width:100%;max-width:${L.width}px;height:auto` : `width:${L.width}px;height:${L.height}px`;
+		button.setAttribute("aria-pressed", String(!wide.fit));
+	};
+	apply();
+	// A pointer press must not take focus from the plot: its blur would clear the reader's selection.
+	button.addEventListener("mousedown", (ev) => ev.preventDefault());
+	button.addEventListener("click", () => ((wide.fit = !wide.fit), apply()));
+	// Offered only while the graph is wider than its plot, so re-measured whenever the plot's width changes.
+	if (wide.toggle && typeof ResizeObserver === "function") new ResizeObserver(() => (bar.hidden = !(plot.clientWidth && L.width > plot.clientWidth + 0.5))).observe(plot);
 	// The readout is for eyes; the live region says the same to a screen reader, without the visual list.
 	const readout = el("p", { class: "tb-graph-readout", "aria-hidden": "true" });
 	const live = el("p", { class: "tb-sr", role: "status", "aria-live": "polite" });
@@ -226,7 +253,7 @@ export function drawLayout(input: Graph, g: Graph, L: GraphLayout, collapsed: Re
 		else return;
 		ev.preventDefault();
 	});
-	return [plot, readout, live, edgeTable(g)];
+	return [bar, plot, readout, live, edgeTable(g)];
 }
 
 /** The chunks' sheets with the graph's own, adopted into whatever root the figure lands in. */

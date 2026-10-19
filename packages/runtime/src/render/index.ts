@@ -204,6 +204,10 @@ export interface RenderOptions {
 	 * graph is laid out on the main thread after a frame, its edge table showing meanwhile.
 	 */
 	graphWorker?: () => Worker;
+	/** A graph wider than its plot: scaled to fit (default) or drawn at full size to scroll (#198). */
+	wide?: "fit" | "scroll";
+	/** Whether a scaled graph offers the button that switches between the two. Default true. */
+	wideToggle?: boolean;
 	/**
 	 * Whether `code` and `table` results carry a Copy button (#155). Default true. A closed card turns it
 	 * off: its preview is there to be opened, and it has no status region to say whether a copy worked.

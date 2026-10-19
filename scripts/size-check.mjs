@@ -168,8 +168,13 @@ const BUDGETS = [
 	 * bytes larger. The rest is the textarea's grammar checks, deciding to fetch the paint chunk for a grammar
 	 * as well as for a hook, its row in the version table and the v7 changelog line. The tokeniser is in the
 	 * paint chunk, never here. 28_000 would have left the build 252 over.
+	 *
+	 * Raised from 28_500 to 29_000 by the wide-graph option (#198), in the commit that spent it: 28,424 to
+	 * 28,534 measured, 110 bytes. The two `defineToolHost` options, the two attributes and passing both to the
+	 * renderer; the bench's import of its own query switches is in that, their code is not. Fitting, the
+	 * button and its icons are in the graph chunk, never here. 28_500 would have left the build 34 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -219,6 +224,8 @@ const BUDGETS = [
 	 * the same reason as the theme switch: a consumer does not download it.
 	 */
 	{ label: "bench highlighter", pattern: /^bench-highlight-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	// `?wide=` and `?wideToggle=` as host options, for the wide-graph tests (#198). 165 measured.
+	{ label: "bench host options", pattern: /^bench-host-options-[^/]+\.js$/, budget: 500, deployOnly: true },
 	/*
 	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
 	 * rather than deployOnly, because a reader of a chart tool genuinely downloads it: the saving is that
@@ -302,6 +309,10 @@ const BUDGETS = [
 	 * groups and lanes 2,837; path highlighting 734; the crossing search 1,570, for a dense layered graph of at
 	 * most 60 nodes; the repair of a route that had to share 898; and the large-graph path 693, past 100 nodes.
 	 * Each budget sits above what it measured with room for a fix, not for a feature.
+	 *
+	 * Fitting a wide graph (#198), its toggle, the two icons and their rules, spent 616 of the base's room:
+	 * 17,865 to 18,481. Inside 18_500 without raising it, which leaves 19 bytes, so the next feature here
+	 * raises it.
 	 */
 	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_500 },
 	{ label: "graph: tree and radial", pattern: /^graph-tree-[^/]+\.js$/, budget: 2_250 },
