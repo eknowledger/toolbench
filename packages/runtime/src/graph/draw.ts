@@ -47,7 +47,8 @@ ${GRAPH_COLORS.slice(1).map((c) => `[data-color="${c}"]{--c:var(--tb-${c.startsW
 :is(.tb-hot,.tb-path)>[data-fill=solid]{fill:var(--tb-fg)}:is(.tb-hot,.tb-path)>.tb-graph-label{fill:var(--tb-fg);font-weight:700}
 .tb-graph-readout{min-height:1.5em;margin:.4rem 0 0;font-size:.8rem;color:var(--tb-muted)}
 .tb-graph-message{margin:0;padding:.75rem;border:1px dashed var(--tb-border);border-radius:8px;color:var(--tb-muted);font-size:.86rem}
-.tb-graph-data{margin-top:.5rem;font-size:.8rem}
+.tb-graph-data{margin-top:.5rem;font-size:.8rem;overflow-x:auto}
+.tb-graph-data summary:focus-visible{outline:2px solid var(--tb-accent);outline-offset:-2px}
 .tb-graph-data summary{color:var(--tb-faint);cursor:pointer;min-height:24px;line-height:24px}
 .tb-graph-data table{margin-top:.5rem}
 `;

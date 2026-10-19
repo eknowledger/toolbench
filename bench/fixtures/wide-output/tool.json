@@ -1,0 +1,34 @@
+{
+	"sdk": 7,
+	"id": "wide-output",
+	"name": "Wide output",
+	"blurb": "Returns each kind of result wider than a phone, so the bench can check that it scrolls rather than clips.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"autoRun": true,
+	"card": "live",
+	"kinds": ["fields", "text", "code", "table", "bytes", "graph", "group", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "case",
+			"type": "select",
+			"label": "Result",
+			"description": "One kind each, every one wider than a phone.",
+			"primary": true,
+			"default": "table",
+			"options": [
+				{ "value": "table", "label": "A table of twelve columns" },
+				{ "value": "code", "label": "Code with one long line" },
+				{ "value": "text", "label": "Prose with one long unbroken token" },
+				{ "value": "text-mono", "label": "Monospace text with one long line" },
+				{ "value": "fields", "label": "Fields with a long unbroken value" },
+				{ "value": "bytes", "label": "Bytes, sixteen to a row" },
+				{ "value": "graph", "label": "A graph of a long chain, left to right" },
+				{ "value": "group", "label": "A group holding a wide table, code and a graph" },
+				{ "value": "error", "label": "An error quoting a long unbroken token" }
+			]
+		}
+	]
+}
