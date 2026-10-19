@@ -1,5 +1,59 @@
 # @toolbench/runtime
 
+## 0.10.0
+
+### Minor Changes
+
+- [#187](https://github.com/eknowledger/toolbench/pull/187) [`aac09a6`](https://github.com/eknowledger/toolbench/commit/aac09a61d3417dd4ce2aa366d96451625c68465d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: highlighted byte ranges are told apart by colour.** ([#148](https://github.com/eknowledger/toolbench/issues/148)) A `bytes` range with no `tone` is drawn in the next chart series colour, `--tb-s1` to `--tb-s6`, round again after six, and its legend swatch matches. Eight labelled fields of one message are no longer eight identical blocks.
+  
+  - No contract change: tools need nothing new, and a range with a `tone` looks as it did.
+  - The digits on every mark keep 4.5:1 contrast or better in light and dark. The label stays in the legend and the hover text.
+  - A host can select a range's colour with `data-series` on `.tb-byte` and the legend entry (see STYLING.md).
+
+- [#188](https://github.com/eknowledger/toolbench/pull/188) [`f7f5336`](https://github.com/eknowledger/toolbench/commit/f7f5336b1fdb112732ee45b4f23061f500106842) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: copy a code result or a table in one press.** ([#155](https://github.com/eknowledger/toolbench/issues/155)) Every `code` result has a "Copy code" button that copies its source exactly, and every `table` a "Copy table" button that copies it as tab-separated text, so it pastes into a spreadsheet as cells.
+  
+  - The outcome is announced to screen readers and shown beside the button. Where the clipboard is missing or refused, it says "Copy failed" and selects the text so the reader can copy it with the keyboard.
+  - A closed card shows no Copy button. Style it with `.tb-copy-bar`, `.tb-copy` and `.tb-copy-note` (see STYLING.md).
+  - What the button does is a chunk of its own, about 0.5 KB, fetched when the first code or table result is drawn. Until it arrives the button shows disabled.
+  - **Fixed:** a copied table cannot carry a spreadsheet formula. A cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'`, so Excel and Sheets paste it as text. Plain numbers such as -5 are unchanged.
+
+- [#181](https://github.com/eknowledger/toolbench/pull/181) [`dde82c6`](https://github.com/eknowledger/toolbench/commit/dde82c61e23eb4624304e1f92305b20557c06b87) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: graphs.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) A tool can return `{ kind: "graph", graph }`, nodes and edges, and the runtime lays it out and draws it: ranks along a direction, ports centred on the side facing the other end, orthogonal edges that never share a stretch of line, labels clear of everything, and the same picture in every browser. Every edge is also listed in a table under the picture, and the picture is one tab stop that follows the edges with the arrow keys.
+  
+  * Nodes take a label, a note, a shape, a tone or colour, a badge and a fixed rank; edges a label, a line style and width, markers, and a side to leave or arrive on. A path can be highlighted, and a tool can set its own `limits`, past which the graph is listed instead of drawn.
+  * The graph kind is a chunk of its own, fetched only by a page that draws a graph.
+  * This raises the contract to version 7: a tool returning a graph declares `"sdk": 7`, and every older manifest loads unchanged. `graphProblem` in the SDK checks a graph's structure, and the fixture runner fails a case whose graph the runtime would refuse.
+
+- [#182](https://github.com/eknowledger/toolbench/pull/182) [`85f7ed9`](https://github.com/eknowledger/toolbench/commit/85f7ed9305812f56cfd21cbca0f6c0451c77e5e7) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: every kind of graph.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) Beyond layered graphs, a `graph` can be a tidy tree, a radial mind map, a force-laid network or nodes placed by hand, with straight, curved, spline or polyline edges. It can draw hexagons, parallelograms, cylinders and documents, record nodes whose rows each have a port, crow's-foot and UML markers, nested groups a reader can close and open, and swimlanes. Each of these is a small chunk fetched by the first graph that uses it, so a page pays only for the graphs it draws.
+
+- [#183](https://github.com/eknowledger/toolbench/pull/183) [`e06d31a`](https://github.com/eknowledger/toolbench/commit/e06d31a22472c880eaea6d2df9a19ba278710276) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: large and dense graphs.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) A graph past a hundred nodes is laid out off the main thread, in a worker made with the `workerFactory` you already pass for worker-mode tools: its edge table shows at once and the picture follows, so the page never stops. A dense layered graph of up to 60 nodes gets a crossing search that redraws it with fewer crossings, fetched only for the graphs that need it.
+  
+  * Without a `workerFactory`, a large graph is laid out on the main thread after a frame.
+
+- [#192](https://github.com/eknowledger/toolbench/pull/192) [`31d4db5`](https://github.com/eknowledger/toolbench/commit/31d4db5dd1a1d6c867e41a91f1a5b7c221ce2f78) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a tool's `sdk` now has to cover what it uses.** ([#170](https://github.com/eknowledger/toolbench/issues/170)) A manifest declaring `"sdk": 4` that used v6's `lang` used to validate, and a v4 runtime then loaded it and silently dropped the highlighting. Now it is refused: `inputs[0].lang: is from contract version 6, but the tool declares "sdk": 4 ... Declare "sdk": 6.`
+  
+  - `upgradeManifest` checks before it stamps the current version, so every path that loads a manifest refuses, a host's own included. `validateManifest` checks a manifest validated as written. The `@toolbench/sdk/fixtures` harness also checks every case's expected output and every sample's result.
+  - New: `checkManifestFeatures(raw)` and `outputFeatureProblem(output, sdk)`, the same checks on their own.
+  - ⚠️ Heads-up: a manifest that under-declares its `sdk` now fails to load. Raise its `sdk` to the version the message names. Every tool and fixture in this repository already declared enough.
+
+- [#193](https://github.com/eknowledger/toolbench/pull/193) [`10678a9`](https://github.com/eknowledger/toolbench/commit/10678a9872cf10465c7ee11fd1774e22cc7d0451) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a tool can ship a grammar for its own textarea language.** ([#163](https://github.com/eknowledger/toolbench/issues/163)) Beside `lang`, a textarea's `grammar` lists `keywords`, a `comment` prefix, `operators` and `strings` delimiters, and the runtime paints what the reader types with them, so a notation no host highlighter knows is highlighted anyway.
+  
+  - No patterns: a tool cannot ship a regular expression that freezes the page, any other key is refused, and every list is capped.
+  - A host `highlight` hook that paints the `lang` still wins. The paint is the same as `lang`'s: behind the real textarea, `aria-hidden`, so the caret, selection, undo and screen reader are the browser's own.
+  - The tokeniser is in the lazily fetched paint chunk, now about 1.5 KB, which a tool with a grammar fetches even on a host with no hook. Contract version 7.
+
+### Patch Changes
+
+- [#186](https://github.com/eknowledger/toolbench/pull/186) [`f88acbe`](https://github.com/eknowledger/toolbench/commit/f88acbec9fa7c89be2b88ce9858ea25995b13073) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: no em dashes in what the runtime and the SDK write.** ([#42](https://github.com/eknowledger/toolbench/issues/42))
+  
+  - The status line now reads "inputs changed. Press Run", "filled with "…". Press Run" and "showing the default result. Press Run to try your own".
+  - A bytes legend entry reads "U+00E9 é: 2 bytes at 0x0001".
+  - A missing value in a chart's data table, readout or share reads "n/a".
+  - Validation messages use a colon where they used an em dash.
+  - The example tools' own wording changed too, so their output did: `percentiles` 1.3.0 ("No measurements yet. Paste some numbers.", and its notes on the mean and the averaged p99) and `queue-explorer` 1.1.0 ("...no steady state to report. Lower the arrival rate or speed up service."). Minor versions, because a consumer could match on that output.
+  - ⚠️ Heads-up: a host or a test matching any of these strings exactly needs the new wording.
+- Updated dependencies [[`dde82c6`](https://github.com/eknowledger/toolbench/commit/dde82c61e23eb4624304e1f92305b20557c06b87), [`f88acbe`](https://github.com/eknowledger/toolbench/commit/f88acbec9fa7c89be2b88ce9858ea25995b13073), [`31d4db5`](https://github.com/eknowledger/toolbench/commit/31d4db5dd1a1d6c867e41a91f1a5b7c221ce2f78), [`10678a9`](https://github.com/eknowledger/toolbench/commit/10678a9872cf10465c7ee11fd1774e22cc7d0451)]:
+  - @toolbench/sdk@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes
