@@ -34,7 +34,9 @@ function jsdoc(raw: string | undefined, firstParagraph = false): { text: string;
 		.join(" ")
 		.replace(/\s+/g, " ")
 		// The Since column says this; in the notes it would be said twice.
-		.replace(/\s*Contract version \d+\.?/g, "")
+		.replace(/\s*(?:Contract|Added in contract) version \d+\.?/g, "")
+		// An inline object type's members arrive with their JSDoc already flattened to one line.
+		.replace(/\s\*\s/g, " ")
 		.replace(/\s*\(#\d+(?:, contract version \d+)?\)/g, "")
 		.trim();
 	return { text, ...(tag ? { fallback: tag.replace("@default", "").trim() } : {}) };
@@ -57,6 +59,15 @@ function members(body: string): Attr[] {
 		}
 		if (body.startsWith("//", i)) {
 			i = body.indexOf("\n", i) + 1 || body.length;
+			continue;
+		}
+		// A method, `progress(fraction: number, partial?: Output): void;`, is one member: its parameters are not.
+		const method = /^(\w+)(\([^)]*\)):\s*([^;\n]+);?/.exec(body.slice(i));
+		if (method) {
+			const d = jsdoc(doc);
+			out.push({ name: `${method[1]}${method[2]}`, type: (method[3] ?? "").trim(), required: true, notes: d.text });
+			doc = undefined;
+			i += method[0].length;
 			continue;
 		}
 		const head = /^(\w+)(\?)?:\s*/.exec(body.slice(i));
@@ -104,10 +115,34 @@ const cell = (text: string) => text.replace(/\n/g, " ");
 const typeCell = (type: string) => `\`${type}\``;
 const sinceCell = (v: number) => (v > 1 ? `**v${v}**` : "v1");
 
+/**
+ * An attribute table. The Default column appears only when some attribute has one: empty, it took a sixth of
+ * the width and squeezed the Notes to a few words a line.
+ */
+function attributeTable(attrs: Attr[], sinceOf: (a: Attr) => number): string {
+	const withDefault = attrs.some((a) => a.fallback);
+	const head = withDefault ? "| Attribute | Type | Required | Default | Since | Notes |\n|---|---|---|---|---|---|" : "| Attribute | Type | Required | Since | Notes |\n|---|---|---|---|---|";
+	const row = (a: Attr) =>
+		`| \`${a.name}\` | ${typeCell(a.type)} | ${a.required ? "**yes**" : "no"} |${withDefault ? ` ${a.fallback ? `\`${a.fallback}\`` : ""} |` : ""} ${sinceCell(sinceOf(a))} | ${cell(a.notes)} |`;
+	return [head, ...attrs.map(row)].join("\n");
+}
+
 /** One manifest broken one way, and what the validator says about it. */
 async function message(change: (m: Record<string, unknown>) => void): Promise<string> {
 	const sdk = (await import(join(ROOT, "packages/sdk/src/index.ts"))) as { validateManifest(m: unknown): unknown };
-	const m: Record<string, unknown> = {
+	const m = baseManifest();
+	change(m);
+	try {
+		sdk.validateManifest(m);
+	} catch (error) {
+		return (error as Error).message;
+	}
+	throw new Error("reference: the validator accepted a manifest this page shows it refusing");
+}
+
+/** A manifest that passes, so each rule can break exactly one thing. */
+function baseManifest(): Record<string, unknown> {
+	return {
 		sdk: 7,
 		id: "example",
 		name: "Example",
@@ -122,13 +157,6 @@ async function message(change: (m: Record<string, unknown>) => void): Promise<st
 			{ id: "name", type: "text", label: "Name", default: "" },
 		],
 	};
-	change(m);
-	try {
-		sdk.validateManifest(m);
-	} catch (error) {
-		return (error as Error).message;
-	}
-	throw new Error("reference: the validator accepted a manifest this page shows it refusing");
 }
 
 const input = (m: Record<string, unknown>, i: number) => (m.inputs as Record<string, unknown>[])[i] as Record<string, unknown>;
@@ -203,10 +231,7 @@ export async function inputsReference(): Promise<string> {
 	const option = members(block(types, "export interface SelectOption"));
 	const grammar = members(block(types, "export interface TextareaGrammar"));
 
-	const attrRow = (a: Attr, key: string) =>
-		`| \`${a.name}\` | ${typeCell(a.type)} | ${a.required ? "**yes**" : "no"} | ${a.fallback ? `\`${a.fallback}\`` : ""} | ${sinceCell(at(key))} | ${cell(a.notes)} |`;
-	const attrTable = (attrs: Attr[], prefix: string) =>
-		["| Attribute | Type | Required | Default | Since | Notes |", "|---|---|---|---|---|---|", ...attrs.map((a) => attrRow(a, `${prefix}.${a.name}`))].join("\n");
+	const attrTable = (attrs: Attr[], prefix: string) => attributeTable(attrs, (a) => at(`${prefix}.${a.name}`));
 
 	const out: string[] = [];
 	out.push(
@@ -237,7 +262,8 @@ export async function inputsReference(): Promise<string> {
 		out.push("", "### Example", "", exampleInput(s.type));
 	}
 	out.push("", "## Validation rules", "", "`validateManifest` checks these before anything runs. The message is exactly what an author gets.", "", "| Rule | Message |", "|---|---|");
-	for (const r of RULES) out.push(`| ${r.rule} | \`${cell(await message(r.change))}\` |`);
+	// Plain text, not a code span: a message may quote `run` in backticks of its own.
+	for (const r of RULES) out.push(`| ${r.rule} | ${cell(await message(r.change))} |`);
 	return out.join("\n");
 }
 
@@ -363,10 +389,7 @@ export async function resultsReference(): Promise<string> {
 		const close = before.lastIndexOf("*/");
 		return open >= 0 && close > open && before.slice(close + 2).trim() === "" ? jsdoc(before.slice(open + 3, close), true).text : "";
 	};
-	const row = (a: Attr, since: number) =>
-		`| \`${a.name}\` | ${typeCell(a.type)} | ${a.required ? "**yes**" : "no"} | ${a.fallback ? `\`${a.fallback}\`` : ""} | ${sinceCell(since)} | ${cell(a.notes)} |`;
-	const table = (attrs: Attr[], since: (a: Attr) => number) =>
-		["| Attribute | Type | Required | Default | Since | Notes |", "|---|---|---|---|---|---|", ...attrs.map((a) => row(a, since(a)))].join("\n");
+	const table = attributeTable;
 
 	const out: string[] = [
 		"A tool's `run` returns one result. The runtime draws it: a tool never writes HTML. Every result is an object with a `kind`, and a `group` holds several.",
@@ -394,5 +417,122 @@ export async function resultsReference(): Promise<string> {
 		}
 		out.push("", "### Example", "", await resultExample(k.kind));
 	}
+	return out.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Manifest
+// ---------------------------------------------------------------------------
+
+/** The rules a manifest as a whole is held to, each with the message an author gets. */
+const MANIFEST_RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = [
+	{ rule: "`sdk` is a contract version this SDK reads", change: (m) => (m.sdk = 99) },
+	{ rule: "`id` is lowercase letters, digits and hyphens", change: (m) => (m.id = "My Tool") },
+	{ rule: "`blurb` is under 200 characters", change: (m) => (m.blurb = "x".repeat(240)) },
+	{ rule: "At least one capability", change: (m) => (m.capabilities = []) },
+	{ rule: "`kinds` is not empty", change: (m) => (m.kinds = []) },
+	{ rule: "`kinds` includes `error`", change: (m) => (m.kinds = ["fields"]) },
+	{ rule: "`cardFields` is a positive number", change: (m) => (m.cardFields = 0) },
+	{ rule: "`timeoutMs` is 100 to 30000", change: (m) => Object.assign(m, { runtime: { entry: "index.ts", thread: "worker" }, timeoutMs: 50 }) },
+	{ rule: "`samples` is not empty when present", change: (m) => (m.samples = []) },
+	{ rule: "A link is `http`, `https`, `mailto` or relative", change: (m) => (m.links = [{ label: "Spec", href: "javascript:alert(1)" }]) },
+];
+
+export async function manifestReference(): Promise<string> {
+	const types = read("packages/sdk/src/types.ts");
+	const at = await since();
+	const body = (name: string) => {
+		const i = types.search(new RegExp(`export (?:interface ${name}\\b[^{]*\\{|type ${name}\\b[^=]*= \\{)`));
+		if (i < 0) throw new Error(`reference: types.ts has no ${name}`);
+		return members(block(types.slice(i), "{"));
+	};
+	const table = (attrs: Attr[], key: (a: Attr) => string) => attributeTable(attrs, (a) => at(key(a)));
+	const manifest = body("Manifest");
+	// `runtime` and `links` are inline object types; their own members get tables of their own.
+	const inline = (name: string) => {
+		const a = manifest.find((x) => x.name === name);
+		if (!a) throw new Error(`reference: Manifest has no ${name}`);
+		return members(a.type.replace(/^\{|\}(\[\])?$/g, ""));
+	};
+	const { CAPABILITIES } = (await import(join(ROOT, "packages/sdk/src/index.ts"))) as { CAPABILITIES: readonly string[] };
+	const example = read("tools/histogram/tool.json").trim();
+
+	const out: string[] = [
+		"A tool is a directory with three files: `tool.json`, the manifest; `index.ts`, the module whose `run` computes the result; and `cases.json`, the known answers its fixtures check.",
+		"",
+		"## Manifest attributes",
+		"",
+		"The keys of `tool.json`.",
+		"",
+		table(manifest.map((a) => (a.name === "runtime" ? { ...a, type: "object" } : a.name === "links" ? { ...a, type: "Link[]" } : a)), (a) => a.name),
+		"",
+		"### runtime",
+		"",
+		table(inline("runtime"), (a) => `runtime.${a.name}`),
+		"",
+		"### Link",
+		"",
+		"Each entry of `links`.",
+		"",
+		table(inline("links"), (a) => `links.${a.name}`),
+		"",
+		"### Sample",
+		"",
+		"Each entry of `samples`, a button under the form that fills the inputs.",
+		"",
+		table(body("Sample"), (a) => `samples.${a.name}`),
+		"",
+		"### Capabilities",
+		"",
+		"| Capability | Meaning |",
+		"|---|---|",
+		...CAPABILITIES.map((c) => `| \`${c}\` | ${c === "pure" ? "No network, no storage, no clock, no randomness that is not seeded: the same input always gives the same result" : ""} |`),
+		"",
+		"## Example",
+		"",
+		"```json",
+		example,
+		"```",
+		"",
+		"`tools/histogram/tool.json`.",
+		"",
+		"## The tool module",
+		"",
+		"`index.ts` default-exports an object with `run`.",
+		"",
+		"```ts",
+		'import type { Tool } from "@toolbench/sdk";',
+		"",
+		"type Input = { values: string; bins: number }; // a type, not an interface",
+		"",
+		"export default {",
+		"  run({ values, bins }, ctx) {",
+		'    return { kind: "fields", fields: [{ label: "bins", value: String(bins) }] };',
+		"  },",
+		"} satisfies Tool<Input>;",
+		"```",
+		"",
+		"Declare the input type with `type`, not `interface`: an interface does not satisfy `InputValues`, and TypeScript's error does not say why.",
+		"",
+		"### Ctx",
+		"",
+		"The second argument to `run`.",
+		"",
+		table(body("Ctx"), () => "ctx"),
+		"",
+		"## Fixtures",
+		"",
+		"`cases.json` is an array of cases. `pnpm check` runs each and compares the result.",
+		"",
+		table(body("Case"), () => "case"),
+		"",
+		"## Validation rules",
+		"",
+		"`validateManifest` checks these before anything runs. Rules for inputs are on the [Inputs](./docs-ref-inputs.html#validation-rules) page.",
+		"",
+		"| Rule | Message |",
+		"|---|---|",
+	];
+	for (const r of MANIFEST_RULES) out.push(`| ${r.rule} | ${cell(await message(r.change))} |`);
 	return out.join("\n");
 }

@@ -900,15 +900,19 @@ export interface Manifest {
 	sdk: number;
 	/** Stable, lowercase, hyphenated. Also the directory name and the URL segment. */
 	id: string;
+	/** The tool's title, shown as its heading. */
 	name: string;
 	/** One sentence. Shown on cards and used as a page description. */
 	blurb: string;
 	/** The tool's own version, independent of `sdk`. */
 	version: string;
+	/** What the tool is allowed to do. At least one; `pure` is the only capability today. */
 	capabilities: Capability[];
+	/** The form, one control per entry, in order. At least one. */
 	inputs: InputSpec[];
 	/** Every kind `run` can return, so a host can refuse a tool it cannot draw. */
 	kinds: OutputKind[];
+	/** How the runtime loads and runs the tool. */
 	runtime: {
 		/** Entry file, relative to the tool's directory. */
 		entry: string;
@@ -942,12 +946,18 @@ export interface Manifest {
 	timeoutMs?: number;
 	/** Markdown file, relative to the tool's directory, rendered as the tool's help. */
 	help?: string;
+	/** Free-form labels a host can filter or group tools by. */
 	tags?: string[];
 	/**
 	 * Anything the tool wants to point at: a spec it implements, a post explaining it, a reference
 	 * decoder. Deliberately generic: a host site's own content relations are the host's business.
 	 */
-	links?: { label: string; href: string }[];
+	links?: {
+		/** The link text. */
+		label: string;
+		/** An `http`, `https` or `mailto` URL, or a relative path. Anything else is refused. */
+		href: string;
+	}[];
 	/**
 	 * Example inputs, rendered as a row of buttons under the form. Added in contract version 3.
 	 *
@@ -1007,8 +1017,11 @@ export interface LoadedTool<I extends InputValues = InputValues> {
 // ---------------------------------------------------------------------------
 
 export interface Case {
+	/** What the case checks, shown when it fails. */
 	name: string;
+	/** The values `run` receives, keyed by input id, passed exactly as given. */
 	input: InputValues;
+	/** The result `run` must return. */
 	expect: Output;
 	/**
 	 * Exact deep equality by default, because that is what catches a duplicated field, a reordered
@@ -1018,6 +1031,8 @@ export interface Case {
 	 * two things in return: a `why`, and a `fieldCount`, so a dropped field is still a failure.
 	 */
 	match?: "exact" | "subset";
+	/** Why this case needs `subset`. Required with it. */
 	why?: string;
+	/** How many fields the result has. Required with `subset`, so a dropped field still fails. */
 	fieldCount?: number;
 }
