@@ -75,7 +75,7 @@ same order, so the cascade is the same.
 ### Result parts
 
 Every part of a result has `data-kind` on its root element, naming its kind: `fields`, `text`, `code`,
-`table`, `series`, `heatmap`, `pie`, `radar`, `treemap`, `venn`, `bytes`, `group` or `error`. A part
+`table`, `series`, `heatmap`, `pie`, `radar`, `treemap`, `venn`, `graph`, `bytes`, `group` or `error`. A part
 the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 
 | Kind | Root | Inside it |
@@ -87,10 +87,36 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 | `code` | `.tb-out-code` | `<pre><code class="language-…">` |
 | `bytes` | `.tb-out-bytes` | `.tb-bytes-grid`, `.tb-bytes-row`, `.tb-bytes-offset`, `.tb-bytes-hex`, `.tb-bytes-ascii`, `.tb-byte`, `.tb-bytes-legend`, `.tb-bytes-caption` |
 | every chart kind | `.tb-out-chart`, plus `.tb-out-chart-card` on a card | The chart's own markup. Not covered: see below |
+| `graph` | `.tb-out-graph` | `.tb-graph-plot` (the picture, one tab stop), `.tb-graph-readout`, `.tb-graph-data` (the edge table, a `<details>`), `.tb-graph-message` (why a graph is listed instead of drawn). Inside the picture, the parts below |
 | `error` | `.tb-out-error` | `.tb-error-message` |
 
 A chart's internal markup, the SVG and its classes, is not part of this contract. Style a chart through its
 root and the series colour properties. Its insides are drawn geometry and will change.
+
+### Inside a graph
+
+A graph's picture is different: a tool names its nodes and edges, so a host can style them by name. Every one carries `data-kind`, and `data-role` when the tool gave it one. Where they are drawn is
+geometry and not covered; what they are, below, is.
+
+| `data-kind` | Element | Also carries |
+|---|---|---|
+| `node` | `.tb-graph-node`, a `<g>` with `.tb-graph-shape` (the outline), `.tb-graph-name` and `.tb-graph-note` | `data-id`, `data-shape`, `data-color` |
+| `edge` | `.tb-graph-edge`, a `<g>` with `.tb-graph-line`, `.tb-graph-mark` for each end and `.tb-graph-label` | `data-line` (`dashed`, `dotted`), `data-width` (`thin`, `thick`), `data-color`, `data-routed` |
+| `badge` | `.tb-graph-badge` | |
+
+`data-color` is the tool's `tone` or `color`, `bad` or `series-3` say, and every coloured rule reads one
+custom property, `--c`, so a host recolours a category by its `data-color` alone. A mark carries
+`data-end` (`head`, `tail`) and `data-fill` (`solid`, `hollow`, `none`). A node or edge on the highlighted
+path carries the class `tb-path`, and while a reader points at or focuses a node, it and its edges carry
+`tb-hot` and its neighbours `tb-near`. A row of the edge table for a node with no edges carries
+`data-orphan`.
+
+```css
+/* Decisions in a flowchart, drawn heavier: the tool set role: "decision" on them. */
+.tb-graph-node[data-role="decision"] > .tb-graph-shape { stroke-width: 2.5; }
+/* Development-only dependencies, faded. */
+.tb-graph-edge[data-role="dev"] { opacity: 0.5; }
+```
 
 ### Attributes
 
@@ -165,6 +191,6 @@ Under semver, against `@toolbench/runtime`:
 - **Adding** a class, an attribute, or a value is a **minor** change. A host sheet written against one minor
   version keeps working on the next.
 - Moving the runtime's rules out of `@layer toolbench` is a major change: it is what makes your rules win.
-- Anything **not** listed here, including element nesting beyond what the tables say, chart internals, and
-  the runtime's own rule values, may change in any release. Do not select by position
+- Anything **not** listed here, including element nesting beyond what the tables say, chart internals, a
+  graph's coordinates, and the runtime's own rule values, may change in any release. Do not select by position
   (`.tb-output > :nth-child(2)`); ask the tool for a `role` instead.

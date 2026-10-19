@@ -28,6 +28,7 @@ execute in a plain `node --test`. That floor is worth it.
 | `pnpm new-tool <id>` | Scaffolds `tools/<id>/` with the four files, already green |
 | `pnpm bench` | Whenever you touch the runtime. Look at the thing |
 | `pnpm bench:build && pnpm size` | Before a PR, if `packages/runtime` grew |
+| `pnpm test:graph-scale` | After a change to the graph layout. Its 250 and 500 node graphs, out of `pnpm test` because they take about 25 s; CI runs them on every pull request |
 | `pnpm test:counts --update` | After adding or removing tests. It rewrites the Count column in the testing table, so nobody types those numbers |
 | `pnpm test:bench` | Before a PR. Browser tests, against the **built** bundle. `PLAYWRIGHT_BROWSER=firefox` or `webkit` for the other engines |
 | `pnpm coverage` | When you want the uncovered list. Node suite only, no threshold |
@@ -130,8 +131,9 @@ Tools in this repository exist to exercise the runtime, not to be a collection. 
 each cover something the others do not: `percentiles` is a main-thread group of fields and a table,
 `queue-explorer` is a worker with progress and a timeout, `utf8-bytes` is the `bytes` kind,
 `regex-explainer` is the `text` kind, and a worker whose timeout is the point rather than an
-afterthought, and `histogram` is a bare `series` with no group around it, the `bar` shape, and no
-primary input for a card to fall back on.
+afterthought, `histogram` is a bare `series` with no group around it, the `bar` shape, and no
+primary input for a card to fall back on, and `build-order` is the `graph` kind, a graph the runtime lays out
+beside the fields that explain it.
 
 Start with `pnpm new-tool <id>`, then replace the starter function. The scaffold exists so the first
 two minutes are not copying boilerplate. It does not change what a tool in this repository has to cover.

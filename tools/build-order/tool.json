@@ -1,0 +1,42 @@
+{
+  "sdk": 7,
+  "id": "build-order",
+  "name": "Build order",
+  "blurb": "Finds the rounds a set of packages can be built in, and draws the dependency graph with its longest chain marked.",
+  "version": "1.0.0",
+  "capabilities": ["pure"],
+  "runtime": { "entry": "index.ts", "thread": "main" },
+  "kinds": ["group", "fields", "graph", "error"],
+  "card": "live",
+  "cardFields": 2,
+  "autoRun": true,
+  "inputs": [
+    {
+      "id": "deps",
+      "type": "textarea",
+      "label": "Packages",
+      "description": "One per line, as name: dependency, dependency. A name with no colon has no dependencies.",
+      "primary": true,
+      "dir": "ltr",
+      "rows": 8,
+      "maxLength": 4000,
+      "default": "app: api-client, ui-kit\nadmin: api-client, ui-kit, auth\napi-client: http, schema\nui-kit: icons\nauth: http\nhttp: core\nschema: core\nicons: core"
+    }
+  ],
+  "samples": [
+    {
+      "label": "Diamond",
+      "input": { "deps": "app: left, right\nleft: base\nright: base" }
+    },
+    {
+      "label": "A cycle",
+      "input": { "deps": "a: b\nb: c\nc: a" }
+    },
+    {
+      "label": "Not a name",
+      "input": { "deps": "app: api client" }
+    }
+  ],
+  "help": "README.md",
+  "tags": ["dependencies", "graph"]
+}

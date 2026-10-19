@@ -35,6 +35,8 @@ const LAYERS = [
 	{ label: "`tools/cases.test.ts`", glob: "tools/cases.test.ts" },
 	{ label: "`tools/*/‌*.test.ts`", glob: "tools/*/*.test.ts" },
 	{ label: "`scripts/*.test.ts`", glob: "scripts/*.test.ts" },
+	// Its own command and CI step, not in `pnpm test`, so not in the sum checked against it below.
+	{ label: "`pnpm test:graph-scale`", glob: "packages/runtime/test/graph-large.scale.ts", separate: true },
 	{ label: "`bench/bench.test.ts`", browser: true },
 ];
 
@@ -85,7 +87,7 @@ for (const layer of LAYERS) {
  * covers, the rows still each measure something and the table quietly describes a subset. Summing the Node
  * layers and comparing against the whole suite is what makes the table an allowlist rather than a sample.
  */
-const nodeTotal = [...LAYERS].filter((l) => !l.browser).reduce((sum, l) => sum + measured.get(l.label), 0);
+const nodeTotal = [...LAYERS].filter((l) => !l.browser && !l.separate).reduce((sum, l) => sum + measured.get(l.label), 0);
 const wholeSuite = countFrom(execFileSync("pnpm", ["test"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
 if (nodeTotal !== wholeSuite) {
 	console.error(

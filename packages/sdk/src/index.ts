@@ -16,6 +16,7 @@ export {
 	CAPABILITIES,
 	INPUT_TYPES,
 	OUTPUT_KINDS,
+	GRAPH_COLORS,
 	type Capability,
 	type Case,
 	type ByteRange,
@@ -39,6 +40,16 @@ export {
 	type Treemap,
 	type TreemapNode,
 	type Venn,
+	type Graph,
+	type GraphColor,
+	type GraphEdge,
+	type GraphGroup,
+	type GraphLane,
+	type GraphMarker,
+	type GraphNode,
+	type GraphRow,
+	type GraphShape,
+	type GraphSide,
 	type Readout,
 	type Series,
 	type Tone,
@@ -50,6 +61,7 @@ export {
 
 export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
 export { isSafeLinkHref } from "./links.ts";
+export { graphProblem } from "./graph.ts";
 
 export { SeedError, defaultInputs, seed, serialiseSeed, type SeedOptions } from "./seed.ts";
 export { MIGRATIONS, VersionError, canLoad, upgradeManifest, upgradeOutput, type Migration } from "./migrate.ts";

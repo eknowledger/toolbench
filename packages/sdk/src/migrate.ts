@@ -110,6 +110,17 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 6,
+		/*
+		 * 6 → 7 added the `graph` output kind (#152).
+		 *
+		 * Identity on both halves, for the reason 1 → 2 gave: a v6 manifest cannot name a kind that did not
+		 * exist, and a v6 tool cannot return one.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {

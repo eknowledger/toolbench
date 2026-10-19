@@ -11,6 +11,7 @@
  * case may opt out with `match: "subset"`, and then it owes two things — a `why`, and a `fieldCount`
  * so a disappearing field is still a failure.
  */
+import { graphProblem } from "./graph.ts";
 import type { Case, Ctx, Field, Output, Tool } from "./types.ts";
 
 export interface CaseResult {
@@ -108,6 +109,16 @@ export function compare(actual: Output, testCase: Case): string | undefined {
 	 */
 	const twice = repeatedPartId(actual, new Set());
 	if (twice !== undefined) return `output: part id "${twice}" is used twice. host.reveal(id) needs each id once per result.`;
+	/*
+	 * Also on every case: a graph the runtime would refuse to draw (a dangling edge, a cycle of groups) is a
+	 * bug in the tool, and an expected output that contains one would otherwise pass here and draw a message on
+	 * every page. Contract version 7.
+	 */
+	for (const part of flatten(actual)) {
+		if (part.kind !== "graph") continue;
+		const problem = graphProblem(part.graph);
+		if (problem !== undefined) return `output: the graph "${part.graph.label}" cannot be drawn: ${problem}.`;
+	}
 	const mode = testCase.match ?? "exact";
 	if (mode === "subset") {
 		if (!testCase.why) {

@@ -10,7 +10,7 @@
  * drawn into a shadow root adopts them there. The series colour TOKENS stay in the runtime's sheet,
  * because a host themes with them before any chart exists.
  */
-import { adopt } from "../styles.ts";
+import { adoptStyles } from "../styles.ts";
 
 export const CHART_STYLES = /* css */ `
 /* ── chart ────────────────────────────────────────────────────────────────────────────────── */
@@ -116,47 +116,12 @@ export const CHART_STYLES = /* css */ `
 .tb-chart-data table { margin-top: 0.5rem; }
 `;
 
-/**
- * Adopt the chart sheet into the shadow root a chart was just drawn into, once per root.
- *
- * ⚠️ Called on the next microtask, not inside `renderChart`: the renderer builds a detached figure and
- * the host inserts it afterwards, so only then does it have a root to adopt into. A microtask runs before
- * the browser paints, so the chart is never seen unstyled.
- */
+// Re-exported so the chart kinds keep importing it from here; it lives in styles.ts since the graph kind shares it.
+export { adoptStyles };
+
+/** Adopt the chart sheet into the shadow root a chart was just drawn into, once per root. See `adoptStyles`. */
 export function adoptChartStyles(node: Node): void {
 	adoptStyles(node, "chart", () => CHART_STYLES);
-}
-
-const sheets = new Map<string, CSSStyleSheet>();
-
-/** Adopt a named sheet into the shadow root `node` is drawn into, once per root. See `adoptChartStyles`. */
-export function adoptStyles(node: Node, name: string, rules: () => string): void {
-	// In the runtime's layer, like its main sheet, so a host's unlayered rule beats a chart's too.
-	const css = () => `@layer toolbench{${rules()}}`;
-	queueMicrotask(() => {
-		const root = node.getRootNode();
-		if (!(root instanceof ShadowRoot)) return;
-		if ("adoptedStyleSheets" in root && typeof CSSStyleSheet === "function") {
-			try {
-				let sheet = sheets.get(name);
-				if (!sheet) {
-					sheet = new CSSStyleSheet();
-					sheet.replaceSync(css());
-					sheets.set(name, sheet);
-				}
-				// After the runtime's own sheet and before any host sheet, so a host rule still wins. See `adopt`.
-				adopt(root, sheet);
-				return;
-			} catch {
-				// Fall through, as the runtime's own sheet does.
-			}
-		}
-		if (root.querySelector(`style[data-tb-sheet="${name}"]`)) return;
-		const style = document.createElement("style");
-		style.setAttribute("data-tb-sheet", name);
-		style.textContent = css();
-		root.append(style);
-	});
 }
 
 /**

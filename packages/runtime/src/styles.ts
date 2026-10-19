@@ -64,7 +64,8 @@ export const STYLES = /* css */ `
      on #f59e0b. Defaults to the surface, so nothing changes unless a host sets it. */
   --tb-accent-ink: var(--tb-bg);
 
-  /* Series colours. Six, then they repeat — a chart needing seven is a chart needing a rethink. */
+  /* Series colours. A chart uses six, then they repeat: a chart needing seven is a chart needing a
+     rethink. A graph's categories can name all eight, because seven teams in a dependency graph are not. */
   --tb-s1: #8a5a00; --tb-s2: #5b3fa8; --tb-s3: #0f6e6e;
   --tb-s4: #1f5aa8; --tb-s5: #a02a5e; --tb-s6: #2d6b32;
   --tb-s1: light-dark(#8a5a00, #e0b877);
@@ -73,6 +74,9 @@ export const STYLES = /* css */ `
   --tb-s4: light-dark(#1f5aa8, #8ec4f0);
   --tb-s5: light-dark(#a02a5e, #f0a5c0);
   --tb-s6: light-dark(#2d6b32, #8fd6a8);
+  --tb-s7: #7a4e2d; --tb-s8: #4a5568;
+  --tb-s7: light-dark(#7a4e2d, #e3b48f);
+  --tb-s8: light-dark(#4a5568, #b9c3d1);
 
   display: block;
   color: var(--tb-fg);
@@ -512,4 +516,44 @@ export function applyHostStyles(root: ShadowRoot, wanted: readonly HostSheet[]):
 		style.textContent = typeof w === "string" ? w : [...w.cssRules].map((r) => r.cssText).join("\n");
 		root.append(style);
 	}
+}
+
+const sheets = new Map<string, CSSStyleSheet>();
+
+/**
+ * Adopt a named sheet into the shadow root `node` is drawn into, once per root: how a renderer in a chunk of
+ * its own brings its rules (the chart kinds, the graph kind).
+ *
+ * ⚠️ Called on the next microtask, not inside the renderer: a renderer builds a detached figure and the host
+ * inserts it afterwards, so only then does it have a root to adopt into. A microtask runs before the browser
+ * paints, so the figure is never seen unstyled. It does assume the figure is attached by then, which the
+ * element does synchronously; a caller that awaits between rendering and inserting must adopt again after.
+ */
+export function adoptStyles(node: Node, name: string, rules: () => string): void {
+	// In the runtime's layer, like its main sheet, so a host's unlayered rule beats a chart's too.
+	const css = () => `@layer toolbench{${rules()}}`;
+	queueMicrotask(() => {
+		const root = node.getRootNode();
+		if (!(root instanceof ShadowRoot)) return;
+		if ("adoptedStyleSheets" in root && typeof CSSStyleSheet === "function") {
+			try {
+				let sheet = sheets.get(name);
+				if (!sheet) {
+					sheet = new CSSStyleSheet();
+					sheet.replaceSync(css());
+					sheets.set(name, sheet);
+				}
+				// After the runtime's own sheet and before any host sheet, so a host rule still wins. See `adopt`.
+				adopt(root, sheet);
+				return;
+			} catch {
+				// Fall through, as the runtime's own sheet does.
+			}
+		}
+		if (root.querySelector(`style[data-tb-sheet="${name}"]`)) return;
+		const style = document.createElement("style");
+		style.setAttribute("data-tb-sheet", name);
+		style.textContent = css();
+		root.append(style);
+	});
 }

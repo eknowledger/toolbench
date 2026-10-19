@@ -136,7 +136,17 @@ const BUDGETS = [
 	 * chunk, 956 bytes. Measured before the rebase onto v5, building them into this chunk instead cost 761
 	 * bytes here against 313 split, which is why they are split. 25_500 would have left 174 bytes.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_000 },
+	/*
+	 * Raised from 26_000 to 27_000 by the graph kind (#152), in the commit that spent it: 25,428 to 26,511
+	 * measured, 1,083 bytes. 462 of them are the build-order example's manifest, which `registry.ts` inlines here
+	 * as it does every tool's. The other 621 are the runtime: the graph kind's loader and its case in both
+	 * exhaustive switches, the screen-reader summary, `prepareOutput` so a seeded graph paints with its chunks,
+	 * the renderer's own way to say which chunk is missing, `adoptStyles` moved here from the chart chunk so
+	 * the graph kind shares it, two more series tokens, the closed list of graph colours and the v7 changelog
+	 * line. The layout and the drawing are chunks of their own, below. 26_000 would have left the build 511
+	 * bytes over.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -164,7 +174,11 @@ const BUDGETS = [
 	 * overlay has to survive. Bench-only. The worker copy still fits its line.
 	 */
 	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_000, deployOnly: true },
+	/*
+	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured.
+	 * Bench-only.
+	 */
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_500, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -229,6 +243,20 @@ const BUDGETS = [
 	 * other page pays nothing for it. Reader cost, because that reader does download it. 956 measured.
 	 */
 	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
+	/*
+	 * The graph kind (#152): a base chunk and two fetched on demand, so a page pays for the graphs it draws.
+	 *
+	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
+	 * graphs, with its keyboard model, readout and edge table: 17,351 measured. Exactly an 8-character hash after
+	 * "graph-", so it cannot match a chunk below, whose names are longer.
+	 *
+	 * The chunks, each fetched by the first graph that needs it and counted as reader cost, because that reader
+	 * downloads it: path highlighting 735, and the repair of a route that had to share 900.
+	 * Each budget sits above what it measured with room for a fix, not for a feature.
+	 */
+	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_500 },
+	{ label: "graph: path highlighting", pattern: /^graph-interact-[^/]+\.js$/, budget: 1_000 },
+	{ label: "graph: repair", pattern: /^graph-repair-[^/]+\.js$/, budget: 1_250 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
@@ -236,7 +264,11 @@ const BUDGETS = [
 	 * chunk. Tool *code* stays in worker-tool-* copies; this is the registry plus the protocol.
 	 * 4_000 left the chunk 237 bytes over after those manifests, which is not a ceiling.
 	 */
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 4_500 },
+	/*
+	 * Raised from 4_500 to 5_000 by the graph kind's example (#152): 4,252 to 4,705 measured, 416 of it the
+	 * build-order manifest, inlined here as every tool's is. 4_500 would have left the build 205 bytes over.
+	 */
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
 	/*
@@ -253,6 +285,8 @@ const BUDGETS = [
 	 */
 	{ label: "tool: regex-explainer", pattern: /^tool-regex-explainer-[^/]+\.js$/, budget: 3_000 },
 	{ label: "tool: histogram", pattern: /^tool-histogram-[^/]+\.js$/, budget: 1_500 },
+	// The graph kind's example (#152): parsing, rounds, the longest chain and the cycle. 1,209 measured.
+	{ label: "tool: build-order", pattern: /^tool-build-order-[^/]+\.js$/, budget: 1_500 },
 	/*
 	 * ⚠️ The two bench FIXTURES, measured but deployOnly, and labelled so nobody mistakes them for shipped
 	 * tools. `json-code` arrived counted as reader cost, which would have put a chunk only the bench
@@ -277,10 +311,14 @@ const BUDGETS = [
 	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// A textarea declaring `lang` (#153) on screen for the browser tests. 228 measured.
 	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,419 measured.
+	{ label: "bench fixture: graph-families", pattern: /^tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
+	// The graph gallery (#152). 1,091 measured.
+	{ label: "bench page: graphs", pattern: /^graphs-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	// STYLING.md's four example sheets, the toggle that removes them, and the reveal links (#157, #147). 1,046 measured.
 	{ label: "bench page: styling", pattern: /^styling-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "bench source links", pattern: /^source-[^/]+\.js$/, budget: 1_500, deployOnly: true },
@@ -304,6 +342,8 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture styled-output", pattern: /^worker-tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture presets", pattern: /^worker-tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture highlighted-input", pattern: /^worker-tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: build-order", pattern: /^worker-tool-build-order-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 ];
 
 let files;
@@ -387,6 +427,8 @@ if (process.argv.includes("--update")) {
 		["README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
 		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
 		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
+		["README.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
+		["docs/architecture.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 		/*
 		 * ⚠️ The per-tool rows, which this block did not own until a tool was added and somebody checked.
@@ -396,7 +438,7 @@ if (process.argv.includes("--update")) {
 		 * stale figure. Generated from the same rows as everything else here, so adding a tool means adding
 		 * one line below and one row to each table, and never a number.
 		 */
-		...["percentiles", "queue-explorer", "regex-explainer", "histogram"].flatMap((id) => [
+		...["percentiles", "queue-explorer", "regex-explainer", "histogram", "build-order"].flatMap((id) => [
 			["README.md", new RegExp(`(\\| \`${id}\` tool chunk[^|]*\\| )[\\d.]+ KB`), kb(find(`tool: ${id}`))],
 			["docs/architecture.md", new RegExp(`(\\| \`${id}\` chunk[^|]*\\| )[\\d.]+ KB`), kb(find(`tool: ${id}`))],
 		]),
