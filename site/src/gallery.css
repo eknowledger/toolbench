@@ -53,10 +53,8 @@
 }
 
 /* ── cards: a heading, tabs, and panels that share one box ── */
+/* One card to a row, always: folding the sidebar away is for giving a card the whole width, not more cards. */
 .cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
-/* Two to a row once the column has room for two, which at 1440 px is with the sidebar folded away. */
-.gallery-main { container-type: inline-size; }
-@container (min-width: 64rem) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; scroll-margin-top: 80px; }
 .card-wide { grid-column: 1 / -1; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.9rem 1rem 0; }
