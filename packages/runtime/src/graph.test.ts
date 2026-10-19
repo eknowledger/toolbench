@@ -92,12 +92,16 @@ describe("graph layout, the eleven families", () => {
 		// 50 ms on the machine REFERENCE_MS was measured on. Without the scaling the budget was that laptop's:
 		// the call graph took 22.8 ms there and 82.4 ms on a GitHub runner, and failed with nothing wrong.
 		if (instrumented) return t.skip("V8 coverage is on, so a time here measures the instrumentation");
-		// Medians of five, after the run above warmed the code, so a collection pause does not decide it.
-		const { measured, factor, medians } = paced(cases.map(([name, g]) => [name, () => layout(g)] as const));
+		// The fastest of five, after the run above warmed the code, so a collection pause does not decide it.
+		const { measured, factor, times, medians } = paced(cases.map(([name, g]) => [name, () => layout(g)] as const));
 		const budget = 50 * factor;
-		const [slowest, slowestMs] = medians.reduce((a, b) => (b[1] > a[1] ? b : a));
-		t.diagnostic(`reference ${measured.toFixed(1)} ms against ${REFERENCE_MS}, budget ${budget.toFixed(1)} ms, slowest ${slowest} ${slowestMs.toFixed(1)} ms`);
-		const slow = medians.filter(([, ms]) => ms >= budget).map(([name, ms]) => `${name} ${ms.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
+		const [slowest, slowestMs] = times.reduce((a, b) => (b[1] > a[1] ? b : a));
+		const slowestMedian = medians.tasks.find(([name]) => name === slowest)![1];
+		t.diagnostic(
+			`reference ${measured.toFixed(1)} ms against ${REFERENCE_MS}, budget ${budget.toFixed(1)} ms, slowest ${slowest} ${slowestMs.toFixed(1)} ms` +
+				` (medians: reference ${medians.reference.toFixed(1)}, ${slowest} ${slowestMedian.toFixed(1)})`,
+		);
+		const slow = times.filter(([, ms]) => ms >= budget).map(([name, ms]) => `${name} ${ms.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
 		assert.deepEqual(slow, []);
 	});
 
