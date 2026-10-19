@@ -20,12 +20,12 @@
  */
 
 /**
- * The reference workload's median on the machine the budgets were set on: an M3 Pro on Node 26, inside a full
- * `pnpm check` run so the other test files compete for the CPU as they do whenever this runs. Five runs measured
- * 13.2, 12.5, 12.1, 12.6 and 11.9 ms, with the call graph at 23.1 to 24.5 ms beside them; this is their median.
- * Re-measure it if a budget is ever set again; the test prints the figure as a diagnostic.
+ * The reference workload's fastest of five on the machine the budgets were set on: an M3 Pro on Node 26,
+ * inside a full `pnpm check` run so the other test files compete for the CPU as they do whenever this runs. Five runs measured
+ * 11.4, 11.1, 11.0, 10.5 and 11.8 ms, with the call graph's fastest at 22.1 to 23.2 ms beside them; this is
+ * their median. Re-measure it if a budget is ever set again; the test prints the figure as a diagnostic.
  */
-export const REFERENCE_MS = 12.5;
+export const REFERENCE_MS = 11.1;
 
 /** A linear congruential generator, so every machine works on the same numbers in the same order. */
 function lcg(seed: number): () => number {
@@ -130,11 +130,17 @@ export function reference(): number {
 	return performance.now() - t0;
 }
 
+const fastest = (ms: number[]) => Math.min(...ms);
 const median = (ms: number[]) => [...ms].sort((x, y) => x - y)[ms.length >> 1]!;
 
 /**
- * Times each task `rounds` times, a reference run before every round, and returns each task's median, the
- * reference's median and how many times slower than the reference machine this one ran, never below 1.
+ * Times each task `rounds` times, a reference run before every round, and returns each task's fastest run, the
+ * reference's fastest and how many times slower than the reference machine this one ran, never below 1.
+ *
+ * The fastest, not the median: contention only ever adds time, so the fastest of five is the run least disturbed,
+ * for the layout and the reference alike, and their ratio is the machine's rather than the moment's. Across six
+ * CI legs the ratio of medians, call graph to reference, ran from 1.86 to 3.29 against 1.85 here, and the worst
+ * left the budget 1.22 times above the layout. The medians are kept for the diagnostic.
  */
 export function paced<K>(tasks: readonly (readonly [K, () => unknown])[], rounds = 5) {
 	reference();
@@ -148,11 +154,12 @@ export function paced<K>(tasks: readonly (readonly [K, () => unknown])[], rounds
 			ms[i]!.push(performance.now() - t0);
 		});
 	}
-	const measured = median(ref);
+	const measured = fastest(ref);
 	return {
 		measured,
 		factor: Math.max(1, measured / REFERENCE_MS),
-		medians: tasks.map(([key], i) => [key, median(ms[i]!)] as const),
+		times: tasks.map(([key], i) => [key, fastest(ms[i]!)] as const),
+		medians: { reference: median(ref), tasks: tasks.map(([key], i) => [key, median(ms[i]!)] as const) },
 	};
 }
 
