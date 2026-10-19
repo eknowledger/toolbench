@@ -5020,7 +5020,10 @@ describe("a result wider than its tool scrolls inside it, and is never clipped (
 						if (el.scrollWidth <= el.clientWidth + 1) continue;
 						let up = el.parentElement;
 						while (up && up !== frame && !scrolls(up)) up = up.parentElement;
-						if (up === frame || up === null) problems.push(`${at}: ${name(el)} overflows with nothing to scroll it, ${el.clientWidth}/${el.scrollWidth} overflow-x:${getComputedStyle(el).overflowX}`);
+						if (up !== frame && up !== null) continue;
+						// Which descendant reaches furthest, so a failure names the cause and not only its ancestors.
+						const far = [...el.querySelectorAll("*")].reduce<Element>((a, b) => (b.getBoundingClientRect().right > a.getBoundingClientRect().right ? b : a), el);
+						problems.push(`${at}: ${name(el)} overflows with nothing to scroll it, ${el.clientWidth}/${el.scrollWidth} overflow-x:${getComputedStyle(el).overflowX}, furthest ${name(far)}`);
 					}
 				}
 				return problems;
