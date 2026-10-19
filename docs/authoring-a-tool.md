@@ -108,6 +108,11 @@ because it has real errors, and it wants two result shapes at once.
 concrete: the current contract is 6 (§3), and declaring 1 opts out of everything added since (`bytes` in
 v2, `samples` in v3, through select presets and highlighted textareas in v6).
 
+Declare the version of the newest feature you use, not the newest one there is. Validation refuses a
+manifest that uses a key, input type or kind newer than its `sdk`, and the fixture harness refuses a case
+or a sample whose result does, with the field, the version that added it and the `sdk` to declare: a
+runtime of the version you declared would load the tool and quietly ignore what it does not know.
+
 `dir: "ltr"` matters more than it looks. Base64 is not prose, and inside a right-to-left page it would
 otherwise be laid out backwards.
 

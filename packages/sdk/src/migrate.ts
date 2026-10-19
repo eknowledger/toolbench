@@ -25,6 +25,7 @@
  *  - **Old fixtures run forever.** Every tool's cases are checked against the current runtime in CI,
  *    which is what turns this file from a good intention into a tested claim.
  */
+import { checkManifestFeatures } from "./features.ts";
 import type { Manifest, Output } from "./types.ts";
 import { SDK_VERSION } from "./version.ts";
 
@@ -179,6 +180,12 @@ export function upgradeManifest(
 				"Upgrade @toolbench/runtime, or lower the tool's sdk if it does not use the newer features.",
 		);
 	}
+	/*
+	 * ⚠️ Here, before the chain stamps the current version over `sdk`, because this is the last moment the
+	 * declaration exists (#170). A manifest declaring 4 that used v6's `lang` validated after the stamp, and
+	 * a v4 runtime then loaded it and ignored the key. Every caller passes through here, so every one refuses.
+	 */
+	checkManifestFeatures(manifest);
 
 	let out = manifest;
 	for (const step of chainFrom(declared, migrations, currentVersion)) {

@@ -153,8 +153,15 @@ const BUDGETS = [
 	 * spent it: 26,765 to 27,290 measured, 525 bytes. The button, its note and their styles, drawn with the
 	 * result, and the host announcing the outcome. The copying itself is a chunk of its own, below; built into
 	 * this chunk instead it cost 685 here, measured on v6. 27_000 would have left the build 60 over.
+	 *
+	 * Raised from 27_500 to 28_000 by refusing a manifest that under-declares its sdk (#170), in the commit
+	 * that spent it: 27,322 to 27,701 measured, 379 bytes. The rows of the version table after version 1 and
+	 * the check that names the field and the sdk to declare, here because `upgradeManifest` and
+	 * `validateManifest` are. The first version carried every key at every version and a general walker, 654
+	 * bytes; the full table now lives in the test that keeps the two in step. The output half is the fixture
+	 * harness's and tree-shaking leaves it out of this chunk. 27_500 would have left the build 201 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow

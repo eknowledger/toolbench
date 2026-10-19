@@ -24,6 +24,7 @@ import {
 	type OutputKind,
 } from "./types.ts";
 import { isSafeLinkHref } from "./links.ts";
+import { checkManifestFeatures } from "./features.ts";
 import { SDK_CHANGELOG, SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";
 
 export class ManifestError extends Error {
@@ -332,9 +333,9 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  * default. So a known key found in the wrong place is refused with the place it belongs. Unknown keys are
  * still ignored: refusing those would narrow the contract and stop manifests that load today from loading.
  */
-const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
-const RUNTIME_KEYS = ["entry", "thread"];
-const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang"];
+export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
+export const RUNTIME_KEYS = ["entry", "thread"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {
@@ -369,6 +370,8 @@ export function validateManifest(raw: unknown): Manifest {
 	if (!SUPPORTED_SDK_VERSIONS.includes(o.sdk)) {
 		fail("sdk", `contract version ${o.sdk} is not one this SDK can read (${SUPPORTED_SDK_VERSIONS.join(", ")})`);
 	}
+	// Finds nothing on an upgraded manifest, whose `sdk` is current; catches one validated as written (#170).
+	checkManifestFeatures(o);
 
 	// --- identity ---------------------------------------------------------------------------------
 	const id = str(o, "id", "");

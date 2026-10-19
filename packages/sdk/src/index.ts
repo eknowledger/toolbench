@@ -62,6 +62,7 @@ export {
 export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
 export { isSafeLinkHref } from "./links.ts";
 export { graphProblem } from "./graph.ts";
+export { checkManifestFeatures, outputFeatureProblem } from "./features.ts";
 
 export { SeedError, defaultInputs, seed, serialiseSeed, type SeedOptions } from "./seed.ts";
 export { MIGRATIONS, VersionError, canLoad, upgradeManifest, upgradeOutput, type Migration } from "./migrate.ts";

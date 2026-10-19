@@ -144,6 +144,7 @@ toolbench/
 │   │       ├── testing.ts          fixture runner and result comparison
 │   │       ├── graph.ts            graphProblem, the graph kind's structural rules
 │   │       ├── version.ts          SDK_VERSION, supported versions, changelog
+│   │       ├── features.ts         the version each key and output field arrived in, and the check against `sdk`
 │   │       └── index.ts            public surface
 │   └── runtime/                    @toolbench/runtime   no dependencies, no framework
 │       ├── test/graph/             the graph families, seeded graphs and geometric checks the tests use
@@ -657,6 +658,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | Invariant | Enforced in | If it were not |
 |---|---|---|
 | `manifest.sdk` is a version this SDK can read | `migrate.ts`, `validate.ts` | A tool from the future renders half correctly |
+| Nothing a manifest uses, and nothing its cases or samples return, is newer than its declared `sdk` | `features.ts`, called by `upgradeManifest` before it stamps the current version, and by `validateManifest`; outputs by the tool-directory harness | A runtime of the declared version loads the tool and silently drops what it does not know: presets, highlighting, a part's name |
 | `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the directory name | `validate.ts`, `tools/cases.test.ts` | Derived links and routes point at the wrong tool |
 | No two tools share an `id` | `RegistrySource` constructor | One silently shadows the other |
 | Input ids are unique | `validate.ts` | Two inputs answering to one id makes a form ambiguous and a fixture unreadable |
@@ -852,8 +854,8 @@ Seven layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 145 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 112 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 161 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 114 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 23 |
@@ -937,7 +939,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 27.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), and 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk) |
+| Runtime plus the bench's own wiring | 27.7 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), and 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.0 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook. 956 bytes |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
@@ -1196,6 +1198,7 @@ declaration, so browsers without that function get the light palette rather than
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `isSafeLinkHref` | whether a link target may be offered to a reader |
+| `checkManifestFeatures`, `outputFeatureProblem` | the declared `sdk` against what a manifest uses and a result returns. `upgradeManifest` already calls the first |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
 | `runCases`, `assertCases`, `compare`, `testCtx`, `CaseResult`, `RunCasesOptions` | fixtures |
 | `checkToolDirectory`, `readToolDirectory`, `readTool`, `scanToolDirectory`, `ToolOnDisk`, `ToolDirectoryError` | **`@toolbench/sdk/fixtures`** subpath. Node-only: it reads the filesystem, which is why it is not in the main entry |

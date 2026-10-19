@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { defaultInputs } from "./seed.ts";
 import { assertCases, testCtx } from "./testing.ts";
 import type { Case, Manifest, Tool } from "./types.ts";
+import { outputFeatureProblem } from "./features.ts";
 import { upgradeManifest } from "./migrate.ts";
 import { validateManifest } from "./validate.ts";
 
@@ -37,6 +38,8 @@ export interface ToolOnDisk {
 	/** Absolute path to the entry module, ready to `import()`. */
 	entry: string;
 	manifest: Manifest;
+	/** The `sdk` the manifest declares, before `upgradeManifest` stamped the current version on it (#170). */
+	declaredSdk: number;
 	cases: Case[];
 }
 
@@ -80,8 +83,12 @@ export function scanToolDirectory(dir: string | URL): { id: string; root: string
 export function readTool(id: string, root: string): ToolOnDisk {
 	{
 		let manifest: Manifest;
+		let declaredSdk: number;
 		try {
-			manifest = validateManifest(upgradeManifest(JSON.parse(readFileSync(join(root, "tool.json"), "utf8"))));
+			const raw = JSON.parse(readFileSync(join(root, "tool.json"), "utf8")) as Record<string, unknown>;
+			// Read before the upgrade, which overwrites it, to check what the tool returns against (#170).
+			declaredSdk = raw.sdk as number;
+			manifest = validateManifest(upgradeManifest(raw));
 		} catch (error) {
 			throw new ToolDirectoryError(error instanceof Error ? error.message : String(error), id);
 		}
@@ -111,9 +118,17 @@ export function readTool(id: string, root: string): ToolOnDisk {
 					id,
 				);
 			}
+			/*
+			 * What the tool returns has to fit its declared `sdk` as well as what it declares does. A v3 tool
+			 * returning a v5 `role` validates and passes its fixtures, and on a v3 runtime draws without the
+			 * name a host stylesheet looks for. Checked on `expect`, which is the output exactly unless the case
+			 * opted into `subset`; samples are checked on what they actually return.
+			 */
+			const newer = outputFeatureProblem(testCase.expect, declaredSdk);
+			if (newer) throw new ToolDirectoryError(`case "${testCase.name}" expects ${newer}`, id);
 		}
 
-		return { id, root, entry: join(root, manifest.runtime.entry), manifest, cases };
+		return { id, root, entry: join(root, manifest.runtime.entry), manifest, declaredSdk, cases };
 	}
 }
 
@@ -250,8 +265,11 @@ export function checkToolDirectory(dir: string | URL, options: CheckToolDirector
 					const controller = new AbortController();
 					const timer = setTimeout(() => controller.abort(), timeoutMs);
 					try {
-						await impl.run({ ...defaultInputs(tool), ...sample.input }, testCtx(controller.signal));
+						const output = await impl.run({ ...defaultInputs(tool), ...sample.input }, testCtx(controller.signal));
+						const newer = outputFeatureProblem(output, tool.declaredSdk);
+						if (newer) throw new ToolDirectoryError(`sample "${sample.label}" returns ${newer}`, id);
 					} catch (error) {
+						if (error instanceof ToolDirectoryError) throw error;
 						// An overrun is reported below, whether the tool answered the abort by throwing or by
 						// returning: either way what went wrong is the time, not the throw.
 						if (!controller.signal.aborted) {
