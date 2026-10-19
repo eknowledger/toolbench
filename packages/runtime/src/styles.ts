@@ -146,6 +146,8 @@ export const STYLES = /* css */ `
   border-radius: 8px;
   padding: 0.4375rem 0.5625rem;
 }
+/* WebKit counts a select's clipped option text as overflow of .tb, which can then be scrolled sideways (#194). */
+.tb-select { overflow: hidden; }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
 /* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
@@ -230,6 +232,7 @@ export const STYLES = /* css */ `
   color: var(--tb-faint);
   font-family: var(--tb-mono);
   min-height: 1.2em;
+  overflow-wrap: anywhere;
 }
 /* An empty status must take no room: after a run it is cleared, and a blank line above a result reads
    as a rendering bug. */
@@ -237,8 +240,9 @@ export const STYLES = /* css */ `
 .tb-output { display: grid; gap: 0.75rem; }
 /* Grid items default to min-width: auto, so the widest result set the track: at 390px a six-column
    table made the tool 402px wide inside a 348px frame, and the card clipped the rest (#154). With
-   this the table scrolls inside its own box. */
-.tb-output, .tb-group { min-width: 0; }
+   this the table scrolls inside its own box.
+   ⚠️ Every child too: a graph, code or a hex dump is not itself a scroller, so it grew and was clipped (#194). */
+.tb-group, .tb-body > *, .tb-output > * { min-width: 0; }
 .tb-output[data-state="running"] { opacity: 0.65; }
 /* The form no longer matches what is on screen. Dimmed rather than cleared: the previous answer is
    still the last true one, and throwing it away loses the comparison the reader was making. */
@@ -282,7 +286,7 @@ export const STYLES = /* css */ `
    and from aria-expanded, both of which say it outright. */
 @media (prefers-reduced-motion: reduce) { .tb-disclose::before { transition: none; } }
 
-.tb-out-text p { margin: 0; }
+.tb-out-text p { margin: 0; overflow-wrap: anywhere; }
 .tb-mono, .tb-out-text pre, .tb-out-code pre { font-family: var(--tb-mono); font-size: 0.82rem; }
 .tb-out-text pre, .tb-out-code pre {
   margin: 0; padding: 0.625rem 0.75rem; overflow-x: auto;
@@ -339,6 +343,7 @@ export const STYLES = /* css */ `
   background: var(--tb-bad); color: var(--tb-bg);
   font-size: 0.72rem; font-weight: 700; line-height: 1.05rem; text-align: center;
 }
+.tb-error-message { min-width: 0; overflow-wrap: anywhere; }
 .tb-at { color: var(--tb-faint); font-family: var(--tb-mono); font-size: 0.78rem; }
 
 .tb-unknown {
