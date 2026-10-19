@@ -289,6 +289,24 @@ export const STYLES = /* css */ `
   background: var(--tb-surface); border: 1px solid var(--tb-border); border-radius: 8px;
 }
 .tb-out-code code { font: inherit; }
+/* The Copy action (#155): under the block, at the end, in the disclosure's quiet vocabulary so it does
+   not compete with the result. 24px for WCAG 2.5.8. Sticky inside a table's scroller, or a wide table
+   scrolled sideways would take the button out of view with it. */
+.tb-copy-bar {
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;
+  margin-top: 0.375rem; position: sticky; inset-inline-start: 0;
+}
+.tb-copy {
+  min-height: 24px; padding: 0.15rem 0.6rem;
+  font: inherit; font-size: 0.78rem; color: var(--tb-muted);
+  background: var(--tb-bg); border: 1px solid var(--tb-border); border-radius: 999px; cursor: pointer;
+}
+/* The table's root is its scroller, which clipped the focus ring's right and bottom edges. 4px is the ring. */
+.tb-out-table .tb-copy-bar { padding: 0 4px 4px; }
+.tb-copy:hover:enabled { color: var(--tb-fg); border-color: var(--tb-muted); }
+.tb-copy:disabled { opacity: 0.6; cursor: default; }
+.tb-copy:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+.tb-copy-note { font-size: 0.78rem; color: var(--tb-muted); }
 
 .tb-out-table { overflow-x: auto; }
 .tb-out-table table, .tb-chart-data table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
