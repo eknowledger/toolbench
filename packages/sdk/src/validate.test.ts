@@ -441,3 +441,36 @@ describe("validateManifest: lang on a textarea", () => {
 		failsWith((m) => { m.lang = "json"; }, "lang", "belongs in an entry of `inputs`");
 	});
 });
+
+describe("validateManifest: link targets", () => {
+	const withHref = (href: string) => (m: Record<string, unknown>) => {
+		m.links = [{ label: "More", href }];
+	};
+
+	it("accepts http, https, mailto and relative links", () => {
+		for (const href of ["https://example.com/a?b=c#d", "http://example.com", "mailto:someone@example.com", "/tools/other", "other", "#section", "?q=1", "//example.com/x"]) {
+			const m = good() as unknown as Record<string, unknown>;
+			withHref(href)(m);
+			assert.doesNotThrow(() => validateManifest(m), href);
+		}
+	});
+
+	/*
+	 * Each of these resolves to `javascript:` in a browser. The last four were written by hand from the WHATWG URL
+	 * parser's rules, which strip tab and newline anywhere and leading C0 controls and space, and each was
+	 * measured getting past a check that matched the scheme as text.
+	 */
+	for (const href of ["javascript:alert(1)", "JavaScript:alert(1)", "java\tscript:alert(1)", "java\nscript:alert(1)", " javascript:alert(1)", "\u0000javascript:alert(1)"]) {
+		it(`refuses ${JSON.stringify(href)}`, () => failsWith(withHref(href), "links[0].href", "http, https or mailto"));
+	}
+
+	it("refuses the other schemes that run or embed content", () => {
+		for (const href of ["data:text/html,<script>alert(1)</script>", "vbscript:msgbox(1)", "blob:https://example.com/x", "file:///etc/passwd"]) {
+			failsWith(withHref(href), "links[0].href", "http, https or mailto");
+		}
+	});
+
+	it("refuses a link with a space in it, which a browser would quietly reinterpret", () => {
+		failsWith(withHref("https://example.com/a b"), "links[0].href", "no spaces");
+	});
+});

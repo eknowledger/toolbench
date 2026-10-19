@@ -281,7 +281,7 @@ repository was found by looking at the thing, not by reasoning about it.
 | `status` | no | `"live"` (default), `"deprecated"`, `"retired"`. See §3b. |
 | `help` | no | Path to Markdown, relative to the tool directory. |
 | `tags` | no | Free-form strings for the host's own grouping. |
-| `links` | no | `{ label, href }`. Specs, source, further reading. For a retired tool, this is the way onward. |
+| `links` | no | `{ label, href }`. Specs, source, further reading. For a retired tool, this is the way onward. `href` must be `http`, `https`, `mailto` or a relative path, with no spaces. |
 
 ## 3b. Retiring a tool
 

@@ -612,6 +612,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | Every case's `expect.kind` is declared in `kinds` | `tools/cases.test.ts` | `kinds` drifts into fiction |
 | Every sample fills declared inputs only, with values of the right type inside their bounds, and no two share a label or the same input values | `validate.ts` | A button that fills the form with a value the form itself refuses, or two buttons that do the same thing |
 | Every preset's `sets` passes the sample checks, names neither its own select nor another preset select, differs from its siblings, and on the default option equals the inputs' defaults | `validate.ts` | A choice that writes values the form refuses, rewrites another choice, cannot be told apart from a sibling, or a form that opens contradicting itself |
+| Every `links[].href` resolves to `http:`, `https:` or `mailto:`, with no spaces or control characters | `links.ts`, used by `validate.ts` and `element.ts` | A manifest link runs script in the host page |
 | `lang` appears only on a textarea, as one word | `validate.ts` | A key that promises colour on an input nothing paints |
 | Every declared sample runs without throwing | `tools/cases.test.ts` | The first thing a reader clicks is the first thing to crash |
 | Only a `pure` tool with no assets may be `card: "live"` | `validate.ts` | A landing page card could read files or call the network |
@@ -797,8 +798,8 @@ Six layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 115 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 9 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 127 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids | 11 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 21 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
@@ -873,7 +874,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 25.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), and 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk) |
+| Runtime plus the bench's own wiring | 25.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), and 0.1 KB with the link and code-class checks (132 bytes) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.0 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook. 956 bytes |
 | Worker entry | 4.3 KB | Only on pages with a worker-mode tool, and only after activation |
@@ -971,6 +972,8 @@ is here because the guards look arbitrary without it.
 | The browser suite passed every test in CI and then hung until the job timeout | The preview ran as `npx vite preview` with its stderr piped to the suite. On Linux npx does not pass SIGTERM on, so vite outlived the suite holding that pipe open, and the open stream kept Node's event loop alive. macOS delivered the signal, so it never showed locally | vite's own bin runs directly in a process group of its own, stopped by a group SIGTERM with a SIGKILL two seconds later; the pipe and child are unreferenced once the server is ready |
 | `percentiles` treated a thousands grouping as extra measurements | Pasting `1,204 980 1,100 1,340` was read as seven measurements (1, 204, 980, 1, 100, 1, 340), so the result showed min 1 and mean 232.4 with no error. Every figure on screen was wrong and all of them looked reasonable | A comma between digits is refused as `{ kind: "error" }` naming the token, in the same style as `"18ms" is not a number`. Fixtures assert the refusal and lock `12, 14, 15` as still valid |
 | One undo took back one character in Chrome | Once a result was on screen, every keystroke re-sent "inputs changed" to the status line, and assigning `textContent` replaces the text node even when the text is the same. Chrome ends an undo group at a node insertion anywhere in the document, so typing `abc def` and a newline into a textarea took 7 presses of undo to take back instead of 1. Firefox and WebKit grouped it as one either way. Found while measuring the textarea highlighting overlay, which has the same hazard | The status line is written only when its text changes. Browser test types a burst after a run and asserts one undo restores it, on all three engines; it fails without the guard |
+| A manifest link could run script in the host page | The validator checked only that `links[].href` was a string, and the element wrote it straight into `<a href>`. A manifest from any `ToolSource` carrying `javascript:alert(document.cookie)` rendered a link that ran in the host's origin when a reader followed it. A check matching the scheme as text was no fix: the URL parser strips tab and newline anywhere and leading controls and space, so `java\tscript:` reads as a relative path to a pattern and as `javascript:` to the browser | `isSafeLinkHref` in the SDK refuses control characters and spaces, then asks `URL` for the protocol and allows only `http:`, `https:` and `mailto:`. The validator refuses anything else by field, and the element renders a refused link as its label in plain text, for a source that never validated. Node tests cover each bypass |
+| A code result could add any class to its element | `lang` became `class="language-<lang>"` verbatim, and a class attribute is a list, so `json tb-hidden` wrote a class the tool chose, which a host's or the runtime's stylesheet then applied | `languageClass` writes the class only for one token of word characters, `+`, `#`, `.` and `-`. A Node test covers spaces, tabs and newlines |
 
 ## 15. Limitations
 
@@ -1120,6 +1123,7 @@ declaration, so browsers without that function get the light palette rather than
 | `Tool`, `Ctx`, `Output`, `PartNames`, `Field`, `Column`, `Cell`, `ByteRange`, `Chart`, `Series`, `InputSpec`, `InputValues`, `Manifest`, `LoadedTool`, `ToolModule`, `Case`, `Tone`, `TextTone`, `Capability`, `OutputKind`, `InputType` | types |
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
+| `isSafeLinkHref` | whether a link target may be offered to a reader |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
 | `runCases`, `assertCases`, `compare`, `testCtx`, `CaseResult`, `RunCasesOptions` | fixtures |
 | `checkToolDirectory`, `readToolDirectory`, `readTool`, `scanToolDirectory`, `ToolOnDisk`, `ToolDirectoryError` | **`@toolbench/sdk/fixtures`** subpath. Node-only: it reads the filesystem, which is why it is not in the main entry |

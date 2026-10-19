@@ -25,6 +25,7 @@ This package holds four things:
 |---|---|
 | Types (`Tool`, `Ctx`, `Output`, `InputSpec`, `Manifest`) | The whole agreement between a tool and a host |
 | `validateManifest` | Turns unknown JSON into a `Manifest`, or throws naming the field and saying what to do |
+| `isSafeLinkHref` | Whether a link target may be offered to a reader: `http`, `https`, `mailto` or relative, judged by the URL parser |
 | `upgradeManifest`, `upgradeOutput`, `canLoad` | Version migration, so a tool written against an older contract keeps working |
 | `runCases`, `assertCases`, `compare` | The fixture runner. Known-answer cases run in Node with no browser and no build step |
 

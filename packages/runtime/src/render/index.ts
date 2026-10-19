@@ -344,6 +344,15 @@ function renderText(text: string, mono: boolean): HTMLElement {
 	return el("div", { class: "tb-out-text" }, el(mono ? "pre" : "p", { class: mono ? "tb-mono" : "" }, text));
 }
 
+/**
+ * The `language-<lang>` class a host's highlighter keys on, or none. `lang` is tool output, and a class
+ * attribute is a list: `json x tb-hidden` wrote three classes, so a tool could put any of the runtime's or
+ * the host's own classes on the element. A language name is one token.
+ */
+export function languageClass(lang: string): string | undefined {
+	return /^[\w+#.-]+$/.test(lang) ? `language-${lang}` : undefined;
+}
+
 function renderCode(lang: string, source: string, highlight?: (source: string, lang: string) => Node): HTMLElement {
 	/*
 	 * No bundled highlighter, deliberately. A highlighter is a large dependency and a host site
@@ -364,7 +373,7 @@ function renderCode(lang: string, source: string, highlight?: (source: string, l
 	return el(
 		"div",
 		{ class: "tb-out-code", "data-lang": lang },
-		el("pre", {}, el("code", { class: `language-${lang}` }, body)),
+		el("pre", {}, el("code", { class: languageClass(lang) }, body)),
 	);
 }
 
