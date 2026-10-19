@@ -3,12 +3,15 @@ import { fixtures } from "./fixtures.ts";
 import { HIGHLIGHT_STYLES, highlight, perTool } from "./gallery-host.ts";
 import "./tabs.ts";
 import "./panels.ts";
+import { followSections } from "./spy.ts";
 
 bootSite({
 	extra: fixtures,
 	highlight,
 	perTool: { "*": [HIGHLIGHT_STYLES], ...perTool },
 });
+
+followSections(".gallery-nav", ".gallery-main [id]");
 
 type Host = HTMLElement & { values: Record<string, unknown>; run(): Promise<void>; reveal(id: string): Promise<boolean> };
 
@@ -56,7 +59,9 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".graph-size")
 	button.addEventListener("click", () => {
 		const full = button.getAttribute("aria-pressed") !== "true";
 		button.setAttribute("aria-pressed", String(full));
-		button.textContent = full ? "Fit to card" : "Full size";
+		const label = full ? "Fit to card" : "Show at full size";
+		button.setAttribute("aria-label", label);
+		button.title = label;
 		graph.toggleAttribute("data-fit", !full);
 		measure();
 	});

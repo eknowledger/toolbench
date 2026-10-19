@@ -341,6 +341,36 @@ describe("the site in a browser", () => {
 		await context.close();
 	});
 
+	/*
+	 * The three sidebars marked "where you are" three ways: a grey fill and white bar on the docs list, an amber bar
+	 * on "On this page", and nothing at all in the gallery. Each must mark exactly one link, and mark it the same way.
+	 */
+	it("every sidebar marks where the reader is, one link, with the same amber bar", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		const bar = (selector: string) =>
+			page.locator(selector).evaluateAll((links) => links.map((a) => ({ shadow: getComputedStyle(a).boxShadow, weight: getComputedStyle(a).fontWeight, fill: getComputedStyle(a).backgroundColor })));
+		await page.goto(`${origin}docs-authoring.html`);
+		await page.evaluate(() => document.querySelectorAll(".prose h2[id]")[2]?.scrollIntoView());
+		await page.waitForTimeout(300);
+		const docsNav = await bar(".docs-nav a[aria-current]");
+		const toc = await bar(".docs-toc a[aria-current]");
+		await page.goto(`${origin}gallery.html`);
+		// Cards above load their tools as they come into view and grow, which can push the section back down, so
+		// scroll until it stays put rather than once.
+		for (let i = 0; i < 10; i++) {
+			await page.evaluate(() => document.getElementById("samples")?.scrollIntoView());
+			await page.waitForTimeout(300);
+			if ((await page.locator(".gallery-nav a[aria-current]").getAttribute("href")) === "#samples") break;
+		}
+		const gallery = await bar(".gallery-nav a[aria-current]");
+		assert.equal(await page.locator(".gallery-nav a[aria-current]").getAttribute("href"), "#samples");
+		for (const [name, marked] of [["docs list", docsNav], ["On this page", toc], ["gallery", gallery]] as const) {
+			assert.equal(marked.length, 1, `${name}: ${marked.length} links marked`);
+			assert.deepEqual(marked[0], toc[0], `${name} marks the current link differently from On this page`);
+		}
+		await page.close();
+	});
+
 	it("'On this page' marks the section in view as the reader scrolls", async () => {
 		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 		await page.goto(`${origin}docs-authoring.html`);

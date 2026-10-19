@@ -218,8 +218,7 @@ main { display: block; }
 .docs-nav .panel-body h2 { margin-top: 1.5rem; }
 .docs-nav ul, .docs-toc ol { list-style: none; margin: 0 0 1.5rem; padding: 0; }
 .docs-nav a { display: block; padding: 0.4rem 0.75rem; border-radius: 8px; text-decoration: none; color: var(--muted); font-weight: 700; }
-.docs-nav a:hover { color: var(--ink); background: var(--panel); }
-.docs-nav a[aria-current="page"] { color: var(--ink); background: var(--panel); box-shadow: inset 3px 0 0 var(--ink); }
+.docs-nav a:hover { color: var(--ink); }
 .docs-toc ol ol { margin: 0 0 0.25rem; padding-left: 0.75rem; }
 .docs-toc a { display: block; padding: 0.2rem 0; text-decoration: none; color: var(--muted); }
 .docs-toc a:hover { color: var(--ink); text-decoration: underline; }
@@ -345,7 +344,16 @@ main { display: block; }
 .prose li.task input { position: absolute; left: 0; top: 0.3em; margin: 0; width: 1rem; height: 1rem; accent-color: var(--ink); }
 
 /* ── "On this page": the section in view ── */
-.docs-toc a[aria-current] { color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--amber); padding-left: 0.6rem; margin-left: -0.6rem; }
+/*
+ * Every sidebar marks where the reader is the same way: the docs list marks the page, "On this page" and the
+ * gallery mark the section in view. The left docs list had a grey fill and a white bar while "On this page" had
+ * an amber bar, so the same idea read as two. The negative margin pays for the padding, so the marked text
+ * does not move.
+ */
+.docs-toc a[aria-current],
+.gallery-nav a[aria-current],
+.docs-nav a[aria-current="page"] { color: var(--ink); font-weight: 700; background: none; box-shadow: inset 3px 0 0 var(--amber); padding-left: 0.6rem; margin-left: -0.6rem; border-radius: 0; }
+.docs-nav a[aria-current="page"] { padding-left: 0.75rem; margin-left: 0; }
 
 /* ── the browsers tile ── */
 .stat-browsers { align-content: space-between; }

@@ -38,7 +38,7 @@ function chunk(id: string, prefix: string): string | null {
 	 * The sidebars and the card tabs are shared by the docs and the gallery, so Rollup would fold them into
 	 * the chunk every page shares, and the landing page, which has neither, would download them.
 	 */
-	if (/\/site\/src\/(?:panels|tabs)\.ts$/.test(id)) return "site-panels";
+	if (/\/site\/src\/(?:panels|tabs|spy)\.ts$/.test(id)) return "site-panels";
 	return null;
 }
 
