@@ -233,8 +233,6 @@ main { display: block; }
 .prose h1 { font-size: clamp(2rem, 3.6vw, 2.75rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 0.75rem; font-weight: 700; }
 .prose h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 3rem 0 0.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); line-height: 1.2; scroll-margin-top: 80px; }
 .prose h3 { font-size: 1.2rem; margin: 2rem 0 0.5rem; scroll-margin-top: 80px; }
-/* Long-form docs prose keeps a reading measure; everything else fills its area. */
-.prose p, .prose li { max-width: 46rem; }
 .prose li + li { margin-top: 0.35rem; }
 .prose a { color: var(--ink); text-decoration-color: var(--amber-text); }
 /* A file path has no spaces, so on a phone `packages/runtime/src/styles.ts` ran 9px past the column. Let it break. */

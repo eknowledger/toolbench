@@ -128,6 +128,16 @@ describe("the Inputs reference", () => {
 	});
 });
 
+describe("the Results reference", () => {
+	it("has a row and a section for exactly the SDK's result kinds", async () => {
+		const { OUTPUT_KINDS } = (await import("../packages/sdk/src/index.ts")) as { OUTPUT_KINDS: readonly string[] };
+		const page = html.get("docs-ref-results.html") ?? "";
+		const sections = [...page.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]).filter((id) => !["kinds", "common-attributes"].includes(id ?? ""));
+		assert.deepEqual([...sections].sort(), [...OUTPUT_KINDS].sort());
+		for (const k of OUTPUT_KINDS) assert.ok(page.includes(`href="#${k}"`), `the Kinds table has no row for ${k}`);
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.

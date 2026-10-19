@@ -24,7 +24,7 @@ import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
 import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
-import { inputsReference } from "./reference.ts";
+import { inputsReference, resultsReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -79,6 +79,14 @@ export const DOCS: Doc[] = [
 		summary: "Every input type, its attributes, and the rules a manifest's inputs are held to.",
 		group: "Reference",
 		generate: inputsReference,
+	},
+	{
+		file: "packages/sdk/src/types.ts",
+		page: "docs-ref-results.html",
+		title: "Results",
+		summary: "Every result kind a tool can return, its attributes, and an example of each.",
+		group: "Reference",
+		generate: resultsReference,
 	},
 	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it.", group: "Project" },
 	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report.", group: "Project" },
