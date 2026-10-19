@@ -198,16 +198,22 @@ const BUDGETS = [
 	 *
 	 * Raised from 5_000 to 5_500 by the grammar fixture (#163): 4,686 to 5,141 measured, its two textareas'
 	 * defaults and grammars. Bench-only.
+	 *
+	 * Raised from 5_500 to 6_000 by the wide-output fixture (#194): 5,141 to 5,544 measured, its manifest's nine
+	 * cases. The option labels are long on purpose: one of them is what showed WebKit counting a select's text
+	 * as overflow of the tool. Bench-only.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_500, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 6_000, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
 	 * Bench-only.
 	 *
 	 * Raised from 4_500 to 5_000 by the grammar fixture (#163): 4,237 to 4,649 measured. Bench-only.
+	 *
+	 * Raised from 5_000 to 5_500 by the wide-output fixture (#194): 4,649 to 5,013 measured. Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 5_500, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -388,6 +394,8 @@ const BUDGETS = [
 	{ label: "bench fixture: graph-families", pattern: /^tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	// A textarea painted by its tool's own grammar (#163), beside one the host's hook paints. 446 measured.
 	{ label: "bench fixture: grammar-input", pattern: /^tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// Every kind the runtime draws itself, wider than a phone (#194), for the scroll-never-clip test. 1,058 measured.
+	{ label: "bench fixture: wide-output", pattern: /^tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -420,6 +428,7 @@ const BUDGETS = [
 	{ label: "worker copy: build-order", pattern: /^worker-tool-build-order-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 ];
 
 let files;

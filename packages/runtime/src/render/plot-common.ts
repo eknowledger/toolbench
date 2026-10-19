@@ -110,7 +110,9 @@ export const CHART_STYLES = /* css */ `
 .tb-swatch-marker[data-marker="2"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .tb-swatch-marker[data-marker="4"] { clip-path: polygon(0 0, 100% 0, 50% 100%); }
 .tb-swatch-marker[data-marker="5"] { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
-.tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; }
+/* A data table can be wider than its chart, so it scrolls; the ring is inset, as a scroller clips one outside (#194). */
+.tb-chart-data { margin-top: 0.5rem; font-size: 0.8rem; overflow-x: auto; }
+.tb-chart-data summary:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: -2px; }
 /* 24px tall, the minimum target size (WCAG 2.5.8): at the text's own height it was 19px. */
 .tb-chart-data summary { color: var(--tb-faint); cursor: pointer; min-height: 24px; line-height: 24px; }
 .tb-chart-data table { margin-top: 0.5rem; }

@@ -17,12 +17,16 @@
  */
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
+import type { Ctx, Output, Tool } from "../packages/sdk/src/types.ts";
 import type { GraphLayout } from "../packages/runtime/src/graph/model.ts";
 import { layout } from "../packages/runtime/test/graph/all.ts";
-import { graphs } from "./fixtures/graph-families/index.ts";
+import discreteSeries from "./fixtures/discrete-series/index.ts";
+import graphFamilies, { graphs } from "./fixtures/graph-families/index.ts";
+import wideOutput from "./fixtures/wide-output/index.ts";
 
 const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
@@ -4918,4 +4922,147 @@ describe("live demo", () => {
 		assert.equal(href, "https://github.com/eknowledger/toolbench/tree/main/bench/fixtures/stress/");
 		await page.close();
 	});
+});
+
+describe("a result wider than its tool scrolls inside it, and is never clipped (#194)", () => {
+	/*
+	 * An entity-relationship graph 916px wide, in a tool whose frame was 822px, lost its right edge with no
+	 * way to scroll to it: its figure was a grid item of `.tb-output` with the default `min-width: auto`, so
+	 * it grew to the drawing, the plot's own `overflow-x: auto` never engaged, and `.tb` clipped the rest.
+	 * #154 was the same mistake one level up, fixed for `.tb-output` alone, so this holds every kind at once.
+	 *
+	 * Every case of the three fixtures that between them cover every kind, in every mode, at a phone's width
+	 * and a column's. For each host: the frame never scrolls; anything wider than its own box is either a
+	 * scroller or inside one; and every scroller lies within the frame. An allowlist of what may overflow,
+	 * not a list of the elements that once did. Every `<details>` is opened first, since a chart's and a
+	 * graph's data tables are inside one, and the readout is tested at a plot's right edge, where it is
+	 * most likely to push past the frame.
+	 */
+	const ctx = { signal: new AbortController().signal, progress: () => undefined } satisfies Ctx;
+	const casesOf = (dir: string) =>
+		(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", dir, "tool.json"), "utf8")).inputs[0].options as { value: string }[]).map((o) => o.value);
+	type CaseTool = Tool<{ case: string }>;
+	// `large` is laid out in a worker after a frame, and its width is the graph-scale suite's business.
+	const sources: [string, CaseTool, string[]][] = [
+		["wide-output", wideOutput, casesOf("wide-output")],
+		["discrete-series", discreteSeries as unknown as CaseTool, casesOf("discrete-series")],
+		["graph-families", graphFamilies, casesOf("graph-families").filter((c) => c !== "large")],
+	];
+	const all = async () => {
+		const out: { tool: string; case: string; seed: Output }[] = [];
+		for (const [tool, module, cases] of sources) for (const c of cases) out.push({ tool, case: c, seed: await module.run({ case: c }, ctx) });
+		return out;
+	};
+	const modes = ["page", "embed", "card", "closed-card"] as const;
+
+	async function measure(width: number, mode: (typeof modes)[number]): Promise<string[]> {
+		const cases = await all();
+		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=wide-output`, { waitUntil: "load" });
+		await page.evaluate(
+			async ({ width, mode, cases }) => {
+				await customElements.whenDefined("tool-host");
+				const box = document.createElement("div");
+				box.id = "narrow";
+				box.style.cssText = `width:${width}px;display:grid;gap:16px;margin:16px`;
+				document.body.prepend(box);
+				type Host = HTMLElement & { values: Record<string, unknown>; seed: unknown; run(): Promise<void> };
+				const hosts: Host[] = [];
+				for (const c of cases) {
+					const host = document.createElement("tool-host") as Host;
+					host.setAttribute("tool", c.tool);
+					host.setAttribute("mode", mode === "closed-card" ? "card" : mode);
+					if (mode === "embed") host.setAttribute("controls", "none");
+					host.dataset.case = `${c.tool}/${c.case}`;
+					if (mode === "closed-card") host.seed = c.seed;
+					box.append(host);
+					hosts.push(host);
+				}
+				if (mode !== "closed-card") {
+					for (const [i, host] of hosts.entries()) {
+						host.values = { case: (cases[i] as { case: string }).case };
+						await host.run();
+					}
+				}
+				// Or degraded to a status line, which a seed whose graph needs a chunk not yet loaded does; its frame is still measured.
+				const drawn = (h: Host) => h.shadowRoot?.querySelector("[data-kind], .tb-facade .tb-status");
+				const deadline = Date.now() + 15_000;
+				while (!hosts.every(drawn)) {
+					if (Date.now() > deadline) throw new Error(`never drew: ${hosts.filter((h) => !drawn(h)).map((h) => h.dataset.case)}`);
+					await new Promise((r) => setTimeout(r, 50));
+				}
+				for (const h of hosts) for (const d of h.shadowRoot?.querySelectorAll("details") ?? []) d.open = true;
+				await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			},
+			{ width, mode, cases },
+		);
+
+		const check = () =>
+			page.evaluate(() => {
+				const scrolls = (el: Element) => /^(auto|scroll)$/.test(getComputedStyle(el).overflowX);
+				const name = (el: Element) => `${el.tagName.toLowerCase()}${typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/).join(".")}` : ""}`;
+				const problems: string[] = [];
+				const column = (document.getElementById("narrow") as HTMLElement).getBoundingClientRect();
+				for (const host of document.querySelectorAll<HTMLElement>("#narrow > tool-host")) {
+					const at = host.dataset.case;
+					const frame = host.shadowRoot?.querySelector(".tb") as HTMLElement;
+					const fr = frame.getBoundingClientRect();
+					if (fr.right > column.right + 1) problems.push(`${at}: the tool is ${Math.round(fr.width)}px in a ${Math.round(column.width)}px column`);
+					if (frame.scrollWidth > frame.clientWidth + 1) problems.push(`${at}: .tb clips, ${frame.clientWidth}/${frame.scrollWidth}`);
+					for (const el of frame.querySelectorAll<HTMLElement>("*")) {
+						// An inline box has no clientWidth to compare with: Firefox reports 0/262 for a value's span. Its block is checked.
+						if (!(el instanceof HTMLElement) || el.closest(".tb-sr") || /^(inline|contents)$/.test(getComputedStyle(el).display)) continue;
+						if (scrolls(el) && el.scrollWidth > el.clientWidth + 1) {
+							const r = el.getBoundingClientRect();
+							if (r.right > fr.right + 1 || r.left < fr.left - 1) problems.push(`${at}: ${name(el)} scrolls but is ${Math.round(r.width)}px in a ${Math.round(fr.width)}px frame`);
+							continue;
+						}
+						if (el.scrollWidth <= el.clientWidth + 1) continue;
+						let up = el.parentElement;
+						while (up && up !== frame && !scrolls(up)) up = up.parentElement;
+						if (up !== frame && up !== null) continue;
+						// Which descendant reaches furthest, so a failure names the cause and not only its ancestors.
+						const far = [...el.querySelectorAll("*")].reduce<Element>((a, b) => (b.getBoundingClientRect().right > a.getBoundingClientRect().right ? b : a), el);
+						problems.push(`${at}: ${name(el)} overflows with nothing to scroll it, ${el.clientWidth}/${el.scrollWidth} overflow-x:${getComputedStyle(el).overflowX}, furthest ${name(far)}`);
+					}
+				}
+				return problems;
+			});
+
+		const problems = await check();
+		// The readout at each plot's right edge, where it either flips to the left or pushes the frame wider.
+		if (mode === "embed") {
+			const plots = await page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>("#narrow > tool-host")].flatMap((host) =>
+					[...(host.shadowRoot?.querySelectorAll("[data-kind] svg") ?? [])].filter((s) => !s.parentElement?.closest("svg")).map((_, i) => ({ host: host.dataset.case as string, i })),
+				),
+			);
+			for (const { host, i } of plots) {
+				const point = await page.evaluate(
+					({ host, i }) => {
+						const el = document.querySelector<HTMLElement>(`#narrow > tool-host[data-case="${host}"]`);
+						const svg = [...(el?.shadowRoot?.querySelectorAll("[data-kind] svg") ?? [])].filter((s) => !s.parentElement?.closest("svg"))[i] as SVGSVGElement;
+						svg.scrollIntoView({ block: "center", inline: "nearest" });
+						const r = svg.getBoundingClientRect();
+						const frame = (el?.shadowRoot?.querySelector(".tb") as HTMLElement).getBoundingClientRect();
+						return { x: Math.min(r.right, frame.right) - 6, y: r.top + r.height / 2 };
+					},
+					{ host, i },
+				);
+				await page.mouse.move(point.x, point.y);
+				for (const p of await check()) if (!problems.includes(p)) problems.push(`with the pointer at the right edge, ${p}`);
+			}
+		}
+		await page.close();
+		return problems;
+	}
+
+	for (const width of [320, 600]) {
+		for (const mode of modes) {
+			it(`fits or scrolls every kind at ${width}px in ${mode === "closed-card" ? "a closed seeded card" : `${mode} mode`}`, async () => {
+				const problems = await measure(width, mode);
+				assert.deepEqual(problems, [], problems.join("\n"));
+			});
+		}
+	}
 });
