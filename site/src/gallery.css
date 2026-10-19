@@ -81,3 +81,8 @@
 .card-code .codeblock { margin: 0 0 0.75rem; }
 .card-code pre { overflow: visible; }
 .card-live tool-host { min-block-size: 8rem; }
+
+/* Above the drawing, not over it: an overlaid button would hide the corner of a graph that fills the card. */
+.graph-size { display: block; margin: 0 0 0.5rem auto; min-height: 28px; padding: 0 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: 600 0.8125rem/1 inherit; cursor: pointer; }
+.graph-size:hover { border-color: var(--ink); }
+.graph-size[hidden] { display: none; }

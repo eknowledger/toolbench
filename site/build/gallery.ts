@@ -397,7 +397,8 @@ async function charts(): Promise<string> {
 	for (const g of GRAPHS) {
 		const result = await output(`${FIX}/graph-families`, { case: g.id }, "run() returns");
 		const live = `<tool-host tool="graph-families" mode="embed" controls="none" data-values='{"case":"${g.id}"}' data-run></tool-host>`;
-		graphs.push(card({ id: `graph-${g.id}`, title: g.title, meta: "graph", text: escapeHtml(g.text), live, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
+		const fit = `<button type="button" class="graph-size" aria-pressed="false" hidden>Full size</button>${live.replace("<tool-host ", "<tool-host data-fit ")}`;
+		graphs.push(card({ id: `graph-${g.id}`, title: g.title, meta: "graph", text: escapeHtml(g.text), live: fit, tabs: [{ name: "Result", codes: [result] }, { name: "Embed", codes: [markup(live)] }] }));
 	}
 	const cards: string[] = [];
 	for (const c of CHARTS) {

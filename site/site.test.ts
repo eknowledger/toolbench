@@ -279,6 +279,53 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	/*
+	 * A graph wider than its card was drawn past the card's right edge and cut off, with no scrollbar, because
+	 * the runtime's frame clips and the graph's container grew to the drawing. Every graph, at a desktop and a
+	 * phone width, must fit inside its frame, and the wide ones must offer full size, which scrolls.
+	 */
+	for (const width of [1440, 390]) {
+		it(`every gallery graph fits its card at ${width}px, and a wide one opens at full size and scrolls`, async () => {
+			const page = await browser.newPage({ viewport: { width, height: 900 } });
+			await page.goto(`${origin}gallery.html#graphs`);
+			const cards = page.locator("#graphs article");
+			const n = await cards.count();
+			assert.ok(n >= 5, `expected the graph families, found ${n} cards`);
+			let wide = 0;
+			for (let i = 0; i < n; i++) {
+				const card = cards.nth(i);
+				await card.scrollIntoViewIfNeeded();
+				const svg = card.locator("tool-host .tb-graph-plot svg");
+				await svg.waitFor();
+				const read = () =>
+					card.locator("tool-host").evaluate((host) => {
+						const root = host.shadowRoot as ShadowRoot;
+						const plot = root.querySelector(".tb-graph-plot") as HTMLElement;
+						const frame = root.querySelector(".tb") as HTMLElement;
+						const pic = plot.querySelector("svg") as SVGSVGElement;
+						return { natural: Number(pic.getAttribute("width")), drawn: pic.getBoundingClientRect().width, plot: plot.clientWidth, scroll: plot.scrollWidth, frame: frame.clientWidth, frameScroll: frame.scrollWidth };
+					});
+				const fit = await read();
+				const name = await card.locator("h3").innerText();
+				assert.ok(fit.drawn <= fit.plot + 1, `${name}: drawn ${fit.drawn}px in a ${fit.plot}px plot`);
+				assert.ok(fit.frameScroll <= fit.frame, `${name}: the frame overflows, ${fit.frameScroll} > ${fit.frame}`);
+				const button = card.locator(".graph-size");
+				assert.equal(await button.isVisible(), fit.natural > fit.plot + 1, `${name}: Full size should show exactly when the graph is wider than its card`);
+				if (fit.natural <= fit.plot + 1) continue;
+				wide++;
+				await button.click();
+				assert.equal(await button.getAttribute("aria-pressed"), "true");
+				const full = await read();
+				assert.ok(Math.abs(full.drawn - full.natural) <= 1, `${name}: full size drew ${full.drawn}px of ${full.natural}px`);
+				assert.ok(full.scroll > full.plot, `${name}: full size should scroll inside the plot`);
+				assert.ok(full.frameScroll <= full.frame, `${name}: full size overflows the frame`);
+				await button.click();
+			}
+			assert.ok(wide > 0, "no graph was wider than its card, so the full-size path went untested");
+			await page.close();
+		});
+	}
+
 	it("a code block copies its code without the line numbers, and says so", async () => {
 		const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
 		const page = await context.newPage();

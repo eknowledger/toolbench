@@ -249,7 +249,7 @@ const PANELS: Record<string, string> = { "docs-nav": "Documentation", "docs-toc"
 /** A sidebar's heading and the button that collapses it. See src/panels.ts. */
 function panelBar(name: string): string {
 	const title = PANELS[name] ?? name;
-	return `<div class="panel-bar"><h2 class="panel-title">${escapeHtml(title)}</h2><button type="button" class="panel-toggle" data-panel-toggle="${name}" aria-expanded="true" aria-controls="${name}-body"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden">${escapeHtml(title)}</span></button></div>`;
+	return `<div class="panel-bar"><h2 class="panel-title">${escapeHtml(title)}</h2><button type="button" class="panel-toggle" data-panel-toggle="${name}" aria-expanded="true" aria-controls="${name}-body"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="visually-hidden">${escapeHtml(title)}</span></button></div>`;
 }
 
 /** The landing page's figures: one tile each, every value read from the file that owns it. */

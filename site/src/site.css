@@ -358,11 +358,6 @@ main { display: block; }
 .panel-bar .panel-title { margin: 0; font-size: 0.875rem; color: var(--muted); font-weight: 700; }
 .panel-toggle { flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
 .panel-toggle:hover { border-color: var(--ink); }
-.panel-toggle svg { transition: transform 160ms ease; }
-/* The right-hand panel's arrow points the other way: each points toward the edge it folds into. */
-.docs-toc .panel-toggle svg { transform: scaleX(-1); }
-.panel-toggle[aria-expanded="false"] svg { transform: scaleX(-1); }
-.docs-toc .panel-toggle[aria-expanded="false"] svg { transform: none; }
 :root[data-hide-docs-nav] .docs-nav .panel-body,
 :root[data-hide-docs-toc] .docs-toc .panel-body,
 :root[data-hide-gallery-nav] .gallery-nav .panel-body,
