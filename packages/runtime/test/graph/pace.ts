@@ -7,25 +7,36 @@
  * wrong in the layout. Raising the number would let a real regression through on the laptop, and skipping in CI
  * would stop the gate running where it is enforced.
  *
- * So the test times a fixed workload shaped like the layout's own: objects allocated, sorted by two keys, hashed
- * into a Map and walked. It is deterministic, seeded and free of the code under test, so it measures the machine
- * and not the change. The budget scales by how much slower it ran here than it did where the budget was set,
- * never below 1, so a faster machine keeps the full budget. A layout twice as slow fails on both machines.
+ * So the test times a fixed workload shaped like the layout's own two halves: objects allocated, sorted by two
+ * keys and hashed into a Map, as layering does, then shortest paths over a weighted grid through a binary heap in
+ * typed arrays, as the router does. It is deterministic, seeded and free of the code under test, so it measures
+ * the machine and not the change. The budget scales by how much slower it ran here than where the budget was set,
+ * never below 1, so a faster machine keeps the full budget.
+ *
+ * ⚠️ The reference runs interleaved with the work it calibrates, one round of each at a time, not once up front. A
+ * shared runner's speed changes within seconds: the first calibrated CI run had the call graph at 41.3 ms on one
+ * leg and 81.5 ms on the other, the same code on the same kind of machine. Timed apart, the reference can catch
+ * a quiet moment and the layout a busy one.
  */
 
 /**
  * The reference workload's median on the machine the budgets were set on: an M3 Pro on Node 26, inside a full
  * `pnpm check` run so the other test files compete for the CPU as they do whenever this runs. Five runs measured
- * 13.6, 14.2, 14.5, 14.5 and 14.8 ms; this is their median. Re-measure it if a budget is ever set again.
+ * 13.2, 12.5, 12.1, 12.6 and 11.9 ms, with the call graph at 23.1 to 24.5 ms beside them; this is their median.
+ * Re-measure it if a budget is ever set again; the test prints the figure as a diagnostic.
  */
-export const REFERENCE_MS = 14.5;
+export const REFERENCE_MS = 12.5;
 
-function workload(): number {
-	// A linear congruential generator, so every machine sorts the same numbers in the same order.
-	let s = 12345;
-	const next = () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0);
+/** A linear congruential generator, so every machine works on the same numbers in the same order. */
+function lcg(seed: number): () => number {
+	let s = seed;
+	return () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0);
+}
+
+function layering(): number {
+	const next = lcg(12345);
 	const points: { x: number; y: number; id: number }[] = [];
-	for (let i = 0; i < 30_000; i++) points.push({ x: next() % 1000, y: next() % 1000, id: i });
+	for (let i = 0; i < 15_000; i++) points.push({ x: next() % 1000, y: next() % 1000, id: i });
 	points.sort((a, b) => a.x - b.x || a.y - b.y || a.id - b.id);
 	const cells = new Map<string, number>();
 	for (const p of points) {
@@ -37,20 +48,117 @@ function workload(): number {
 	return sum;
 }
 
-/** The workload's median of five on this machine, in ms, after one warming run. */
-export function referenceMs(): number {
-	workload();
-	const ms: number[] = [];
-	for (let r = 0; r < 5; r++) {
-		const t0 = performance.now();
-		workload();
-		ms.push(performance.now() - t0);
+function routing(): number {
+	const W = 120;
+	const N = W * W;
+	const next = lcg(54321);
+	const cost = new Uint8Array(N);
+	for (let i = 0; i < N; i++) cost[i] = 1 + (next() % 9);
+	let total = 0;
+	for (let q = 0; q < 4; q++) {
+		const d = new Float64Array(N).fill(Infinity);
+		let hs = new Int32Array(1024);
+		let hf = new Float64Array(1024);
+		let hn = 0;
+		const push = (v: number, f: number) => {
+			if (hn === hs.length) {
+				const a = new Int32Array(hn * 2);
+				a.set(hs);
+				hs = a;
+				const b = new Float64Array(hn * 2);
+				b.set(hf);
+				hf = b;
+			}
+			let i = hn++;
+			while (i > 0) {
+				const p = (i - 1) >> 1;
+				if (hf[p]! <= f) break;
+				hs[i] = hs[p]!;
+				hf[i] = hf[p]!;
+				i = p;
+			}
+			hs[i] = v;
+			hf[i] = f;
+		};
+		const pop = () => {
+			const top = hs[0]!;
+			const v = hs[--hn]!;
+			const f = hf[hn]!;
+			let i = 0;
+			for (;;) {
+				let c = 2 * i + 1;
+				if (c >= hn) break;
+				if (c + 1 < hn && hf[c + 1]! < hf[c]!) c++;
+				if (hf[c]! >= f) break;
+				hs[i] = hs[c]!;
+				hf[i] = hf[c]!;
+				i = c;
+			}
+			hs[i] = v;
+			hf[i] = f;
+			return top;
+		};
+		const src = next() % N;
+		d[src] = 0;
+		push(src, 0);
+		while (hn) {
+			const u = pop();
+			const x = u % W;
+			const y = (u / W) | 0;
+			const relax = (v: number) => {
+				const nd = d[u]! + cost[v]!;
+				if (nd < d[v]!) {
+					d[v] = nd;
+					push(v, nd);
+				}
+			};
+			if (x + 1 < W) relax(u + 1);
+			if (x > 0) relax(u - 1);
+			if (y + 1 < W) relax(u + W);
+			if (y > 0) relax(u - W);
+		}
+		total += d[N - 1]!;
 	}
-	return ms.sort((x, y) => x - y)[2]!;
+	return total;
 }
 
-/** How many times slower than the reference machine this one ran the workload, never below 1. */
-export function pace(): { factor: number; measured: number } {
-	const measured = referenceMs();
-	return { factor: Math.max(1, measured / REFERENCE_MS), measured };
+/** The reference workload once, in ms. */
+export function reference(): number {
+	const t0 = performance.now();
+	layering();
+	routing();
+	return performance.now() - t0;
 }
+
+const median = (ms: number[]) => [...ms].sort((x, y) => x - y)[ms.length >> 1]!;
+
+/**
+ * Times each task `rounds` times, a reference run before every round, and returns each task's median, the
+ * reference's median and how many times slower than the reference machine this one ran, never below 1.
+ */
+export function paced<K>(tasks: readonly (readonly [K, () => unknown])[], rounds = 5) {
+	reference();
+	const ref: number[] = [];
+	const ms = tasks.map(() => [] as number[]);
+	for (let r = 0; r < rounds; r++) {
+		ref.push(reference());
+		tasks.forEach(([, run], i) => {
+			const t0 = performance.now();
+			run();
+			ms[i]!.push(performance.now() - t0);
+		});
+	}
+	const measured = median(ref);
+	return {
+		measured,
+		factor: Math.max(1, measured / REFERENCE_MS),
+		medians: tasks.map(([key], i) => [key, median(ms[i]!)] as const),
+	};
+}
+
+/**
+ * V8 coverage instruments every line of the layout and almost none of the reference, whose time is in the
+ * engine's own sort, Map and typed arrays. Measured locally, the call graph went from 23 to 133 ms under
+ * `pnpm coverage` while the reference did not move, so a time taken there describes the instrumentation.
+ */
+export const instrumented = Boolean(process.env.NODE_V8_COVERAGE);
