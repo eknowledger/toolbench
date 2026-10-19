@@ -581,12 +581,16 @@ inside the block. The return type is a `Node` on purpose. A string would need `i
 { kind: "group", parts: [ /* any of the above */ ] }
 ```
 
-Three notes on `bytes`, added in contract version 2 for wire formats. **Every highlight needs a
+Four notes on `bytes`, added in contract version 2 for wire formats. **Every highlight needs a
 `label`**, because colour alone tells a reader something is interesting without saying what, and tells a
 screen reader nothing at all: the labels become a legend under the dump. **`at` is always relative to
 `bytes`**, never to `offset`, which only changes what the first row is *labelled*. And **`tone` is for
 real severity only**: the default palette resolves `warn` and `accent` to the same colour, so a tone
-used decoratively implies a distinction the reader cannot see.
+used decoratively implies a distinction the reader cannot see. And **you do not need a tone to tell ranges
+apart**: a range without one is drawn in the next chart series colour, `--tb-s1` to `--tb-s6` in order,
+coming round to the first again after six, and its legend swatch matches. A toned range keeps its tone
+and takes no series colour, so the next untoned range takes the next one. Past six ranges two share a
+colour, which is one more reason the labels carry the identity rather than the colour.
 
 Two notes on `group`. Order matters: a **card renders only the first part**, so put the part that works
 alone at the front. And declare every kind you use, `"group"` included.

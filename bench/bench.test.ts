@@ -473,6 +473,95 @@ describe("bytes output — contract version 2", () => {
 		await page.close();
 	});
 
+	/*
+	 * #148: every untoned range used to be the same accent, so adjacent ranges read as one block. The text is
+	 * chosen by hand for seven multi-byte characters: é (2 bytes), 世 (3), 界 (3), 👋 (4), ñ (2), € (3) and
+	 * 😀 (4), so ranges 2 and 3 touch, and the seventh has to come round to the first colour again.
+	 */
+	for (const scheme of ["light", "dark"] as const) {
+		it(`tells untoned ranges apart by colour, matches the legend, and keeps 4.5:1 text (${scheme})`, async () => {
+			const page = await browser.newPage({ colorScheme: scheme });
+			await page.goto(`${BASE}/tool.html?id=utf8-bytes`, { waitUntil: "load" });
+			await page.locator("#host").scrollIntoViewIfNeeded();
+			await page.locator("#host >> .tb-run").waitFor();
+			await page.evaluate(() => {
+				(document.getElementById("host") as HTMLElement & { values: Record<string, unknown> }).values = { text: "é世界👋ñ€😀" };
+			});
+			await page.locator("#host >> .tb-run").click();
+			await page.locator("#host >> .tb-bytes-legend li").nth(6).waitFor({ timeout: 15_000 });
+			const seen = await page.evaluate(() => {
+				const root = document.getElementById("host")?.shadowRoot;
+				const lum = (rgb: string) => {
+					const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
+						const c = Number(v) / 255;
+						return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+					}) as [number, number, number];
+					return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+				};
+				const ratio = (a: string, b: string) => {
+					const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+					return (hi + 0.05) / (lo + 0.05);
+				};
+				const legend = [...(root?.querySelectorAll(".tb-bytes-legend li") ?? [])];
+				const hexBytes = [...(root?.querySelectorAll(".tb-bytes-hex .tb-byte[data-series]") ?? [])];
+				return {
+					series: legend.map((li) => li.getAttribute("data-series")),
+					swatches: legend.map((li) => getComputedStyle(li.querySelector(".tb-bytes-swatch") as Element).backgroundColor),
+					// The first hex byte of each range, found by its label, which is also its hover text.
+					marks: legend.map((li) => {
+						const label = li.textContent?.split(" ").slice(0, 2).join(" ");
+						const byte = hexBytes.find((b) => b.getAttribute("title") === label);
+						return byte ? getComputedStyle(byte).backgroundColor : "missing";
+					}),
+					titles: hexBytes.map((b) => b.getAttribute("title")),
+					worst: Math.min(...hexBytes.map((b) => ratio(getComputedStyle(b).color, getComputedStyle(b).backgroundColor))),
+				};
+			});
+			assert.deepEqual(seen.series, ["1", "2", "3", "4", "5", "6", "1"], "the next series colour per range, round again after six");
+			assert.deepEqual(seen.marks, seen.swatches, "each legend swatch is the colour of its range's bytes");
+			assert.equal(new Set(seen.swatches.slice(0, 6)).size, 6, `six ranges, six colours: ${seen.swatches.join(" | ")}`);
+			assert.notEqual(seen.marks[1], seen.marks[2], "two ranges that touch, 世 and 界, are different colours");
+			assert.ok(seen.titles.every((t) => t !== null && t.length > 0), "and colour is not the only carrier: every marked byte keeps its label");
+			assert.ok(seen.worst >= 4.5, `the hex digits on every mark need 4.5:1, the worst was ${seen.worst.toFixed(2)}`);
+			await page.close();
+		});
+	}
+
+	it("lets a tone win over the series colour", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		// A bytes result drawn as a seed, so a toned range sits between two untoned ones without a new fixture.
+		await page.evaluate(() => {
+			const host = document.createElement("tool-host") as HTMLElement & { seed: unknown };
+			host.id = "toned-bytes";
+			host.setAttribute("tool", "utf8-bytes");
+			host.setAttribute("mode", "card");
+			host.seed = {
+				kind: "bytes",
+				bytes: [1, 2, 3, 4, 5, 6],
+				highlight: [
+					{ at: 0, len: 2, label: "first" },
+					{ at: 2, len: 2, label: "broken", tone: "bad" },
+					{ at: 4, len: 2, label: "second" },
+				],
+			};
+			document.body.append(host);
+		});
+		await page.locator("#toned-bytes >> .tb-bytes-legend li").nth(2).waitFor({ timeout: 15_000 });
+		const legend = await page.evaluate(() =>
+			[...(document.getElementById("toned-bytes")?.shadowRoot?.querySelectorAll(".tb-bytes-legend li") ?? [])].map((li) => ({
+				tone: li.getAttribute("data-tone"),
+				series: li.getAttribute("data-series"),
+			})),
+		);
+		assert.deepEqual(legend, [
+			{ tone: "normal", series: "1" },
+			{ tone: "bad", series: null },
+			{ tone: "normal", series: "2" },
+		], "the bad range keeps its tone, and the next untoned range takes the next colour rather than skipping one");
+		await page.close();
+	});
+
 	it("truncates a long dump on a card but never silently", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });

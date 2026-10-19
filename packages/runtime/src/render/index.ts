@@ -497,6 +497,19 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 	for (const range of highlight) {
 		for (let i = range.at; i < range.at + range.len && i < bytes.length; i++) rangeOf.set(i, range);
 	}
+	/*
+	 * A range with no tone takes the next chart series colour, 1 to 6 and then round again (#148). Every one
+	 * used to be the same accent, so a decoder marking eight fields of a message drew eight identical blocks,
+	 * and two adjacent ranges read as one. A tone still wins: it says something about a range, and a `bad`
+	 * field must look bad whatever its neighbours are. Counted over untoned ranges only, so a toned one in
+	 * the middle does not leave a colour unused. The label stays in the legend and the hover, because a
+	 * colour on its own tells a reader nothing about which field it is.
+	 */
+	const attrs = new Map<ByteRange, Record<string, string>>();
+	let untoned = 0;
+	for (const range of highlight) {
+		attrs.set(range, range.tone ? { "data-tone": range.tone } : { "data-tone": "normal", "data-series": String((untoned++ % 6) + 1) });
+	}
 
 	const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW);
 	const rows = options.compact ? Math.min(totalRows, COMPACT_ROWS) : totalRows;
@@ -520,7 +533,7 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 							"span",
 							{
 								class: "tb-byte",
-								...(range ? { "data-tone": range.tone ?? "normal", title: range.label } : {}),
+								...(range ? { ...attrs.get(range), title: range.label } : {}),
 							},
 							hex(byte, 2),
 						);
@@ -533,7 +546,7 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 						const range = rangeOf.get(start + i);
 						return el(
 							"span",
-							{ class: "tb-byte", ...(range ? { "data-tone": range.tone ?? "normal" } : {}) },
+							{ class: "tb-byte", ...(range ? attrs.get(range) : {}) },
 							byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : ".",
 						);
 					}),
@@ -563,7 +576,7 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 					...highlight.map((range) =>
 						el(
 							"li",
-							{ "data-tone": range.tone ?? "normal" },
+							attrs.get(range),
 							el("span", { class: "tb-bytes-swatch" }),
 							`${range.label}: ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
 						),
