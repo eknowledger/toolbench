@@ -565,7 +565,7 @@ function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: Render
 							"li",
 							{ "data-tone": range.tone ?? "normal" },
 							el("span", { class: "tb-bytes-swatch" }),
-							`${range.label} — ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
+							`${range.label}: ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
 						),
 					),
 				)

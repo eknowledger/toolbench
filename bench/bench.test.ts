@@ -334,7 +334,7 @@ describe("card mode — the facade", () => {
 			"typing must not re-run the tool — the previous result stays until Run is pressed",
 		);
 		assert.equal(await host.locator(".tb-output[data-stale]").count(), 1, "but it is marked stale");
-		assert.match(String(await host.locator(".tb-status").textContent()), /inputs changed/);
+		assert.equal(await host.locator(".tb-status").textContent(), "inputs changed. Press Run", "a full stop, not an em dash (#42)");
 
 		await host.locator(".tb-run").click();
 		await host.locator(".tb-out-error").waitFor();
@@ -458,6 +458,8 @@ describe("bytes output — contract version 2", () => {
 		assert.equal(dump.marked, 24, `expected 12 bytes marked in two columns, got ${dump.marked}`);
 		assert.equal(dump.legend.length, 4, "every named range appears in the legend");
 		assert.match(String(dump.legend[3]), /U\+1F44B/, "including the four-byte one that wraps rows");
+		// By hand from the default "Héllo, 世界 👋": é is U+00E9, two bytes, after the one-byte H. A colon, not an em dash (#42).
+		assert.equal(dump.legend[0], "U+00E9 é: 2 bytes at 0x0001");
 		assert.ok(
 			dump.legend.every((entry) => /\d+ bytes? at 0x[0-9a-f]{4}/.test(String(entry))),
 			`each legend entry states its size and offset: ${dump.legend.join(" | ")}`,
@@ -521,7 +523,7 @@ describe("sample inputs — contract version 3", () => {
 		assert.match(after.values, /18ms/, `expected the "Not a number" sample's values, got: ${after.values}`);
 		assert.equal(after.results, 0, "a sample fills the form; it must not run the tool");
 		assert.match(after.status, /Not a number/, `the status must name the sample that was applied: ${after.status}`);
-		assert.match(after.status, /press Run/, "and still say what to do next");
+		assert.match(after.status, /Press Run/, "and still say what to do next");
 		await page.close();
 	});
 
@@ -804,7 +806,7 @@ describe("sample inputs — contract version 3", () => {
 			return { run: root?.querySelectorAll(".tb-run").length ?? -1, status: root?.querySelector(".tb-status")?.textContent ?? "" };
 		});
 		assert.equal(state.run, 0);
-		assert.doesNotMatch(state.status, /press Run/);
+		assert.doesNotMatch(state.status, /press Run/i);
 		await page.close();
 	});
 
@@ -848,7 +850,7 @@ describe("sample inputs — contract version 3", () => {
 
 		assert.notEqual(after.values, before, "the click must reach the control");
 		assert.ok(after.results > 0, "an autoRun tool must draw a result from the click, not wait for Run");
-		assert.doesNotMatch(after.status, /press Run/, `the run already happened, so the status must not ask for it: ${after.status}`);
+		assert.doesNotMatch(after.status, /press Run/i, `the run already happened, so the status must not ask for it: ${after.status}`);
 		await page.close();
 	});
 });
@@ -3826,7 +3828,7 @@ describe("select presets (#151)", () => {
 		assert.deepEqual(after.shown, { stack: "b", connect: "5", read: "60", retries: "3", backoff: "500" }, "the controls show Library B's values, and connect keeps its own");
 		assert.deepEqual(after.values, { stack: "b", connect: 5, read: 60, retries: 3, backoff: 500 }, "and so does what Run will use");
 		assert.equal(after.stale, true, "the answer on screen belongs to Library A's values");
-		assert.equal(after.status, 'filled with "Library B" — press Run', "the status names the option, as it names a sample");
+		assert.equal(after.status, 'filled with "Library B". Press Run', "the status names the option, as it names a sample");
 
 		await page.locator("#host >> .tb-run").click();
 		await page.locator("#host >> .tb-output:not([data-stale])").waitFor();
@@ -3866,7 +3868,7 @@ describe("select presets (#151)", () => {
 		await page.locator('#host >> .tb-sample:text-is("Slow upstream")').click();
 		let now = await form(page);
 		assert.deepEqual([now.shown.stack, now.shown.read, now.shown.retries], ["custom", "120", "1"]);
-		assert.equal(now.status, 'filled with "Slow upstream"; Library now shows "Custom" — press Run');
+		assert.equal(now.status, 'filled with "Slow upstream"; Library now shows "Custom". Press Run');
 
 		await page.locator('#host >> .tb-sample:text-is("Library B\'s values")').click();
 		now = await form(page);

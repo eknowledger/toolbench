@@ -157,7 +157,7 @@ function table(heatmap: Heatmap, xs: string[], ys: string[], description: string
 			el("th", { scope: "row" }, y),
 			...xs.map((_, c) => {
 				const v = heatmap.values[r]?.[c] ?? null;
-				return el("td", {}, v === null ? "—" : format(v));
+				return el("td", {}, v === null ? "n/a" : format(v));
 			}),
 		),
 	);

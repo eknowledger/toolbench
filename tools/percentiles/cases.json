@@ -1,6 +1,6 @@
 [
   {
-    "name": "ten integers, nearest rank — every number below was worked out by hand, not captured from the implementation",
+    "name": "ten integers, nearest rank: every number below was worked out by hand, not captured from the implementation",
     "input": { "values": "1 2 3 4 5 6 7 8 9 10", "method": "nearest" },
     "expect": {
       "kind": "group",
@@ -12,7 +12,7 @@
             { "label": "p50", "value": "5" },
             { "label": "p99", "value": "10" },
             { "label": "max", "value": "10" },
-            { "label": "mean", "value": "5.50", "note": "shown for contrast — it is not a percentile" },
+            { "label": "mean", "value": "5.50", "note": "shown for contrast: it is not a percentile" },
             { "label": "min", "value": "1" }
           ]
         },
@@ -62,7 +62,7 @@
           "kind": "fields",
           "fields": [
             { "label": "true p99", "value": "10", "group": "Averaging percentiles", "note": "of all measurements pooled" },
-            { "label": "averaged p99", "value": "7", "group": "Averaging percentiles", "note": "mean of four chunks' p99 — what a dashboard usually shows" },
+            { "label": "averaged p99", "value": "7", "group": "Averaging percentiles", "note": "mean of four chunks' p99, which is what a dashboard usually shows" },
             { "label": "error", "value": "-30.0%", "group": "Averaging percentiles", "tone": "bad", "note": "how wrong the averaged figure is" }
           ]
         }
@@ -99,7 +99,7 @@
     "input": { "values": "   ", "method": "nearest" },
     "expect": {
       "kind": "error",
-      "message": "No measurements yet — paste some numbers.",
+      "message": "No measurements yet. Paste some numbers.",
       "input": "values"
     }
   },

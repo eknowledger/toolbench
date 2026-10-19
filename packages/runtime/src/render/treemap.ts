@@ -172,7 +172,7 @@ export function renderTreemap(treemap: Treemap, options: RenderOptions = {}): HT
 	return figure;
 }
 
-const share = (v: number, total: number) => (total > 0 ? `${((v / total) * 100).toFixed(v / total < 0.0995 ? 1 : 0)}%` : "—");
+const share = (v: number, total: number) => (total > 0 ? `${((v / total) * 100).toFixed(v / total < 0.0995 ? 1 : 0)}%` : "n/a");
 
 function table(treemap: Treemap, laid: Laid[], total: number, unit: string, note: string | undefined): HTMLElement {
 	// The hierarchy in reading order, each row indented by its depth.

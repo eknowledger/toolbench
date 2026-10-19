@@ -532,7 +532,7 @@ export class ToolHost extends HTMLElement {
 			if (this.#manifest?.autoRun === true) {
 				void this.#run({ focusResult: false });
 			} else if (!this.#hostWroteValues && this.#seed) {
-				this.#say("showing the default result — press Run to try your own");
+				this.#say("showing the default result. Press Run to try your own");
 			}
 		} catch (error) {
 			this.#activated = false;
@@ -582,7 +582,7 @@ export class ToolHost extends HTMLElement {
 		output.toggleAttribute("data-stale", hasResult);
 		this.#els.run?.toggleAttribute("data-attention", true);
 		// Nothing on screen means nothing is stale, and "press Run" would only restate the button (#99).
-		this.#say(hasResult ? "inputs changed — press Run" : "");
+		this.#say(hasResult ? "inputs changed. Press Run" : "");
 	}
 
 	async #run(options: { focusResult: boolean }): Promise<void> {
@@ -1160,11 +1160,11 @@ export class ToolHost extends HTMLElement {
 		 */
 		this.#inputChanged();
 		/*
-		 * `#markStale` has just said "inputs changed — press Run". Naming the sample is more use than
+		 * `#markStale` has just said "inputs changed. Press Run". Naming the sample is more use than
 		 * that, and it is the only confirmation a screen-reader user gets that the click did anything. An
 		 * `autoRun` tool is already announcing its own run, so leave that one alone.
 		 */
-		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${label}"${note} — press Run`);
+		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${label}"${note}. Press Run`);
 	}
 
 	/**
