@@ -858,7 +858,7 @@ Seven layers. Each catches something the others structurally cannot.
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 23 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 171 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 174 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
