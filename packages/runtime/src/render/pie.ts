@@ -154,7 +154,7 @@ export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 
 /** One way to write a share everywhere it appears: a decimal below 10%, where a whole number says too little. */
 const percent = (share: number) => {
-	if (!Number.isFinite(share)) return "—";
+	if (!Number.isFinite(share)) return "n/a";
 	const pct = share * 100;
 	return `${pct < 9.95 ? pct.toFixed(1) : Math.round(pct)}%`;
 };

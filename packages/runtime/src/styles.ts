@@ -378,6 +378,16 @@ export const STYLES = /* css */ `
 .tb-byte[data-tone="good"]   { background: var(--tb-good); color: var(--tb-bg); }
 .tb-byte[data-tone="warn"]   { background: var(--tb-warn); color: var(--tb-bg); }
 .tb-byte[data-tone="bad"]    { background: var(--tb-bad); color: var(--tb-bg); }
+/* An untoned range in the next series colour (#148), after the tone rules so it beats "normal" at equal
+   specificity. The page colour as text: the light series are dark and the dark series light, and every
+   pairing measured 5.58:1 or better in both themes. --_tb-range is private, not a theming token. */
+.tb-out-bytes [data-series="1"] { --_tb-range: var(--tb-s1); }
+.tb-out-bytes [data-series="2"] { --_tb-range: var(--tb-s2); }
+.tb-out-bytes [data-series="3"] { --_tb-range: var(--tb-s3); }
+.tb-out-bytes [data-series="4"] { --_tb-range: var(--tb-s4); }
+.tb-out-bytes [data-series="5"] { --_tb-range: var(--tb-s5); }
+.tb-out-bytes [data-series="6"] { --_tb-range: var(--tb-s6); }
+.tb-byte[data-series] { background: var(--_tb-range); color: var(--tb-bg); }
 .tb-bytes-legend {
   display: flex; flex-wrap: wrap; gap: 0.75rem;
   margin: 0.5rem 0 0; padding: 0; list-style: none;
@@ -388,6 +398,7 @@ export const STYLES = /* css */ `
 .tb-bytes-legend li[data-tone="good"] .tb-bytes-swatch { background: var(--tb-good); }
 .tb-bytes-legend li[data-tone="warn"] .tb-bytes-swatch { background: var(--tb-warn); }
 .tb-bytes-legend li[data-tone="bad"]  .tb-bytes-swatch { background: var(--tb-bad); }
+.tb-bytes-legend li[data-series] .tb-bytes-swatch { background: var(--_tb-range); }
 
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
 /* Ordinary content, clickable as a whole; the hint inside it is the button (#98, #105). */

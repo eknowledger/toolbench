@@ -90,7 +90,7 @@ function parse(text: string): { values: number[] } | { error: string; at: number
 }
 
 function round(value: number): string {
-	if (!Number.isFinite(value)) return "—";
+	if (!Number.isFinite(value)) return "n/a";
 	if (Number.isInteger(value)) return String(value);
 	return value.toFixed(Math.abs(value) < 10 ? 2 : 1);
 }
@@ -102,7 +102,7 @@ const tool: Tool<Input> = {
 			return { kind: "error", message: `${parsed.error}.`, input: "values", at: parsed.at, len: 1 };
 		}
 		if (parsed.values.length === 0) {
-			return { kind: "error", message: "No measurements yet — paste some numbers.", input: "values" };
+			return { kind: "error", message: "No measurements yet. Paste some numbers.", input: "values" };
 		}
 
 		const chosen: Method = method === "linear" ? "linear" : "nearest";
@@ -115,7 +115,7 @@ const tool: Tool<Input> = {
 			{ label: "p50", value: round(percentile(sorted, 50, chosen)) },
 			{ label: "p99", value: round(percentile(sorted, 99, chosen)) },
 			{ label: "max", value: round(sorted[n - 1] as number) },
-			{ label: "mean", value: round(sum / n), note: "shown for contrast — it is not a percentile" },
+			{ label: "mean", value: round(sum / n), note: "shown for contrast: it is not a percentile" },
 			{ label: "min", value: round(sorted[0] as number) },
 		];
 
@@ -161,7 +161,7 @@ const tool: Tool<Input> = {
 					kind: "fields",
 					fields: [
 						{ label: "true p99", value: round(truth), group: "Averaging percentiles", note: "of all measurements pooled" },
-						{ label: "averaged p99", value: round(naive), group: "Averaging percentiles", note: "mean of four chunks' p99 — what a dashboard usually shows" },
+						{ label: "averaged p99", value: round(naive), group: "Averaging percentiles", note: "mean of four chunks' p99, which is what a dashboard usually shows" },
 						{
 							label: "error",
 							value: `${drift >= 0 ? "+" : ""}${drift.toFixed(1)}%`,

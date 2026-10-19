@@ -150,7 +150,7 @@ const BUDGETS = [
 	 * graph spent 17 more, 26,531, both inside it.
 	 *
 	 * Raised from 27_000 to 27_500 by the Copy action on code and table results (#155), in the commit that
-	 * spent it: 26,531 to 27,060 measured, 529 bytes. The button, its note and their styles, drawn with the
+	 * spent it: 26,765 to 27,290 measured, 525 bytes. The button, its note and their styles, drawn with the
 	 * result, and the host announcing the outcome. The copying itself is a chunk of its own, below; built into
 	 * this chunk instead it cost 685 here, measured on v6. 27_000 would have left the build 60 over.
 	 */

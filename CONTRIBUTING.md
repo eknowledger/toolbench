@@ -108,6 +108,10 @@ purpose: the rules that matter here are not the ones a linter checks.
 Comments explain **why**, not what. If a line looks arbitrary, say what went wrong without it. The `⚠️`
 marker means "a trap someone could reasonably fall into again" and is reserved for that.
 
+No em dashes, anywhere: prose, comments, and every string a reader or a tool author sees, which means the
+status line, validation messages, a tool's blurb and its output. A colon, a comma or a full stop is always
+available. `scripts/em-dash.test.ts` checks the packages' strings and every `tool.json`.
+
 Commit messages: a subject line saying what changed, then prose saying why. If the change came from a
 defect, describe the defect concretely, what was on screen and what should have been. Those descriptions
 are what the defect register is built from, and they are the most useful thing in the history a year

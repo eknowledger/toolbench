@@ -358,9 +358,9 @@ function scatterTable(chart: Chart): HTMLElement {
 				"tr",
 				{},
 				el("th", { scope: "row" }, series.label),
-				el("td", {}, typeof x === "number" ? format(x) : String(x ?? "—")),
-				el("td", {}, y === null ? "—" : format(y)),
-				sized ? el("td", {}, size === null || size === undefined ? "—" : format(size)) : null,
+				el("td", {}, typeof x === "number" ? format(x) : String(x ?? "n/a")),
+				el("td", {}, y === null ? "n/a" : format(y)),
+				sized ? el("td", {}, size === null || size === undefined ? "n/a" : format(size)) : null,
 			);
 		}),
 	);
@@ -941,7 +941,7 @@ function dataTable(chart: Chart, xText: (i: number) => string, note?: string, fo
 			{ "data-i": i },
 			el("th", { scope: "row" }, xText(i)),
 			...chart.series.flatMap((s) => {
-				const cell = (v: number | null | undefined) => el("td", {}, v === null || v === undefined ? "—" : format(v));
+				const cell = (v: number | null | undefined) => el("td", {}, v === null || v === undefined ? "n/a" : format(v));
 				if (s.shape === "box") {
 					const b = s.boxes?.[i];
 					return [b?.low, b?.q1, b?.median, b?.q3, b?.high].map(cell);
@@ -979,7 +979,7 @@ function formatterFor(values: number[]): (value: number) => string {
 	const whole = finite.length > 0 && finite.every((v) => Number.isInteger(v));
 	const digits = whole ? 0 : step >= 10 ? 0 : step >= 1 ? 1 : step >= 0.1 ? 2 : 3;
 	return (value) => {
-		if (!Number.isFinite(value)) return "—";
+		if (!Number.isFinite(value)) return "n/a";
 		if (Math.abs(value) >= 10000) return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 		return value.toFixed(digits);
 	};

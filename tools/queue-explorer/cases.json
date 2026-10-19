@@ -4,12 +4,12 @@
     "input": { "arrivals": 1200, "service": 1, "samples": 1000, "seed": 1 },
     "expect": {
       "kind": "error",
-      "message": "At 1200 arrivals/s and 1 ms of service, one server can handle 1000/s. The queue never drains, so there is no steady state to report — lower the arrival rate or speed up service.",
+      "message": "At 1200 arrivals/s and 1 ms of service, one server can handle 1000/s. The queue never drains, so there is no steady state to report. Lower the arrival rate or speed up service.",
       "input": "arrivals"
     }
   },
   {
-    "name": "the closed form at 80% utilisation — every value here is hand-checkable from the M/M/1 formulas",
+    "name": "the closed form at 80% utilisation: every value here is hand-checkable from the M/M/1 formulas",
     "input": { "arrivals": 800, "service": 1, "samples": 1000, "seed": 42 },
     "match": "subset",
     "why": "asserts the analytic half exactly; the simulated half is a separate case, and the chart is covered by the convergence unit test",
@@ -26,7 +26,7 @@
     }
   },
   {
-    "name": "the simulation is a pure function of its inputs — same seed, same answer, forever",
+    "name": "the simulation is a pure function of its inputs: same seed, same answer, forever",
     "input": { "arrivals": 800, "service": 1, "samples": 1000, "seed": 42 },
     "match": "subset",
     "why": "pins the seeded simulation; if this value ever changes, the generator or the recursion changed and that is worth knowing",

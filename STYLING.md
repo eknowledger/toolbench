@@ -134,6 +134,7 @@ path carries the class `tb-path`, and while a reader points at or focuses a node
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |
 | `data-align` | Table cells and headers | `start`, `end` |
+| `data-series` | `.tb-byte`, `.tb-bytes-legend li` | `1` to `6`: the series colour of a range with no tone, in order, round again after six. Absent on a toned range |
 | `data-lang` | `.tb-out-code` | The code's language |
 | `data-state` | `.tb-output` | `running`, `idle` |
 | `data-stale` | `.tb-output` | Present when the inputs have changed since the result was drawn |
