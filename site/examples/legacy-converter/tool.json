@@ -1,0 +1,39 @@
+{
+  "sdk": 1,
+  "id": "legacy-converter",
+  "name": "Legacy converter",
+  "blurb": "Still works, but a better tool has replaced it.",
+  "version": "1.0.0",
+  "status": "deprecated",
+  "capabilities": [
+    "pure"
+  ],
+  "runtime": {
+    "entry": "index.ts",
+    "thread": "main"
+  },
+  "card": "info",
+  "kinds": [
+    "fields",
+    "error"
+  ],
+  "links": [
+    {
+      "label": "Use percentiles instead",
+      "href": "./gallery.html#tool-percentiles"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "value",
+      "type": "number",
+      "label": "Value",
+      "description": "Any number in range. The result repeats it, to show the tool still runs.",
+      "primary": true,
+      "default": 1,
+      "min": 0,
+      "max": 10,
+      "unit": "units"
+    }
+  ]
+}

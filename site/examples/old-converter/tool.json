@@ -1,0 +1,43 @@
+{
+  "sdk": 1,
+  "id": "old-converter",
+  "name": "Old converter",
+  "blurb": "Taken down. A bookmarked link explains what happened rather than breaking.",
+  "version": "1.0.0",
+  "status": "retired",
+  "capabilities": [
+    "pure"
+  ],
+  "runtime": {
+    "entry": "index.ts",
+    "thread": "main"
+  },
+  "card": "info",
+  "kinds": [
+    "fields",
+    "error"
+  ],
+  "links": [
+    {
+      "label": "Use percentiles instead",
+      "href": "./gallery.html#tool-percentiles"
+    },
+    {
+      "label": "Why tools are retired",
+      "href": "./docs-authoring.html#3b-retiring-a-tool"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "value",
+      "type": "number",
+      "label": "Value",
+      "description": "Unused. A retired tool does not run.",
+      "primary": true,
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "unit": "n"
+    }
+  ]
+}

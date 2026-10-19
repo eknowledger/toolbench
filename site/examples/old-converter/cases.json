@@ -1,0 +1,17 @@
+[
+  {
+    "name": "the module answers if called, though the runtime never calls a retired tool",
+    "input": {
+      "value": 0
+    },
+    "expect": {
+      "kind": "fields",
+      "fields": [
+        {
+          "label": "unreachable",
+          "value": "a retired tool does not run"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,19 @@
+/*
+ * The optional web font, included only when the site is built with SITE_FONT=atkinson. Two static
+ * subsets made by site/build/subset-font.py, so the site's CSS uses weights 400 and 700 and nothing else.
+ * Atkinson Hyperlegible Next is under the SIL Open Font License; see fonts/OFL.txt.
+ */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root { --sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }

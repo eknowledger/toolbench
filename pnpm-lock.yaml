@@ -45,6 +45,19 @@ importers:
 
   packages/sdk: {}
 
+  site:
+    dependencies:
+      '@toolbench/runtime':
+        specifier: workspace:*
+        version: link:../packages/runtime
+      '@toolbench/sdk':
+        specifier: workspace:*
+        version: link:../packages/sdk
+    devDependencies:
+      vite:
+        specifier: 7.3.6
+        version: 7.3.6(@types/node@24.10.1)(yaml@2.9.1)
+
 packages:
 
   '@changesets/apply-release-plan@8.1.1':

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toolbench: small interactive tools for any web page</title>
+  <meta name="description" content="Write one function and one JSON file. Toolbench builds the form, runs it, and draws the answer. <!-- runtime-kb --> KB of runtime, no dependencies, no framework.">
+  <!-- partial:theme-init -->
+  <link rel="stylesheet" href="./src/base.css">
+  <link rel="stylesheet" href="./src/site.css">
+  <!-- fonts -->
+  <script type="module" src="./src/landing.ts"></script>
+</head>
+<body class="site">
+<!-- partial:header -->
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <div class="hero-title">
+        <h1 id="hero-title"><!-- partial:mark-large --><span>Toolbench</span></h1>
+        <p class="hero-sub">Small interactive tools for any web page.</p>
+      </div>
+      <div class="hero-side">
+        <p class="lede">Write one function and one JSON file. Toolbench builds the form, runs the function, and draws the answer as fields, tables, charts or bytes.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="./docs.html">Build your first tool</a>
+          <a class="button" href="./gallery.html">See every example</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="rig" aria-label="A manifest and the tool built from it">
+      <div class="rig-source">
+        <p class="rig-label"><span>tools/histogram/tool.json</span><span class="rig-hint">The file you write</span></p>
+        <!-- trace:tools/histogram/tool.json -->
+      </div>
+      <div class="rig-live">
+        <p class="rig-label"><span class="live-tag"><span class="live-dot" aria-hidden="true"></span>Live</span><span class="rig-hint">What a visitor gets</span></p>
+        <div class="rig-tool">
+          <tool-host tool="histogram" mode="page" id="hero-tool"></tool-host>
+        </div>
+      </div>
+    </div>
+    <p class="rig-caption">Click into a field to light up the lines it was built from.</p>
+  </section>
+
+  <section class="band band-stats" aria-labelledby="stats-title">
+    <div class="band-head">
+      <h2 id="stats-title">By the numbers</h2>
+    </div>
+    <!-- stats -->
+  </section>
+
+  <section class="band" aria-labelledby="write-title">
+    <div class="band-head">
+      <h2 id="write-title">The whole tool is a function</h2>
+      <p>It takes the form's values and returns a result. It has no idea it is on the web, so it runs the same in a page, in a worker, and in your test suite.</p>
+    </div>
+    <div class="snippets">
+      <!-- readme-block:0 -->
+      <div class="snippet-then">
+        <p>Then put it on any page, in any framework or none:</p>
+        <!-- readme-block:1 -->
+      </div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="spec-title">
+    <div class="band-head">
+      <h2 id="spec-title">What you get</h2>
+    </div>
+    <dl class="spec">
+      <div class="spec-row">
+        <dt>Tiny</dt>
+        <dd><strong><!-- runtime-kb --> KB gzipped</strong> for the runtime, once per page.</dd>
+      </div>
+      <div class="spec-row">
+        <dt>No dependencies</dt>
+        <dd><strong>Both packages install nothing else.</strong> No framework on the page, and none inside the tool.</dd>
+      </div>
+      <div class="spec-row">
+        <dt>Lazy</dt>
+        <dd><strong>A tool's code downloads when someone opens it.</strong> A card nobody clicks costs nothing but its markup.</dd>
+      </div>
+      <div class="spec-row">
+        <dt>Accessible</dt>
+        <dd><strong>Real labels, keyboard operation and a status line</strong> on every tool. An error points at the input that caused it, and every chart also ships its numbers as a table.</dd>
+      </div>
+      <div class="spec-row">
+        <dt>Themeable</dt>
+        <dd><strong>A dozen CSS custom properties</strong> restyle every tool, and a stylesheet of your own reaches the rest.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="band band-install" aria-labelledby="install-title">
+    <div class="band-head">
+      <h2 id="install-title">Install</h2>
+      <p>Version <!-- version -->. Node 24 for development; any bundler for your site.</p>
+    </div>
+    <div class="install">
+      <div class="install-box">
+        <pre class="code install-cmd"><code id="install-cmd">pnpm add @toolbench/sdk @toolbench/runtime</code></pre>
+        <button type="button" class="button copy" data-copy="#install-cmd">Copy</button>
+      </div>
+      <ol class="steps">
+        <li><strong>Write the tool.</strong> A directory with <code>tool.json</code>, <code>index.ts</code>, known answers in <code>cases.json</code>, and a README.</li>
+        <li><strong>Register it.</strong> One call to <code>defineToolHost</code>, once per site.</li>
+        <li><strong>Put it on a page.</strong> <code>&lt;tool-host tool="your-tool"&gt;</code>, anywhere in your HTML.</li>
+      </ol>
+      <p class="install-next"><a href="./docs.html">Read the full walkthrough</a> or <a href="https://github.com/eknowledger/toolbench">browse the source</a>.</p>
+    </div>
+  </section>
+</main>
+<!-- partial:footer -->
+</body>
+</html>

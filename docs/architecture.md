@@ -118,6 +118,8 @@ graph TB
     RM -.->|"rendered by the host"| PAGE
 ```
 
+The diagram shows the three phases, build, host and browser, and what crosses between them.
+
 Reading the diagram:
 
 * A **manifest** is validated and migrated before anything sees it, so every component downstream
@@ -350,6 +352,29 @@ opt-in and has to justify itself:
 
 ### 6.2 `@toolbench/runtime`
 
+```mermaid
+flowchart LR
+    accTitle: The runtime's components
+    subgraph RT["@toolbench/runtime"]
+        EL["tool-host element<br/>facade, form, status"]
+        RS["RegistrySource<br/>manifests and loaders"]
+        RU["Runner<br/>sequence, abort, timeout"]
+        RE["renderers<br/>one per result kind"]
+        SH["stylesheet<br/>layer toolbench, then host sheets"]
+    end
+    SDK["@toolbench/sdk<br/>validate and migrate"]
+    W["tool.worker.ts<br/>createToolWorker"]
+    T["the tool's module<br/>run(input, ctx)"]
+    EL --> RS --> SDK
+    EL --> RU --> T
+    RU -.->|thread worker| W --> T
+    EL --> RE
+    SH --> EL
+```
+
+The element is the hub: it asks the source for manifests and code, the runner for results, and the
+renderers for markup, while a worker is reached only through the runner.
+
 **`element.ts`** is `<tool-host>`, and it is the only public surface most hosts touch. It owns:
 
 * reading `tool`, `mode`, `parts` and `more` attributes, and the inline seed;
@@ -525,7 +550,8 @@ sequenceDiagram
     end
 ```
 
-Nothing has been downloaded except the manifest data, which was already in the page's bundle.
+The sequence shows registration, from the host's script to a painted facade. Nothing has been downloaded
+except the manifest data, which was already in the page's bundle.
 
 ### 7.2 Activation
 
@@ -549,7 +575,8 @@ sequenceDiagram
     EL->>EL: status: "press Run"
 ```
 
-Two decisions are visible here. The form is not painted until the module has arrived, because a Run
+The sequence shows activation, from a click or a scroll to a drawn form. Two decisions are visible here.
+The form is not painted until the module has arrived, because a Run
 button that exists and does nothing is worse than a spinner. And activation does not run the tool: see
 §7.3 for why.
 
@@ -579,7 +606,8 @@ sequenceDiagram
     EL->>EL: draw, summarise into the status region, clear the slow timer
 ```
 
-The reader triggers every run. An earlier version ran on activation and again on every keystroke, and
+The sequence shows one run on the main thread, from Run to a drawn result. The reader triggers every
+run. An earlier version ran on activation and again on every keystroke, and
 the result was a Run button that appeared broken: the answer was already on screen before you looked at
 it, and pressing the button changed nothing visible. It also did work nobody asked for. A tool that is
 genuinely instant can opt back in with `autoRun`.
@@ -613,7 +641,8 @@ sequenceDiagram
     RU-->>EL: Output
 ```
 
-`Ctx` is built on the side that runs the tool, never sent across the boundary. An `AbortSignal` is not
+The sequence shows one run in a worker, including the timeout that is armed beside it. `Ctx` is built on
+the side that runs the tool, never sent across the boundary. An `AbortSignal` is not
 structured-cloneable, `progress` is a function, and a `Response` is neither. Once that is true, an RPC
 library adds a wrapper and removes the one thing needed here, which is a timeout that can stop a
 running tool, so the protocol is hand written in about forty lines.
@@ -650,7 +679,8 @@ sequenceDiagram
     end
 ```
 
-Four distinct outcomes, four distinct messages. A reader who cannot tell them apart cannot do anything
+The sequence shows the four ways a run can fail, and what each one puts on screen. Four distinct
+outcomes, four distinct messages. A reader who cannot tell them apart cannot do anything
 useful about any of them, and the failure paths are the part a demo never exercises.
 
 ## 8. Invariants, and where they are enforced
@@ -770,7 +800,8 @@ graph LR
     E --> F["pnpm test:bench<br/>node --test + playwright<br/>against the built bench"]
 ```
 
-Each step is also a script you can run alone. `pnpm check` is steps 2 and 3, which is what to run while
+The flow shows the pipeline from install to the published artifacts. Each step is also a script you can
+run alone. `pnpm check` is steps 2 and 3, which is what to run while
 working.
 
 ### 11.2 Compiler settings that are load bearing
@@ -819,15 +850,16 @@ build: {
   applies to the worker's build. Skipping it leaves the worker's copies anonymous, which is how a
   duplicate copy of every tool went unnoticed for a while.
 * **`base` must be `/toolbench/` on the Pages build.** A project Pages site is not at the origin root,
-  and without the prefix the HTML loads while every `/assets/...` request 404s. Local `pnpm bench`
-  keeps `/` unless `BENCH_BASE` is set. In-page nav is relative (`./tool.html`) for the same reason.
+  and without the prefix the HTML loads while every `/assets/...` request 404s. The published build is
+  the project site, with `SITE_BASE=/toolbench/`; the bench keeps `/` unless `BENCH_BASE` is set. In-page
+  nav is relative (`./tool.html`) in both, for the same reason.
 
 ### 11.4 Artifacts
 
 | Command | Output |
 |---|---|
 | `pnpm build` | `packages/*/dist`: ESM plus `.d.ts` and source maps. No bundling; consumers bundle. |
-| `pnpm bench:build` | `bench/dist`: four HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk, the chart renderer, and two bench-only chunks for the theme switch and the fixture manifests. Per-tool chunks and the fixture chunk are emitted twice, once for the worker pass, which §13 explains. Local builds keep Vite `base` at `/`; the Pages deploy sets `BENCH_BASE=/toolbench/` so assets resolve under the project path. |
+| `pnpm bench:build` | `bench/dist`: four HTML entries, one CSS file, one runtime chunk, one chunk per tool, one worker chunk, the chart renderer, and two bench-only chunks for the theme switch and the fixture manifests. Per-tool chunks and the fixture chunk are emitted twice, once for the worker pass, which §13 explains. Vite `base` stays at `/`: the bench is not published. |
 
 ### 11.5 CI
 
@@ -835,7 +867,7 @@ Four workflows, split so each badge answers one question:
 
 * `tests.yml`: typecheck, every Node-runnable test, and the coverage report.
 * `build.yml`: packages, published contents, the bench, transfer budgets, and the browser suite on Chromium, Firefox and WebKit.
-* `pages.yml`: builds the bench with `BENCH_BASE=/toolbench/` and, on `main`, publishes it to GitHub Pages. Enabling Pages, under Settings then Pages then Source: GitHub Actions, is a maintainer click; the workflow is already in the tree.
+* `pages.yml`: builds the project site in `site/` with `SITE_BASE=/toolbench/`, checks its links and examples, and, on `main`, publishes it to GitHub Pages. The bench is not published. Enabling Pages, under Settings then Pages then Source: GitHub Actions, is a maintainer click; the workflow is already in the tree.
 * `release.yml`: version pull requests and the npm publish, after a human at both gates.
 
 ⚠️ `types and unit tests` and `packages, bench, browser` are required status checks on `main`, so renaming
@@ -853,7 +885,7 @@ numbers, and the report says which files it never loaded for that reason.
 
 ## 12. Testing strategy
 
-Seven layers. Each catches something the others structurally cannot.
+Eight layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
@@ -862,6 +894,7 @@ Seven layers. Each catches something the others structurally cannot.
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 23 |
+| `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
 | `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 200 |
 

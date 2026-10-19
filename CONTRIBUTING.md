@@ -13,9 +13,10 @@ pnpm check      # should be green before you change anything
 pnpm bench      # http://localhost:5180
 ```
 
-The hosted demo is https://eknowledger.github.io/toolbench/. Local `pnpm bench` is unchanged
-(`base` stays `/`). The Pages build sets `BENCH_BASE=/toolbench/`. A maintainer enables Pages
-once (Settings → Pages → Source: GitHub Actions). See the README's Live demo section.
+The project site is https://eknowledger.github.io/toolbench/, built from `site/` with `pnpm site:build`
+and served locally with `pnpm site`. The bench is not published: it is the browser suite's fixture, and
+`pnpm bench` runs it locally. A maintainer enables Pages once (Settings → Pages → Source: GitHub
+Actions). See the README's Live demo section.
 
 Node 24 or newer. Toolbench runs TypeScript directly, with no build step, which is how a tool's fixtures
 execute in a plain `node --test`. That floor is worth it.

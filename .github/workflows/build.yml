@@ -48,6 +48,11 @@ jobs:
       - name: Build the bench
         run: pnpm bench:build
 
+      - name: Build the project site
+        # Only so the size check below can measure the site's landing page. It fails under CI when this
+        # build is missing, so removing this step cannot quietly turn that line off.
+        run: pnpm site:build
+
       - name: Transfer size budget
         # The sizes quoted in README.md and docs/architecture.md, checked. A number in a document
         # rots the moment nobody checks it, and the lazy-loading argument rests on these staying

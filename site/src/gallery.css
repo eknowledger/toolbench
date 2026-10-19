@@ -1,0 +1,86 @@
+/* The gallery: groups of features, each a live example beside the code that makes it. */
+
+/* #region theme */
+/* The same tool in another theme: a dozen custom properties on a wrapper, nothing else. */
+.theme-demo tool-host {
+  --tb-accent: #0b6b5f;
+  --tb-accent-text: #0b6b5f;
+  --tb-accent-ink: #ffffff;
+  --tb-accent-bg: #e1f0ec;
+  --tb-bg: #fbfdfc;
+  --tb-surface: #eef6f3;
+  --tb-fg: #1d2422;
+  --tb-muted: #4f5b57;
+  --tb-border: #b9dbd4;
+  --tb-radius: 2px;
+  --tb-font: Georgia, "Times New Roman", serif;
+}
+/* #endregion */
+
+.gallery-page { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+.gallery-nav { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow: auto; padding: 0.25rem 0 2rem; font-size: 0.9375rem; }
+.gallery-nav ol { list-style: none; margin: 0; padding: 0; }
+.gallery-nav > ol > li { margin-bottom: 0.6rem; }
+.gallery-nav > ol > li > a { font-weight: 700; color: var(--ink); }
+.gallery-nav ol ol { margin: 0.25rem 0 0 0.6rem; }
+.gallery-nav a { display: block; padding: 0.15rem 0 0.15rem 0.6rem; text-decoration: none; color: var(--muted); }
+.gallery-nav a:hover { color: var(--ink); text-decoration: underline; }
+.gallery-main { min-width: 0; }
+
+.group { margin-bottom: clamp(3rem, 6vw, 4.5rem); scroll-margin-top: 80px; }
+.group-head { border-top: 2px solid var(--ink); padding-top: 1rem; margin-bottom: 1.5rem; }
+.group-head h2 { margin: 0 0 0.4rem; font-size: clamp(1.5rem, 2.6vw, 2rem); letter-spacing: -0.02em; }
+.group-head p { margin: 0; color: var(--muted); }
+
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; align-items: start; }
+.article-demo { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem 1.5rem; }
+.article-demo p { margin: 0 0 1rem; }
+.article-demo p:last-child { margin: 1rem 0 0; }
+.reveal-buttons { margin: 0 0 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+
+
+@media (max-width: 1000px) {
+  .gallery-page { grid-template-columns: minmax(0, 1fr); }
+  .gallery-nav { position: static; max-height: none; padding: 0; }
+  .gallery-nav ol ol { display: none; }
+  .gallery-nav > ol { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+  .gallery-nav > ol > li { margin: 0; }
+}
+
+@media (min-width: 1001px) {
+  :root[data-hide-gallery-nav] .gallery-page { grid-template-columns: 2rem minmax(0, 1fr); }
+}
+
+/* ── cards: a heading, tabs, and panels that share one box ── */
+/* One card to a row, always: folding the sidebar away is for giving a card the whole width, not more cards. */
+.cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; scroll-margin-top: 80px; }
+.card-wide { grid-column: 1 / -1; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.9rem 1rem 0; }
+.card-head h3 { margin: 0; font-size: 1.05rem; }
+.card-head h3 a { color: inherit; text-decoration: none; }
+.card-head h3 a:hover { text-decoration: underline; }
+.card-meta { color: var(--muted); font-size: 0.8125rem; text-align: right; }
+.card-text { margin: 0.35rem 1rem 0; color: var(--muted); font-size: 0.9375rem; }
+.card-tabs { display: flex; flex-wrap: wrap; gap: 0.15rem; padding: 0.6rem 0.75rem 0; border-bottom: 1px solid var(--line); }
+.card-tabs [role="tab"] { font: inherit; font-size: 0.875rem; font-weight: 700; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; padding: 0.45rem 0.7rem; min-height: 36px; cursor: pointer; }
+.card-tabs [role="tab"]:hover { color: var(--ink); }
+.card-tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--amber); }
+/*
+ * The panels share one box. The Live panel is in flow and sets the height (with a floor, so a short tool
+ * still leaves room to read code); a code panel lies over it and scrolls inside, so a tab switch never
+ * moves the grid. The Live panel is made invisible, never removed, so its tool stays mounted.
+ */
+.card-panels { position: relative; flex: 1; min-height: 20rem; }
+.card-panel { padding: 1rem; min-width: 0; }
+.card-live[data-away] { visibility: hidden; }
+.card-code { position: absolute; inset: 0; overflow: auto; background: var(--panel); border-radius: 0 0 12px 12px; }
+.card-code .codeblock { margin: 0 0 0.75rem; }
+.card-code pre { overflow: visible; }
+.card-live tool-host { min-block-size: 8rem; }
+
+/* A refusal is the validator's own message, shown the way a tool's error is: a bad-tone rule and plain text. */
+.refusal { border: 1px solid var(--line); border-left: 3px solid light-dark(#cf222e, #f85149); border-radius: 8px; padding: 0.75rem 1rem; background: var(--panel); min-width: 0; }
+.refusal-title { margin: 0 0 0.4rem; font-weight: 700; }
+.refusal-message { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.8125rem/1.5 var(--mono, ui-monospace, monospace); color: var(--ink); }
