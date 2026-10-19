@@ -152,6 +152,20 @@ async function stopServer(child: ChildProcess | undefined): Promise<void> {
 	clearTimeout(timer);
 }
 
+/**
+ * Move focus forward one step the way a keyboard user of this engine and platform does.
+ *
+ * ⚠️ On macOS, WebKit's plain Tab visits only text fields and selects unless the system's "Keyboard
+ * navigation" setting is on, which Playwright's WebKit does not inherit. From the percentiles select,
+ * Tab went to the body, then the textarea, then back to the select, never reaching a sample pill or
+ * Run; Option+Tab, WebKit's "every control" key, walked select, the four pills, Run, then the links,
+ * the same order plain Tab gives in Chromium and Firefox. Linux WebKit tabs to buttons, and Alt+Tab in
+ * Firefox does not move focus at all, so the modifier is for this one combination only.
+ */
+async function tabForward(page: Page): Promise<void> {
+	await page.keyboard.press(engineName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab");
+}
+
 after(async () => {
 	await browser?.close();
 	await stopServer(server);
@@ -776,7 +790,7 @@ describe("sample inputs — contract version 3", () => {
 			assert.ok(attention, `${theme}: Run exists after the sample`);
 			assertFillNotRing(idle, attention, theme);
 
-			await page.keyboard.press("Tab");
+			await tabForward(page);
 			const both = await readRun();
 			assert.ok(both, `${theme}: Run exists when focused`);
 			assert.equal(both.focusVisible, true, `${theme}: Tab must put :focus-visible on Run`);
@@ -836,7 +850,7 @@ describe("sample inputs — contract version 3", () => {
 
 		// The row sits after the form, so a Tab out of the last control lands on the first pill.
 		await page.locator("#host >> .tb-select").focus();
-		await page.keyboard.press("Tab");
+		await tabForward(page);
 		const focused = await page.evaluate(() => {
 			const active = document.querySelector("#host")?.shadowRoot?.activeElement;
 			return { cls: active?.className ?? "", label: active?.textContent ?? "" };
