@@ -31,7 +31,7 @@ const GITHUB = "https://github.com/eknowledger/toolbench";
 const BLOB = `${GITHUB}/blob/main`;
 const EDIT = `${GITHUB}/edit/main`;
 
-type Doc = { file: string; page: string; title: string; summary: string; sections?: string[] };
+type Doc = { file: string; page: string; title: string; summary: string; sections?: string[]; unnumbered?: boolean };
 
 /**
  * The repository's markdown the site renders, one page each. The README is the exception: it is a front
@@ -54,6 +54,8 @@ export const DOCS: Doc[] = [
 		title: "Charts and graphs",
 		summary: "Every chart and graph a tool can return, and what each one needs from the data.",
 		sections: ["9. Charts", "9b. Graphs"],
+		// "9." is where the section sits in the authoring guide; on a page of its own it reads as a stray number.
+		unnumbered: true,
 	},
 	{ file: "docs/versioning.md", page: "docs-versioning.html", title: "Versioning", summary: "The compatibility promise, and how the contract version rises." },
 	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it." },
@@ -97,6 +99,12 @@ function rendered(doc: Doc): Rendered {
 		return `${BLOB}/${target}${hash ? `#${hash}` : ""}`;
 	};
 	const out = renderMarkdown(text, { linkFor, dropContents: true, diagram, marker });
+	// Only the visible text loses its number. The ids keep it, so a link into the page still lands.
+	if (doc.unnumbered) {
+		const strip = (t: string) => t.replace(/^\d+[a-z]?\.\s+/, "");
+		out.html = out.html.replace(/(<h[23] id="[^"]*">)\d+[a-z]?\.\s+/g, "$1");
+		out.headings = out.headings.map((h) => ({ ...h, text: strip(h.text) }));
+	}
 	cache.set(doc.page, out);
 	return out;
 }
