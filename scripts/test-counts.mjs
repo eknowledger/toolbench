@@ -35,6 +35,7 @@ const LAYERS = [
 	{ label: "`tools/cases.test.ts`", glob: "tools/cases.test.ts" },
 	{ label: "`tools/*/‌*.test.ts`", glob: "tools/*/*.test.ts" },
 	{ label: "`scripts/*.test.ts`", glob: "scripts/*.test.ts" },
+	{ label: "`site/examples.test.ts`", glob: "site/examples.test.ts" },
 	// Its own command and CI step, not in `pnpm test`, so not in the sum checked against it below.
 	{ label: "`pnpm test:graph-scale`", glob: "packages/runtime/test/graph-large.scale.ts", separate: true },
 	{ label: "`bench/bench.test.ts`", browser: true },
