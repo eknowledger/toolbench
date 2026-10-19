@@ -22,7 +22,7 @@ import { attach } from "../test/graph/attach.ts";
 import { audit, overlaps } from "../test/graph/audit.ts";
 import { families } from "../test/graph/families.ts";
 import { effective, layout } from "../test/graph/all.ts";
-import { pace, REFERENCE_MS } from "../test/graph/pace.ts";
+import { instrumented, paced, REFERENCE_MS } from "../test/graph/pace.ts";
 
 /** Every family and variant, plus the nested family with a group closed: 21 layouts. */
 const cases: [string, Graph][] = [];
@@ -91,25 +91,13 @@ describe("graph layout, the eleven families", () => {
 	it("lays out every family in under 50 ms, scaled to this machine", (t) => {
 		// 50 ms on the machine REFERENCE_MS was measured on. Without the scaling the budget was that laptop's:
 		// the call graph took 22.8 ms there and 82.4 ms on a GitHub runner, and failed with nothing wrong.
-		const { factor, measured } = pace();
+		if (instrumented) return t.skip("V8 coverage is on, so a time here measures the instrumentation");
+		// Medians of five, after the run above warmed the code, so a collection pause does not decide it.
+		const { measured, factor, medians } = paced(cases.map(([name, g]) => [name, () => layout(g)] as const));
 		const budget = 50 * factor;
-		t.diagnostic(`reference workload ${measured.toFixed(1)} ms against ${REFERENCE_MS} ms, budget ${budget.toFixed(1)} ms`);
-		// The median of five, after the run above warmed the code, so a collection pause does not decide it.
-		const slow: string[] = [];
-		let slowest = "";
-		let slowestMs = 0;
-		for (const [name, g] of cases) {
-			const ms: number[] = [];
-			for (let r = 0; r < 5; r++) {
-				const t0 = performance.now();
-				layout(g);
-				ms.push(performance.now() - t0);
-			}
-			const median = ms.sort((x, y) => x - y)[2]!;
-			if (median > slowestMs) [slowest, slowestMs] = [name, median];
-			if (median >= budget) slow.push(`${name} ${median.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
-		}
-		t.diagnostic(`slowest ${slowest} ${slowestMs.toFixed(1)} ms`);
+		const [slowest, slowestMs] = medians.reduce((a, b) => (b[1] > a[1] ? b : a));
+		t.diagnostic(`reference ${measured.toFixed(1)} ms against ${REFERENCE_MS}, budget ${budget.toFixed(1)} ms, slowest ${slowest} ${slowestMs.toFixed(1)} ms`);
+		const slow = medians.filter(([, ms]) => ms >= budget).map(([name, ms]) => `${name} ${ms.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
 		assert.deepEqual(slow, []);
 	});
 
