@@ -507,9 +507,11 @@ describe("bytes output — contract version 2", () => {
 				return {
 					series: legend.map((li) => li.getAttribute("data-series")),
 					swatches: legend.map((li) => getComputedStyle(li.querySelector(".tb-bytes-swatch") as Element).backgroundColor),
-					// The first hex byte of each range, found by its label, which is also its hover text.
+					// The first hex byte of each range, found by its label, which is also its hover text. The label is
+					// whatever precedes the size and offset, not a fixed number of words: counting words matched only
+					// while a separator happened to be one of them.
 					marks: legend.map((li) => {
-						const label = li.textContent?.split(" ").slice(0, 2).join(" ");
+						const label = li.textContent?.replace(/: \d+ bytes? at 0x[0-9a-f]+$/i, "");
 						const byte = hexBytes.find((b) => b.getAttribute("title") === label);
 						return byte ? getComputedStyle(byte).backgroundColor : "missing";
 					}),
