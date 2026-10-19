@@ -313,7 +313,7 @@ describe("the site in a browser", () => {
 		await page.goto(`${origin}docs-architecture.html`, { waitUntil: "networkidle" });
 		assert.ok((await page.locator("figure.diagram svg").count()) >= 8);
 		// An allowlist: the page's own entry and the shared chunks the site builds, nothing else.
-		for (const s of scripts) assert.match(s, /\/assets\/(?:docs|theme|copy|panels)-[\w-]+\.js$/, s);
+		for (const s of scripts) assert.match(s, /\/assets\/(?:docs|theme|copy|site-panels)-[\w-]+\.js$/, s);
 		await page.close();
 	});
 });
