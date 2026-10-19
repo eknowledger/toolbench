@@ -107,6 +107,27 @@ describe("links in the built site", () => {
 	});
 });
 
+describe("the Inputs reference", () => {
+	/*
+	 * The page is generated from types.ts, so it can only fall behind the SDK if the generator stops reading
+	 * something. Hold it to the SDK's own list: every input type has its row and its section, and nothing more.
+	 */
+	it("has a row and a section for exactly the SDK's input types", async () => {
+		const { INPUT_TYPES } = (await import("../packages/sdk/src/index.ts")) as { INPUT_TYPES: readonly string[] };
+		const page = html.get("docs-ref-inputs.html") ?? "";
+		const sections = [...page.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]).filter((id) => !["types", "common-attributes", "validation-rules"].includes(id ?? ""));
+		assert.deepEqual(sections, [...INPUT_TYPES]);
+		for (const t of INPUT_TYPES) assert.ok(page.includes(`href="#${t}"`), `the Types table has no row for ${t}`);
+	});
+
+	it("shows the validator's own messages", async () => {
+		const page = html.get("docs-ref-inputs.html") ?? "";
+		// One message, checked against the source text, so a page of invented messages would fail.
+		assert.ok(page.includes("a select needs at least two options; with one, use a fixed value"));
+		assert.ok(readFileSync(join(import.meta.dirname, "../packages/sdk/src/validate.ts"), "utf8").includes("a select needs at least two options; with one, use a fixed value"));
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.

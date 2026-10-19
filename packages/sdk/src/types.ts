@@ -556,9 +556,11 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 // ---------------------------------------------------------------------------
 
 interface InputBase {
+	/** The key this input's value has in `run(values)`. Unique within the tool. */
 	id: string;
+	/** The visible label, which is also the control's accessible name. */
 	label: string;
-	/** The hint a form shows and a screen reader reads. Not a placeholder — those vanish on focus. */
+	/** The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. */
 	description?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
@@ -572,17 +574,29 @@ interface InputBase {
 	primary?: boolean;
 	/**
 	 * Force text direction. Bytes, code and identifiers are left-to-right even inside right-to-left
-	 * prose, and a runtime cannot know which is which — the tool says.
+	 * prose, and a runtime cannot know which is which, so the tool says.
 	 */
 	dir?: "ltr" | "auto";
 }
 
 export type InputSpec =
-	| (InputBase & { type: "text"; default: string; maxLength?: number })
+	| (InputBase & {
+			type: "text";
+			/** The value the form opens with. */
+			default: string;
+			/** The most characters the control accepts. */
+			maxLength?: number;
+	  })
 	| (InputBase & {
 			type: "textarea";
+			/** The value the form opens with. */
 			default: string;
+			/**
+			 * Visible lines of text.
+			 * @default 3
+			 */
 			rows?: number;
+			/** The most characters the control accepts. */
 			maxLength?: number;
 			/**
 			 * The language of what the reader types, passed to the host's `highlight(source, lang)` hook, the
@@ -599,9 +613,13 @@ export type InputSpec =
 	  })
 	| (InputBase & {
 			type: "number";
+			/** The value the form opens with, within `min..max`. */
 			default: number;
+			/** The lowest value. Required: the only guard against a runaway value, and `run` receives it clamped. */
 			min: number;
+			/** The highest value, above `min`. */
 			max: number;
+			/** The increment for the arrow keys and the slider. Any value when omitted. */
 			step?: number;
 			/**
 			 * `slider` asks for a range control beside the number box, for a tool read by sweeping a value
@@ -610,8 +628,18 @@ export type InputSpec =
 			 */
 			control?: "slider";
 	  })
-	| (InputBase & { type: "select"; default: string; options: SelectOption[] })
-	| (InputBase & { type: "toggle"; default: boolean });
+	| (InputBase & {
+			type: "select";
+			/** The option value the form opens with. */
+			default: string;
+			/** Two or more choices, with unique values. */
+			options: SelectOption[];
+	  })
+	| (InputBase & {
+			type: "toggle";
+			/** Whether the form opens with it on. */
+			default: boolean;
+	  });
 
 /**
  * A textarea language a tool defines itself (#163), tokenised by the runtime and painted behind the real
@@ -636,7 +664,9 @@ export interface TextareaGrammar {
 
 /** One choice in a `select`. */
 export interface SelectOption {
+	/** What `run` receives when this option is chosen. Unique within the select. */
 	value: string;
+	/** What the reader sees. */
 	label: string;
 	/**
 	 * A preset: choosing this option writes these values into the other inputs it names, which the reader

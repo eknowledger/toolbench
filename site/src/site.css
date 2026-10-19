@@ -239,6 +239,8 @@ main { display: block; }
 .prose a { color: var(--ink); text-decoration-color: var(--amber-text); }
 /* A file path has no spaces, so on a phone `packages/runtime/src/styles.ts` ran 9px past the column. Let it break. */
 .prose :not(pre) > code { font-size: 0.88em; background: var(--sunk); border-radius: 4px; padding: 0.05em 0.2em; overflow-wrap: anywhere; }
+/* Not in a table, which scrolls instead: there a name broke mid-word, "texta" over "rea". */
+.prose td code, .prose th code { overflow-wrap: normal; white-space: nowrap; }
 .prose .table-wrap { overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--line); border-radius: 10px; }
 .prose table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 .prose th, .prose td { text-align: left; vertical-align: top; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line-soft); }

@@ -24,6 +24,7 @@ import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
 import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
+import { inputsReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -31,7 +32,18 @@ const GITHUB = "https://github.com/eknowledger/toolbench";
 const BLOB = `${GITHUB}/blob/main`;
 const EDIT = `${GITHUB}/edit/main`;
 
-type Doc = { file: string; page: string; title: string; summary: string; sections?: string[]; unnumbered?: boolean };
+type Doc = {
+	file: string;
+	page: string;
+	title: string;
+	summary: string;
+	sections?: string[];
+	unnumbered?: boolean;
+	/** Which list the docs sidebar puts the page in. */
+	group: "Guide" | "Reference" | "Project";
+	/** Markdown written at build time from the source, for a reference page; `file` is then what it is read from. */
+	generate?: () => Promise<string>;
+};
 
 /**
  * The repository's markdown the site renders, one page each. The README is the exception: it is a front
@@ -42,12 +54,13 @@ export const DOCS: Doc[] = [
 	{
 		file: "README.md",
 		page: "docs.html",
-		title: "Guide",
+		title: "Getting started",
 		summary: "Install, the quick start, and how a tool is shown, run and themed.",
+		group: "Guide",
 		sections: ["Install", "Quick start", "Display modes", "How a tool runs", "Result shapes", "Worker mode", "Theming", "Size and cost", "Browser and runtime support", "Non-goals"],
 	},
-	{ file: "docs/authoring-a-tool.md", page: "docs-authoring.html", title: "Authoring a tool", summary: "The walkthrough for a first tool, then the manifest, inputs, results and fixtures in full." },
-	{ file: "STYLING.md", page: "docs-styling.html", title: "Styling", summary: "Host stylesheets, and the class names and attributes they may rely on." },
+	{ file: "docs/authoring-a-tool.md", page: "docs-authoring.html", title: "Authoring a tool", summary: "The walkthrough for a first tool, then the manifest, inputs, results and fixtures in full.", group: "Guide" },
+	{ file: "STYLING.md", page: "docs-styling.html", title: "Styling", summary: "Host stylesheets, and the class names and attributes they may rely on.", group: "Guide" },
 	{
 		file: "docs/authoring-a-tool.md",
 		page: "docs-charts.html",
@@ -56,10 +69,19 @@ export const DOCS: Doc[] = [
 		sections: ["9. Charts", "9b. Graphs"],
 		// "9." is where the section sits in the authoring guide; on a page of its own it reads as a stray number.
 		unnumbered: true,
+		group: "Guide",
 	},
-	{ file: "docs/versioning.md", page: "docs-versioning.html", title: "Versioning", summary: "The compatibility promise, and how the contract version rises." },
-	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it." },
-	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report." },
+	{ file: "docs/versioning.md", page: "docs-versioning.html", title: "Versioning", summary: "The compatibility promise, and how the contract version rises.", group: "Guide" },
+	{
+		file: "packages/sdk/src/types.ts",
+		page: "docs-ref-inputs.html",
+		title: "Inputs",
+		summary: "Every input type, its attributes, and the rules a manifest's inputs are held to.",
+		group: "Reference",
+		generate: inputsReference,
+	},
+	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it.", group: "Project" },
+	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report.", group: "Project" },
 ];
 
 function read(path: string): string {
@@ -67,7 +89,15 @@ function read(path: string): string {
 }
 
 /** The README cut to the sections the guide uses. Each `## ` heading starts a section. */
+/** A reference page's markdown, written once per build before any page asks for it. */
+const generated = new Map<string, string>();
+
+async function generateReference(): Promise<void> {
+	for (const d of DOCS) if (d.generate) generated.set(d.page, await d.generate());
+}
+
 function source(doc: Doc): string {
+	if (doc.generate) return generated.get(doc.page) ?? "";
 	const text = read(doc.file);
 	if (!doc.sections) return text;
 	const parts = text.split(/^(?=## )/m);
@@ -153,15 +183,16 @@ function toc(doc: Doc): string {
 }
 
 function docPage(doc: Doc): string {
-	const nav = DOCS.map(
-		(d) => `<li><a href="./${d.page}"${d === doc ? ' aria-current="page"' : ""}>${escapeHtml(d.title)}</a></li>`,
-	).join("");
+	const link = (d: Doc) => `<li><a href="./${d.page}"${d === doc ? ' aria-current="page"' : ""}>${escapeHtml(d.title)}</a></li>`;
+	const nav = (["Guide", "Reference", "Project"] as const)
+		.map((g) => `<h2>${g}</h2><ul>${DOCS.filter((d) => d.group === g).map(link).join("")}</ul>`)
+		.join("");
 	const { html } = rendered(doc);
 	return `
   <nav class="docs-nav panel" aria-label="Documentation">
     ${panelBar("docs-nav")}
     <div class="panel-body" id="docs-nav-body">
-      <ul>${nav}</ul>
+      ${nav}
       <h2>Elsewhere</h2>
       <ul>
         <li><a href="${BLOB}/CONTRIBUTING.md">Contributing</a></li>
@@ -172,7 +203,7 @@ function docPage(doc: Doc): string {
   <article class="prose">
     <h1>${escapeHtml(doc.title)}</h1>
     <p class="doc-meta">${escapeHtml(doc.summary)}</p>
-    <p class="doc-links"><a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a></p>
+    <p class="doc-links">${doc.generate ? `Generated from <a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> and the validator` : `<a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a>`}</p>
     ${html}
   </article>
   <nav class="docs-toc panel" aria-label="On this page">
@@ -310,7 +341,8 @@ export function siteContent(): Plugin {
 	return {
 		name: "toolbench-site-content",
 		// The build only reads drawings. A diagram edited without `pnpm site:diagrams` fails here, by name.
-		buildStart() {
+		async buildStart() {
+			await generateReference();
 			checkDiagrams(diagramSources());
 		},
 		configureServer(server) {
