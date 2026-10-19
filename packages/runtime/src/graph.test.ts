@@ -9,7 +9,8 @@
  *    hides it.
  *  - Ports where a reader expects them: one end alone on a side at its midpoint, several packed symmetrically,
  *    none at a corner, every record row's edge at that row.
- *  - Each family laid out in under 50 ms, and the same layout twice.
+ *  - Each family laid out in under 50 ms on the machine that budget was set on, scaled to this one by a
+ *    reference workload (test/graph/pace.ts), and the same layout twice.
  *
  * The overlap and attachment checks measure the drawn geometry, not the router's bookkeeping, so a bug in the
  * router cannot hide behind its own accounting. See test/graph/audit.ts.
@@ -21,6 +22,7 @@ import { attach } from "../test/graph/attach.ts";
 import { audit, overlaps } from "../test/graph/audit.ts";
 import { families } from "../test/graph/families.ts";
 import { effective, layout } from "../test/graph/all.ts";
+import { pace, REFERENCE_MS } from "../test/graph/pace.ts";
 
 /** Every family and variant, plus the nested family with a group closed: 21 layouts. */
 const cases: [string, Graph][] = [];
@@ -87,9 +89,16 @@ describe("graph layout, the eleven families", () => {
 		});
 	}
 
-	it("lays out every family in under 50 ms", () => {
+	it("lays out every family in under 50 ms, scaled to this machine", (t) => {
+		// 50 ms on the machine REFERENCE_MS was measured on. Without the scaling the budget was that laptop's:
+		// the call graph took 22.8 ms there and 82.4 ms on a GitHub runner, and failed with nothing wrong.
+		const { factor, measured } = pace();
+		const budget = 50 * factor;
+		t.diagnostic(`reference workload ${measured.toFixed(1)} ms against ${REFERENCE_MS} ms, budget ${budget.toFixed(1)} ms`);
 		// The median of five, after the run above warmed the code, so a collection pause does not decide it.
 		const slow: string[] = [];
+		let slowest = "";
+		let slowestMs = 0;
 		for (const [name, g] of cases) {
 			const ms: number[] = [];
 			for (let r = 0; r < 5; r++) {
@@ -98,8 +107,10 @@ describe("graph layout, the eleven families", () => {
 				ms.push(performance.now() - t0);
 			}
 			const median = ms.sort((x, y) => x - y)[2]!;
-			if (median >= 50) slow.push(`${name} ${median.toFixed(1)} ms`);
+			if (median > slowestMs) [slowest, slowestMs] = [name, median];
+			if (median >= budget) slow.push(`${name} ${median.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
 		}
+		t.diagnostic(`slowest ${slowest} ${slowestMs.toFixed(1)} ms`);
 		assert.deepEqual(slow, []);
 	});
 });
