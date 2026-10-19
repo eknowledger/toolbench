@@ -131,8 +131,9 @@ export const STYLES = /* css */ `
 .tb-body { padding: 0.875rem 1rem 1rem; display: grid; gap: var(--tb-gap); }
 
 /* ── the form ─────────────────────────────────────────────────────────────────────────────── */
-.tb-form { display: grid; gap: 0.625rem; margin: 0; border: 0; padding: 0; }
-.tb-field-row { display: grid; gap: 0.25rem; }
+/* minmax(0): WebKit sized an auto track to a select's option text, wider than the tool (#194). */
+.tb-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.625rem; margin: 0; border: 0; padding: 0; }
+.tb-field-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
 .tb-label { font-size: 0.82rem; font-weight: 600; color: var(--tb-muted); }
 .tb-unit { font-weight: 400; color: var(--tb-faint); }
 .tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
@@ -146,7 +147,7 @@ export const STYLES = /* css */ `
   border-radius: 8px;
   padding: 0.4375rem 0.5625rem;
 }
-/* WebKit counts a select's clipped option text as overflow of .tb, which can then be scrolled sideways (#194). */
+/* WebKit also counts a select's clipped text as overflow of .tb. */
 .tb-select { overflow: hidden; }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
