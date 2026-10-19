@@ -110,6 +110,10 @@
 					"label": "Nested groups, one closed"
 				},
 				{
+					"value": "large",
+					"label": "150 nodes, laid out off the main thread"
+				},
+				{
 					"value": "dangling",
 					"label": "A dangling edge, refused"
 				},

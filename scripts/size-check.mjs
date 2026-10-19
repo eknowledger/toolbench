@@ -145,6 +145,9 @@ const BUDGETS = [
 	 * the graph kind shares it, two more series tokens, the closed list of graph colours and the v7 changelog
 	 * line. The layout and the drawing are chunks of their own, below. 26_000 would have left the build 511
 	 * bytes over.
+	 *
+	 * The graph families (#152) moved it 3 bytes, to 26,514, and passing the host's worker factory to a large
+	 * graph spent 17 more, 26,531, both inside it.
 	 */
 	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_000 },
 	/*
@@ -176,7 +179,7 @@ const BUDGETS = [
 	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
-	 * the cases the graph kind's base draws, and 4,210 with every family's.
+	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
 	 * Bench-only.
 	 */
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 4_500, deployOnly: true },
@@ -245,16 +248,17 @@ const BUDGETS = [
 	 */
 	{ label: "painted textarea", pattern: /^paint-[^/]+\.js$/, budget: 1_500 },
 	/*
-	 * The graph kind (#152): a base chunk and nine fetched on demand, so a page pays for the graphs it draws.
+	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
 	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
-	 * graphs, with its keyboard model, readout and edge table: 17,574 measured. Exactly an 8-character hash after
+	 * graphs, with its keyboard model, readout and edge table: 17,856 measured. Exactly an 8-character hash after
 	 * "graph-", so it cannot match a chunk below, whose names are longer.
 	 *
 	 * The chunks, each fetched by the first graph that needs it and counted as reader cost, because that reader
-	 * downloads it: tree and radial placement 1,758; force and manual 896; what those two share 939; straight
-	 * lines and curves 2,631; hexagon, parallelogram, cylinder and document 465; records and crow's feet 971;
-	 * groups and lanes 2,840; path highlighting 737; and the repair of a route that had to share 901.
+	 * downloads it: tree and radial placement 1,756; force and manual 895; what those two share 937; straight
+	 * lines and curves 2,632; hexagon, parallelogram, cylinder and document 464; records and crow's feet 969;
+	 * groups and lanes 2,837; path highlighting 734; the crossing search 1,570, for a dense layered graph of at
+	 * most 60 nodes; the repair of a route that had to share 898; and the large-graph path 693, past 100 nodes.
 	 * Each budget sits above what it measured with room for a fix, not for a feature.
 	 */
 	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_500 },
@@ -266,7 +270,26 @@ const BUDGETS = [
 	{ label: "graph: records and crow's feet", pattern: /^graph-er-[^/]+\.js$/, budget: 1_250 },
 	{ label: "graph: groups and lanes", pattern: /^graph-groups-[^/]+\.js$/, budget: 3_500 },
 	{ label: "graph: path highlighting", pattern: /^graph-interact-[^/]+\.js$/, budget: 1_000 },
+	{ label: "graph: crossing search", pattern: /^graph-search-[^/]+\.js$/, budget: 1_750 },
 	{ label: "graph: repair", pattern: /^graph-repair-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph: large graphs", pattern: /^graph-large-[^/]+\.js$/, budget: 1_000 },
+	/*
+	 * ⚠️ The worker's copies of the layout, and NOT deployOnly, unlike a tool's worker copy. A tool's two copies
+	 * are alternatives, since it declares one thread. A graph past 100 nodes is drawn on the page and laid out
+	 * in the worker, so its reader downloads both the page's base and this one: 13,708 measured, the layout
+	 * without the drawing, named after `graph/graph-worker.ts`, the module the worker imports. Each chunk's copy
+	 * is fetched by the worker for a large graph that needs it.
+	 */
+	{ label: "graph worker: base", pattern: /^worker-graph-worker-[^/]+\.js$/, budget: 14_000 },
+	{ label: "graph worker: tree and radial", pattern: /^worker-graph-tree-[^/]+\.js$/, budget: 2_250 },
+	{ label: "graph worker: force and manual", pattern: /^worker-graph-force-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph worker: free placement, shared", pattern: /^worker-graph-free-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph worker: lines and curves", pattern: /^worker-graph-lines-[^/]+\.js$/, budget: 3_250 },
+	{ label: "graph worker: more shapes", pattern: /^worker-graph-shapes-[^/]+\.js$/, budget: 750 },
+	{ label: "graph worker: records and crow's feet", pattern: /^worker-graph-er-[^/]+\.js$/, budget: 1_250 },
+	{ label: "graph worker: groups and lanes", pattern: /^worker-graph-groups-[^/]+\.js$/, budget: 3_500 },
+	{ label: "graph worker: crossing search", pattern: /^worker-graph-search-[^/]+\.js$/, budget: 1_750 },
+	{ label: "graph worker: repair", pattern: /^worker-graph-repair-[^/]+\.js$/, budget: 1_250 },
 	{ label: "stylesheet", pattern: /^boot-[^/]+\.css$/, budget: 1_200 },
 	/*
 	 * Raised from 4_000 to 4_500 in the commit that spent it. The worker imports the same eager
@@ -277,6 +300,10 @@ const BUDGETS = [
 	/*
 	 * Raised from 4_500 to 5_000 by the graph kind's example (#152): 4,252 to 4,705 measured, 416 of it the
 	 * build-order manifest, inlined here as every tool's is. 4_500 would have left the build 205 bytes over.
+	 *
+	 * The worker's half of laying out a large graph (#152), one message and a dynamic import of the layout,
+	 * spent 123 inside it, 4,827. The layout itself is the "graph worker" chunks above, which a worker-mode tool
+	 * never fetches.
 	 */
 	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
@@ -321,13 +348,13 @@ const BUDGETS = [
 	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// A textarea declaring `lang` (#153) on screen for the browser tests. 228 measured.
 	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
-	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,415 measured.
+	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,871 measured.
 	{ label: "bench fixture: graph-families", pattern: /^tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
-	// The graph gallery (#152). 1,090 measured.
+	// The graph gallery (#152). 1,089 measured.
 	{ label: "bench page: graphs", pattern: /^graphs-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	// STYLING.md's four example sheets, the toggle that removes them, and the reveal links (#157, #147). 1,046 measured.
 	{ label: "bench page: styling", pattern: /^styling-[^/]+\.js$/, budget: 1_500, deployOnly: true },

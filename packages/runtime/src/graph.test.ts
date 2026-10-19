@@ -50,8 +50,7 @@ const CROSSINGS: Record<string, number> = {
 	"directions (RL)": 0,
 	"directions (TB)": 0,
 	"directions (BT)": 0,
-	// The base alone leaves 14. The crossing search, a chunk of its own that follows this change, takes it to 4.
-	bipartite: 14,
+	bipartite: 4,
 	"nested, vpc collapsed": 0,
 };
 
@@ -104,5 +103,14 @@ describe("graph layout, the eleven families", () => {
 		);
 		const slow = times.filter(([, ms]) => ms >= budget).map(([name, ms]) => `${name} ${ms.toFixed(1)} ms, budget ${budget.toFixed(1)}`);
 		assert.deepEqual(slow, []);
+	});
+
+	it("searches only the family dense enough to need it", () => {
+		// The bipartite graph leaves 14 crossings on 16 edges without the search; every other family leaves
+		// fewer than one per two edges, and the search finds nothing better for them.
+		assert.deepEqual(
+			cases.filter(([, g]) => layout(g).meta.searched).map(([name]) => name),
+			["bipartite"],
+		);
 	});
 });

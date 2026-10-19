@@ -48,8 +48,26 @@ export function createToolWorker(options: ToolWorkerOptions): void {
 			running.delete(message.seq);
 			return;
 		}
+		if (message.type === "layout") {
+			void laid(message);
+			return;
+		}
 		void run(message);
 	});
+
+	/**
+	 * A large graph's layout, for a page that would otherwise stop while it ran. The layout and the chunks it
+	 * fetches are this package's own modules, so unlike a tool's code they need no loader from the host.
+	 */
+	async function laid({ seq, graph, collapsed }: Extract<Request, { type: "layout" }>): Promise<void> {
+		try {
+			const { layoutHere } = await import("./graph/graph-worker.ts");
+			scope.postMessage({ type: "laid", seq, layout: await layoutHere(graph, collapsed) });
+		} catch (error) {
+			const e = error as Error;
+			scope.postMessage({ type: "crash", seq, name: e?.name ?? "Error", message: e?.message ?? String(error), ...(e?.stack ? { stack: e.stack } : {}) });
+		}
+	}
 
 	async function run(request: Extract<Request, { type: "run" }>): Promise<void> {
 		const { seq, id, input, sdk } = request;

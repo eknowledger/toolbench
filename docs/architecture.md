@@ -442,24 +442,29 @@ with no DOM, which is what lets a worker run it and Node test it:
    libavoid's penalties: a crossing 1000, a bend 35, a segment running backwards 60. The grid makes "no
    overlap" structural: a grid edge has one owner, a vertex a route turns at is that route's, and node
    interiors, rings, labels, titles and every port's own lane are blocked to everyone else.
-4. **Repair and finish.** A route that could only be found by sharing goes to the repair chunk; then corners
-   are rounded and the drawing is made.
+4. **Repair, search, finish.** A route that could only be found by sharing goes to the repair chunk; a dense
+   graph's order to the search chunk; then corners are rounded and the drawing is made.
 
 Everything optional is a chunk of its own, fetched for the first graph that needs it (`graph/chunks.ts`):
 `graph-tree`, `graph-force` and what they share in `graph-free`, `graph-lines` for straight lines and
 curves, `graph-shapes`, `graph-er` for records and crow's feet, `graph-groups`, `graph-interact` for path
-highlighting, and `graph-repair`. A renderer that finds one missing throws `ChartRendererMissing` carrying the
-load, and the element fetches it and draws again, the pattern the chart kinds use. Whether the repair is
-needed is only known after the base layout, so the layout itself asks for it and the drawing starts again with
-it.
+highlighting, `graph-search`, `graph-repair` and `graph-large`. A renderer that finds one missing throws
+`ChartRendererMissing` carrying the load, and the element fetches it and draws again, the pattern the chart
+kinds use. Whether the search or the repair is needed is only known after the base layout, so the layout
+itself asks for them and the drawing starts again with them.
 
 ⚠️ **Determinism is a property of the code, not of the engine.** `Math.sin`, `Math.cos`, `Math.atan2`,
 `Math.hypot` and `**` are not correctly rounded, so engines differ in the last bit, and a layout is a long
 chain of comparisons in which a last bit decides an order. The layout uses only `+ - * /` and `Math.sqrt`,
 which IEEE 754 fixes: an ellipse by its rational parametrisation, the radial placement with its own sine
-series, and a seeded integer generator for force layouts. Every budget that bounds a search is counted in A*
-states, never in milliseconds, so a slow machine draws the same picture as a fast one. A browser test compares
-every family's drawing with the layout Node computes.
+series, and a seeded integer generator for force layouts. The budgets that bound the search are counted in
+A* states, never in milliseconds, so a slow machine draws the same picture as a fast one. A browser test
+compares every family's drawing, the large one from the worker included, with the layout Node computes.
+
+**A graph past a hundred nodes** is the `graph-large` chunk's: the figure comes back at once with the edge
+table open and a line saying the picture is being laid out, and the layout runs in one worker for the page,
+made with the host's `workerFactory`, which imports `graph/graph-worker.ts` through `createToolWorker`'s
+`layout` message. Without a factory it runs on the main thread after a frame.
 
 **Accessibility is the drawing's, not a later pass.** The picture is one tab stop, a `role="group"` with
 the graph's summary as its name; the arrow along the flow follows the selected edge out of the focused
@@ -848,7 +853,7 @@ Seven layers. Each catches something the others structurally cannot.
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
 | `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 145 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, and the same layout twice | 105 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 106 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 20 |
@@ -908,7 +913,8 @@ production build:
 * theming through custom properties, and a host's own sheets: kept after the runtime's in every root,
   winning over it through the runtime's layer, replaced everywhere by `setHostStyles`, and each of
   STYLING.md's four examples producing the computed style it exists for;
-* every graph family drawn through the element is the drawing Node lays out, in all three engines; every part carries `data-kind` and its `data-role`; the edge table
+* every graph family drawn through the element is the drawing Node lays out, in all three engines, the one
+  past 100 nodes laid out in the worker; every part carries `data-kind` and its `data-role`; the edge table
   is a closed `<details>` with a row per edge and one for a node with none; the arrow keys follow the edges
   and the live region says so; focus stays on the picture when a group closes under it; and a plain layered
   graph fetches the graph's base chunk and nothing else of it;
@@ -931,8 +937,8 @@ table cannot quietly stop being true.
 | Runtime plus the bench's own wiring | 26.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, and 462 for the build-order manifest the bench inlines) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.0 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook. 956 bytes |
-| Worker entry | 4.7 KB | Only on pages with a worker-mode tool, and only after activation |
-| Graph kind, base chunk | 17.6 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Nine chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one. Each has its own line in `size-check.mjs` |
+| Worker entry | 4.8 KB | Only on pages with a worker-mode tool, and only after activation |
+| Graph kind, base chunk | 17.9 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Eleven chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one, and a graph past 100 nodes also fetches the worker's copy of the layout. Each has its own line in `size-check.mjs` |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
 | `regex-explainer` chunk | 2.8 KB | The largest tool here, and the only one that is a parser |
@@ -1135,6 +1141,7 @@ Page to worker:
 |---|---|
 | `{ type: "run", seq, id, input, sdk }` | A run starts |
 | `{ type: "abort", seq }` | The page cancels or supersedes a run |
+| `{ type: "layout", seq, graph, collapsed }` | A graph past 100 nodes needs laying out, with these groups closed (#152) |
 
 Worker to page:
 
@@ -1143,6 +1150,7 @@ Worker to page:
 | `{ type: "ready" }` | Once, after the worker's listeners are attached |
 | `{ type: "progress", seq, fraction, partial? }` | The tool called `ctx.progress` |
 | `{ type: "result", seq, output }` | The tool returned |
+| `{ type: "laid", seq, layout }` | A graph's layout is ready |
 | `{ type: "crash", seq, name, message, stack? }` | The tool threw, or its module failed to load |
 
 Aborts are not acknowledged. The page already knows, and the worker's own abort is swallowed rather

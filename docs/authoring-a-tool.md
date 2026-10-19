@@ -882,6 +882,8 @@ What the runtime does for you, so you do not have to:
   focus is. Space on two nodes highlights the shortest path between them.
 * **The same graph gives the same picture** in every engine and in Node, so a screenshot or a test never
   depends on the browser.
+* **A graph past a hundred nodes** is laid out off the main thread when the host configured a worker: its
+  table shows at once and the picture follows.
 
 The structural rules hold in your fixtures as well as on the page: ids are unique, every edge,
 port, group, lane and highlighted node names something that exists, groups do not nest in a circle, and a

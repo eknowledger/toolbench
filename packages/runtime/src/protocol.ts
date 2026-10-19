@@ -11,18 +11,22 @@
  * library adds a wrapper and takes away the one thing a tool harness needs, which is a timeout that
  * can actually stop a running tool.
  */
-import type { InputValues, Output } from "@toolbench/sdk";
+import type { Graph, InputValues, Output } from "@toolbench/sdk";
+import type { GraphLayout } from "./graph/model.ts";
 
 /** page → worker */
 export type Request =
 	| { type: "run"; seq: number; id: string; input: InputValues; sdk: number }
-	| { type: "abort"; seq: number };
+	| { type: "abort"; seq: number }
+	/** Lay out a large graph off the main thread, with these groups drawn closed (#152). */
+	| { type: "layout"; seq: number; graph: Graph; collapsed: string[] };
 
 /** worker → page */
 export type Response =
 	| { type: "ready" }
 	| { type: "progress"; seq: number; fraction: number; partial?: Output }
 	| { type: "result"; seq: number; output: Output }
+	| { type: "laid"; seq: number; layout: GraphLayout }
 	/**
 	 * The tool threw, or the worker could not load it. Distinct from an `{ kind: "error" }` output,
 	 * which means the tool worked and the input was wrong.

@@ -239,6 +239,8 @@ describe("card mode — the facade", () => {
 			"the main-thread copy must never be fetched for a worker-mode tool",
 		);
 		assert.equal(loaded(urls, /\/assets\/index-[^/]+\.js$/).length, 0, "no tool should load under an anonymous chunk name");
+		// The worker also lays out large graphs (#152), and a tool that draws none must not fetch that layout.
+		assert.deepEqual(loaded([...urls, ...workerUrls], /\/assets\/[^/]*graph[^/]*\.js$/), [], "a worker-mode tool fetches no graph code");
 		await page.close();
 	});
 
@@ -4142,7 +4144,7 @@ describe("graphs (#152)", () => {
 		"#" +
 		L.edges.map((e) => [e.d, e.tail?.d ?? "", e.head?.d ?? "", e.label ? `${e.label.x},${e.label.y},${e.label.w},${e.label.h}` : ""].join(";")).join("|");
 
-	it("draws every family as the same picture Node lays out", async () => {
+	it("draws every family as the same picture Node lays out, the large one from a worker", async () => {
 		const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 		const errors: string[] = [];
 		page.on("pageerror", (e) => errors.push(String(e)));
@@ -4169,6 +4171,14 @@ describe("graphs (#152)", () => {
 			const want = id === "dangling" || id === "limits" ? "refused" : drawn(layout(graphs[id]!));
 			assert.equal(inBrowser[id], want, `${id} draws what Node lays out`);
 		}
+		/*
+		 * The large one was laid out in the worker: a layout chunk was fetched there. Which one shows depends on
+		 * the engine: Chromium lists the chunks the layout fetched itself (the repair, for this graph) and not the
+		 * one its entry imported, so the check is any of the worker's own copies.
+		 */
+		const inWorker: string[] = [];
+		for (const worker of page.workers()) inWorker.push(...(await worker.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name))));
+		assert.ok(inWorker.some((url) => /\/assets\/worker-graph[^/]*\.js$/.test(url)), `the worker fetched the layout: ${inWorker.join(", ")}`);
 		assert.deepEqual(errors, []);
 		await page.close();
 	});

@@ -540,6 +540,10 @@ Two things to know before you spend an afternoon on them:
 * If no `workerFactory` is configured, a worker-mode tool runs on the main thread and logs a warning.
   A slow tool is better than a missing one.
 
+The same factory makes one more worker for the page, the first time a `graph` past a hundred nodes needs
+laying out, so a large graph never stops the page: its edge table shows at once and the picture follows.
+Without a factory, a large graph is laid out on the main thread after a frame.
+
 ## Theming
 
 The runtime renders inside a shadow root. Your CSS cannot reach in and break a tool, and the tool's CSS
@@ -596,8 +600,8 @@ Measured on the built bench with gzip, not estimated:
 | | Transfer |
 |---|---|
 | Runtime plus the bench's page wiring, once per page that uses a tool | 26.5 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.7 KB |
-| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.6 KB |
+| Worker entry, only for pages with a worker-mode tool | 4.8 KB |
+| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.9 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |
