@@ -39,6 +39,7 @@ export const LATER = {
 	samples: 3,
 	"inputs.control": 4,
 	"inputs.lang": 6,
+	"inputs.grammar": 7,
 	"options.sets": 6,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,

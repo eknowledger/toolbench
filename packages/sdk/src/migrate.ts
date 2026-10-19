@@ -114,10 +114,11 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		from: 6,
 		/*
-		 * 6 → 7 added the `graph` output kind (#152).
+		 * 6 → 7 added the `graph` output kind (#152), and an optional `grammar` on a textarea (#163).
 		 *
 		 * Identity on both halves, for the reason 1 → 2 gave: a v6 manifest cannot name a kind that did not
-		 * exist, and a v6 tool cannot return one.
+		 * exist, and a v6 tool cannot return one. A v6 textarea without `grammar` is painted only by a host's
+		 * hook, which is exactly what it was.
 		 */
 		manifest: (m) => m,
 		output: (o) => o,

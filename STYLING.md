@@ -136,6 +136,7 @@ path carries the class `tb-path`, and while a reader points at or focuses a node
 | `data-align` | Table cells and headers | `start`, `end` |
 | `data-series` | `.tb-byte`, `.tb-bytes-legend li` | `1` to `6`: the series colour of a range with no tone, in order, round again after six. Absent on a toned range |
 | `data-lang` | `.tb-out-code` | The code's language |
+| `data-tok` | A token a tool's `grammar` painted in a textarea, inside `.tb-paint` | `keyword`, `string`, `comment`, `operator`. Colour only: a rule that changes a token's width moves the caret off the glyph |
 | `data-state` | `.tb-output` | `running`, `idle` |
 | `data-stale` | `.tb-output` | Present when the inputs have changed since the result was drawn |
 | `data-status` | `tool-host` itself | `deprecated`, `retired`. Absent for a live tool |

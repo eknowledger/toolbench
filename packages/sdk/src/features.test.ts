@@ -25,6 +25,7 @@ const INPUT_SINCE: Since = {
 	rows: 1, maxLength: 1,
 	control: 4,
 	lang: 6,
+	grammar: 7,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1 };
@@ -109,8 +110,8 @@ describe("the version each feature arrived in (#170)", () => {
 	 */
 	it("dates each manifest feature where the version history puts it", () => {
 		assert.deepEqual(
-			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets },
-			{ samples: 3, control: 4, lang: 6, sets: 6 },
+			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar },
+			{ samples: 3, control: 4, lang: 6, sets: 6, grammar: 7 },
 		);
 		assert.deepEqual(
 			Object.fromEntries(Object.entries(KIND_SINCE).filter(([, v]) => v > 1)),

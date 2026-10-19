@@ -4650,6 +4650,196 @@ describe("graphs (#152)", () => {
 	});
 });
 
+describe("a textarea painted by the tool's own grammar (#163)", () => {
+	/*
+	 * The `grammar-input` fixture's Machine textarea declares `lang: "doors"`, which the bench's hook does not
+	 * know, and a grammar: keywords initial, state, on and final, `#` comments, `->` and `:` operators, and `"`
+	 * strings. Its Labels textarea declares `lang: "json"`, which the hook does know, beside a grammar of its
+	 * own, so the hook should win there. Every expectation is read off that manifest by hand.
+	 */
+	async function open(query = "", options: { blockPaint?: boolean; scheme?: "light" | "dark" } = {}): Promise<Page> {
+		const page = await browser.newPage(options.scheme ? { colorScheme: options.scheme } : {});
+		if (options.blockPaint) await page.route(/\/assets\/paint-[^/]+\.js$/, (route) => route.abort());
+		await page.goto(`${BASE}/tool.html?id=grammar-input${query}`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> #in-machine").waitFor();
+		return page;
+	}
+	const layerOf = (page: Page, id: string) =>
+		page.evaluate((id) => {
+			const area = document.querySelector("#host")?.shadowRoot?.querySelector(`#in-${id}`) as HTMLTextAreaElement;
+			const wrap = area.parentElement as HTMLElement;
+			const layer = wrap.querySelector(".tb-paint");
+			return {
+				painted: wrap.hasAttribute("data-paint"),
+				grammar: Boolean(layer?.querySelector("[data-grammar]")),
+				hook: Boolean(layer?.querySelector("[data-highlight-hook]")),
+				matches: layer ? layer.textContent?.replace(/ $/, "") === area.value : false,
+				tokens: [...(layer?.querySelectorAll("[data-tok]") ?? [])].map((t) => [t.getAttribute("data-tok"), t.textContent]),
+			};
+		}, id);
+
+	// The default Machine text, tokenised by hand from the grammar's rules.
+	const transition = [["keyword", "on"], ["operator", ":"], ["operator", "->"]];
+	const expected = [
+		["comment", "# A door that locks"],
+		["keyword", "initial"],
+		["keyword", "state"],
+		["keyword", "state"],
+		["string", '"needs a key"'],
+		...transition,
+		...transition,
+		...transition,
+		...transition,
+	];
+
+	for (const [query, what] of [
+		["", "a host hook that does not know the language"],
+		["&code=plain", "no host hook at all"],
+	] as const) {
+		it(`paints the tool's grammar under ${what}`, async () => {
+			const page = await open(query);
+			const now = await layerOf(page, "machine");
+			assert.equal(now.painted, true);
+			assert.equal(now.grammar, true, "the grammar's paint, not the hook's");
+			assert.equal(now.matches, true, "and the textarea's own text, exactly");
+			assert.deepEqual(now.tokens, expected);
+			await page.close();
+		});
+	}
+
+	it("lets a host hook win for a language it knows", async () => {
+		const page = await open();
+		const now = await layerOf(page, "labels");
+		assert.equal(now.painted, true);
+		assert.equal(now.hook, true, "the bench's JSON highlighter painted it");
+		assert.equal(now.grammar, false, "and the tool's grammar did not");
+		await page.close();
+	});
+
+	it("fetches the paint chunk for a grammar even on a host with no hook", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/tool.html?id=grammar-input&code=plain`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-painted[data-paint]").first().waitFor();
+		assert.equal(scripts.filter((s) => /\/assets\/paint-[^/]+\.js$/.test(s)).length, 1, "the grammar lives in that chunk, not in boot");
+		await page.close();
+	});
+
+	it("leaves the accessibility tree exactly as the plain textarea's", async () => {
+		const painted = await open();
+		// The baseline is the same page with the paint chunk refused, which the runtime answers with plain textareas.
+		const plain = await open("", { blockPaint: true });
+		assert.equal(await plain.locator("#host >> .tb-painted").count(), 0, "the baseline really is unpainted");
+		assert.equal(await painted.locator("#host >> .tb-paint").first().getAttribute("aria-hidden"), "true");
+		assert.equal(await painted.locator("#host").ariaSnapshot(), await plain.locator("#host").ariaSnapshot());
+		await painted.close();
+		await plain.close();
+	});
+
+	it("puts the caret on the glyph that was clicked", async () => {
+		const page = await open();
+		const targets = await page.evaluate(() => {
+			const area = document.querySelector("#host")?.shadowRoot?.querySelector("#in-machine") as HTMLTextAreaElement;
+			const layer = area.parentElement?.querySelector(".tb-paint") as HTMLElement;
+			const box = area.getBoundingClientRect();
+			const out: { i: number; x: number; y: number }[] = [];
+			const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+			let offset = 0;
+			for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+				for (let k = 0; k < n.data.length; k++, offset++) {
+					if (n.data[k] === "\n" || offset % 7 !== 0) continue;
+					const range = document.createRange();
+					range.setStart(n, k);
+					range.setEnd(n, k + 1);
+					const rect = range.getClientRects()[0];
+					if (!rect || rect.width === 0 || rect.bottom > box.bottom - 8) continue;
+					out.push({ i: offset, x: rect.left + rect.width / 4, y: rect.top + rect.height / 2 });
+				}
+			}
+			return out;
+		});
+		assert.ok(targets.length >= 10, `enough visible glyphs to mean something: ${targets.length}`);
+		const area = page.locator("#host >> #in-machine");
+		for (const t of targets) {
+			await page.mouse.click(t.x, t.y);
+			assert.equal(await area.evaluate((el: HTMLTextAreaElement) => el.selectionStart), t.i, `clicking painted character ${t.i} put the caret elsewhere`);
+		}
+		await page.close();
+	});
+
+	/*
+	 * Every way a regular expression runs goes through one of these: String's match, matchAll, replace, search
+	 * and split call the RegExp's symbol methods, and test calls exec. Counted across a repaint, which a host's
+	 * `values` write triggers synchronously for every painted textarea on the tool.
+	 *
+	 * With no hook, both textareas are painted by their grammars, so the count must be zero. With the bench's
+	 * hook, the JSON textarea is painted by it, and it tokenises with regular expressions: that run is the
+	 * control, because a count of zero there would mean the counter counts nothing.
+	 */
+	const regexCalls = (page: Page) =>
+		page.evaluate(() => {
+			const proto = RegExp.prototype as unknown as Record<string | symbol, (...args: unknown[]) => unknown>;
+			const names: (string | symbol)[] = ["exec", "test", Symbol.match, Symbol.matchAll, Symbol.replace, Symbol.search, Symbol.split];
+			const originals = names.map((name) => proto[name]);
+			let calls = 0;
+			names.forEach((name, i) => {
+				proto[name] = function (this: RegExp, ...args: unknown[]) {
+					calls++;
+					return (originals[i] as (...a: unknown[]) => unknown).apply(this, args);
+				};
+			});
+			try {
+				const host = document.querySelector("#host") as HTMLElement & { values: Record<string, string> };
+				host.values = { machine: '# longer now\ninitial a\nstate b "x \\" y"\non go: a -> b\n'.repeat(20), labels: '{"go": "Go", "back": "Back"}' };
+			} finally {
+				names.forEach((name, i) => (proto[name] = originals[i] as (...args: unknown[]) => unknown));
+			}
+			return calls;
+		});
+
+	it("never runs a regular expression to paint", async () => {
+		const grammarOnly = await open("&code=plain");
+		assert.equal(await regexCalls(grammarOnly), 0, "both grammars painted, and not one regular expression ran");
+		assert.equal((await layerOf(grammarOnly, "machine")).grammar, true, "and they did paint");
+		assert.equal((await layerOf(grammarOnly, "labels")).grammar, true);
+		await grammarOnly.close();
+
+		const withHook = await open();
+		assert.ok((await regexCalls(withHook)) > 0, "the control: the host's JSON hook runs regular expressions, and the counter sees them");
+		await withHook.close();
+	});
+
+	for (const scheme of ["light", "dark"] as const) {
+		it(`keeps every token at 4.5:1 on the field (${scheme})`, async () => {
+			const page = await open("", { scheme });
+			const worst = await page.evaluate(() => {
+				const lum = (rgb: string) => {
+					const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
+						const c = Number(v) / 255;
+						return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+					}) as [number, number, number];
+					return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+				};
+				const layer = document.querySelector("#host")?.shadowRoot?.querySelector("#in-machine")?.parentElement?.querySelector(".tb-paint") as HTMLElement;
+				const bg = lum(getComputedStyle(layer).backgroundColor);
+				const ratios = [...layer.querySelectorAll("[data-tok]")].map((t) => {
+					const fg = lum(getComputedStyle(t).color);
+					return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+				});
+				return { kinds: new Set([...layer.querySelectorAll("[data-tok]")].map((t) => t.getAttribute("data-tok"))).size, worst: Math.min(...ratios) };
+			});
+			assert.equal(worst.kinds, 4, "all four token kinds are on screen to be measured");
+			assert.ok(worst.worst >= 4.5, `the worst token measured ${worst.worst.toFixed(2)}:1`);
+			await page.close();
+		});
+	}
+});
+
 describe("live demo", () => {
 	it("keeps the stress fixture off the landing page", async () => {
 		const page = await browser.newPage();

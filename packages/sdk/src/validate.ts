@@ -70,6 +70,47 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], path: st
 	return value as T;
 }
 
+/**
+ * A textarea's grammar (#163), deliberately small: whole-word keywords, a line-comment prefix, literal
+ * operators and string delimiters, and nothing else.
+ *
+ * ⚠️ No patterns, and an unknown key is refused rather than ignored, so a `"pattern"` or `"regex"` an author
+ * reaches for is an error naming the reason instead of a key that silently does nothing. A regular expression
+ * from a tool could backtrack for seconds on a line a reader pasted and freeze the page the tool sits in;
+ * data cannot. The caps keep the tokeniser's cost a small multiple of the text's length.
+ *
+ * Operators, the comment prefix and string delimiters are ASCII punctuation, so none of them can also be part
+ * of a word, and a keyword is made of the characters a word is, so it can match one.
+ *
+ * One rule table and one loop, because this ships in the chunk every page loads: each key's cap on entries
+ * (0 for a single string) and on length. Written as a branch per key it measured 535 gzipped bytes there.
+ */
+const GRAMMAR: Record<string, [entries: number, longest: number]> = { keywords: [64, 32], operators: [32, 4], comment: [0, 4], strings: [0, 4] };
+const isWordChar = (ch: string) => ch === "_" || (ch >= "0" && ch <= "9") || ch.toLowerCase() !== ch.toUpperCase();
+const isPunct = (ch: string) => ch > " " && ch <= "~" && !isWordChar(ch);
+
+function validateGrammar(raw: unknown, path: string): void {
+	const g = obj(raw, path);
+	if (Object.keys(g).length === 0) fail(path, "sets nothing; omit `grammar` instead");
+	for (const key of Object.keys(g)) {
+		const at = `${path}.${key}`;
+		const rule = Object.hasOwn(GRAMMAR, key) ? GRAMMAR[key] : undefined;
+		if (!rule) fail(at, `is not part of a grammar, which has ${Object.keys(GRAMMAR).join(", ")} and no patterns: a regular expression from a tool could hang the page it is on`);
+		const [entries, longest] = rule;
+		const items = entries ? arr(g[key], at) : [g[key]];
+		if (entries && (items.length === 0 || items.length > entries)) fail(at, `must list 1 to ${entries} entries, got ${items.length}`);
+		const what = key === "keywords" ? "a word of letters, digits and _" : "ASCII punctuation";
+		items.forEach((item, i) => {
+			if (typeof item !== "string" || item.length === 0 || item.length > longest || ![...item].every(key === "keywords" ? isWordChar : isPunct)) {
+				fail(entries ? `${at}[${i}]` : at, `must be ${what} of 1 to ${longest} characters, got ${JSON.stringify(item)}`);
+			}
+		});
+		// Each delimiter opens and closes its own strings, so a repeated one says nothing; a comment like `//` may repeat.
+		const repeat = firstRepeat(key === "strings" ? [...(g[key] as string)] : entries ? (items as string[]) : []);
+		if (repeat) fail(entries ? `${at}[${repeat.index}]` : at, `repeats ${entries ? `${at}[${repeat.previous}]` : "a character: each must be different"}`);
+	}
+}
+
 function validateInput(raw: unknown, path: string): InputSpec {
 	const o = obj(raw, path);
 	misplaced(o, "input", `${path}.`);
@@ -85,6 +126,12 @@ function validateInput(raw: unknown, path: string): InputSpec {
 		// A one-line input has no room for structure to see, and nothing would paint it.
 		if (type !== "textarea") fail(`${path}.lang`, `only a textarea is highlighted; on a ${type} input it would be ignored`);
 		if (typeof o.lang !== "string" || !/^\S+$/.test(o.lang)) fail(`${path}.lang`, "must be a language name with no spaces, as passed to the host's highlight hook");
+	}
+	if (o.grammar !== undefined) {
+		if (type !== "textarea") fail(`${path}.grammar`, `only a textarea is painted; on a ${type} input it would be ignored`);
+		// The language is what a host's hook is asked about first, and what the grammar is the tool's answer for.
+		if (o.lang === undefined) fail(`${path}.grammar`, "needs a lang beside it: the grammar is the tool's own notation for that language");
+		validateGrammar(o.grammar, `${path}.grammar`);
 	}
 
 	switch (type) {
@@ -335,7 +382,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

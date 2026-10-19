@@ -1,0 +1,44 @@
+{
+	"sdk": 7,
+	"id": "grammar-input",
+	"name": "Door machine",
+	"blurb": "A state machine written in a notation of its own, painted by the grammar the tool ships, with no host highlighter needed.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "machine",
+			"type": "textarea",
+			"label": "Machine",
+			"description": "One state or transition per line. # starts a comment.",
+			"primary": true,
+			"lang": "doors",
+			"grammar": {
+				"keywords": ["initial", "state", "on", "final"],
+				"comment": "#",
+				"operators": ["->", ":"],
+				"strings": "\""
+			},
+			"rows": 9,
+			"maxLength": 4000,
+			"dir": "ltr",
+			"default": "# A door that locks\ninitial closed\nstate open\nstate locked \"needs a key\"\non push: closed -> open\non pull: open -> closed\non lock: closed -> locked\non unlock: locked -> closed"
+		},
+		{
+			"id": "labels",
+			"type": "textarea",
+			"label": "Button labels",
+			"description": "JSON, which the host's highlighter knows, so it paints this one rather than the grammar.",
+			"lang": "json",
+			"grammar": { "keywords": ["never"] },
+			"rows": 2,
+			"maxLength": 1000,
+			"dir": "ltr",
+			"default": "{\"push\": \"Push\", \"pull\": \"Pull\"}"
+		}
+	]
+}

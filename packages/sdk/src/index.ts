@@ -34,6 +34,7 @@ export {
 	type OutputKind,
 	type Sample,
 	type SelectOption,
+	type TextareaGrammar,
 	type Heatmap,
 	type Pie,
 	type Radar,

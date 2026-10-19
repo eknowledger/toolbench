@@ -474,3 +474,50 @@ describe("validateManifest: link targets", () => {
 		failsWith(withHref("https://example.com/a b"), "links[0].href", "no spaces");
 	});
 });
+
+// A tool's own grammar for a textarea language (#163): data only, capped, and never a pattern.
+describe("validateManifest: grammar on a textarea", () => {
+	const area = { id: "machine", type: "textarea", label: "Machine", default: "", lang: "doors" };
+	const full = { keywords: ["state", "on"], comment: "#", operators: ["->", ":"], strings: "\"'" };
+	const withGrammar = (grammar: unknown, extra: Record<string, unknown> = {}) => (m: Record<string, unknown>) => {
+		m.inputs = [{ ...area, ...extra, grammar }];
+	};
+
+	it("accepts every part of a grammar, and any one of them alone", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...area, grammar: full }] });
+		const input = m.inputs[0];
+		assert.deepEqual(input?.type === "textarea" ? input.grammar : undefined, full);
+		for (const key of Object.keys(full)) {
+			assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ ...area, grammar: { [key]: full[key as keyof typeof full] } }] }), key);
+		}
+	});
+	it("refuses a grammar off a textarea, or without the lang it is the notation for", () => {
+		failsWith((m) => { m.inputs = [{ id: "name", type: "text", label: "Name", default: "", lang: "doors", grammar: full }]; }, "inputs[0].lang", "only a textarea");
+		failsWith(withGrammar(full, { lang: undefined }), "inputs[0].grammar", "needs a lang");
+	});
+	it("refuses a pattern by name, and says why", () => {
+		failsWith(withGrammar({ ...full, pattern: "(a+)+$" }), "inputs[0].grammar.pattern", "no patterns: a regular expression");
+		failsWith(withGrammar({ regex: "\\w+" }), "inputs[0].grammar.regex", "could hang the page");
+	});
+	it("refuses an empty grammar", () => {
+		failsWith(withGrammar({}), "inputs[0].grammar", "omit `grammar`");
+	});
+	it("caps the keyword list at 64 words of 32 characters, made of word characters", () => {
+		const words = Array.from({ length: 65 }, (_, i) => `k${i}`);
+		failsWith(withGrammar({ keywords: words }), "inputs[0].grammar.keywords", "1 to 64 entries, got 65");
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ ...area, grammar: { keywords: words.slice(0, 64) } }] }));
+		failsWith(withGrammar({ keywords: ["x".repeat(33)] }), "inputs[0].grammar.keywords[0]", "1 to 32 characters");
+		failsWith(withGrammar({ keywords: ["two words"] }), "inputs[0].grammar.keywords[0]", "letters, digits and _");
+		failsWith(withGrammar({ keywords: ["on", "on"] }), "inputs[0].grammar.keywords[1]", "repeats");
+		failsWith(withGrammar({ keywords: [] }), "inputs[0].grammar.keywords", "1 to 64");
+	});
+	it("takes operators, a comment prefix and string delimiters as short ASCII punctuation only", () => {
+		failsWith(withGrammar({ operators: ["and"] }), "inputs[0].grammar.operators[0]", "ASCII punctuation");
+		failsWith(withGrammar({ operators: ["=====" ] }), "inputs[0].grammar.operators[0]", "1 to 4 characters");
+		failsWith(withGrammar({ operators: Array.from({ length: 33 }, () => "+") }), "inputs[0].grammar.operators", "1 to 32 entries");
+		failsWith(withGrammar({ comment: "rem" }), "inputs[0].grammar.comment", "ASCII punctuation");
+		failsWith(withGrammar({ comment: "# " }), "inputs[0].grammar.comment", "ASCII punctuation");
+		failsWith(withGrammar({ strings: "\"\"" }), "inputs[0].grammar.strings", "different");
+		failsWith(withGrammar({ strings: "q" }), "inputs[0].grammar.strings", "ASCII punctuation");
+	});
+});
