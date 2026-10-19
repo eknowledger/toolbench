@@ -371,6 +371,38 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	/*
+	 * Nothing on a docs page may run past its column unless it sits inside something that scrolls: on a phone
+	 * a file path in inline code ran 9px off the architecture page. Every built docs page, at two widths.
+	 */
+	for (const width of [1440, 390]) {
+		it(`no docs page overflows its column at ${width}px`, async () => {
+			const page = await browser.newPage({ viewport: { width, height: 900 } });
+			const docs = pages.filter((f) => /^docs.*\.html$/.test(f));
+			assert.ok(docs.length >= 5, `found ${docs.length} docs pages`);
+			for (const name of docs) {
+				await page.goto(`${origin}${name}`);
+				const bad = await page.evaluate((w) => {
+					const out: string[] = [];
+					if (document.documentElement.scrollWidth > w + 1) out.push(`the page is ${document.documentElement.scrollWidth}px wide`);
+					const scrolls = (el: Element | null) => {
+						for (let p = el; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowX)) return true;
+						return false;
+					};
+					for (const el of document.querySelectorAll(".prose *")) {
+						if (el.closest(".visually-hidden")) continue;
+						const cs = getComputedStyle(el);
+						if (cs.display === "inline" || el.clientWidth === 0) continue;
+						if (el.scrollWidth > el.clientWidth + 1 && !scrolls(el)) out.push(`${el.tagName.toLowerCase()} ${el.clientWidth}/${el.scrollWidth}: ${el.textContent?.slice(0, 60)}`);
+					}
+					return out.slice(0, 5);
+				}, width);
+				assert.deepEqual(bad, [], `${name} at ${width}px`);
+			}
+			await page.close();
+		});
+	}
+
 	it("'On this page' marks the section in view as the reader scrolls", async () => {
 		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 		await page.goto(`${origin}docs-authoring.html`);

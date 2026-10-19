@@ -237,7 +237,8 @@ main { display: block; }
 .prose p, .prose li { max-width: 46rem; }
 .prose li + li { margin-top: 0.35rem; }
 .prose a { color: var(--ink); text-decoration-color: var(--amber-text); }
-.prose :not(pre) > code { font-size: 0.88em; background: var(--sunk); border-radius: 4px; padding: 0.05em 0.2em; }
+/* A file path has no spaces, so on a phone `packages/runtime/src/styles.ts` ran 9px past the column. Let it break. */
+.prose :not(pre) > code { font-size: 0.88em; background: var(--sunk); border-radius: 4px; padding: 0.05em 0.2em; overflow-wrap: anywhere; }
 .prose .table-wrap { overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--line); border-radius: 10px; }
 .prose table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 .prose th, .prose td { text-align: left; vertical-align: top; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line-soft); }
