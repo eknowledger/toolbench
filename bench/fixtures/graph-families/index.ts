@@ -1,5 +1,5 @@
 /**
- * The graph families the layout is held to (#152), each one case of this fixture, so the graphs page
+ * The eleven graph families the layout is held to (#152), each one case of this fixture, so the graphs page
  * and the browser tests draw them through a real tool, a real result and the element, exactly as a reader
  * would get them.
  *
@@ -15,10 +15,9 @@ type Input = { case: string };
 
 /** Every family and variant, by case id: `flowchart`, `state-spline`, and so on. */
 export const graphs: Record<string, Graph> = {};
-// The families the graph kind's base draws on its own: layered, orthogonal, the basic shapes.
-const BASE = ["state-orthogonal", "deps-orthogonal", "calls-orthogonal", "bipartite"];
 for (const f of families) for (const v of f.variants ?? [{ label: "", graph: f.graph }]) graphs[v.label ? `${f.id}-${v.label.toLowerCase()}` : f.id] = v.graph;
-for (const id of Object.keys(graphs)) if (!BASE.includes(id)) delete graphs[id];
+const nested = families.find((f) => f.id === "nested")!.graph;
+graphs["nested-collapsed"] = { ...nested, groups: nested.groups!.map((x) => (x.id === "vpc" ? { ...x, collapsed: true } : x)) };
 graphs["dangling"] = { label: "A dangling edge", nodes: [{ id: "a" }, { id: "b" }], edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }] };
 /*
  * A colour that is not a colour: what a plain-JavaScript tool, or one passing a reader's input through, could

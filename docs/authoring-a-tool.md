@@ -857,13 +857,21 @@ everything goes. `tools/build-order` is the example.
 
 What you choose, with its default:
 
-* **`layout`**: `layered`, ranks along `direction`, for anything with a flow. Edges are `orthogonal`.
+* **`layout`**: `layered` (ranks along `direction`, for anything with a flow), `tree` and `radial` for a
+  hierarchy, `force` for a network with no direction, `manual` for nodes you place with `x` and `y`.
+* **`routing`**: `orthogonal` for layered and tree, `straight` for force and manual, `spline` for radial.
+  A straight line that would cross a node is drawn as a polyline instead.
 * **Nodes**: `label` (the id if you give none), a muted `note`, a `shape` (`rounded` by default; `rect`,
-  `pill`, `circle`, `ellipse`, `diamond` or `point`), a `tone` for status or a `color` for category, a short
-  `badge`, and a fixed `rank`.
+  `pill`, `circle`, `ellipse`, `diamond`, `hexagon`, `parallelogram`, `cylinder`, `document`, `point`, or
+  `record` with `rows`), a `tone` for status or a `color` for category, a short `badge`, a `group`, and in a
+  layered layout a `lane` or a fixed `rank`.
 * **Edges**: a `label` and where it sits (`labelAt`), `line` (`dashed`, `dotted`), `width` (`thin`,
-  `thick`), `tone` or `color`, an `arrow` or `open` marker at either end (`head`, `tail`), and a side to leave
-  or arrive on (`fromSide`, `toSide`). No two edges ever share a stretch of line.
+  `thick`), `tone` or `color`, a marker at each end (`head`, `tail`: arrows, UML ends, or crow's feet for
+  entity-relationship diagrams), a side to leave or arrive on (`fromSide`, `toSide`), and on a record the
+  row (`fromPort`, `toPort`).
+* **Groups** nest through `parent`, and a reader can close one (`collapsed: true` starts it closed);
+  **lanes** are straight bands across a layered graph. **`merge: "source"`** lets the edges leaving one node
+  share a trunk, the bus of an org chart; otherwise no two edges ever share a stretch of line.
 
 What the runtime does for you, so you do not have to:
 

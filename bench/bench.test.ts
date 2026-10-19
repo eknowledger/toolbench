@@ -4178,31 +4178,33 @@ describe("graphs (#152)", () => {
 		await page.goto(`${BASE}/graphs.html`, { waitUntil: "load" });
 		await ready(page);
 		const read = await page.evaluate(() => {
-			const deps = document.querySelector<HTMLElement>('tool-host[data-case="deps-orthogonal"]')!.shadowRoot!;
+			const root = (id: string) => document.querySelector<HTMLElement>(`tool-host[data-case="${id}"]`)!.shadowRoot!;
+			const kinds = (id: string) => [...new Set([...root(id).querySelectorAll("svg [data-kind]")].map((x) => x.getAttribute("data-kind")))].sort();
+			const flow = root("flowchart");
 			return {
-				kinds: [...new Set([...deps.querySelectorAll("svg [data-kind]")].map((x) => x.getAttribute("data-kind")))].sort(),
-				dev: deps.querySelectorAll('.tb-graph-edge[data-kind="edge"][data-role="dev-dependency"]').length,
-				devOnly: deps.querySelectorAll('.tb-graph-node[data-kind="node"][data-role="dev-only"]').length,
-				part: deps.querySelector(".tb-out-graph")?.getAttribute("data-kind"),
-				open: deps.querySelector("details")?.open,
-				rows: deps.querySelectorAll("details tbody tr").length,
-				summary: deps.querySelector("details summary")?.textContent,
-				caption: deps.querySelector("details caption")?.textContent,
-				label: deps.querySelector(".tb-out-graph")?.getAttribute("aria-label"),
-				plot: [deps.querySelector(".tb-graph-plot")?.getAttribute("role"), deps.querySelector(".tb-graph-plot")?.getAttribute("tabindex")],
-				refused: document.querySelector<HTMLElement>('tool-host[data-case="dangling"]')!.shadowRoot!.querySelector(".tb-graph-message")?.textContent,
+				nested: kinds("nested"),
+				lanes: kinds("lanes"),
+				decisions: flow.querySelectorAll('.tb-graph-node[data-kind="node"][data-role="decision"]').length,
+				part: flow.querySelector(".tb-out-graph")?.closest("[data-kind]")?.getAttribute("data-kind"),
+				open: flow.querySelector("details")?.open,
+				rows: flow.querySelectorAll("details tbody tr").length,
+				summary: flow.querySelector("details summary")?.textContent,
+				caption: flow.querySelector("details caption")?.textContent,
+				label: flow.querySelector(".tb-out-graph")?.getAttribute("aria-label"),
+				plot: [flow.querySelector(".tb-graph-plot")?.getAttribute("role"), flow.querySelector(".tb-graph-plot")?.getAttribute("tabindex")],
+				refused: root("dangling").querySelector(".tb-graph-message")?.textContent,
 			};
 		});
-		// Written by hand from the dependency family: every node has a badge, two edges and one node a role.
-		assert.deepEqual(read.kinds, ["badge", "edge", "node"]);
-		assert.equal(read.dev, 2, "the two dev-only edges carry their role");
-		assert.equal(read.devOnly, 1, "and the dev-only package its own");
+		// Written by hand from the families: nested has nodes, edges, groups and their titles, and badges.
+		assert.deepEqual(read.nested, ["badge", "edge", "group", "group-title", "node"]);
+		assert.deepEqual(read.lanes, ["edge", "lane", "node"]);
+		assert.equal(read.decisions, 3, "the flowchart's three diamonds carry their role");
 		assert.equal(read.part, "graph");
 		assert.equal(read.open, false, "the table starts closed");
-		assert.equal(read.rows, 16, "one row per edge");
+		assert.equal(read.rows, 13, "one row per edge of the flowchart");
 		assert.equal(read.summary, "Show the edges as a table");
-		assert.equal(read.caption, "Graph, Package build order: 11 nodes, 16 edges");
-		assert.equal(read.label, "Graph, Package build order: 11 nodes, 16 edges");
+		assert.equal(read.caption, "Graph, Expense approval: 11 nodes, 13 edges");
+		assert.equal(read.label, "Graph, Expense approval: 11 nodes, 13 edges");
 		assert.deepEqual(read.plot, ["group", "0"], "one tab stop for the picture");
 		assert.equal(read.refused, 'A dangling edge: an edge names "c", which is not a node, so it is listed below instead of drawn.');
 		await page.close();
@@ -4227,6 +4229,22 @@ describe("graphs (#152)", () => {
 		assert.equal(await live(), "cart, 2 in, 2 out, selected begin to checkout, 1 of 2");
 		const focus = () => state.evaluate((h) => [document.activeElement === h, h.shadowRoot!.activeElement?.className]);
 		assert.deepEqual(await focus(), [true, "tb-graph-plot"], "focus is on the picture, not the shadow root");
+		await page.close();
+	});
+
+	it("keeps focus on the picture when a group closes under it", async () => {
+		const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+		await page.goto(`${BASE}/graphs.html`, { waitUntil: "load" });
+		await ready(page);
+		const nested = page.locator('tool-host[data-case="nested"]');
+		await nested.locator(".tb-graph-plot").focus();
+		await nested.evaluate((h) => h.shadowRoot!.querySelector('[data-kind="group-title"][data-id="vpc"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+		await nested.locator('[data-kind="collapsed-group"][data-id="vpc"]').waitFor({ timeout: 15_000 });
+		assert.deepEqual(
+			await nested.evaluate((h) => [document.activeElement === h, h.shadowRoot!.activeElement?.className]),
+			[true, "tb-graph-plot"],
+			"redrawn under the focus, the picture keeps it",
+		);
 		await page.close();
 	});
 

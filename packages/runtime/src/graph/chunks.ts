@@ -60,19 +60,21 @@ export function need<T>(value: T | undefined, chunk: Chunk): T {
 }
 
 /*
- * One import per chunk, each a literal path a bundler can follow. `interact` acts on a drawing, so the
- * drawing loads it. The placements, lines, shapes, records and groups are named here before their chunks
- * exist, so a graph that needs one is refused with the chunk it needs rather than drawn wrong.
+ * One import per chunk, each a literal path a bundler can follow. `free` is shared by tree and force, so it
+ * is imported by them rather than listed here, and `interact` acts on a drawing, so the drawing loads it.
  */
-const loaders: Partial<Record<Chunk, () => Promise<unknown>>> = {
+const loaders: Record<Exclude<Chunk, "free" | "interact">, () => Promise<unknown>> = {
+	tree: () => import("./graph-tree.ts"),
+	force: () => import("./graph-force.ts"),
+	lines: () => import("./graph-lines.ts"),
+	shapes: () => import("./graph-shapes.ts"),
+	er: () => import("./graph-er.ts"),
+	groups: () => import("./graph-groups.ts"),
 	repair: () => import("./graph-repair.ts"),
 };
 
 export async function loadChunk(chunk: Chunk): Promise<void> {
-	if (chunk === "interact") return;
-	const load = loaders[chunk];
-	if (!load) throw new Error(`this runtime cannot draw a graph that needs its ${chunk} chunk`);
-	await load();
+	if (chunk !== "free" && chunk !== "interact") await loaders[chunk]();
 }
 
 /** Orthogonal for layered and tree; straight for force and manual; curved for radial. */

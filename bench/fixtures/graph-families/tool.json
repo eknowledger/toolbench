@@ -27,23 +27,87 @@
 			"label": "Graph",
 			"description": "One family each, the graphs the layout's tests hold it to.",
 			"primary": true,
-			"default": "state-orthogonal",
+			"default": "flowchart",
 			"options": [
+				{
+					"value": "flowchart",
+					"label": "Flowchart"
+				},
 				{
 					"value": "state-orthogonal",
 					"label": "State machine, orthogonal"
+				},
+				{
+					"value": "state-spline",
+					"label": "State machine, spline"
 				},
 				{
 					"value": "deps-orthogonal",
 					"label": "Dependency DAG, orthogonal"
 				},
 				{
+					"value": "deps-spline",
+					"label": "Dependency DAG, spline"
+				},
+				{
+					"value": "org",
+					"label": "Org chart"
+				},
+				{
+					"value": "network-straight",
+					"label": "Network, straight"
+				},
+				{
+					"value": "network-orthogonal",
+					"label": "Network, orthogonal"
+				},
+				{
+					"value": "er",
+					"label": "Entity-relationship"
+				},
+				{
+					"value": "mind",
+					"label": "Mind map"
+				},
+				{
+					"value": "lanes",
+					"label": "Swimlanes"
+				},
+				{
+					"value": "nested",
+					"label": "Nested groups"
+				},
+				{
 					"value": "calls-orthogonal",
 					"label": "Dense call graph, orthogonal"
 				},
 				{
+					"value": "calls-spline",
+					"label": "Dense call graph, spline"
+				},
+				{
+					"value": "directions-lr",
+					"label": "Pipeline, LR"
+				},
+				{
+					"value": "directions-rl",
+					"label": "Pipeline, RL"
+				},
+				{
+					"value": "directions-tb",
+					"label": "Pipeline, TB"
+				},
+				{
+					"value": "directions-bt",
+					"label": "Pipeline, BT"
+				},
+				{
 					"value": "bipartite",
 					"label": "Bipartite"
+				},
+				{
+					"value": "nested-collapsed",
+					"label": "Nested groups, one closed"
 				},
 				{
 					"value": "dangling",

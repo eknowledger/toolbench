@@ -497,7 +497,7 @@ tool cannot invent something nobody can render.
 | `fields` | Label and value pairs, optionally grouped under headings |
 | `table` | Columns and rows, with alignment and per-cell emphasis |
 | `series` | A chart with axes, legend and annotations. Ships the same numbers as a table for readers who cannot see it |
-| `graph` | Nodes and edges the runtime lays out: flowcharts, state machines, dependency graphs, call graphs. Every edge is also listed in a table, and the picture follows the arrow keys |
+| `graph` | Nodes and edges the runtime lays out: flowcharts, state machines, dependency graphs, org charts, networks, entity-relationship diagrams. Every edge is also listed in a table, and the picture follows the arrow keys |
 | `text` | Prose or preformatted output |
 | `code` | Source, with a language tag. The runtime renders preformatted text. A host that already has a highlighter passes `highlight?: (source, lang) => Node` to `defineToolHost` |
 | `bytes` | Raw bytes as a reader of a wire format wants them: offsets, hex, a printable gutter, and named ranges that can wrap a row |
@@ -597,7 +597,7 @@ Measured on the built bench with gzip, not estimated:
 |---|---|
 | Runtime plus the bench's page wiring, once per page that uses a tool | 26.5 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.7 KB |
-| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.4 KB |
+| Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 17.6 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
 | `regex-explainer` tool chunk | 2.8 KB |

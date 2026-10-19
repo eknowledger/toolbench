@@ -95,13 +95,18 @@ root and the series colour properties. Its insides are drawn geometry and will c
 
 ### Inside a graph
 
-A graph's picture is different: a tool names its nodes and edges, so a host can style them by name. Every one carries `data-kind`, and `data-role` when the tool gave it one. Where they are drawn is
+A graph's picture is different: a tool names its nodes, edges, groups and lanes, so a host can style them
+by name. Every one carries `data-kind`, and `data-role` when the tool gave it one. Where they are drawn is
 geometry and not covered; what they are, below, is.
 
 | `data-kind` | Element | Also carries |
 |---|---|---|
 | `node` | `.tb-graph-node`, a `<g>` with `.tb-graph-shape` (the outline), `.tb-graph-name` and `.tb-graph-note` | `data-id`, `data-shape`, `data-color` |
+| `collapsed-group` | `.tb-graph-node` standing for a closed group's members | `data-id` (the group's), `data-color` |
 | `edge` | `.tb-graph-edge`, a `<g>` with `.tb-graph-line`, `.tb-graph-mark` for each end and `.tb-graph-label` | `data-line` (`dashed`, `dotted`), `data-width` (`thin`, `thick`), `data-color`, `data-routed` |
+| `group` | `.tb-graph-group`, the rectangle | `data-id`, `data-depth`, `data-color` |
+| `group-title` | The group's title, which closes it | `data-id` |
+| `lane` | `.tb-graph-lane`, the band | `data-id` |
 | `badge` | `.tb-graph-badge` | |
 
 `data-color` is the tool's `tone` or `color`, `bad` or `series-3` say, and every coloured rule reads one

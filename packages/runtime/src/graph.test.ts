@@ -1,5 +1,5 @@
 /**
- * The graph layout's gates on the bench families the base chunk draws (#152), in Node, where the layout runs as it does in a
+ * The graph layout's gates on the eleven bench families (#152), in Node, where the layout runs as it does in a
  * page or a worker: no DOM, the same numbers.
  *
  *  - No overlaps, ever: no two edges sharing a stretch or running closer than 6px, no edge through a node, a
@@ -21,27 +21,41 @@ import type { Graph } from "@toolbench/sdk";
 import { attach } from "../test/graph/attach.ts";
 import { audit, overlaps } from "../test/graph/audit.ts";
 import { families } from "../test/graph/families.ts";
-import { needs } from "./graph/chunks.ts";
 import { effective, layout } from "../test/graph/all.ts";
 import { instrumented, paced, REFERENCE_MS } from "../test/graph/pace.ts";
 
-/**
- * Every family and variant the base chunk draws on its own: layered, orthogonal, the basic shapes. The others
- * need a placement, lines, shapes, records or groups from chunks of their own.
- */
+/** Every family and variant, plus the nested family with a group closed: 21 layouts. */
 const cases: [string, Graph][] = [];
-for (const f of families) for (const v of f.variants ?? [{ label: "", graph: f.graph }]) if (!needs(v.graph).length) cases.push([v.label ? `${f.id} (${v.label})` : f.id, v.graph]);
+for (const f of families) for (const v of f.variants ?? [{ label: "", graph: f.graph }]) cases.push([v.label ? `${f.id} (${v.label})` : f.id, v.graph]);
+const nested = families.find((f) => f.id === "nested")!.graph;
+cases.push(["nested, vpc collapsed", { ...nested, groups: nested.groups!.map((x) => (x.id === "vpc" ? { ...x, collapsed: true } : x)) }]);
 
 /** Drawn crossings per family in the reviewed mockup, F1c. A family may do better, never worse. */
 const CROSSINGS: Record<string, number> = {
+	flowchart: 1,
 	"state (orthogonal)": 0,
+	"state (spline)": 0,
 	"deps (orthogonal)": 2,
+	"deps (spline)": 2,
+	org: 0,
+	"network (straight)": 0,
+	"network (orthogonal)": 0,
+	er: 2,
+	mind: 0,
+	lanes: 2,
+	nested: 2,
 	"calls (orthogonal)": 15,
+	"calls (spline)": 15,
+	"directions (LR)": 0,
+	"directions (RL)": 0,
+	"directions (TB)": 0,
+	"directions (BT)": 0,
 	// The base alone leaves 14. The crossing search, a chunk of its own that follows this change, takes it to 4.
 	bipartite: 14,
+	"nested, vpc collapsed": 0,
 };
 
-describe("graph layout, the families the base draws", () => {
+describe("graph layout, the eleven families", () => {
 	it("covers every family the table names, and the table names every family", () => {
 		assert.deepEqual(cases.map(([name]) => name).sort(), Object.keys(CROSSINGS).sort());
 	});

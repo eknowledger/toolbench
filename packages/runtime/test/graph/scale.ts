@@ -9,9 +9,14 @@ import { describe, it } from "node:test";
 import type { Graph } from "@toolbench/sdk";
 import { audit, overlaps } from "./audit.ts";
 import { effective, layout } from "./all.ts";
-import { dag } from "./synth.ts";
+import { dag, net } from "./synth.ts";
 
-export const KINDS: [string, (n: number) => Graph][] = [["layered, orthogonal", (n) => dag(n)]];
+export const KINDS: [string, (n: number) => Graph][] = [
+	["layered, orthogonal", (n) => dag(n)],
+	["layered, spline", (n) => dag(n, "spline")],
+	["force, straight", (n) => net(n)],
+	["force, orthogonal", (n) => net(n, "orthogonal")],
+];
 
 export function noOverlapsAt(sizes: number[]): void {
 	describe("graph layout at scale", () => {
