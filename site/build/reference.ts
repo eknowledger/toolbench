@@ -748,3 +748,73 @@ export async function hostReference(): Promise<string> {
 	];
 	return out.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Theme tokens
+// ---------------------------------------------------------------------------
+
+/**
+ * What each token is for, read from the token table in docs/architecture.md. A row may name several
+ * tokens, "`--tb-bad`, `--tb-warn`, `--tb-good`" or "`--tb-s1` to `--tb-s8`", and each gets its row.
+ */
+function tokenUses(): Map<string, string> {
+	const uses = new Map<string, string>();
+	for (const m of read("docs/architecture.md").matchAll(/^\| (`--tb-[^|]+) \| [^|]+ \| ([^|]+) \|$/gm)) {
+		const names = [...(m[1] ?? "").matchAll(/`(--tb-[\w-]+)`/g)].map((n) => n[1] ?? "");
+		const range = /`--tb-([a-z]+)(\d+)` to `--tb-[a-z]+(\d+)`/.exec(m[1] ?? "");
+		if (range) for (let i = Number(range[2]); i <= Number(range[3]); i++) names.push(`--tb-${range[1]}${i}`);
+		for (const n of names) uses.set(n, (m[2] ?? "").trim());
+	}
+	return uses;
+}
+
+export async function tokensReference(): Promise<string> {
+	const css = read("packages/runtime/src/styles.ts");
+	const host = css.slice(css.indexOf(":host {"), css.indexOf("}", css.indexOf(":host {")));
+	// Each token's last declaration wins, which is the light-dark() one where there are two.
+	const tokens = new Map<string, string>();
+	for (const m of host.matchAll(/(--tb-[\w-]+):\s*([^;]+);/g)) tokens.set(m[1] ?? "", (m[2] ?? "").trim().replace(/\s+/g, " "));
+	const uses = tokenUses();
+	const missing = [...tokens.keys()].filter((t) => !uses.has(t));
+	if (missing.length) throw new Error(`reference: docs/architecture.md's token table has no row for ${missing.join(", ")}`);
+	const values = (v: string) => {
+		const ld = /^light-dark\((.+), (.+)\)$/.exec(v);
+		if (ld) return [`\`${ld[1]}\``, `\`${ld[2]}\``];
+		const ref = /^var\((--tb-[\w-]+)\)$/.exec(v);
+		return ref ? [`\`${v}\``, `follows \`${ref[1]}\``] : [`\`${v}\``, "same as light"];
+	};
+	const parts = [...new Set([...read("packages/runtime/src/graph/draw.ts").matchAll(/part: "([\w-]+)"/g), ...read("packages/runtime/src/element.ts").matchAll(/part: "([\w-]+)"/g)].map((m) => m[1] ?? ""))];
+	return [
+		"A tool draws inside a shadow root, so a page's CSS does not reach it. It reads these custom properties instead, which do cross the boundary: set any of them on `tool-host`, or on anything around it.",
+		"",
+		"## Tokens",
+		"",
+		"| Token | Light | Dark | Used for |",
+		"|---|---|---|---|",
+		...[...tokens].map(([t, v]) => `| \`${t}\` | ${values(v).join(" | ")} | ${cell(uses.get(t) ?? "")} |`),
+		"",
+		"The defaults follow the page's colour scheme through `light-dark()`.",
+		"",
+		"### Example",
+		"",
+		"```css",
+		read("site/src/gallery.css").slice(read("site/src/gallery.css").indexOf("/* #region theme */") + "/* #region theme */".length, read("site/src/gallery.css").indexOf("/* #endregion */")).trim(),
+		"```",
+		"",
+		"The gallery's second theme, from `site/src/gallery.css`.",
+		"",
+		"<!-- site: gallery theming -->",
+		"",
+		"## Parts",
+		"",
+		"Elements a page can style from outside with `::part()`.",
+		"",
+		"| Part | Element |",
+		"|---|---|",
+		...parts.map((p) => `| \`${p}\` | ${p === "wide-toggle" ? "The expand and fit button on a scaled graph" : ""} |`),
+		"",
+		"## Classes and attributes",
+		"",
+		"For everything inside the shadow root, a host passes its own stylesheet to `defineToolHost({ styles })`. The class names and attributes it may rely on are listed on the [Styling](./docs-styling.html#what-you-can-select) page.",
+	].join("\n");
+}

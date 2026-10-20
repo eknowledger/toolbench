@@ -24,7 +24,7 @@ import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
 import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
-import { hostReference, inputsReference, manifestReference, resultsReference } from "./reference.ts";
+import { hostReference, inputsReference, manifestReference, resultsReference, tokensReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -103,6 +103,14 @@ export const DOCS: Doc[] = [
 		summary: "defineToolHost, the element's attributes, properties and methods, and tool sources.",
 		group: "Reference",
 		generate: hostReference,
+	},
+	{
+		file: "packages/runtime/src/styles.ts",
+		page: "docs-ref-tokens.html",
+		title: "Theme tokens",
+		summary: "The custom properties a page sets to theme every tool, and the parts it can style.",
+		group: "Reference",
+		generate: tokensReference,
 	},
 	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it.", group: "Project" },
 	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report.", group: "Project" },
