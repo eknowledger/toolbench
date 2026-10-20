@@ -44,6 +44,56 @@ import { applyPartialValues, coerce } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
 
+/**
+ * The attributes `<tool-host>` reads, as a type: what a page writes in its markup, and what the docs'
+ * Host API reference lists. Types only; nothing here ships in the bundle.
+ */
+export interface ToolHostAttributes {
+	/** The id of the tool to show, as its manifest declares. */
+	tool: string;
+	/**
+	 * `card`: name, blurb, the `primary` inputs and the first result part, fetching the tool's code only when
+	 * the reader opens it. `page`: every input, the full result and the tool's links. `embed`: `page` without
+	 * the title, for the middle of an article. `page` and `embed` fetch when they scroll near the viewport.
+	 * @default "page"
+	 */
+	mode?: Mode;
+	/**
+	 * How many parts of a grouped result to show. A card always caps; on `page` and `embed` there is no cap
+	 * unless this is set.
+	 * @default 1
+	 */
+	parts?: number;
+	/**
+	 * What stands for the parts `parts` hid: `link`, a line of text pointing at the full tool, or `expand`,
+	 * a button that shows them in place without running the tool again.
+	 * @default "link"
+	 */
+	more?: "link" | "expand";
+	/**
+	 * `answer-first` draws the result above the form, for a tool that opens a page about something else.
+	 * @default "default"
+	 */
+	layout?: "default" | "answer-first";
+	/**
+	 * `none` draws the result and nothing else: no form, no Run, no status line. The page drives the tool
+	 * through `values` and `run()`.
+	 * @default "default"
+	 */
+	controls?: "default" | "none";
+	/**
+	 * A graph wider than its plot: `fit` scales it down to the width, `scroll` draws it full size in a plot
+	 * that scrolls. Overrides `defineToolHost({ wide })`.
+	 * @default "fit"
+	 */
+	wide?: "fit" | "scroll";
+	/**
+	 * `false` hides the expand and fit button on a scaled graph. Overrides `defineToolHost({ wideToggle })`.
+	 * @default "true"
+	 */
+	"wide-toggle"?: "true" | "false";
+}
+
 /** How long a run must last before its progress bar is worth showing. */
 const SLOW_MS = 400;
 
@@ -52,7 +102,7 @@ export interface ToolHostConfig {
 	source: ToolSource;
 	/** Required only for tools that declare `thread: "worker"`. See the README. */
 	workerFactory?: () => Worker;
-	/** Given a tool id, the URL of its full page — used by card and embed modes to link out. */
+	/** Given a tool id, the URL of its full page, which card and embed modes link out to. */
 	pageUrl?: (id: string) => string;
 	/** How far ahead of the viewport `page` and `embed` modes start loading. Default "200% 0px". */
 	rootMargin?: string;

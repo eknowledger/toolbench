@@ -11,12 +11,14 @@
  */
 
 // ---------------------------------------------------------------------------
-// Output — what a tool returns
+// Output: what a tool returns
 // ---------------------------------------------------------------------------
 
 /** A label and a value. The plainest thing a tool can say. */
 export interface Field {
+	/** What the value is: the term the value is listed under. */
 	label: string;
+	/** The value, shown as the tool formatted it. */
 	value: string;
 	/** A qualifier shown beside the value: a unit, a caveat, "(dynamic)". */
 	note?: string;
@@ -42,7 +44,13 @@ export type Tone = "normal" | "warn" | "bad" | "good";
 export type TextTone = Tone | "muted";
 
 export interface Column {
+	/** The header text, also set on each cell as `data-label` so host CSS can name a value on a narrow screen. */
 	label: string;
+	/**
+	 * Alignment of the header and the column's cells. Without it, a cell given as a number aligns to the end
+	 * and every other cell to the start.
+	 * @default "start"
+	 */
 	align?: "start" | "end";
 	/** Monospace, for anything the reader will compare digit by digit. */
 	mono?: boolean;
@@ -52,9 +60,14 @@ export type Cell = string | number | { text: string; mono?: boolean; tone?: Text
 
 /** One line, bar or area on a chart. */
 export interface Series {
+	/** The series' name in the legend, the readout and the data table. */
 	label: string;
-	/** One value per x. A `null` is a gap, not a zero — the distinction matters on a chart. */
+	/** One value per x. A `null` is a gap, not a zero, and the distinction matters on a chart. */
 	points: (number | null)[];
+	/**
+	 * Shown after each value in the readout, and after `label` in the legend and the data table. The first
+	 * right-axis series' unit also goes beside `yLabelRight`.
+	 */
 	unit?: string;
 	/**
 	 * `points` draws a marker at each value and no line between them: for an x of separate items (frames,
@@ -101,7 +114,15 @@ export interface Series {
 	 * and the readout: "Calls".
 	 */
 	sizes?: (number | null)[];
+	/**
+	 * The name of `sizes` in the key, the readout and the data table.
+	 * @default "Size"
+	 */
 	sizeLabel?: string;
+	/**
+	 * `right` draws the series against a second y scale on the right, titled by the chart's `yLabelRight`.
+	 * @default "left"
+	 */
 	axis?: "left" | "right";
 	/**
 	 * What the readout says for this series at each point, replacing the formatted value there: "250 ms,
@@ -126,7 +147,9 @@ export interface Readout {
 }
 
 export interface Chart {
+	/** The x axis title, with `xUnit` in parentheses. Also heads the data table's x column. */
 	xLabel: string;
+	/** The left y axis title, with `yUnit` in parentheses. */
 	yLabel: string;
 	/**
 	 * One position per value. Numbers for a quantity; text for named things, "Mesh", "SFU", "p99", which
@@ -134,8 +157,11 @@ export interface Chart {
 	 * text, all are read as text.
 	 */
 	x: (number | string)[];
+	/** Every line, bar or area, drawn in order, each in the next of six series colours. A legend is shown when there is more than one. */
 	series: Series[];
+	/** Shown after `xLabel` in parentheses, on the axis and in the data table. */
 	xUnit?: string;
+	/** Shown after `yLabel` in parentheses. */
 	yUnit?: string;
 	/** A vertical marker with a name: "the knee", "capacity", "p99". */
 	annotations?: { x: number | string; label: string }[];
@@ -147,6 +173,7 @@ export interface Chart {
 	thresholds?: { y: number; label: string; axis?: "left" | "right"; tone?: Tone }[];
 	/** Second axis label, required if any series sets `axis: "right"`. */
 	yLabelRight?: string;
+	/** How the chart answers a pointer or keyboard focus. Default: a crosshair and every series at the nearest x. */
 	readout?: Readout;
 	/** A name a `table` in the same result can link to with `link.chart` (#124). Unique within a result. */
 	id?: string;
@@ -169,6 +196,10 @@ export interface Chart {
 	 * a bar's length means nothing there.
 	 */
 	yScale?: "linear" | "log";
+	/**
+	 * `log` draws the x axis in powers of ten, as `yScale` does for y. Ignored when `x` is text.
+	 * @default "linear"
+	 */
 	xScale?: "linear" | "log";
 }
 
@@ -180,13 +211,19 @@ export interface Chart {
  * table, and a key shows the scale.
  */
 export interface Heatmap {
+	/** The title under the columns. */
 	xLabel: string;
+	/** The title above the row labels. */
 	yLabel: string;
 	/** What a cell's value is, for the key and the readout: "p95 latency". */
 	label: string;
+	/** Shown after each value in the readout, and after `label` in the key and the data table's caption. */
 	unit?: string;
+	/** The column labels, left to right. */
 	x: (number | string)[];
+	/** The row labels, top to bottom. */
 	y: (number | string)[];
+	/** `values[row][column]`. A `null` or missing cell has no value and is drawn hatched. */
 	values: (number | null)[][];
 	/** `sequential` (default) is one hue, light to dark: how much. `diverging` is two hues either side of `midpoint`. */
 	scale?: "sequential" | "diverging";
@@ -202,6 +239,7 @@ export interface Heatmap {
 export interface Pie {
 	/** What the whole is: "Traffic by codec". */
 	label: string;
+	/** Shown after each value in the readout and in the data table's Value column. */
 	unit?: string;
 	/**
 	 * `explode` pulls a slice out a little to point at it (#126). A slice pulled out looks bigger than it is,
@@ -220,25 +258,42 @@ export interface Pie {
  * are drawn, since more overlap past reading.
  */
 export interface Radar {
+	/** What the chart is: its accessible name and the data table's caption. */
 	label: string;
+	/** Shown after each value in the readout, and after each series' name in the legend and the data table. */
 	unit?: string;
+	/**
+	 * One spoke per axis, clockwise from 12 o'clock. An axis `max` gives that spoke its own scale; otherwise every
+	 * spoke shares one, rounded up from the largest value to 1, 2 or 5 times a power of ten. Values are clamped
+	 * between zero and the scale's top.
+	 */
 	axes: { label: string; max?: number }[];
 	/** One value per axis; a `null` breaks the shape at that spoke rather than drawing it at the centre. */
 	series: { label: string; values: (number | null)[] }[];
 }
 
-/** One node of a treemap: a leaf has a `value`, a branch has `children` (and a value only to override their sum). */
+/** One node of a treemap: a leaf has a `value`, a branch has `children`. */
 export interface TreemapNode {
+	/** Drawn on the rectangle where it fits, cut at 18 characters, and always in the readout and the data table. */
 	label: string;
+	/**
+	 * A leaf's size. A negative counts as zero, and a node of zero is not drawn. On a branch the children's sum
+	 * is drawn instead, and the data table's caption says the two differed.
+	 */
 	value?: number;
+	/** Drawn inside this node's rectangle, largest first. Past the third level they fold into their parent. */
 	children?: TreemapNode[];
+	/** Replaces the colour this node's top-level group gives it. `normal` keeps the group's colour. */
 	tone?: Tone;
 }
 
 /** A hierarchy of sizes (#129): areas proportional to values, at most three levels drawn. */
 export interface Treemap {
+	/** What the whole is: its accessible name and the data table's caption. */
 	label: string;
+	/** Shown after each value on a rectangle, in the readout and in the data table. */
 	unit?: string;
+	/** The whole. Not drawn itself: its children are the top level, each in its own series colour. */
 	root: TreemapNode;
 }
 
@@ -248,8 +303,14 @@ export interface Treemap {
  * sets, or an overlap larger than a set, draws a message instead.
  */
 export interface Venn {
+	/** What the diagram is: its accessible name and the data table's caption. */
 	label: string;
+	/** Shown after each count in the readout and in the data table's Count column. */
 	unit?: string;
+	/**
+	 * Two or three sets, each `size` above zero and counting every member, including those in an overlap.
+	 * Any other number of sets draws a message instead.
+	 */
 	sets: { label: string; size: number }[];
 	/** `sets` are indices into `sets`: [0, 1], or [0, 1, 2] for the middle of three. */
 	overlaps: { sets: number[]; size: number }[];
@@ -300,6 +361,7 @@ export type GraphMarker =
 export type GraphRow = {
 	/** Unique within the node; what `fromPort` and `toPort` name. */
 	id: string;
+	/** The row's text, after `tag` and before `detail`. */
 	label: string;
 	/** Right-aligned and muted: a column type, a value. */
 	detail?: string;
@@ -332,20 +394,26 @@ export type GraphNode = {
 	rank?: number;
 	/** `manual` layout: the centre. `force` layout: pins the node here. */
 	x?: number;
+	/** `manual` layout: the centre's y, in the same units as `x`; a missing one counts as 0. `force` layout: pins the node only with `x` set too. */
 	y?: number;
 	/** Rendered as `data-role`, for host stylesheets. The runtime gives it no meaning. */
 	role?: string;
 };
 
 export type GraphEdge = {
+	/** The id of the node the edge leaves. Must name a node, or the graph is listed instead of drawn. */
 	from: string;
+	/** The id of the node the edge arrives at. Must name a node; the same as `from` draws a loop. */
 	to: string;
-	/** A row id on a `record` node: the edge attaches at that row. */
+	/** A row id on the `from` node, a `record`: the edge attaches at that row. Must name one of its rows. */
 	fromPort?: string;
+	/** A row id on the `to` node, a `record`: the edge attaches at that row. Must name one of its rows. */
 	toPort?: string;
-	/** The side of the node the edge must use. Default: the side facing the other end. */
+	/** The side of the `from` node the edge must use. Default: the side facing the other end. */
 	fromSide?: GraphSide;
+	/** The side of the `to` node the edge must use. Default: the side facing the other end. */
 	toSide?: GraphSide;
+	/** Drawn on the line at `labelAt`, and shown in the edge table and the keyboard readout. */
 	label?: string;
 	/** Where along the edge the label sits. Default `middle`. */
 	labelAt?: "start" | "middle" | "end";
@@ -353,28 +421,42 @@ export type GraphEdge = {
 	line?: "solid" | "dashed" | "dotted";
 	/** Default `normal`. */
 	width?: "thin" | "normal" | "thick";
+	/** Status: the line in the tone's colour. Wins over `color`, except `normal`. */
 	tone?: Tone;
+	/** Category: a series colour or a named token for the line. An unknown value draws the default colour. */
 	color?: GraphColor;
 	/** At `to`. Default `arrow` when the graph is directed, else `none`. */
 	head?: GraphMarker;
 	/** At `from`. Default `none`. */
 	tail?: GraphMarker;
+	/** Rendered as `data-role`, for host stylesheets. The runtime gives it no meaning. */
 	role?: string;
 };
 
 export type GraphGroup = {
+	/** Unique among groups and nodes, because a collapsed group is drawn as a node with this id. What a node's `group` names. */
 	id: string;
+	/** The title at the group's top-left corner, which collapses the group when pressed. Also the collapsed node's label. */
 	label: string;
 	/** The enclosing group. Groups nest to any depth; a cycle of parents is refused. */
 	parent?: string;
 	/** Drawn as one node standing for its members until a reader opens it. Default false. */
 	collapsed?: boolean;
+	/** The box's colour, and the colour of the node standing for the group when collapsed. Default: the plain border. */
 	color?: GraphColor;
+	/** Rendered as `data-role` on the box and on the collapsed node, for host stylesheets. The runtime gives it no meaning. */
 	role?: string;
 };
 
 /** A swimlane: a straight band across a layered layout. A group may not span two. */
-export type GraphLane = { id: string; label: string; role?: string };
+export type GraphLane = {
+	/** Unique among lanes. What a node's `lane` names. */
+	id: string;
+	/** The title at the start of the band. */
+	label: string;
+	/** Rendered as `data-role` on the band, for host stylesheets. The runtime gives it no meaning. */
+	role?: string;
+};
 
 /**
  * Nodes and edges, laid out and drawn by the runtime (#152, contract version 7): flowcharts, state machines,
@@ -413,9 +495,13 @@ export type Graph = {
 	seed?: number;
 	/** Default `normal`. */
 	spacing?: "compact" | "normal" | "loose";
+	/** Every node, ids unique. At least one, or the graph is listed instead of drawn. */
 	nodes: GraphNode[];
+	/** Every edge, each end naming a node. All are also listed in a table under the picture. */
 	edges: GraphEdge[];
+	/** Boxes drawn around their members in any layout. A node joins one with `group`. */
 	groups?: GraphGroup[];
+	/** Swimlanes, in order. Layered layouts only. A node joins one with `lane`. */
 	lanes?: GraphLane[];
 	/** A path to emphasise, as node ids in order. */
 	highlight?: string[];
@@ -424,6 +510,7 @@ export type Graph = {
 	 * No default: without one, any size is drawn.
 	 */
 	limits?: { nodes?: number; edges?: number };
+	/** What a reader can do with the picture. Every part is on by default. */
 	interaction?: {
 		/** Whether a reader can collapse and open groups. Default true. */
 		collapse?: boolean;
@@ -444,8 +531,11 @@ export type Graph = {
 export interface ByteRange {
 	/** Offset from the start of `bytes`, not from `offset`. */
 	at: number;
+	/** How many bytes, from `at`. Bytes past the end of `bytes` are not marked. */
 	len: number;
+	/** Named in the legend with its length and offset, and the hover title of each of its bytes. */
 	label: string;
+	/** Default: the next of six series colours, counted over ranges without a tone, so neighbouring ranges differ. */
 	tone?: Tone;
 }
 
@@ -453,7 +543,7 @@ export interface ByteRange {
  * What a tool returns. A closed union: a runtime can render every member, and a tool cannot invent
  * a shape nobody can draw.
  *
- * ⚠️ `group` is what lets one tool answer in more than one shape — a decode that produces both a
+ * ⚠️ `group` is what lets one tool answer in more than one shape. A decode that produces both a
  * field list and a table is the common case, not the exception.
  *
  * Every part may also carry the names in `PartNames`.
@@ -481,13 +571,35 @@ export interface PartNames {
 }
 
 type OutputBody =
-	| { kind: "fields"; fields: Field[] }
-	| { kind: "text"; text: string; mono?: boolean }
-	| { kind: "code"; lang: string; source: string }
+	| {
+			kind: "fields";
+			/** Shown in order as a list of labels and values, grouped by `group`. A card shows the first `cardFields`. */
+			fields: Field[];
+	  }
+	| {
+			kind: "text";
+			/** Shown as a paragraph, or preformatted when `mono` is set. */
+			text: string;
+			/**
+			 * Monospace and preformatted, keeping spaces and line breaks.
+			 * @default false
+			 */
+			mono?: boolean;
+	  }
+	| {
+			kind: "code";
+			/** Passed to the host's `highlight(source, lang)` hook and set as `data-lang`. A single token also becomes the `language-<lang>` class. */
+			lang: string;
+			/** Shown as is, and what Copy copies even when a highlighter adds line numbers. */
+			source: string;
+	  }
 	| {
 			kind: "table";
+			/** The header row. Each row's cells line up with these in order. */
 			columns: Column[];
+			/** One array of cells per row, in column order. */
 			rows: Cell[][];
+			/** Shown above the table, except on a card. */
 			caption?: string;
 			/**
 			 * Link these rows to a chart in the same result (#124): `keys[i]` is the chart x that row i
@@ -496,20 +608,52 @@ type OutputBody =
 			 */
 			link?: { chart: string; keys: (number | string | null)[] };
 	  }
-	| { kind: "series"; chart: Chart }
+	| {
+			kind: "series";
+			/** The chart: its axes, its series and how it answers a pointer. */
+			chart: Chart;
+	  }
 	/** A value over two dimensions, one coloured cell each (#121, contract version 4). */
-	| { kind: "heatmap"; heatmap: Heatmap }
+	| {
+			kind: "heatmap";
+			/** The grid of values and its row and column labels. */
+			heatmap: Heatmap;
+	  }
 	/** Parts of a whole, every slice labelled with its name and share (#123, contract version 4). */
-	| { kind: "pie"; pie: Pie }
+	| {
+			kind: "pie";
+			/** The whole and its slices. */
+			pie: Pie;
+	  }
 	/** A profile across several measures, one spoke each (#128, contract version 4). */
-	| { kind: "radar"; radar: Radar }
+	| {
+			kind: "radar";
+			/** The axes and the series drawn across them. */
+			radar: Radar;
+	  }
 	/** A hierarchy of sizes as nested rectangles (#129, contract version 4). */
-	| { kind: "treemap"; treemap: Treemap }
+	| {
+			kind: "treemap";
+			/** The hierarchy, from its root. */
+			treemap: Treemap;
+	  }
 	/** The overlap of two or three sets (#130, contract version 4). */
-	| { kind: "venn"; venn: Venn }
+	| {
+			kind: "venn";
+			/** The sets and their overlaps. */
+			venn: Venn;
+	  }
 	/** Nodes and edges, laid out by the runtime, with every edge also in a table (#152, contract version 7). */
-	| { kind: "graph"; graph: Graph }
-	| { kind: "group"; parts: Output[] }
+	| {
+			kind: "graph";
+			/** The nodes, edges, groups and lanes, and how to lay them out. */
+			graph: Graph;
+	  }
+	| {
+			kind: "group";
+			/** Rendered in order, each by its own kind, and may nest. A host's `cardParts` caps how many are shown. */
+			parts: Output[];
+	  }
 	/**
 	 * Raw bytes, as a reader of a wire format wants to see them: offsets down the side, hex in the
 	 * middle, printable characters in a gutter, and named ranges over the top.
@@ -521,15 +665,38 @@ type OutputBody =
 	 * `offset` is what the first byte should be *labelled*, for a tool showing a window into
 	 * something larger. It does not shift `ByteRange.at`, which is always relative to `bytes`.
 	 */
-	| { kind: "bytes"; bytes: number[]; offset?: number; highlight?: ByteRange[]; caption?: string }
+	| {
+			kind: "bytes";
+			/** One number per byte, 0 to 255, drawn sixteen to a row. A card shows the first four rows. */
+			bytes: number[];
+			/**
+			 * What the first byte is labelled in the offset column and the legend.
+			 * @default 0
+			 */
+			offset?: number;
+			/** Named ranges, each coloured over its bytes and listed in a legend. Where two overlap, the later one wins. */
+			highlight?: ByteRange[];
+			/** Shown above the grid, on a card too. */
+			caption?: string;
+	  }
 	/**
 	 * The INPUT was wrong, and the tool worked correctly by saying so. `input` names the control at
-	 * fault so a generated form can mark it invalid and point a screen reader at the message —
-	 * without it, an error can only ever float unattached.
+	 * fault so a generated form can mark it invalid and point a screen reader at the message.
+	 * Without it, an error can only ever float unattached.
 	 *
 	 * A tool that is itself broken should THROW instead. The two render differently on purpose.
 	 */
-	| { kind: "error"; message: string; input?: string; at?: number; len?: number };
+	| {
+			kind: "error";
+			/** Shown in full, never truncated, and announced. Also read as the description of the input named by `input`. */
+			message: string;
+			/** The id of the input at fault: that control is marked `aria-invalid` and points its description at the message. */
+			input?: string;
+			/** Where in that input's value the problem starts, shown after the message. The tools here give a character offset. */
+			at?: number;
+			/** How far the problem runs from `at`, shown as a range after the message. */
+			len?: number;
+	  };
 
 export type OutputKind = Output["kind"];
 
@@ -552,13 +719,15 @@ export const OUTPUT_KINDS: readonly OutputKind[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Input — what a tool asks for
+// Input: what a tool asks for
 // ---------------------------------------------------------------------------
 
 interface InputBase {
+	/** The key this input's value has in `run(values)`. Unique within the tool. */
 	id: string;
+	/** The visible label, which is also the control's accessible name. */
 	label: string;
-	/** The hint a form shows and a screen reader reads. Not a placeholder — those vanish on focus. */
+	/** The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. */
 	description?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
@@ -572,17 +741,29 @@ interface InputBase {
 	primary?: boolean;
 	/**
 	 * Force text direction. Bytes, code and identifiers are left-to-right even inside right-to-left
-	 * prose, and a runtime cannot know which is which — the tool says.
+	 * prose, and a runtime cannot know which is which, so the tool says.
 	 */
 	dir?: "ltr" | "auto";
 }
 
 export type InputSpec =
-	| (InputBase & { type: "text"; default: string; maxLength?: number })
+	| (InputBase & {
+			type: "text";
+			/** The value the form opens with. */
+			default: string;
+			/** The most characters the control accepts. */
+			maxLength?: number;
+	  })
 	| (InputBase & {
 			type: "textarea";
+			/** The value the form opens with. */
 			default: string;
+			/**
+			 * Visible lines of text.
+			 * @default 3
+			 */
 			rows?: number;
+			/** The most characters the control accepts. */
 			maxLength?: number;
 			/**
 			 * The language of what the reader types, passed to the host's `highlight(source, lang)` hook, the
@@ -599,9 +780,13 @@ export type InputSpec =
 	  })
 	| (InputBase & {
 			type: "number";
+			/** The value the form opens with, within `min..max`. */
 			default: number;
+			/** The lowest value. Required: the only guard against a runaway value, and `run` receives it clamped. */
 			min: number;
+			/** The highest value, above `min`. */
 			max: number;
+			/** The increment for the arrow keys and the slider. Any value when omitted. */
 			step?: number;
 			/**
 			 * `slider` asks for a range control beside the number box, for a tool read by sweeping a value
@@ -610,8 +795,18 @@ export type InputSpec =
 			 */
 			control?: "slider";
 	  })
-	| (InputBase & { type: "select"; default: string; options: SelectOption[] })
-	| (InputBase & { type: "toggle"; default: boolean });
+	| (InputBase & {
+			type: "select";
+			/** The option value the form opens with. */
+			default: string;
+			/** Two or more choices, with unique values. */
+			options: SelectOption[];
+	  })
+	| (InputBase & {
+			type: "toggle";
+			/** Whether the form opens with it on. */
+			default: boolean;
+	  });
 
 /**
  * A textarea language a tool defines itself (#163), tokenised by the runtime and painted behind the real
@@ -636,7 +831,9 @@ export interface TextareaGrammar {
 
 /** One choice in a `select`. */
 export interface SelectOption {
+	/** What `run` receives when this option is chosen. Unique within the select. */
 	value: string;
+	/** What the reader sees. */
 	label: string;
 	/**
 	 * A preset: choosing this option writes these values into the other inputs it names, which the reader
@@ -658,12 +855,12 @@ export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", 
 export type InputValues = Record<string, string | number | boolean>;
 
 // ---------------------------------------------------------------------------
-// Capabilities — what a tool is allowed to do
+// Capabilities: what a tool is allowed to do
 // ---------------------------------------------------------------------------
 
 /**
  * `pure` is the only capability in contract version 1: a function of its inputs, no I/O, no clock,
- * no randomness that is not seeded. That is not a limitation to apologise for — it is what makes a
+ * no randomness that is not seeded. That is not a limitation to apologise for: it is what makes a
  * tool testable by fixture, runnable at build time, and safe to put on a landing page.
  *
  * Reading files and calling networks arrive in later versions, each with its own capability, so a
@@ -703,21 +900,25 @@ export interface Manifest {
 	sdk: number;
 	/** Stable, lowercase, hyphenated. Also the directory name and the URL segment. */
 	id: string;
+	/** The tool's title, shown as its heading. */
 	name: string;
 	/** One sentence. Shown on cards and used as a page description. */
 	blurb: string;
 	/** The tool's own version, independent of `sdk`. */
 	version: string;
+	/** What the tool is allowed to do. At least one; `pure` is the only capability today. */
 	capabilities: Capability[];
+	/** The form, one control per entry, in order. At least one. */
 	inputs: InputSpec[];
 	/** Every kind `run` can return, so a host can refuse a tool it cannot draw. */
 	kinds: OutputKind[];
+	/** How the runtime loads and runs the tool. */
 	runtime: {
 		/** Entry file, relative to the tool's directory. */
 		entry: string;
 		/**
 		 * `main` is the default and costs nothing. `worker` is for a tool whose running time depends
-		 * on its input — it is the only mode where a timeout can actually stop anything.
+		 * on its input. It is the only mode where a timeout can actually stop anything.
 		 */
 		thread?: "main" | "worker";
 	};
@@ -738,19 +939,25 @@ export interface Manifest {
 	 * Off by default, and that default is deliberate. A tool that runs on every keystroke does work
 	 * nobody asked for, makes the Run button look broken (the answer is already there), and takes the
 	 * decision away from the reader. Opt in only for a tool that is genuinely instant and reads better
-	 * live — a unit converter, say. Anything with a worker or a heavy loop should leave it alone.
+	 * live, a unit converter say. Anything with a worker or a heavy loop should leave it alone.
 	 */
 	autoRun?: boolean;
 	/** Worker mode only. A tool that declares this on the main thread is rejected: nothing there can be stopped. */
 	timeoutMs?: number;
 	/** Markdown file, relative to the tool's directory, rendered as the tool's help. */
 	help?: string;
+	/** Free-form labels a host can filter or group tools by. */
 	tags?: string[];
 	/**
 	 * Anything the tool wants to point at: a spec it implements, a post explaining it, a reference
-	 * decoder. Deliberately generic — a host site's own content relations are the host's business.
+	 * decoder. Deliberately generic: a host site's own content relations are the host's business.
 	 */
-	links?: { label: string; href: string }[];
+	links?: {
+		/** The link text. */
+		label: string;
+		/** An `http`, `https` or `mailto` URL, or a relative path. Anything else is refused. */
+		href: string;
+	}[];
 	/**
 	 * Example inputs, rendered as a row of buttons under the form. Added in contract version 3.
 	 *
@@ -766,7 +973,7 @@ export interface Manifest {
 export interface Ctx {
 	/**
 	 * Aborted when the reader cancels, when the input changes mid-run, or when a worker-mode timeout
-	 * fires. A loop whose length depends on input MUST check it — on the main thread it is the only
+	 * fires. A loop whose length depends on input MUST check it: on the main thread it is the only
 	 * way to stop.
 	 */
 	signal: AbortSignal;
@@ -810,8 +1017,11 @@ export interface LoadedTool<I extends InputValues = InputValues> {
 // ---------------------------------------------------------------------------
 
 export interface Case {
+	/** What the case checks, shown when it fails. */
 	name: string;
+	/** The values `run` receives, keyed by input id, passed exactly as given. */
 	input: InputValues;
+	/** The result `run` must return. */
 	expect: Output;
 	/**
 	 * Exact deep equality by default, because that is what catches a duplicated field, a reordered
@@ -821,6 +1031,8 @@ export interface Case {
 	 * two things in return: a `why`, and a `fieldCount`, so a dropped field is still a failure.
 	 */
 	match?: "exact" | "subset";
+	/** Why this case needs `subset`. Required with it. */
 	why?: string;
+	/** How many fields the result has. Required with `subset`, so a dropped field still fails. */
 	fieldCount?: number;
 }

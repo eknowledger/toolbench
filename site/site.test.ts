@@ -107,6 +107,62 @@ describe("links in the built site", () => {
 	});
 });
 
+describe("the Inputs reference", () => {
+	/*
+	 * The page is generated from types.ts, so it can only fall behind the SDK if the generator stops reading
+	 * something. Hold it to the SDK's own list: every input type has its row and its section, and nothing more.
+	 */
+	it("has a row and a section for exactly the SDK's input types", async () => {
+		const { INPUT_TYPES } = (await import("../packages/sdk/src/index.ts")) as { INPUT_TYPES: readonly string[] };
+		const page = html.get("docs-ref-inputs.html") ?? "";
+		const sections = [...page.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]).filter((id) => !["types", "common-attributes", "validation-rules"].includes(id ?? ""));
+		assert.deepEqual(sections, [...INPUT_TYPES]);
+		for (const t of INPUT_TYPES) assert.ok(page.includes(`href="#${t}"`), `the Types table has no row for ${t}`);
+	});
+
+	it("shows the validator's own messages", async () => {
+		const page = html.get("docs-ref-inputs.html") ?? "";
+		// One message, checked against the source text, so a page of invented messages would fail.
+		assert.ok(page.includes("a select needs at least two options; with one, use a fixed value"));
+		assert.ok(readFileSync(join(import.meta.dirname, "../packages/sdk/src/validate.ts"), "utf8").includes("a select needs at least two options; with one, use a fixed value"));
+	});
+});
+
+describe("the Results reference", () => {
+	it("has a row and a section for exactly the SDK's result kinds", async () => {
+		const { OUTPUT_KINDS } = (await import("../packages/sdk/src/index.ts")) as { OUTPUT_KINDS: readonly string[] };
+		const page = html.get("docs-ref-results.html") ?? "";
+		const sections = [...page.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]).filter((id) => !["kinds", "common-attributes"].includes(id ?? ""));
+		assert.deepEqual([...sections].sort(), [...OUTPUT_KINDS].sort());
+		for (const k of OUTPUT_KINDS) assert.ok(page.includes(`href="#${k}"`), `the Kinds table has no row for ${k}`);
+	});
+});
+
+describe("the Host API reference", () => {
+	it("lists every attribute the element observes, and no other", () => {
+		const element = readFileSync(join(import.meta.dirname, "../packages/runtime/src/element.ts"), "utf8");
+		const observed = JSON.parse(/observedAttributes = (\[[^\]]+\])/.exec(element)?.[1] ?? "[]") as string[];
+		const page = html.get("docs-ref-host.html") ?? "";
+		const section = page.slice(page.indexOf('id="element-attributes"'), page.indexOf('id="properties-and-methods"'));
+		const listed = [...section.matchAll(/<tr><td><code>([\w-]+)<\/code>/g)].map((m) => m[1]);
+		assert.deepEqual([...listed].sort(), [...observed].sort());
+	});
+});
+
+describe("llms.txt and reference.json", () => {
+	it("are built beside the pages, describe the current contract, and hold every input type and result kind", async () => {
+		const { INPUT_TYPES, OUTPUT_KINDS, SDK_VERSION } = (await import("../packages/sdk/src/index.ts")) as { INPUT_TYPES: readonly string[]; OUTPUT_KINDS: readonly string[]; SDK_VERSION: number };
+		const data = JSON.parse(readFileSync(join(DIST, "reference.json"), "utf8")) as { contract: number; inputs: { types: { type: string }[] }; results: { kinds: { kind: string }[] } };
+		assert.equal(data.contract, SDK_VERSION);
+		assert.deepEqual(data.inputs.types.map((t) => t.type), [...INPUT_TYPES]);
+		assert.deepEqual(data.results.kinds.map((k) => k.kind).sort(), [...OUTPUT_KINDS].sort());
+		const text = readFileSync(join(DIST, "llms.txt"), "utf8");
+		assert.ok(text.startsWith("# Toolbench\n"));
+		for (const k of OUTPUT_KINDS) assert.ok(text.includes(`## ${k}\n`), `llms.txt has no section for ${k}`);
+		assert.ok(!text.includes("<!-- site:"), "a site-only marker leaked into llms.txt");
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.

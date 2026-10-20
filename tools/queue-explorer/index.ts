@@ -148,6 +148,7 @@ const tool: Tool<Input> = {
 		const a = analytic(lambda, mu);
 
 		// Partial results, so a long run shows itself converging instead of hiding behind a bar.
+		// #region ctx
 		const simulated = simulate(lambda, mu, samples, seed, (done, meanSoFar) => {
 			if (ctx.signal.aborted) return;
 			ctx.progress(done / samples, {
@@ -159,6 +160,7 @@ const tool: Tool<Input> = {
 				],
 			});
 		});
+		// #endregion
 
 		const error = a.w === 0 ? 0 : ((simulated - a.w) / a.w) * 100;
 		const agrees = Math.abs(error) < 5;

@@ -34,6 +34,7 @@ export function boot({ styles = "", perTool, extra, highlight }: BootOptions = {
 	// "*" applies to every tool, so a page's own "*" sheets join the site's rather than replacing them.
 	const every = [COMMON + styles, ...(perTool?.["*"] ?? [])];
 	const all: HostStyles = perTool ? { ...perTool, "*": every } : every;
+	// #region define
 	defineToolHost({
 		source: new RegistrySource({ ...registry, ...extra }),
 		// #region worker
@@ -44,4 +45,5 @@ export function boot({ styles = "", perTool, extra, highlight }: BootOptions = {
 		styles: all,
 		...(highlight ? { highlight } : {}),
 	});
+	// #endregion
 }

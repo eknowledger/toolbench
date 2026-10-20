@@ -233,12 +233,17 @@ main { display: block; }
 .prose h1 { font-size: clamp(2rem, 3.6vw, 2.75rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 0.75rem; font-weight: 700; }
 .prose h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 3rem 0 0.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); line-height: 1.2; scroll-margin-top: 80px; }
 .prose h3 { font-size: 1.2rem; margin: 2rem 0 0.5rem; scroll-margin-top: 80px; }
-/* Long-form docs prose keeps a reading measure; everything else fills its area. */
-.prose p, .prose li { max-width: 46rem; }
 .prose li + li { margin-top: 0.35rem; }
 .prose a { color: var(--ink); text-decoration-color: var(--amber-text); }
 /* A file path has no spaces, so on a phone `packages/runtime/src/styles.ts` ran 9px past the column. Let it break. */
 .prose :not(pre) > code { font-size: 0.88em; background: var(--sunk); border-radius: 4px; padding: 0.05em 0.2em; overflow-wrap: anywhere; }
+/*
+ * Not in a table, which scrolls instead: there a name broke mid-word, "texta" over "rea". A name in the first
+ * column never wraps; a type in another column wraps at its spaces, or a long union pressed the Notes column
+ * down to a word a line.
+ */
+.prose td code, .prose th code { overflow-wrap: normal; }
+.prose td:first-child code { white-space: nowrap; }
 .prose .table-wrap { overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--line); border-radius: 10px; }
 .prose table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 .prose th, .prose td { text-align: left; vertical-align: top; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line-soft); }
