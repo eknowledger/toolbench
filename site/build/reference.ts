@@ -201,9 +201,23 @@ const RECEIVES: Record<string, string> = {
 	toggle: "boolean",
 };
 
-/** Two-space JSON with short arrays of plain values on one line, so a list reads as a list, not a column. */
-function compact(value: unknown): string {
-	return JSON.stringify(value, null, 2).replace(/\[\n\s*((?:"[^"\n]*"|[\d.-]+|true|false)(?:,\n\s*(?:"[^"\n]*"|[\d.-]+|true|false))*)\n\s*\]/g, (_, items: string) => `[${items.split(/,\n\s*/).join(", ")}]`);
+/**
+ * Two-space JSON where anything that fits in 72 characters stays on one line, so a list of `{ label, value }`
+ * pairs reads as a list rather than a column five lines per entry.
+ */
+/** JSON on one line, with a space after each `:` and `,` as a person would write it. */
+function oneLine(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(oneLine).join(", ")}]`;
+	if (value && typeof value === "object") return `{${Object.entries(value).map(([k, v]) => `${JSON.stringify(k)}: ${oneLine(v)}`).join(", ")}}`;
+	return JSON.stringify(value) ?? "null";
+}
+
+function compact(value: unknown, indent = ""): string {
+	const flat = oneLine(value);
+	if (flat.length + indent.length <= 72 || value === null || typeof value !== "object") return flat;
+	const inner = `${indent}  `;
+	if (Array.isArray(value)) return `[\n${value.map((v) => inner + compact(v, inner)).join(",\n")}\n${indent}]`;
+	return `{\n${Object.entries(value).map(([k, v]) => `${inner}${JSON.stringify(k)}: ${compact(v, inner)}`).join(",\n")}\n${indent}}`;
 }
 
 function exampleInput(type: string): string {
@@ -364,6 +378,15 @@ async function resultExample(kind: string): Promise<string> {
 	return `\`\`\`json\n${compact(short.value)}\n\`\`\`\n\n${where}${ex.gallery ? `\n\n<!-- site: gallery ${ex.gallery} -->` : ""}`;
 }
 
+/** A real part that carries a `role`, so the common attributes have an example too. */
+async function namedPart(): Promise<string> {
+	const find = (o: Record<string, unknown>): Record<string, unknown> | undefined =>
+		o.role !== undefined ? o : o.kind === "group" ? (o.parts as Record<string, unknown>[]).map(find).find(Boolean) : undefined;
+	const part = find(await runTool("bench/fixtures/styled-output"));
+	if (!part) throw new Error("reference: bench/fixtures/styled-output returns no part with a role");
+	return `\`\`\`json\n${compact(shorten(part).value)}\n\`\`\`\n\nA part of what \`bench/fixtures/styled-output\` returns, named \`${String(part.role)}\` for a host stylesheet.`;
+}
+
 export async function resultsReference(): Promise<string> {
 	const types = read("packages/sdk/src/types.ts");
 	const { LATER, OUTPUT_SINCE } = (await import(join(ROOT, "packages/sdk/src/features.ts"))) as { LATER: Record<string, number>; OUTPUT_SINCE: Record<string, number> };
@@ -405,6 +428,8 @@ export async function resultsReference(): Promise<string> {
 		"Any result, or any part of a group, may carry these.",
 		"",
 		table(typeBody("PartNames"), (a) => OUTPUT_SINCE[`part ${a.name}`] ?? 1),
+		"",
+		await namedPart(),
 	];
 	for (const k of kinds) {
 		const base = kindSince(k.kind);
@@ -438,6 +463,32 @@ const MANIFEST_RULES: { rule: string; change: (m: Record<string, unknown>) => vo
 	{ rule: "A link is `http`, `https`, `mailto` or relative", change: (m) => (m.links = [{ label: "Spec", href: "javascript:alert(1)" }]) },
 ];
 
+/** The lines between `// #region name` and `// #endregion` in a repository file, dedented. */
+function region(path: string, name: string): string {
+	const text = read(path);
+	const start = text.indexOf(`// #region ${name}`);
+	const end = text.indexOf("// #endregion", start);
+	if (start < 0 || end < 0) throw new Error(`reference: ${path} has no #region ${name}`);
+	const lines = text.slice(text.indexOf("\n", start) + 1, end).replace(/\s+$/, "").split("\n");
+	const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => /^\s*/.exec(l)?.[0].length ?? 0));
+	return lines.map((l) => l.slice(indent).replace(/\t/g, "  ")).join("\n");
+}
+
+/** A few keys of a repository tool's manifest, as JSON. */
+function manifestKeys(dir: string, ...keys: string[]): string {
+	const m = JSON.parse(read(`${dir}/tool.json`)) as Record<string, unknown>;
+	const picked = Object.fromEntries(keys.map((k) => [k, k === "samples" ? (m[k] as unknown[]).slice(0, 2) : m[k]]));
+	return `\`\`\`json\n${compact(picked)}\n\`\`\`\n\nFrom \`${dir}/tool.json\`${keys.includes("samples") ? ", the first two samples" : ""}.`;
+}
+
+/** One case from a repository tool's `cases.json`, chosen by a predicate. */
+function fixtureCase(dir: string, pick: (c: Record<string, unknown>) => boolean, what: string): string {
+	const cases = JSON.parse(read(`${dir}/cases.json`)) as Record<string, unknown>[];
+	const found = cases.find(pick);
+	if (!found) throw new Error(`reference: ${dir}/cases.json has no ${what} case`);
+	return `\`\`\`json\n${compact(shorten(found).value)}\n\`\`\`\n\n${what}, from \`${dir}/cases.json\`.`;
+}
+
 export async function manifestReference(): Promise<string> {
 	const types = read("packages/sdk/src/types.ts");
 	const at = await since();
@@ -470,17 +521,23 @@ export async function manifestReference(): Promise<string> {
 		"",
 		table(inline("runtime"), (a) => `runtime.${a.name}`),
 		"",
+		manifestKeys("tools/regex-explainer", "runtime", "timeoutMs"),
+		"",
 		"### Link",
 		"",
 		"Each entry of `links`.",
 		"",
 		table(inline("links"), (a) => `links.${a.name}`),
 		"",
+		manifestKeys("tools/utf8-bytes", "links"),
+		"",
 		"### Sample",
 		"",
 		"Each entry of `samples`, a button under the form that fills the inputs.",
 		"",
 		table(body("Sample"), (a) => `samples.${a.name}`),
+		"",
+		manifestKeys("tools/percentiles", "samples"),
 		"",
 		"### Capabilities",
 		"",
@@ -520,11 +577,23 @@ export async function manifestReference(): Promise<string> {
 		"",
 		table(body("Ctx"), () => "ctx"),
 		"",
+		"A simulation that stops when the reader cancels, and shows its running mean as it goes:",
+		"",
+		"```ts",
+		region("tools/queue-explorer/index.ts", "ctx"),
+		"```",
+		"",
+		"From `tools/queue-explorer/index.ts`.",
+		"",
 		"## Fixtures",
 		"",
 		"`cases.json` is an array of cases. `pnpm check` runs each and compares the result.",
 		"",
 		table(body("Case"), () => "case"),
+		"",
+		fixtureCase("tools/histogram", (c) => (c.expect as { kind?: string }).kind === "error" && JSON.stringify(c).length < 400, "An exact case for bad input"),
+		"",
+		fixtureCase("tools/percentiles", (c) => c.match === "subset", "A `subset` case, with the `why` and `fieldCount` it requires"),
 		"",
 		"## Validation rules",
 		"",
