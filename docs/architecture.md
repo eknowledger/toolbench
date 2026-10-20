@@ -1249,7 +1249,7 @@ declaration, so browsers without that function get the light palette rather than
 
 | Export | Kind |
 |---|---|
-| `defineToolHost`, `ToolHost`, `ToolHostConfig`, `Mode` | the element. `ToolHostConfig.highlight` is the optional host highlighter for `code` results and for textareas declaring `lang`, and `ToolHostConfig.styles` the host's own stylesheets |
+| `defineToolHost`, `ToolHost`, `ToolHostConfig`, `ToolHostAttributes`, `Mode` | the element. `ToolHostAttributes` types the attributes the element reads. `ToolHostConfig.highlight` is the optional host highlighter for `code` results and for textareas declaring `lang`, and `ToolHostConfig.styles` the host's own stylesheets |
 | `setHostStyles`, `HostStyles`, `HostSheet` | host stylesheets, replaced on every tool at once. See STYLING.md |
 | `RegistrySource`, `ToolSource`, `RegistryEntry`, `ToolNotFoundError` | sources |
 | `Runner`, `RunHooks`, `RunnerOptions`, `isSuperseded` | execution |

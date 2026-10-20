@@ -73,7 +73,7 @@ Measured with gzip on a production build:
 
 | Entry | For |
 |---|---|
-| `@toolbench/runtime` | `defineToolHost`, `RegistrySource`, `Runner`, the renderers, the error types |
+| `@toolbench/runtime` | `defineToolHost`, `RegistrySource`, `Runner`, the renderers, the error types, and the `ToolHostConfig` and `ToolHostAttributes` types |
 | `@toolbench/runtime/register` | Side-effecting registration, for a page with no bundler |
 | `@toolbench/runtime/worker` | `createToolWorker`, for the host's own worker entry file |
 

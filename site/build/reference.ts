@@ -70,7 +70,8 @@ function members(body: string): Attr[] {
 			i += method[0].length;
 			continue;
 		}
-		const head = /^(\w+)(\?)?:\s*/.exec(body.slice(i));
+		// A name may be quoted, `"wide-toggle"?:`, when it is not an identifier.
+		const head = /^"?([\w-]+)"?(\?)?:\s*/.exec(body.slice(i));
 		if (!head) {
 			i++;
 			continue;
@@ -80,7 +81,8 @@ function members(body: string): Attr[] {
 		for (; j < body.length; j++) {
 			const c = body[j];
 			if (c === "{" || c === "(" || c === "[" || c === "<") depth++;
-			else if (c === "}" || c === ")" || c === "]" || c === ">") depth--;
+			// The `>` of an arrow, `() => Worker`, closes nothing.
+			else if (c === "}" || c === ")" || c === "]" || (c === ">" && body[j - 1] !== "=")) depth--;
 			else if ((c === ";" || c === "\n") && depth === 0) break;
 		}
 		const type = body.slice(i + head[0].length, j).trim().replace(/\s+/g, " ").replace(/;$/, "");
@@ -119,12 +121,13 @@ const sinceCell = (v: number) => (v > 1 ? `**v${v}**` : "v1");
  * An attribute table. The Default column appears only when some attribute has one: empty, it took a sixth of
  * the width and squeezed the Notes to a few words a line.
  */
-function attributeTable(attrs: Attr[], sinceOf: (a: Attr) => number): string {
+function attributeTable(attrs: Attr[], sinceOf?: (a: Attr) => number): string {
 	const withDefault = attrs.some((a) => a.fallback);
-	const head = withDefault ? "| Attribute | Type | Required | Default | Since | Notes |\n|---|---|---|---|---|---|" : "| Attribute | Type | Required | Since | Notes |\n|---|---|---|---|---|";
+	// Since is a contract version, so a runtime API, which has none, leaves the column out.
+	const columns = ["Attribute", "Type", "Required", ...(withDefault ? ["Default"] : []), ...(sinceOf ? ["Since"] : []), "Notes"];
 	const row = (a: Attr) =>
-		`| \`${a.name}\` | ${typeCell(a.type)} | ${a.required ? "**yes**" : "no"} |${withDefault ? ` ${a.fallback ? `\`${a.fallback}\`` : ""} |` : ""} ${sinceCell(sinceOf(a))} | ${cell(a.notes)} |`;
-	return [head, ...attrs.map(row)].join("\n");
+		[`\`${a.name}\``, typeCell(a.type), a.required ? "**yes**" : "no", ...(withDefault ? [a.fallback ? `\`${a.fallback}\`` : ""] : []), ...(sinceOf ? [sinceCell(sinceOf(a))] : []), cell(a.notes)];
+	return [columns, columns.map(() => "---"), ...attrs.map(row)].map((r) => `| ${r.join(" | ")} |`).join("\n");
 }
 
 /** One manifest broken one way, and what the validator says about it. */
@@ -467,9 +470,23 @@ const MANIFEST_RULES: { rule: string; change: (m: Record<string, unknown>) => vo
 function region(path: string, name: string): string {
 	const text = read(path);
 	const start = text.indexOf(`// #region ${name}`);
-	const end = text.indexOf("// #endregion", start);
-	if (start < 0 || end < 0) throw new Error(`reference: ${path} has no #region ${name}`);
-	const lines = text.slice(text.indexOf("\n", start) + 1, end).replace(/\s+$/, "").split("\n");
+	if (start < 0) throw new Error(`reference: ${path} has no #region ${name}`);
+	// Regions nest, `worker` inside `define`, so the end is the #endregion that closes this one.
+	let depth = 0;
+	let end = -1;
+	for (const m of text.slice(start).matchAll(/\/\/ #(end)?region\b/g)) {
+		depth += m[1] ? -1 : 1;
+		if (depth === 0) {
+			end = start + (m.index ?? 0);
+			break;
+		}
+	}
+	if (end < 0) throw new Error(`reference: ${path}'s #region ${name} is never closed`);
+	const lines = text
+		.slice(text.indexOf("\n", start) + 1, end)
+		.replace(/\s+$/, "")
+		.split("\n")
+		.filter((l) => !/\/\/ #(end)?region\b/.test(l));
 	const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => /^\s*/.exec(l)?.[0].length ?? 0));
 	return lines.map((l) => l.slice(indent).replace(/\t/g, "  ")).join("\n");
 }
@@ -603,5 +620,131 @@ export async function manifestReference(): Promise<string> {
 		"|---|---|",
 	];
 	for (const r of MANIFEST_RULES) out.push(`| ${r.rule} | ${cell(await message(r.change))} |`);
+	return out.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Host API
+// ---------------------------------------------------------------------------
+
+/** The JSDoc directly above `signature` in a source file, as one paragraph. */
+function docAbove(path: string, signature: string): string {
+	const text = read(path);
+	const at = text.indexOf(signature);
+	if (at < 0) throw new Error(`reference: ${path} has no "${signature}"`);
+	const before = text.slice(0, at);
+	const close = before.lastIndexOf("*/");
+	const open = before.lastIndexOf("/**");
+	if (open < 0 || close < open || before.slice(close + 2).trim() !== "") throw new Error(`reference: "${signature}" in ${path} has no JSDoc`);
+	return jsdoc(before.slice(open + 3, close), true).text;
+}
+
+/** A gallery card's markup, read from the gallery's own source so the example is one that runs. */
+function galleryMarkup(id: string): string {
+	const text = read("site/build/gallery.ts");
+	const at = text.indexOf(`id: "${id}"`);
+	const demo = at < 0 ? null : /demo: `([^`]+)`/.exec(text.slice(at));
+	if (!demo?.[1]) throw new Error(`reference: the gallery has no demo for ${id}`);
+	return demo[1].trim();
+}
+
+export async function hostReference(): Promise<string> {
+	const element = read("packages/runtime/src/element.ts");
+	const sources = read("packages/runtime/src/sources.ts");
+	const bodyIn = (text: string, name: string) => members(block(text.slice(text.indexOf(`export interface ${name}`)), "{"));
+	// A type alias the page would otherwise name without saying what it is, `Mode`, spelled out.
+	const aliases = new Map([...element.matchAll(/export type (\w+) = ([^;{]+);/g)].map((m) => [m[1] ?? "", (m[2] ?? "").trim()]));
+	const spelled = (attrs: Attr[]) => attrs.map((a) => ({ ...a, type: aliases.get(a.type) ?? a.type }));
+	const ELEMENT = "packages/runtime/src/element.ts";
+	const methods: { name: string; signature: string; doc: string }[] = [
+		{ name: "values (set)", signature: "values = { ... }", doc: docAbove(ELEMENT, "set values(partial: InputValues)") },
+		{ name: "values (get)", signature: "values", doc: docAbove(ELEMENT, "get values(): InputValues") },
+		{ name: "run()", signature: "run({ focus? }): Promise<void>", doc: docAbove(ELEMENT, "async run(options") },
+		{ name: "reveal()", signature: "reveal(id): Promise<boolean>", doc: docAbove(ELEMENT, "async reveal(id: string)") },
+		{ name: "seed", signature: "seed = output", doc: docAbove(ELEMENT, "set seed(output") },
+	];
+
+	const out: string[] = [
+		"A host is the page that shows tools. It defines the `<tool-host>` element once, with a source of tools, and then writes `<tool-host>` wherever a tool belongs.",
+		"",
+		"```ts",
+		region("site/src/host.ts", "define"),
+		"```",
+		"",
+		"How this site does it, from `site/src/host.ts`.",
+		"",
+		"## defineToolHost",
+		"",
+		`\`defineToolHost(options, tagName = "tool-host")\`. ${docAbove(ELEMENT, "export function defineToolHost(")}`,
+		"",
+		"### Options",
+		"",
+		attributeTable(bodyIn(element, "ToolHostConfig")),
+		"",
+		"### setHostStyles",
+		"",
+		`\`setHostStyles(styles)\`. ${docAbove(ELEMENT, "export function setHostStyles(")}`,
+		"",
+		"## Element attributes",
+		"",
+		"What `<tool-host>` reads from its markup. Changing one redraws the tool and keeps the reader's inputs and result.",
+		"",
+		attributeTable(spelled(bodyIn(element, "ToolHostAttributes"))),
+		"",
+		"### Example",
+		"",
+		"```html",
+		galleryMarkup("parts"),
+		"```",
+		"",
+		"A gallery card: one part shown, the rest behind a button.",
+		"",
+		"<!-- site: gallery parts -->",
+		"",
+		"## Properties and methods",
+		"",
+		"On the element, for a page that drives a tool itself.",
+		"",
+		"| Member | Use | What it does |",
+		"|---|---|---|",
+		...methods.map((m) => `| \`${m.name}\` | \`${m.signature}\` | ${cell(m.doc)} |`),
+		"",
+		"### Example",
+		"",
+		"```ts",
+		region("site/src/gallery.ts", "values"),
+		region("site/src/gallery.ts", "run"),
+		"```",
+		"",
+		"```ts",
+		region("site/src/gallery.ts", "reveal"),
+		"```",
+		"",
+		"From `site/src/gallery.ts`.",
+		"",
+		"## Sources",
+		"",
+		"Where tools come from. `RegistrySource` is the one most hosts use; a host may write its own `ToolSource`.",
+		"",
+		"### ToolSource",
+		"",
+		attributeTable(
+			bodyIn(sources, "ToolSource").map((a) => ({ ...a, name: a.name.replace(/\(.*\)/, "()"), type: a.type })),
+		),
+		"",
+		"### RegistrySource",
+		"",
+		`\`new RegistrySource(entries)\`. ${docAbove("packages/runtime/src/sources.ts", "export class RegistrySource")}`,
+		"",
+		"### RegistryEntry",
+		"",
+		attributeTable(bodyIn(sources, "RegistryEntry").map((a) => ({ ...a, name: a.name.replace(/\(.*\)/, "()") }))),
+		"",
+		"```ts",
+		read("site/src/registry.ts").slice(read("site/src/registry.ts").indexOf("export function entries")).trim().replace(/\t/g, "  "),
+		"```",
+		"",
+		"How this site builds its registry from a directory glob, from `site/src/registry.ts`.",
+	];
 	return out.join("\n");
 }

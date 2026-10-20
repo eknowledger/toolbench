@@ -27,7 +27,9 @@ export interface ToolSource {
 
 /** One tool as a host declares it: raw manifest data plus a lazy import of its module. */
 export interface RegistryEntry {
+	/** The parsed `tool.json`, unchecked: `RegistrySource` validates and upgrades it. */
 	manifest: unknown;
+	/** A lazy import of the tool's module, called only when the tool is opened or scrolled near. */
 	load(): Promise<ToolModule>;
 }
 
@@ -41,7 +43,7 @@ export class ToolNotFoundError extends Error {
 }
 
 /**
- * The everyday source: a map of ids to entries, which a host builds however it likes — by hand, or
+ * The everyday source: a map of ids to entries, which a host builds however it likes: by hand, or
  * from a bundler's directory glob.
  *
  * Validation happens once, on construction, so a malformed manifest is a startup error with a field

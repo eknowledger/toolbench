@@ -24,7 +24,7 @@ import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
 import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
-import { inputsReference, manifestReference, resultsReference } from "./reference.ts";
+import { hostReference, inputsReference, manifestReference, resultsReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -95,6 +95,14 @@ export const DOCS: Doc[] = [
 		summary: "tool.json, the run function, and cases.json: every attribute and rule.",
 		group: "Reference",
 		generate: manifestReference,
+	},
+	{
+		file: "packages/runtime/src/element.ts",
+		page: "docs-ref-host.html",
+		title: "Host API",
+		summary: "defineToolHost, the element's attributes, properties and methods, and tool sources.",
+		group: "Reference",
+		generate: hostReference,
 	},
 	{ file: "docs/architecture.md", page: "docs-architecture.html", title: "Architecture", summary: "How it works, where the boundaries are, and how to change it.", group: "Project" },
 	{ file: "SECURITY.md", page: "docs-security.html", title: "Security", summary: "The threat model, and what is in scope to report.", group: "Project" },
@@ -219,7 +227,7 @@ function docPage(doc: Doc): string {
   <article class="prose">
     <h1>${escapeHtml(doc.title)}</h1>
     <p class="doc-meta">${escapeHtml(doc.summary)}</p>
-    <p class="doc-links">${doc.generate ? `Generated from <a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> and the validator` : `<a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a>`}</p>
+    <p class="doc-links">${doc.generate ? `Generated from <a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a>` : `<a href="${BLOB}/${doc.file}" data-source-file>${escapeHtml(doc.file)}</a> <a class="edit" href="${EDIT}/${doc.file}">Edit this page on GitHub</a>`}</p>
     ${html}
   </article>
   <nav class="docs-toc panel" aria-label="On this page">

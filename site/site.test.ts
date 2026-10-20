@@ -138,6 +138,17 @@ describe("the Results reference", () => {
 	});
 });
 
+describe("the Host API reference", () => {
+	it("lists every attribute the element observes, and no other", () => {
+		const element = readFileSync(join(import.meta.dirname, "../packages/runtime/src/element.ts"), "utf8");
+		const observed = JSON.parse(/observedAttributes = (\[[^\]]+\])/.exec(element)?.[1] ?? "[]") as string[];
+		const page = html.get("docs-ref-host.html") ?? "";
+		const section = page.slice(page.indexOf('id="element-attributes"'), page.indexOf('id="properties-and-methods"'));
+		const listed = [...section.matchAll(/<tr><td><code>([\w-]+)<\/code>/g)].map((m) => m[1]);
+		assert.deepEqual([...listed].sort(), [...observed].sort());
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.
