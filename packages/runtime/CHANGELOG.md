@@ -1,5 +1,16 @@
 # @toolbench/runtime
 
+## 0.12.0
+
+### Minor Changes
+
+- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: `ToolHostAttributes`**, a type for the attributes `<tool-host>` reads (`tool`, `mode`, `parts`, `more`, `layout`, `controls`, `wide`, `wide-toggle`), each with its default and meaning, for a host typing its own markup. Types only: nothing is added to the bundle. `RegistryEntry`'s two members are described too.
+
+### Patch Changes
+
+- Updated dependencies [[`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79), [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79), [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79)]:
+  - @toolbench/sdk@0.12.0
+
 ## 0.11.0
 
 ### Minor Changes

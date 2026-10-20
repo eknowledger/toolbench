@@ -1,5 +1,15 @@
 # @toolbench/sdk
 
+## 0.12.0
+
+### Patch Changes
+
+- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - Every input attribute in the type declarations now has its own description, which an editor shows on hover and the site's Inputs reference is generated from. No behaviour changes.
+
+- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - The manifest, `links`, and fixture `Case` attributes that had no description in the type declarations now have one, shown by an editor on hover and on the site's Manifest reference. No behaviour changes.
+
+- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - Every result attribute in the type declarations now has its own description, which an editor shows on hover and the site's Results reference is generated from. The `TreemapNode.value` description no longer says a branch's own value overrides its children's sum: the runtime always draws the sum. No behaviour changes.
+
 ## 0.11.0
 
 No changes in this release.
