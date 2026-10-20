@@ -818,3 +818,77 @@ export async function tokensReference(): Promise<string> {
 		"For everything inside the shadow root, a host passes its own stylesheet to `defineToolHost({ styles })`. The class names and attributes it may rely on are listed on the [Styling](./docs-styling.html#what-you-can-select) page.",
 	].join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// For tools and agents: the same reference as data, and as one text file
+// ---------------------------------------------------------------------------
+
+type JsonAttr = { name: string; type: string; required: boolean; default?: string; since?: number; notes: string };
+
+/** The reference as JSON, from the same parsers as the pages, so the two cannot disagree. */
+export async function referenceData(): Promise<Record<string, unknown>> {
+	const types = read("packages/sdk/src/types.ts");
+	const element = read("packages/runtime/src/element.ts");
+	const at = await since();
+	const { LATER, OUTPUT_SINCE } = (await import(join(ROOT, "packages/sdk/src/features.ts"))) as { LATER: Record<string, number>; OUTPUT_SINCE: Record<string, number> };
+	const { SDK_VERSION } = (await import(join(ROOT, "packages/sdk/src/index.ts"))) as { SDK_VERSION: number };
+	const json = (a: Attr, v?: number): JsonAttr => ({ name: a.name, type: a.type, required: a.required, ...(a.fallback ? { default: a.fallback } : {}), ...(v ? { since: v } : {}), notes: a.notes });
+	const body = (text: string, name: string) => {
+		const i = text.search(new RegExp(`export (?:interface ${name}\\b[^{]*\\{|type ${name}\\b[^=]*= \\{)`));
+		if (i < 0) throw new Error(`reference: no ${name}`);
+		return members(block(text.slice(i), "{"));
+	};
+
+	const union = types.slice(types.indexOf("export type InputSpec ="), types.indexOf("/** One choice in a `select`. */"));
+	const inputs = union
+		.split("| (InputBase & ")
+		.slice(1)
+		.map((part) => {
+			const attrs = members(block(part, "{"));
+			const type = (attrs.find((a) => a.name === "type")?.type ?? "").replace(/"/g, "");
+			return { type, value: RECEIVES[type], attributes: attrs.filter((a) => a.name !== "type").map((a) => json(a, at(`inputs.${a.name}`))) };
+		});
+
+	const outputs = types.slice(types.indexOf("type OutputBody ="), types.indexOf("export type OutputKind"));
+	const results: Record<string, unknown>[] = [];
+	for (const m of outputs.matchAll(/(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?\|\s*\{/g)) {
+		const attrs = members(block(outputs.slice((m.index ?? 0) + m[0].length - 1), "{"));
+		const kind = (attrs.find((a) => a.name === "kind")?.type ?? "").replace(/"/g, "");
+		const base = LATER[`kinds.${kind}`] ?? 1;
+		results.push({
+			kind,
+			since: base,
+			use: RESULT_USE[kind],
+			attributes: attrs.filter((a) => a.name !== "kind").map((a) => json(a, OUTPUT_SINCE[`${kind} ${a.name}`] ?? base)),
+			types: Object.fromEntries((RESULT_TYPES[kind] ?? []).map((t) => [t, body(types, t).map((a) => json(a, OUTPUT_SINCE[`${t.toLowerCase()} ${a.name}`] ?? base))])),
+		});
+	}
+
+	return {
+		$comment: "Generated at build time from the Toolbench source. The same data as the site's Reference pages.",
+		contract: SDK_VERSION,
+		runtime: (JSON.parse(read("packages/runtime/package.json")) as { version: string }).version,
+		inputs: { common: members(block(types, "interface InputBase")).map((a) => json(a, at(`inputs.${a.name}`))), types: inputs },
+		results: { common: body(types, "PartNames").map((a) => json(a, OUTPUT_SINCE[`part ${a.name}`] ?? 1)), kinds: results },
+		manifest: body(types, "Manifest").map((a) => json(a, at(a.name))),
+		host: { options: body(element, "ToolHostConfig").map((a) => json(a)), attributes: body(element, "ToolHostAttributes").map((a) => json(a)) },
+	};
+}
+
+/** Every reference page in one plain-text file, for an assistant to read in a single request. */
+export async function llmsText(pages: { title: string; url: string; summary: string; markdown: string }[]): Promise<string> {
+	const { SDK_VERSION } = (await import(join(ROOT, "packages/sdk/src/index.ts"))) as { SDK_VERSION: number };
+	return [
+		"# Toolbench",
+		"",
+		"> A zero-dependency framework for small interactive tools in any web page. A tool is one function plus one JSON manifest; the runtime builds the form, runs the function and draws the result.",
+		"",
+		`Contract version ${SDK_VERSION}. Install: \`npm install @toolbench/sdk @toolbench/runtime\`. Machine-readable: reference.json beside this file.`,
+		"",
+		"## Pages",
+		"",
+		...pages.map((p) => `- [${p.title}](${p.url}): ${p.summary}`),
+		"",
+		...pages.flatMap((p) => [`# ${p.title}`, "", p.markdown.replace(/^<!-- site: .* -->$/gm, "").replace(/\n{3,}/g, "\n\n"), ""]),
+	].join("\n");
+}

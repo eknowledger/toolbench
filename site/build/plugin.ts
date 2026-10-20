@@ -24,7 +24,7 @@ import { checkDiagrams, diagram, mermaidBlocks } from "./diagrams.ts";
 import { galleryFeatures, galleryIndex, galleryTitle } from "./gallery.ts";
 import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
-import { hostReference, inputsReference, manifestReference, resultsReference, tokensReference } from "./reference.ts";
+import { hostReference, inputsReference, llmsText, manifestReference, referenceData, resultsReference, tokensReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -376,6 +376,13 @@ export function siteContent(): Plugin {
 		async buildStart() {
 			await generateReference();
 			checkDiagrams(diagramSources());
+		},
+		// The reference for a tool or an assistant to read, written beside the pages: the same data as JSON,
+		// and every reference page as one text file. Linked from the footer, not from the pages.
+		async generateBundle() {
+			const pages = DOCS.filter((d) => d.generate).map((d) => ({ title: d.title, url: `./${d.page}`, summary: d.summary, markdown: generated.get(d.page) ?? "" }));
+			this.emitFile({ type: "asset", fileName: "llms.txt", source: await llmsText(pages) });
+			this.emitFile({ type: "asset", fileName: "reference.json", source: `${JSON.stringify(await referenceData(), null, 2)}\n` });
 		},
 		configureServer(server) {
 			// The markdown lives outside the Vite root, so tell the watcher, and reload the page on an edit.

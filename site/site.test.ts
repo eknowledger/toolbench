@@ -149,6 +149,20 @@ describe("the Host API reference", () => {
 	});
 });
 
+describe("llms.txt and reference.json", () => {
+	it("are built beside the pages, describe the current contract, and hold every input type and result kind", async () => {
+		const { INPUT_TYPES, OUTPUT_KINDS, SDK_VERSION } = (await import("../packages/sdk/src/index.ts")) as { INPUT_TYPES: readonly string[]; OUTPUT_KINDS: readonly string[]; SDK_VERSION: number };
+		const data = JSON.parse(readFileSync(join(DIST, "reference.json"), "utf8")) as { contract: number; inputs: { types: { type: string }[] }; results: { kinds: { kind: string }[] } };
+		assert.equal(data.contract, SDK_VERSION);
+		assert.deepEqual(data.inputs.types.map((t) => t.type), [...INPUT_TYPES]);
+		assert.deepEqual(data.results.kinds.map((k) => k.kind).sort(), [...OUTPUT_KINDS].sort());
+		const text = readFileSync(join(DIST, "llms.txt"), "utf8");
+		assert.ok(text.startsWith("# Toolbench\n"));
+		for (const k of OUTPUT_KINDS) assert.ok(text.includes(`## ${k}\n`), `llms.txt has no section for ${k}`);
+		assert.ok(!text.includes("<!-- site:"), "a site-only marker leaked into llms.txt");
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.
