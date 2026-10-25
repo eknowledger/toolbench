@@ -1462,6 +1462,16 @@ function lazyKindsIn(output: Output | undefined): LazyKind[] {
 }
 
 /**
+ * What a reader is told is missing. A graph is not a chart: a card that lost its graph said "The chart could
+ * not be loaded.", naming something it never had (#201).
+ */
+function missingNoun(kinds: readonly LazyKind[]): string {
+	const graph = kinds.includes("graph");
+	const chart = kinds.some((kind) => kind !== "graph");
+	return graph && chart ? "chart and the graph" : graph ? "graph" : "chart";
+}
+
+/**
  * Render, and if the chart renderer is not loaded, render everything that is not a chart.
  *
  * Only reached when the chart chunk could not be fetched. The reader gets the fields and tables and a
@@ -1477,7 +1487,7 @@ function renderOrDegrade(output: Output, options: RenderOptions): HTMLElement {
 }
 
 function degraded(output: Output, draw: (rest: Output) => HTMLElement): HTMLElement {
-	const note = el("p", { class: "tb-status" }, "The chart could not be loaded.");
+	const note = el("p", { class: "tb-status" }, `The ${missingNoun(lazyKindsIn(output))} could not be loaded.`);
 	const rest = output.kind === "group" ? output.parts.filter((part) => lazyKindsIn(part).length === 0) : [];
 	if (rest.length === 0) return note;
 	const body = draw(rest.length === 1 ? (rest[0] as Output) : { kind: "group", parts: rest });

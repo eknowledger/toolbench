@@ -25,9 +25,28 @@ export const LARGE = 100;
 const has = (c: Chunk): boolean =>
 	({ free: true, tree: !!ext.place.tree, force: !!ext.place.force, lines: !!ext.lines, shapes: !!SHAPES.hexagon, er: !!ext.record, groups: !!ext.compound, interact: !!ext.path, search: !!ext.search, repair: !!ext.repair, large: !!ext.large })[c];
 
-/** Every chunk this graph needs that is not here yet, fetched: what a host awaits before painting a seed. */
+/**
+ * A layout `prepareGraph` made, kept for the draw that follows it, so a seed is not laid out twice. Taken once:
+ * a later draw lays out afresh, as it always did.
+ */
+const prepared = new WeakMap<Graph, GraphLayout>();
+
+/**
+ * Every chunk this graph needs that is not here yet, fetched: what a host awaits before painting a seed.
+ *
+ * ⚠️ `needs()` is not the whole list. The crossing search and the repair are asked for by the layout itself,
+ * once it sees what the base placement left, so the only way to know is to lay out. Fetching `needs()` alone
+ * let the bipartite graph reach a closed card's synchronous paint without the search, and the card showed
+ * "could not be loaded" in place of the graph (#201). A large graph's picture is the large-graph chunk's.
+ */
 export async function prepareGraph(graph: Graph): Promise<void> {
 	await Promise.all(needs(graph).filter((c) => !has(c)).map(loadChunk));
+	if (graphProblem(graph, { colors: false })) return;
+	if (graph.nodes.length > LARGE) {
+		if (!has("large")) await import("./graph-large.ts");
+		return;
+	}
+	prepared.set(graph, await layoutLoading(() => layout(graph, { collapsed: collapsedOf(graph) })));
 }
 
 /** What draws one layout into the figure: the base's, handed to the large-graph chunk. */
@@ -70,7 +89,9 @@ export function renderGraph(graph: Graph, options: RenderOptions = {}): HTMLElem
 		const relayout = (next: Set<string>): void => void layoutLoading(() => layout(graph, { collapsed: next })).then((L) => show(L, next, relayout));
 		const collapsed = collapsedOf(graph);
 		try {
-			show(layout(graph, { collapsed }), collapsed, relayout);
+			const ready = prepared.get(graph);
+			prepared.delete(graph);
+			show(ready ?? layout(graph, { collapsed }), collapsed, relayout);
 		} catch (error) {
 			// The search or the repair, asked for by the layout itself once it knows what it left.
 			if (error instanceof GraphChunkMissing) throw new ChartRendererMissing("graph", () => loadChunk(error.chunk));

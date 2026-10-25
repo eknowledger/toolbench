@@ -313,8 +313,12 @@ const BUDGETS = [
 	 * Fitting a wide graph (#198), its toggle, the two icons and their rules, spent 616 of the base's room:
 	 * 17,865 to 18,481. Inside 18_500 without raising it, which leaves 19 bytes, so the next feature here
 	 * raises it.
+	 *
+	 * Raised to 18_750 by #201: a seed's graph is laid out before the paint, so the chunks its layout asks for
+	 * part way through (the search, the repair) are fetched first, and that layout is kept for the draw. 74
+	 * bytes, 18,484 to 18,558.
 	 */
-	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_500 },
+	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_750 },
 	{ label: "graph: tree and radial", pattern: /^graph-tree-[^/]+\.js$/, budget: 2_250 },
 	{ label: "graph: force and manual", pattern: /^graph-force-[^/]+\.js$/, budget: 1_250 },
 	{ label: "graph: free placement, shared", pattern: /^graph-free-[^/]+\.js$/, budget: 1_250 },
