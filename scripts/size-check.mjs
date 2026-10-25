@@ -196,8 +196,14 @@ const BUDGETS = [
 	 * data-wrap; and the sticky row header and caption. The rest renders the th and its heading's attribute.
 	 * Loading those rules only when such a table renders would save about 260 here, at the price of the table
 	 * shifting when they arrive, which was judged not worth it. 27_000 would have left the build 18 over.
+	 *
+	 * Raised from 27_500 to 28_000 by markup in an input's description (#217), in the commit that crossed it:
+	 * 27,018 to 27,652 measured, 634 bytes. Most of it is the parser and the builder, here because a form's
+	 * descriptions are drawn with the form: one pattern for the inline spans, a line loop for paragraphs and
+	 * lists, and a tree built with `el`, never HTML. Written as a character loop it was 86 more. The rest is the
+	 * CSS for paragraphs, lists, code, bold and the five tones. 27_500 would have left the build 152 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -247,8 +253,11 @@ const BUDGETS = [
 	 *
 	 * Raised from 5_500 to 6_000 by contract v8's fixtures, in the commit that crossed it: 5,753 with
 	 * field-faces (#209) and input-help (#224), four inputs of four types. Bench-only.
+	 *
+	 * Raised from 6_000 to 7_000 by input-help's markup description (#217), 6,044 measured, with its details
+	 * still to come (#215). Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 6_000, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 7_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -585,9 +594,12 @@ for (const file of unclaimed) {
  *
  * Raised to 33_500 by row headers and the narrow table (#214): 32,720 to 33,073 measured, the same CSS as
  * boot's line above, which every consumer pays too. 33_000 would have been 73 bytes over.
+ *
+ * Raised to 34_000 by markup in an input's description (#217): 33,073 to 33,693 measured, the same parser
+ * and CSS as boot's line above. 33_500 would have been 193 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_500 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

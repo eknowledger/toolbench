@@ -243,6 +243,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/grammar-input`, "machine")],
 			},
 			{
+				id: "help-markup",
+				title: "Help text with structure",
+				text: "A description can carry paragraphs, a list, <code>code</code>, bold and a tone for a word, so help that covers several formats reads as a list. Built as elements, never as HTML, and a description without markup is drawn as before.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "values")],
+			},
+			{
 				id: "autorun",
 				title: "Update as the reader types",
 				text: "<code>\"autoRun\": true</code> runs on every edit. Off by default, and refused for worker tools, because it only suits a tool that is genuinely instant.",

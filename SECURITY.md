@@ -45,7 +45,8 @@ concern, as it is for typed input. A host that does not want this sets `share: "
   in `packages/runtime/src/dom.ts`, which use `createElement`, `createElementNS` and `textContent`.
   Neither package contains `innerHTML`, `insertAdjacentHTML`, `eval` or `new Function`, so a way to
   inject markup would be a real bug. The optional host `highlight` hook must return a `Node` for the
-  same reason: the runtime appends that node and will not interpret a string as HTML. A host that
+  same reason: the runtime appends that node and will not interpret a string as HTML. An input's
+  description takes a small markup, parsed to a tree and built with the same helpers, with no links. A host that
   parses a highlighter's HTML string into a node is taking on that XSS surface; the runtime will not
   do it for them;
 * a way for one tool on a page to reach another tool's state or results;

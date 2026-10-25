@@ -751,7 +751,11 @@ interface InputBase {
 	id: string;
 	/** The visible label, which is also the control's accessible name. */
 	label: string;
-	/** The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. */
+	/**
+	 * The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. Takes light
+	 * markup: a blank line starts a paragraph, a line starting "- " is a list item, `code`, **strong**, and
+	 * {good|text} for the tones good, warn, bad, muted and accent. Anything else is text.
+	 */
 	description?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
