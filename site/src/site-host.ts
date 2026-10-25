@@ -8,8 +8,10 @@ const STYLES = /* css */ `
 /* The Run button carries the mark's triangle: the one shape on this site that means "this runs". */
 .tb-run { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; border-radius: 8px; padding: 0.5rem 1rem; min-height: 40px; }
 .tb-run::before { content: ""; width: 0.55em; height: 0.65em; background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+/* Reset sits beside Run, so it takes Run's height here too: at the runtime's own size it stood 5.6px shorter. */
+.tb-reset { font-weight: 700; padding: calc(0.5rem - 1px) 1rem; min-height: 40px; }
 /* An amber focus ring is under 3:1 on white, so focus uses the darker amber the site uses for text. */
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible,
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-reset:focus-visible,
 .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible, .tb-name a:focus-visible {
   outline: 3px solid var(--tb-accent-text); outline-offset: 2px;
 }

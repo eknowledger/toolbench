@@ -361,6 +361,23 @@ no Run, no status line) and the page drives it with the `values` setter and `run
 With `controls="none"` the host does not mark a result stale when values change either: whoever owns the
 control that changed it owns saying so. Neither attribute changes a card.
 
+### Reset
+
+Once the reader has changed an input, a **Reset** button appears beside Run. It puts every input back to
+the values the tool first opened with, which are the page's own if it prefilled them through `values`
+before the tool loaded, and the defaults otherwise. It clears the result, so the panel looks as it did on
+first load: a seeded tool shows its seed again, and an `autoRun` tool computes its default answer again.
+Focus moves to the first input, the status line says what happened, and the element dispatches
+`tool-reset` with `{ values }`, after the `tool-input` for the same change. The button is hidden while
+the values already equal the starting ones, so it never does nothing. Its accessible name is "Reset
+inputs to their starting values".
+
+`reset="none"` leaves it out, for a tool where it adds nothing, such as one with a single input:
+
+```html
+<tool-host tool="utf8-bytes" mode="embed" reset="none"></tool-host>
+```
+
 ### A graph wider than its tool
 
 A graph is laid out at the size its labels need, which is often wider than the column it sits in. By
@@ -558,6 +575,8 @@ host.addEventListener("tool-input", (e) => saveToUrl(e.detail.values));       //
 host.addEventListener("tool-run", (e) => track(e.detail.ok, e.detail.error));  // after the result is drawn
 ```
 
+A third, `tool-reset`, fires when the reader presses Reset (see [Reset](#reset)).
+
 `tool-input` fires once per change to the inputs, whatever made it: typing, a sample, a preset or a
 `values` write, which dispatches it before the setter returns. A write that leaves the values as they
 were fires nothing. `tool-run` fires once per run, from Run, `run()`, `reveal()` or an `autoRun` tool's
@@ -711,7 +730,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.5 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 25.8 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.9 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |

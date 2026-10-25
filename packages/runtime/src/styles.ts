@@ -151,7 +151,7 @@ export const STYLES = /* css */ `
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
 /* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-reset:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
@@ -163,7 +163,7 @@ export const STYLES = /* css */ `
 .tb-slider { flex: 1; min-width: 0; min-height: 24px; accent-color: var(--tb-accent); }
 .tb-slider:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-actions { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
-.tb-run {
+.tb-run, .tb-reset {
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -194,6 +194,12 @@ export const STYLES = /* css */ `
     color-mix(in oklab, var(--tb-accent) 62%, white)
   );
 }
+
+/* Reset (#208): Run's size and shape, outlined instead of filled, so the two read as a pair and the one
+   that runs the tool still draws the eye. The border is inside the box, hence the 1px off Run's padding:
+   without it Reset stood taller than Run beside it. */
+.tb-reset { color: var(--tb-fg); background: none; border: 1px solid var(--tb-border); padding: calc(0.4375rem - 1px) 0.875rem; }
+.tb-reset:hover { border-color: var(--tb-muted); }
 
 /* Quieter than the filled accent of .tb-run on purpose: a sample fills the form, it does not run the
    tool. No margin: the .tb-body grid already spaces its children. */

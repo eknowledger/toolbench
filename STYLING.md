@@ -77,7 +77,7 @@ same order, so the cascade is the same.
 | `.tb-facade`, `.tb-facade-hint` | A closed card, and its "Try it" control |
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
-| `.tb-actions`, `.tb-run`, `.tb-progress` | The Run button and the progress bar |
+| `.tb-actions`, `.tb-run`, `.tb-reset`, `.tb-progress` | The Run button, the Reset button beside it (carries `hidden` while the inputs are at their starting values), and the progress bar |
 | `.tb-status` | The visible status line |
 | `.tb-output` | Where the result is drawn |
 | `.tb-more`, `.tb-disclose`, `.tb-rest` | A truncated result's notice, its expand button, and the parts it reveals |

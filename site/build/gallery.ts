@@ -196,6 +196,13 @@ export const GROUPS: Group[] = [
 				code: () => [keys("tools/percentiles", "samples")],
 			},
 			{
+				id: "reset",
+				title: "Reset",
+				text: "Change an input and a Reset button appears beside Run. It puts back the values the tool opened with and clears the result. <code>reset=\"none\"</code> leaves it out.",
+				demo: `<tool-host tool="queue-explorer" mode="embed"></tool-host>`,
+				code: (demo) => [demo, markup(`<tool-host tool="utf8-bytes" mode="embed" reset="none"></tool-host>`)],
+			},
+			{
 				id: "presets",
 				title: "A select that fills other inputs",
 				text: "Give a select's options <code>sets</code>, and choosing one fills those inputs for the reader to edit. The select follows the form after that.",

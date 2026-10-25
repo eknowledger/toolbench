@@ -92,6 +92,11 @@ export interface ToolHostAttributes {
 	 * @default "true"
 	 */
 	"wide-toggle"?: "true" | "false";
+	/**
+	 * `none` leaves out the Reset button, for a tool where it adds nothing, such as one with a single input.
+	 * @default "default"
+	 */
+	reset?: "default" | "none";
 }
 
 /**
@@ -123,6 +128,11 @@ export interface ToolHostEvents {
 	 * replaced by a newer one before it finished dispatches nothing.
 	 */
 	"tool-run": CustomEvent<{ values: InputValues; ok: boolean; error?: string }>;
+	/**
+	 * The reader pressed Reset. Dispatched after the form shows the starting values and the result is cleared,
+	 * and after the `tool-input` for the same change. `values` are the starting values.
+	 */
+	"tool-reset": CustomEvent<{ values: InputValues }>;
 }
 
 /** How long a run must last before its progress bar is worth showing. */
@@ -189,7 +199,7 @@ export function setHostStyles(styles: HostStyles | undefined): void {
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle", "reset"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -207,6 +217,16 @@ export class ToolHost extends HTMLElement {
 	 * the same number, changed nothing a listener could act on.
 	 */
 	#reported = "";
+	/**
+	 * The values the tool first rendered with, serialised: the defaults with any host prefill on top. Reset
+	 * returns to these, so an embed that opened on the page's own values goes back there and not to the
+	 * manifest's defaults, which is where a "Start again" sample went.
+	 */
+	#start = "";
+	/** Whether the starting values include a host prefill, so a reset seed is marked stale as it was at first. */
+	#startPrefilled = false;
+	/** Counts resets, so a run still in flight when the reader pressed Reset does not draw over the cleared panel. */
+	#resets = 0;
 	/** True after a host wrote `values`, so a later paint of a seed can mark that seed stale. */
 	#hostWroteValues = false;
 	/** Settles when the current `#prepare` finishes. `run()` waits on this so it does not no-op. */
@@ -253,6 +273,7 @@ export class ToolHost extends HTMLElement {
 		status?: HTMLElement;
 		announce?: HTMLElement;
 		run?: HTMLButtonElement;
+		reset?: HTMLButtonElement;
 		progress?: HTMLElement;
 	} = {};
 
@@ -417,6 +438,11 @@ export class ToolHost extends HTMLElement {
 	 * `values` and `run()` (#103). Without it, any controls a page built were duplicated by the ones inside
 	 * the shadow root. Ignored by a card.
 	 */
+	/** `none`: no Reset button (#208). Anything else draws one. */
+	get reset(): "default" | "none" {
+		return this.getAttribute("reset") === "none" ? "none" : "default";
+	}
+
 	get controls(): "default" | "none" {
 		return this.getAttribute("controls") === "none" ? "none" : "default";
 	}
@@ -502,7 +528,8 @@ export class ToolHost extends HTMLElement {
 			// A prefill that arrived before the manifest follows the same preset rule as one after it.
 			this.#follow(Object.keys(overlay));
 			// The starting values, prefill included, are what the first `tool-input` is measured against.
-			this.#reported = JSON.stringify(this.#values);
+			this.#reported = this.#start = JSON.stringify(this.#values);
+			this.#startPrefilled = this.#hostWroteValues;
 			/*
 			 * ⚠️ Before the first paint, and only when this paint is going to draw a chart.
 			 *
@@ -696,6 +723,7 @@ export class ToolHost extends HTMLElement {
 			if (!options.quiet) this.#emit("tool-run", { values, ok, ...(error !== undefined ? { error } : {}) });
 		};
 
+		const resets = this.#resets;
 		this.#hostWroteValues = false;
 		this.#els.output?.removeAttribute("data-stale");
 		this.#els.run?.removeAttribute("data-attention");
@@ -705,9 +733,10 @@ export class ToolHost extends HTMLElement {
 			const output = await runner.run(loaded, this.#values, {
 				onProgress: (fraction, partial) => {
 					this.#setProgress(fraction);
-					if (partial) this.#draw(partial);
+					if (partial && resets === this.#resets) this.#draw(partial);
 				},
 			});
+			if (resets !== this.#resets) return;
 			this.#setBusy(false);
 			this.#draw(output);
 			/*
@@ -724,7 +753,7 @@ export class ToolHost extends HTMLElement {
 			if (options.focusResult) this.#els.output?.focus();
 			settled(output.kind !== "error", output.kind === "error" ? output.message : undefined);
 		} catch (error) {
-			if (isSuperseded(error)) return; // the reader typed again; the newer run owns the UI
+			if (isSuperseded(error) || resets !== this.#resets) return; // a newer run, or a reset, owns the UI
 			this.#setBusy(false);
 			settled(false, this.#showError(error));
 		}
@@ -769,9 +798,55 @@ export class ToolHost extends HTMLElement {
 	 */
 	#changed(): void {
 		const now = JSON.stringify(this.#values);
+		this.#showReset(now);
 		if (now === this.#reported) return;
 		this.#reported = now;
 		this.#emit("tool-input", { values: this.values });
+	}
+
+	/**
+	 * Hidden while the values are the starting ones, so it is never a button that does nothing.
+	 *
+	 * ⚠️ Toggled, never inserted, and only when it changes. Chrome ends an undo group at a node insertion
+	 * anywhere in the document (the defect register's "one undo took back one character"), so a button added
+	 * on the first keystroke and removed when the values came back would split the reader's typing into
+	 * separate undo steps.
+	 */
+	#showReset(now = JSON.stringify(this.#values)): void {
+		const reset = this.#els.reset;
+		if (reset && reset.hidden !== (now === this.#start)) reset.hidden = !reset.hidden;
+	}
+
+	/**
+	 * Back to the first-load state (#208): the starting values in every control, the result cleared, the seed
+	 * back if there was one, and an `autoRun` tool's default answer computed again, because that is what the
+	 * reader first saw.
+	 */
+	#doReset(): void {
+		this.#resets++;
+		if (this.#debounce) clearTimeout(this.#debounce);
+		this.#setBusy(false);
+		this.#values = JSON.parse(this.#start) as InputValues;
+		this.#syncControls();
+		this.#hostWroteValues = this.#startPrefilled;
+		this.#shown = undefined;
+		this.#expanded = this.#uncapped = false;
+		const output = this.#els.output;
+		output?.removeAttribute("data-stale");
+		this.#els.run?.removeAttribute("data-attention");
+		output?.replaceChildren();
+		this.#markInvalid(undefined);
+		if (this.#seed) {
+			this.#draw(this.#seed);
+			this.#shown = undefined;
+			if (this.#startPrefilled) this.#markStale();
+		}
+		this.#say("inputs reset to their starting values");
+		// The button has just hidden itself, and focus on a hidden button falls to the page.
+		this.#controls.values().next().value?.focus();
+		this.#changed();
+		this.#emit("tool-reset", { values: this.values });
+		if (this.#manifest?.autoRun === true) void this.#run({ focusResult: false });
 	}
 
 	// --- painting ---------------------------------------------------------------------------------
@@ -959,7 +1034,16 @@ export class ToolHost extends HTMLElement {
 			setTimeout(() => (announce.textContent = message), 50);
 		});
 
-		this.#els = { run, progress, status, announce, output };
+		/*
+		 * Always built when allowed, and hidden rather than left out, for the undo reason in `#showReset`. Its
+		 * accessible name starts with the visible word, so a speech-input user saying "Reset" still matches.
+		 */
+		const reset =
+			this.reset === "none"
+				? undefined
+				: el("button", { class: "tb-reset", type: "button", "aria-label": "Reset inputs to their starting values", hidden: JSON.stringify(this.#values) === this.#start }, "Reset");
+		reset?.addEventListener("click", () => this.#doReset());
+		this.#els = { run, progress, status, announce, output, ...(reset ? { reset } : {}) };
 		const embedMark = mode === "embed" ? lifecycleMark(lifecycleStatus(manifest)) : null;
 		if (embedMark) body.append(embedMark);
 		/*
@@ -973,7 +1057,7 @@ export class ToolHost extends HTMLElement {
 		 * bar stays, for the rare slow run.
 		 */
 		const autoRun = manifest.autoRun === true;
-		const actions = autoRun ? progress : el("div", { class: "tb-actions" }, run, progress);
+		const actions = autoRun && !reset ? progress : el("div", { class: "tb-actions" }, autoRun ? null : run, reset ?? null, progress);
 		/*
 		 * `controls="none"` and `layout="answer-first"` (#103), neither of which a card honours: a card has
 		 * not been opened, and is answer-forward already.
