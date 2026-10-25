@@ -1,6 +1,6 @@
 import { bootSite } from "./site-host.ts";
 import { fixtures } from "./fixtures.ts";
-import { HIGHLIGHT_STYLES, INPUT_STYLES, WRAP_STYLES, highlight, perTool } from "./gallery-host.ts";
+import { HIGHLIGHT_STYLES, INPUT_STYLES, highlight, perTool } from "./gallery-host.ts";
 import "./tabs.ts";
 import "./panels.ts";
 import { followSections } from "./spy.ts";
@@ -8,7 +8,7 @@ import { followSections } from "./spy.ts";
 bootSite({
 	extra: fixtures,
 	highlight,
-	perTool: { "*": [HIGHLIGHT_STYLES], ...perTool, "input-help": [INPUT_STYLES], "narrow-table": [WRAP_STYLES] },
+	perTool: { "*": [HIGHLIGHT_STYLES], ...perTool, "input-help": [INPUT_STYLES] },
 });
 
 followSections(".gallery-nav", ".gallery-main [id]");

@@ -126,12 +126,12 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		from: 7,
 		/*
-		 * 7 -> 8 added `mono` on a field (#209) and `share` on an input (#211), `role` on an input (#224), and `wrap` on a table column and cell (#213).
+		 * 7 -> 8 added `mono` on a field (#209) and `share` on an input (#211), `role` on an input (#224), `wrap` on a table column and cell (#213), and `rowHeader` on a column (#214).
 		 *
 		 * Identity on both halves. A v7 field has no `mono` and was drawn in the monospace face, and an absent
 		 * `mono` still means exactly that. Writing `mono: true` onto every v7 field would say nothing new and
 		 * would change every old tool's result as its own fixtures see it. A v7 input has no `share`, and a
-		 * host reads that as shareable, which is what every v7 input was; one with no `role` has no name, as before, and a column with no `wrap` makes no claim, as none did.
+		 * host reads that as shareable, which is what every v7 input was; one with no `role` has no name, as before, a column with no `wrap` makes no claim, as none did, and one with no `rowHeader` renders `<td>` cells, as every column did.
 		 */
 		manifest: (m) => m,
 		output: (o) => o,

@@ -69,6 +69,14 @@ export interface Column {
 	 * claim, and no attribute is written. Contract version 8.
 	 */
 	wrap?: "prose" | "none";
+	/**
+	 * The column names each row: its cells render as `<th scope="row">` instead of `<td>`, so a screen reader
+	 * announces the row's name with every cell, and on a narrow tool the column stays in view while the rest
+	 * scrolls. Opt-in, because a host selector such as `td:first-child` stops matching those cells.
+	 * Contract version 8.
+	 * @default false
+	 */
+	rowHeader?: boolean;
 }
 
 /** A cell's `wrap` overrides its column's (contract version 8). */

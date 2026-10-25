@@ -66,6 +66,7 @@ export const OUTPUT_SINCE: Since = {
 	"cell tone muted": 5,
 	"table link": 4,
 	"column wrap": 8,
+	"column rowHeader": 8,
 	"cell wrap": 8,
 	"chart thresholds": 4,
 	"chart readout": 4,
@@ -164,6 +165,7 @@ export function outputFeatureProblem(output: Output, declared: number): string |
 			if (part.link !== undefined) use("table link", `${at}.link`);
 			list(part.columns).forEach((column, c) => {
 				if (isObject(column) && column.wrap !== undefined) use("column wrap", `${at}.columns[${c}].wrap`);
+				if (isObject(column) && column.rowHeader !== undefined) use("column rowHeader", `${at}.columns[${c}].rowHeader`);
 			});
 			list(part.rows).forEach((row, r) =>
 				list(row).forEach((cell, c) => {

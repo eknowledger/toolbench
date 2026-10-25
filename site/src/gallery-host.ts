@@ -50,17 +50,6 @@ export const perTool = {
 };
 // #endregion
 
-// #region wrap-styles
-// A narrow layout that needs no guessing: the table scrolls, short tokens stay on one line, prose gets a width.
-export const WRAP_STYLES = /* css */ `
-@container (max-width: 34rem) {
-  .tb-out-table table { width: max-content; min-width: 100%; }
-  .tb-out-table [data-wrap="none"] { white-space: nowrap; }
-  .tb-out-table [data-wrap="prose"] { min-width: 20ch; }
-}
-`;
-// #endregion
-
 // #region input-styles
 // One input by role and one by id: a property set on a row reaches only that row's control.
 export const INPUT_STYLES = /* css */ `

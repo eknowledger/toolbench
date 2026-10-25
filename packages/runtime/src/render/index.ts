@@ -457,7 +457,7 @@ function renderTable(
 		"tr",
 		{},
 		...output.columns.map((column) =>
-			el("th", { scope: "col", "data-align": column.align ?? "start", "data-wrap": wrapOf(column.wrap), class: column.mono ? "tb-mono" : "" }, column.label),
+			el("th", { scope: "col", "data-align": column.align ?? "start", "data-wrap": wrapOf(column.wrap), "data-row-header": column.rowHeader || undefined, class: column.mono ? "tb-mono" : "" }, column.label),
 		),
 	);
 	const link = output.link;
@@ -469,9 +469,11 @@ function renderTable(
 				const column = output.columns[i];
 				const value = typeof cell === "object" && cell !== null ? cell : { text: String(cell) };
 				const mono = ("mono" in value ? value.mono : undefined) ?? column?.mono ?? false;
+				// A row header (#214) is announced with every cell of its row; it keeps a td's attributes.
 				return el(
-					"td",
+					column?.rowHeader ? "th" : "td",
 					{
+						scope: column?.rowHeader ? "row" : undefined,
 						"data-align": column?.align ?? (typeof cell === "number" ? "end" : "start"),
 						"data-tone": ("tone" in value ? value.tone : undefined) ?? "normal",
 						/*

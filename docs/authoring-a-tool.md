@@ -609,6 +609,13 @@ token kept on one line (a hash, a date, a status word, a row's name), `wrap: "pr
 need a reading width. A cell's own `wrap` overrides its column's. Say nothing and nothing is claimed, as
 before. It is rendered as `data-wrap` on the header and every cell. Contract version 8.
 
+`rowHeader: true` on a column makes its cells each row's name: they render as `<th scope="row">`, so a
+screen reader announces the name with every cell of the row, and on a narrow tool the column stays in view
+while the rest scrolls. Mark the column that names the row, usually the first. Contract version 8.
+
+With `wrap` on its columns, a table has a narrow layout built in: on a tool narrower than 34rem it keeps
+its columns and scrolls, with the tokens on one line and the prose at a reading width.
+
 ```ts
 { kind: "table",
   columns: [{ key: "n", label: "Bucket", align: "end" }, { key: "hits", label: "Hits", align: "end", mono: true }],

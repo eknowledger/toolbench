@@ -326,7 +326,9 @@ export const STYLES = /* css */ `
 .tb-copy:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-copy-note { font-size: 0.78rem; color: var(--tb-muted); }
 
-.tb-out-table { overflow-x: auto; }
+/* Edge shadows while more scrolls (#214): local covers hide each at its end. Covers match the frame. */
+.tb-out-table{overflow-x:auto;--tb-scroll-bg:var(--tb-bg);--s:color-mix(in oklab,var(--tb-fg) 28%,transparent);background:linear-gradient(90deg,var(--tb-scroll-bg) 40%,#0000) left/1.5rem 100% no-repeat local,linear-gradient(270deg,var(--tb-scroll-bg) 40%,#0000) right/1.5rem 100% no-repeat local,radial-gradient(farthest-side at 0,var(--s),#0000) left/.875rem 100% no-repeat,radial-gradient(farthest-side at 100%,var(--s),#0000) right/.875rem 100% no-repeat}
+:host([mode="embed"]) .tb-out-table{--tb-scroll-bg:var(--tb-surface)}
 .tb-out-table table, .tb-chart-data table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
 .tb-out-table caption, .tb-chart-data caption { text-align: start; color: var(--tb-faint); font-size: 0.78rem; padding-bottom: 0.375rem; }
 .tb-out-table th, .tb-out-table td, .tb-chart-data th, .tb-chart-data td {
@@ -334,14 +336,26 @@ export const STYLES = /* css */ `
 }
 .tb-out-table th { color: var(--tb-muted); font-size: 0.78rem; font-weight: 600; }
 .tb-out-table td[data-align="end"], .tb-out-table th[data-align="end"] { text-align: end; }
-.tb-out-table td[data-tone="bad"] { color: var(--tb-bad); }
+/* A row header (#214) is the row's name. Before the tones, which reach it at equal specificity. */
+.tb-out-table th[scope=row]{color:var(--tb-fg);font-size:inherit}
+.tb-out-table th[scope=row][data-align=end]{text-align:end}
+.tb-out-table tr > [data-tone="bad"] { color: var(--tb-bad); }
 /* A row a chart's readout is on (#124), in a table linked to it: a wash and a rule, never colour alone. */
 .tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
 .tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
-.tb-out-table td[data-tone="warn"] { color: var(--tb-warn); }
+.tb-out-table tr > [data-tone="warn"] { color: var(--tb-warn); }
 /* good matched a field value and was unstyled on a cell (#156); muted lets the routine cells recede. */
-.tb-out-table td[data-tone="good"] { color: var(--tb-good); }
-.tb-out-table td[data-tone="muted"] { color: var(--tb-faint); }
+.tb-out-table tr > [data-tone="good"] { color: var(--tb-good); }
+.tb-out-table tr > [data-tone="muted"] { color: var(--tb-faint); }
+/* The narrow layout (#213, #214), only where data-wrap says which cells are prose. width, not only a floor,
+   or prose ran on one line. :where so the linked-row wash still reaches a sticky row header. */
+@container (max-width:34rem){
+.tb-out-table table:has([data-wrap]){width:max-content;min-width:100%}
+.tb-out-table table:has([data-wrap]) thead th,.tb-out-table [data-wrap=none]{white-space:nowrap}
+.tb-out-table [data-wrap=prose]{min-width:20ch;width:26ch}
+.tb-out-table table:has([data-wrap]) caption{position:sticky;inset-inline-start:0;max-width:calc(100cqi - 2rem)}
+.tb-out-table :where(tbody th[scope=row],thead th[data-row-header]){position:sticky;inset-inline-start:0;z-index:1;background:var(--tb-scroll-bg);box-shadow:inset -1px 0 0 var(--tb-border)}
+}
 
 .tb-out-error {
   display: flex; gap: 0.5rem; align-items: baseline;

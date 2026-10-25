@@ -6264,3 +6264,135 @@ describe("how a table column wraps (contract 8, #213)", () => {
 		await page.close();
 	});
 });
+
+describe("a row header and the narrow table (contract 8, #214)", () => {
+	async function open(width: number, id = "narrow-table") {
+		const page = await browser.newPage({ viewport: { width, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=${id}`, { waitUntil: "load" });
+		// The fixture runs as it opens; percentiles waits for Run, so only its form is there yet.
+		await page.locator(id === "narrow-table" ? "#host >> tbody tr" : "#host >> .tb-run").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written from the narrow-table fixture by hand: Instance says rowHeader, so each row's first cell is a th
+	 * with scope="row", carrying the attributes a td would, and the other five stay td.
+	 */
+	it("renders a rowHeader column's cells as th scope=row, with a td's attributes", async () => {
+		const page = await open(1280);
+		const rows = await page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelectorAll("tbody tr") ?? [])].map((tr) => [...tr.children].map((c) => `${c.tagName.toLowerCase()}${c.getAttribute("scope") ? `[${c.getAttribute("scope")}]` : ""}`)),
+		);
+		for (const row of rows) assert.deepEqual(row, ["th[row]", "td", "td", "td", "td", "td"]);
+		const first = await page.evaluate(() => {
+			const th = document.querySelector("#host")?.shadowRoot?.querySelector('tbody th[scope="row"]') as Element;
+			return Object.fromEntries([...th.attributes].map((a) => [a.name, a.value]));
+		});
+		// An empty class, as every td of a column without mono has.
+		assert.deepEqual(first, { scope: "row", "data-align": "start", "data-tone": "normal", "data-label": "Instance", "data-wrap": "none", class: "" });
+		await page.close();
+	});
+
+	const measure = (page: Page) =>
+		page.evaluate(() => {
+			// The cell's content width in its own font's ch, measured with a 1ch probe rather than assumed.
+			const noteWidthInCh = (cell: HTMLElement) => {
+				const probe = document.createElement("span");
+				probe.style.cssText = "display:inline-block;width:1ch";
+				cell.append(probe);
+				const ch = probe.getBoundingClientRect().width;
+				probe.remove();
+				const style = getComputedStyle(cell);
+				return (cell.getBoundingClientRect().width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)) / ch;
+			};
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			const table = part.querySelector("table") as HTMLElement;
+			const rowHead = root.querySelector('tbody th[scope="row"]') as HTMLElement | null;
+			const note = root.querySelector('tbody td[data-wrap="prose"]') as HTMLElement | null;
+			return {
+				part: part.clientWidth,
+				table: table.getBoundingClientRect().width,
+				scrolls: part.scrollWidth > part.clientWidth,
+				headNowrap: [...root.querySelectorAll("thead th")].every((th) => getComputedStyle(th).whiteSpace === "nowrap"),
+				noneNowrap: [...root.querySelectorAll('[data-wrap="none"]')].every((c) => getComputedStyle(c).whiteSpace === "nowrap"),
+				noteCh: note ? noteWidthInCh(note) : 0,
+				sticky: rowHead ? getComputedStyle(rowHead).position : null,
+				attachment: getComputedStyle(part).backgroundAttachment,
+			};
+		});
+
+	it("at 390px keeps the table at its own width, scrolling, tokens on one line and prose at 20ch", async () => {
+		const page = await open(390);
+		const m = await measure(page);
+		assert.ok(m.scrolls && m.table > m.part, `the table should be wider than its ${m.part}px part, got ${m.table}px`);
+		assert.ok(m.headNowrap, "every heading on one line");
+		assert.ok(m.noneNowrap, "every none cell on one line");
+		assert.ok(m.noteCh >= 20, `the Note column is ${m.noteCh.toFixed(1)}ch, under 20`);
+		// And it wraps: as max-content it ran each sentence on one line, the column 50ch wide.
+		assert.ok(m.noteCh <= 27, `the Note column is ${m.noteCh.toFixed(1)}ch, so its sentences do not wrap`);
+		assert.equal(m.sticky, "sticky");
+		await page.close();
+	});
+
+	it("keeps the row header in view while the rest scrolls", async () => {
+		const page = await open(390);
+		const left = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			part.scrollLeft = 200;
+			const th = root.querySelector('tbody th[scope="row"]') as HTMLElement;
+			const heads = [...root.querySelectorAll("thead th")].map((h) => h.hasAttribute("data-row-header"));
+			const head = root.querySelector("thead th[data-row-header]") as HTMLElement;
+			return { part: part.getBoundingClientRect().left, th: th.getBoundingClientRect().left, head: head.getBoundingClientRect().left, heads, scrolled: part.scrollLeft };
+		});
+		assert.ok(left.scrolled > 0, "the part scrolled");
+		assert.ok(Math.abs(left.th - left.part) < 1, `the row header left the view: ${left.th} against ${left.part}`);
+		assert.deepEqual(left.heads, [true, false, false, false, false, false], "only the row header column's heading is marked");
+		assert.ok(Math.abs(left.head - left.part) < 1, `its heading left the view: ${left.head} against ${left.part}`);
+		await page.close();
+	});
+
+	/*
+	 * The caption scrolled with the table and was cut to its last word, "first", at the left edge. At either
+	 * end of the scroll it must lie inside the part, all of it, wrapping if it has to.
+	 */
+	it("keeps the caption whole and in view at both ends of the scroll", async () => {
+		const page = await open(390);
+		for (const to of [0, 99_999]) {
+			const box = await page.evaluate((to) => {
+				const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+				const part = root.querySelector(".tb-out-table") as HTMLElement;
+				part.scrollLeft = to;
+				const caption = root.querySelector("caption") as HTMLElement;
+				const p = part.getBoundingClientRect();
+				const c = caption.getBoundingClientRect();
+				return { pl: p.left, pr: p.left + part.clientWidth, cl: c.left, cr: c.right, text: caption.textContent, overflow: caption.scrollWidth - caption.clientWidth, scrolled: part.scrollLeft };
+			}, to);
+			assert.equal(box.text, "Six instances, slowest p99 first");
+			assert.ok(box.cl >= box.pl - 1 && box.cr <= box.pr + 1, `scrolled to ${box.scrolled}, the caption runs ${box.cl} to ${box.cr} in a part ${box.pl} to ${box.pr}`);
+			assert.ok(box.overflow <= 0, "and none of its text overflows it");
+		}
+		await page.close();
+	});
+
+	/*
+	 * A table that declares no wrap keeps today's layout: the narrow rules are scoped to a table with a
+	 * data-wrap, so percentiles at 390px is still exactly its part's width, as it was.
+	 */
+	it("leaves a table with no wrap at its part's width, as before", async () => {
+		const page = await open(390, "percentiles");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-table").waitFor({ timeout: 15_000 });
+		const m = await measure(page);
+		assert.ok(Math.abs(m.table - m.part) < 1, `the table is ${m.table}px in a ${m.part}px part`);
+		await page.close();
+	});
+
+	it("draws the scroll shadows with a local background, so they follow what is left to scroll", async () => {
+		const page = await open(390);
+		const m = await measure(page);
+		assert.equal(m.attachment, "local, local, scroll, scroll");
+		await page.close();
+	});
+});
