@@ -147,6 +147,18 @@ describe("the Host API reference", () => {
 		const listed = [...section.matchAll(/<tr><td><code>([\w-]+)<\/code>/g)].map((m) => m[1]);
 		assert.deepEqual([...listed].sort(), [...observed].sort());
 	});
+
+	it("lists every event the element dispatches", () => {
+		// The element dispatches through #emit("tool-…") and the share chunk through new CustomEvent("tool-share").
+		const src = (f: string) => readFileSync(join(import.meta.dirname, "../packages/runtime/src", f), "utf8");
+		const code = src("element.ts") + src("share.ts");
+		const dispatched = [...new Set([...code.matchAll(/(?:#emit\(|new CustomEvent\()"(tool-[\w-]+)"/g)].map((m) => m[1]))].sort();
+		assert.ok(dispatched.length > 0, "found no dispatched events to check against");
+		const page = html.get("docs-ref-host.html") ?? "";
+		const section = page.slice(page.indexOf('id="events"'), page.indexOf('id="sources"'));
+		const listed = [...section.matchAll(/<tr><td><code>(tool-[\w-]+)<\/code>/g)].map((m) => m[1]);
+		assert.deepEqual([...listed].sort(), dispatched);
+	});
 });
 
 describe("llms.txt and reference.json", () => {
