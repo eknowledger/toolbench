@@ -587,6 +587,12 @@ options. Clamping is not on offer, for the same reason. On top of those:
 which is how one result holds two comparable sets: `tools/queue-explorer` uses "Formula" and
 "Simulation" side by side.
 
+A field's value is set in the monospace face, which is right for an address, a hex string or a header
+value the reader compares character by character. `mono: false` sets it, and its note, in the text face
+instead, for a sentence or a plain number with a unit, which in monospace reads like terminal output. One
+list can hold both: `{ label: "Mapped address", value: "192.0.2.10:54321" }` beside
+`{ label: "Integrity", value: "No integrity attribute present", mono: false }`. Contract version 8.
+
 ```ts
 { kind: "table",
   columns: [{ key: "n", label: "Bucket", align: "end" }, { key: "hits", label: "Hits", align: "end", mono: true }],

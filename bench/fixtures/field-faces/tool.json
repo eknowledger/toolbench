@@ -1,0 +1,25 @@
+{
+	"sdk": 8,
+	"id": "field-faces",
+	"name": "Connection check",
+	"blurb": "Fields in two faces: an address in monospace beside a sentence and a timing in the text face.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"autoRun": true,
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "address",
+			"type": "text",
+			"label": "Mapped address",
+			"description": "The address and port the far side saw.",
+			"default": "192.0.2.10:54321",
+			"maxLength": 64,
+			"dir": "ltr",
+			"primary": true
+		}
+	]
+}

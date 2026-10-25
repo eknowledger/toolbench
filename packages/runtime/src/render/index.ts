@@ -377,7 +377,11 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 				el("dt", {}, field.label),
 				el(
 					"dd",
-					{},
+					/*
+					 * On the dd rather than the value, so a note such as a unit takes the value's face. The dd's
+					 * own rule sets the size and outranks `.tb-mono`'s, so a field with no `mono` draws as before.
+					 */
+					{ class: field.mono === false ? undefined : "tb-mono" },
 					el("span", { class: "tb-value" }, field.value),
 					field.note ? el("span", { class: "tb-note" }, field.note) : null,
 				),

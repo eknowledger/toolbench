@@ -328,6 +328,13 @@ export const GROUPS: Group[] = [
 				demo: `<tool-host tool="percentiles" mode="embed" data-run></tool-host>`,
 				code: async () => [await output("tools/percentiles", {})],
 			},
+			{
+				id: "field-faces",
+				title: "A field in the text face",
+				text: "A field's value is monospace, for an address or a hex string read character by character. <code>mono: false</code> sets a sentence or a plain number in the text face, in the same list.",
+				demo: `<tool-host tool="field-faces" mode="embed"></tool-host>`,
+				code: async () => [await output(`${FIX}/field-faces`, {})],
+			},
 		],
 	},
 	{

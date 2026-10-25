@@ -146,7 +146,7 @@ async function message(change: (m: Record<string, unknown>) => void): Promise<st
 /** A manifest that passes, so each rule can break exactly one thing. */
 function baseManifest(): Record<string, unknown> {
 	return {
-		sdk: 7,
+		sdk: 8,
 		id: "example",
 		name: "Example",
 		blurb: "An example.",

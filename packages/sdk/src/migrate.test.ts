@@ -307,3 +307,33 @@ describe("the 6 -> 7 step", () => {
 		assert.deepEqual(upgradeOutput(graph, 7), graph);
 	});
 });
+
+/*
+ * 7 -> 8 (#209): `mono` on a field. A v7 field has no `mono` and is drawn in the monospace face, which is
+ * what an absent `mono` still means, so both halves are the identity. The v7 manifest and output are written
+ * by hand as a v7 author would have written them: a grammar on a textarea, a field with a role and a tone.
+ */
+describe("the 7 -> 8 step", () => {
+	const v7 = {
+		sdk: 7,
+		id: "v7-grammar",
+		name: "A v7 tool",
+		inputs: [{ id: "machine", type: "textarea", label: "Machine", default: "", lang: "fsm", grammar: { keywords: ["on"] } }],
+		kinds: ["fields", "graph", "error"],
+	};
+	const step = MIGRATIONS.find((m) => m.from === 7);
+
+	it("exists, and both halves are the identity", () => {
+		assert.ok(step, "a step from 7");
+		assert.deepEqual(step.manifest(v7), v7);
+		const output: Output = { kind: "fields", fields: [{ label: "Mapped address", value: "192.0.2.10:54321", role: "address", tone: "good" }] };
+		assert.deepEqual(step.output(output), output);
+		assert.deepEqual(upgradeOutput(output, 7), output, "an absent mono stays absent, which the renderer draws as mono");
+	});
+
+	it("carries a v7 manifest forward with nothing changed but sdk", () => {
+		const upgraded = upgradeManifest(v7);
+		assert.equal(upgraded.sdk, SDK_VERSION);
+		assert.deepEqual({ ...upgraded, sdk: 7 }, v7);
+	});
+});

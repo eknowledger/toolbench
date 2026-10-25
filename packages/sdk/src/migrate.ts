@@ -123,6 +123,18 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 7,
+		/*
+		 * 7 -> 8 added `mono` on a field (#209).
+		 *
+		 * Identity on both halves. A v7 field has no `mono` and was drawn in the monospace face, and an absent
+		 * `mono` still means exactly that. Writing `mono: true` onto every v7 field would say nothing new and
+		 * would change every old tool's result as its own fixtures see it.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {

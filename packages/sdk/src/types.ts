@@ -31,6 +31,14 @@ export interface Field {
 	 * without counting rows. The runtime gives it no meaning. Contract version 5.
 	 */
 	role?: string;
+	/**
+	 * Set the value, and its note, in the monospace face, for an address, a hex string or a header the
+	 * reader compares character by character. `false` for a sentence or a plain number with a unit, which
+	 * read like terminal output in it. Rendered as `.tb-mono` on the `<dd>`, the class a table cell uses.
+	 * Contract version 8.
+	 * @default true
+	 */
+	mono?: boolean;
 }
 
 export type Tone = "normal" | "warn" | "bad" | "good";
