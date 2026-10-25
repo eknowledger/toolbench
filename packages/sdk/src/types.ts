@@ -991,6 +991,12 @@ export interface Manifest {
 	 * live, a unit converter say. Anything with a worker or a heavy loop should leave it alone.
 	 */
 	autoRun?: boolean;
+	/**
+	 * `false` hides the runtime's Reset control, which puts every input back to the values the tool opened
+	 * with: for a tool with one input, where retyping it is the reset. Contract version 8.
+	 * @default true
+	 */
+	reset?: boolean;
 	/** Worker mode only. A tool that declares this on the main thread is rejected: nothing there can be stopped. */
 	timeoutMs?: number;
 	/** Markdown file, relative to the tool's directory, rendered as the tool's help. */

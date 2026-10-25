@@ -386,7 +386,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  * default. So a known key found in the wrong place is refused with the place it belongs. Unknown keys are
  * still ignored: refusing those would narrow the contract and stop manifests that load today from loading.
  */
-export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
+export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples", "reset"];
 export const RUNTIME_KEYS = ["entry", "thread"];
 export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details"];
 
@@ -499,6 +499,7 @@ export function validateManifest(raw: unknown): Manifest {
 		fail("cardFields", "must be a positive number of fields");
 	}
 	if (o.autoRun !== undefined && typeof o.autoRun !== "boolean") fail("autoRun", "must be a boolean");
+	if (o.reset !== undefined && typeof o.reset !== "boolean") fail("reset", "must be a boolean");
 
 	// --- timeout ----------------------------------------------------------------------------------
 	if (o.timeoutMs !== undefined) {

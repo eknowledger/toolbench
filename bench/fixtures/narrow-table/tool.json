@@ -8,6 +8,7 @@
 	"runtime": { "entry": "index.ts", "thread": "main" },
 	"card": "live",
 	"autoRun": true,
+	"reset": false,
 	"kinds": ["table", "error"],
 	"tags": ["bench"],
 	"inputs": [
