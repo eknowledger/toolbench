@@ -32,6 +32,17 @@ void customElements.whenDefined("tool-host").then(() => {
 	}
 });
 
+// #region events
+const log = document.querySelector("#events-log");
+for (const type of ["tool-input", "tool-run"]) {
+	// Both bubble out of the shadow root, so the listener could as well be on `document`.
+	document.querySelector("#events-host")?.addEventListener(type, (event) => {
+		const { detail } = event as CustomEvent<Record<string, unknown>>;
+		if (log) log.textContent = `${type} ${JSON.stringify(detail, null, 1).replace(/\s*\n\s*/g, " ")}`;
+	});
+}
+// #endregion
+
 // #region reveal
 const host = document.querySelector<Host>("#reveal-host");
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-reveal]")) {

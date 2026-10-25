@@ -385,6 +385,10 @@ renderers for markup, while a worker is reached only through the runner.
   and byte notices so a reader is never shown a truncation they cannot act on;
 * a `values` setter and `run()` method, so a host can prefill the form and opt into running without
   reaching into the shadow root;
+* the `tool-input` and `tool-run` events (#212), composed and bubbling, so a page can follow the form and
+  each settled run without listening for the controls' own events inside the shadow root. `tool-input`
+  is compared with the last values reported, so a write that changes nothing is silent, and neither fires
+  while the tool opens with its starting values, an `autoRun` tool's first run included;
 * `reveal(id)`, so a page can link to one part (#147): it activates a closed card, runs a tool with
   nothing on screen, opens a disclosure or lifts a plain `parts` cap when the part is behind one, then
   scrolls to the part and focuses it. Only for an id the result has, so a wrong link changes nothing;
@@ -896,7 +900,7 @@ Eight layers. Each catches something the others structurally cannot.
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 23 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 207 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 214 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -928,6 +932,10 @@ production build:
 * changing an input marks the result stale without re-running, and Run clears it;
 * a host `values` write fills the form without running, clamps like typing, works before a card
   opens, and `run()` after it produces a result;
+* `tool-input` fires once per keystroke, select change, sample and changing `values` write, before the
+  setter returns and not for a write that changes nothing; `tool-run` fires once per Run or `run()`, after
+  the result is drawn, with `ok` false and the message for an error result and a crash, once for a
+  debounced burst on an `autoRun` tool, and neither fires while the tool opens;
 * a sample fills the form, sets several inputs at once, leaves the ones it does not name alone, keeps
   focus on the button that was pressed, and draws no row on a card;
 * a select preset fills the inputs it names and leaves the rest, goes stale without running, and passes
@@ -978,7 +986,7 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 25.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), and 50 bytes with naming a missing graph as a graph rather than a chart |
+| Runtime plus the bench's own wiring | 25.5 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, and 0.2 KB with the `tool-input` and `tool-run` events (163 bytes) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |

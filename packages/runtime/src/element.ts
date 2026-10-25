@@ -94,6 +94,37 @@ export interface ToolHostAttributes {
 	"wide-toggle"?: "true" | "false";
 }
 
+/**
+ * The events `<tool-host>` dispatches, as a type: each name and the event a listener receives. Every one is
+ * a `CustomEvent` that bubbles and is composed, so a page can listen on the element or on anything above it,
+ * `document` included. None fires while the element is first drawing the tool with its starting values, an
+ * `autoRun` tool's first answer included: opening a tool is not a change, and not a run anyone asked for.
+ * Types only; nothing here ships in the bundle.
+ *
+ * ```ts
+ * host.addEventListener("tool-input", (event) => {
+ *   const { values } = (event as ToolHostEvents["tool-input"]).detail;
+ *   history.replaceState(null, "", `?${new URLSearchParams(values as Record<string, string>)}`);
+ * });
+ * ```
+ */
+export interface ToolHostEvents {
+	/**
+	 * The inputs changed, by typing, a sample, a preset or a write to `values`. Once per change, after the
+	 * form shows the new values, and only when they differ from the last ones reported. Dispatched before a
+	 * `values` write returns. `values` is a copy, already clamped and refused the way typing is. Debounce is
+	 * the listener's business.
+	 */
+	"tool-input": CustomEvent<{ values: InputValues }>;
+	/**
+	 * A run settled: from Run, Enter, `run()`, `reveal()` or an `autoRun` tool's typing. Once per run, after
+	 * its result or error is drawn and before `run()` resolves. `values` are the ones the run used. `ok` is
+	 * false for an error result and for a run that failed, with `error` the message the reader sees. A run
+	 * replaced by a newer one before it finished dispatches nothing.
+	 */
+	"tool-run": CustomEvent<{ values: InputValues; ok: boolean; error?: string }>;
+}
+
 /** How long a run must last before its progress bar is worth showing. */
 const SLOW_MS = 400;
 
@@ -170,6 +201,12 @@ export class ToolHost extends HTMLElement {
 	 * can prefill a card that has not listed tools yet.
 	 */
 	#queued: InputValues = {};
+	/**
+	 * The values `tool-input` last reported, serialised. Compared rather than dispatching on every write,
+	 * because a host writing the values the form already holds, or a keystroke a number box coerces back to
+	 * the same number, changed nothing a listener could act on.
+	 */
+	#reported = "";
 	/** True after a host wrote `values`, so a later paint of a seed can mark that seed stale. */
 	#hostWroteValues = false;
 	/** Settles when the current `#prepare` finishes. `run()` waits on this so it does not no-op. */
@@ -243,7 +280,8 @@ export class ToolHost extends HTMLElement {
 	 *
 	 * Validated the way typing is (clamp, refuse, truncate), and does not run the tool, even if the
 	 * tool set `autoRun`. An existing result goes stale. Works before activation, so a card can be
-	 * prefilled. A host that wants the tool to run calls `run()` afterwards.
+	 * prefilled. A host that wants the tool to run calls `run()` afterwards. Dispatches `tool-input` before
+	 * returning if the values changed, except before the tool has loaded, when they become its starting values.
 	 */
 	set values(partial: InputValues) {
 		if (partial == null || typeof partial !== "object" || Array.isArray(partial)) return;
@@ -270,7 +308,8 @@ export class ToolHost extends HTMLElement {
 	 * Run the tool. Opt-in: setting `values` never does this on its own.
 	 *
 	 * Waits for the manifest, activates if the form has not opened yet, then runs. So
-	 * `host.values = …; host.run()` works on a card nobody has clicked.
+	 * `host.values = …; host.run()` works on a card nobody has clicked. Dispatches `tool-run` once the result
+	 * is drawn, before the promise resolves.
 	 *
 	 * ⚠️ Does NOT move focus, unlike the reader pressing Run. Focus follows the person who acted, and here
 	 * the person who acted is the page, not the reader: a host running a tool on load would otherwise yank
@@ -462,6 +501,8 @@ export class ToolHost extends HTMLElement {
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
 			// A prefill that arrived before the manifest follows the same preset rule as one after it.
 			this.#follow(Object.keys(overlay));
+			// The starting values, prefill included, are what the first `tool-input` is measured against.
+			this.#reported = JSON.stringify(this.#values);
 			/*
 			 * ⚠️ Before the first paint, and only when this paint is going to draw a chart.
 			 *
@@ -588,7 +629,7 @@ export class ToolHost extends HTMLElement {
 			 * output under a form, with nothing saying why. Its default answer is computed once, here.
 			 */
 			if (this.#manifest?.autoRun === true) {
-				void this.#run({ focusResult: false });
+				void this.#run({ focusResult: false, quiet: true });
 			} else if (!this.#hostWroteValues && this.#seed) {
 				this.#say("showing the default result. Press Run to try your own");
 			}
@@ -643,11 +684,17 @@ export class ToolHost extends HTMLElement {
 		this.#say(hasResult ? "inputs changed. Press Run" : "");
 	}
 
-	async #run(options: { focusResult: boolean }): Promise<void> {
+	/** `quiet` is for the run activation makes on its own, which is part of opening the tool and reports nothing. */
+	async #run(options: { focusResult: boolean; quiet?: boolean }): Promise<void> {
 		const loaded = this.#loaded;
 		const runner = this.#runner;
 		if (!loaded || !runner) return;
 		if (this.#manifest && lifecycleStatus(this.#manifest) === "retired") return;
+		// Taken now: the reader may type while a worker runs, and the event describes this run, not the form.
+		const values = this.values;
+		const settled = (ok: boolean, error?: string) => {
+			if (!options.quiet) this.#emit("tool-run", { values, ok, ...(error !== undefined ? { error } : {}) });
+		};
 
 		this.#hostWroteValues = false;
 		this.#els.output?.removeAttribute("data-stale");
@@ -675,20 +722,22 @@ export class ToolHost extends HTMLElement {
 			else this.#announce(summarise(output, this.mode === "card"));
 			this.#markInvalid(output.kind === "error" ? output.input : undefined);
 			if (options.focusResult) this.#els.output?.focus();
+			settled(output.kind !== "error", output.kind === "error" ? output.message : undefined);
 		} catch (error) {
 			if (isSuperseded(error)) return; // the reader typed again; the newer run owns the UI
 			this.#setBusy(false);
-			this.#showError(error);
+			settled(false, this.#showError(error));
 		}
 	}
 
-	#showError(error: unknown): void {
+	/** Draws the failure and returns its message, which is also what `tool-run` reports. */
+	#showError(error: unknown): string {
 		if (!this.#els.output) {
 			// Activation itself failed, so there is no result area yet: the whole element becomes the
 			// message. Better than a facade that silently never opens.
 			const message = error instanceof Error ? error.message : String(error);
 			this.#fatal(message);
-			return;
+			return message;
 		}
 		/*
 		 * A tool crashing, a worker failing to start and a timeout are three different problems, and a
@@ -707,6 +756,22 @@ export class ToolHost extends HTMLElement {
 		this.#draw({ kind: "error", message });
 		this.#say(`error: ${message}`);
 		if (error instanceof ToolCrashError && error.toolStack) console.error(error.toolStack);
+		return message;
+	}
+
+	#emit(type: keyof ToolHostEvents, detail: ToolHostEvents[typeof type]["detail"]): void {
+		this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }));
+	}
+
+	/**
+	 * Dispatch `tool-input` if the values differ from the last ones reported. Called last by every path that
+	 * writes them, so a listener reading the form or the status line finds them already updated.
+	 */
+	#changed(): void {
+		const now = JSON.stringify(this.#values);
+		if (now === this.#reported) return;
+		this.#reported = now;
+		this.#emit("tool-input", { values: this.values });
 	}
 
 	// --- painting ---------------------------------------------------------------------------------
@@ -1238,6 +1303,7 @@ export class ToolHost extends HTMLElement {
 		 * `autoRun` tool is already announcing its own run, so leave that one alone.
 		 */
 		if (this.#manifest?.autoRun !== true) this.#say(`filled with "${label}"${note}. Press Run`);
+		this.#changed();
 	}
 
 	/**
@@ -1251,6 +1317,7 @@ export class ToolHost extends HTMLElement {
 		if (note) this.#syncControls();
 		this.#inputChanged();
 		if (note) this.#say(note.slice(2) + (this.#els.output?.hasAttribute("data-stale") ? ". Press Run" : ""));
+		this.#changed();
 	}
 
 	/**
@@ -1301,6 +1368,7 @@ export class ToolHost extends HTMLElement {
 		this.#hostWroteValues = true;
 		if (this.#els.output) this.#markStale();
 		if (note) this.#say(note.slice(2));
+		this.#changed();
 	}
 
 	#syncControls(): void {
