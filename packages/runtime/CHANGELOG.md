@@ -1,5 +1,46 @@
 # @toolbench/runtime
 
+## 0.13.0
+
+### Minor Changes
+
+- [#228](https://github.com/eknowledger/toolbench/pull/228) [`cbc515c`](https://github.com/eknowledger/toolbench/commit/cbc515ce95725c48528ae51368fdc0b6032aafa5) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: chart labels stay readable at any width.** A chart is now laid out for the width it is drawn at, so its labels are 12px on a phone and on a wide screen, where they used to be about 5px and 22px. ([#210](https://github.com/eknowledger/toolbench/issues/210))
+  
+  - **New:** `--tb-chart-font` sets the size of every label in a chart, and `--tb-chart-max-width` caps how wide a chart is drawn. See STYLING.md.
+  - Below 480px, horizontal bars put each name above its bars, a pie's key goes under the pie, and a Venn diagram's set names go in a key.
+  - ⚠️ Heads-up: a chart is drawn again when its width changes, so a reference to the figure `render` returned can go stale. Find it by `data-kind` or `data-part`.
+
+- [#231](https://github.com/eknowledger/toolbench/pull/231) [`eb76ee3`](https://github.com/eknowledger/toolbench/commit/eb76ee32437b8394607f0652a9484f21555289c3) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: follow a tool from your page.** `<tool-host>` dispatches `tool-input` with `{ values }` after the inputs change, and `tool-run` with `{ values, ok, error? }` after a run's result is drawn, so a deep link, analytics or your own Copy button no longer has to listen for clicks inside the shadow root. ([#212](https://github.com/eknowledger/toolbench/issues/212))
+  
+  - Both bubble and are composed, so one listener on `document` hears every tool.
+  - Neither fires while a tool first opens with its starting values. The `ToolHostEvents` type names both.
+
+- [#233](https://github.com/eknowledger/toolbench/pull/233) [`491888d`](https://github.com/eknowledger/toolbench/commit/491888dbc90cc53930401f32846f4fff8d4a9f74) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: choose the links under a tool.** `links="page"` shows only "Open the full tool" and `links="none"` shows nothing, for a tool in an article that lists its references already. The default, `all`, keeps the manifest's links. Also a property: `host.links = "none"`. ([#216](https://github.com/eknowledger/toolbench/issues/216))
+  
+  A retired tool keeps its links whatever this says, because its notice points at them.
+
+- [#232](https://github.com/eknowledger/toolbench/pull/232) [`eb171da`](https://github.com/eknowledger/toolbench/commit/eb171dae74da06469314d7c55a8a118dbe3cbd42) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a Reset button beside Run.** Once a reader changes an input, Reset puts every input back to the values the tool opened with (your page's prefill, or the defaults) and clears the result. ([#208](https://github.com/eknowledger/toolbench/issues/208))
+  
+  - Hidden while the inputs are already at their starting values. Dispatches `tool-reset` with `{ values }`.
+  - `reset="none"` leaves it out, for a tool where it adds nothing.
+  - **⚠️ Heads-up:** a host stylesheet that styles every `button` in `.tb-actions` now reaches Reset as well. Its class is `.tb-reset`.
+
+- [#234](https://github.com/eknowledger/toolbench/pull/234) [`fe9e82a`](https://github.com/eknowledger/toolbench/commit/fe9e82a7a4535d5a8e177ef5b4cdaab2a04028a2) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: readers can share a link to a tool with its inputs.** A `page` or `embed` tool now has a link icon that copies the page's address with the tool's inputs in it, and a tool opens with the inputs a link carries. ([#227](https://github.com/eknowledger/toolbench/issues/227))
+  
+  - Inputs go in the query as `<tool id>.<input id>`, and an input marked `share: false` is never written or read.
+  - `share="none"`, `share-label` and `share-position` (`top` or `actions`), or the same as `defineToolHost` options. `share: { url, read }` is your own scheme. `tool-share` fires with `{ url, values }`.
+  - **⚠️ Heads-up:** the button is on by default. A page that builds its own share links should set `share: "none"`, or its tools will also read their values from the address.
+
+### Patch Changes
+
+- [#225](https://github.com/eknowledger/toolbench/pull/225) [`5522d5b`](https://github.com/eknowledger/toolbench/commit/5522d5b691711d295fc4f8afacec9e64be20e7c6) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a closed card seeded with a graph draws the graph.** A graph whose layout needs the crossing search, or one past 100 nodes, showed "The chart could not be loaded." instead. ([#201](https://github.com/eknowledger/toolbench/issues/201))
+  
+  When a graph really cannot be loaded, the line now says "graph", not "chart".
+
+- [#230](https://github.com/eknowledger/toolbench/pull/230) [`f922b36`](https://github.com/eknowledger/toolbench/commit/f922b3654b326428e62509172133d924beb15f5b) Thanks [@eknowledger](https://github.com/eknowledger)! - **Smaller: the runtime's stylesheets no longer ship their comments.** Every comment written inside the CSS to explain a rule was a string each reader downloaded: 3,263 of the 28,582 gzipped bytes of the chunk every page loads. The build now strips them, and the chunk is 25,319 bytes. The comments stay in the source. No style changes.
+- Updated dependencies []:
+  - @toolbench/sdk@0.13.0
+
 ## 0.12.0
 
 ### Minor Changes
