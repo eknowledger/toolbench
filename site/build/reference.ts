@@ -179,6 +179,7 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "`grammar` needs `lang` beside it", change: (m) => Object.assign(input(m, 2), { type: "textarea", grammar: { keywords: ["on"] } }) },
 	{ rule: "`share` is `true` or `false`", change: (m) => (input(m, 2).share = "no") },
 	{ rule: "`role` is a non-empty string", change: (m) => (input(m, 2).role = "") },
+	{ rule: "`details` is a non-empty string", change: (m) => (input(m, 2).details = "") },
 ];
 
 /** For each type: a real input from the repository to show, and the gallery card that runs one. */

@@ -38,6 +38,7 @@
 			"type": "number",
 			"label": "p99 target",
 			"description": "The p99 the service promises.",
+			"details": "Compared with the p99 of what you paste, by nearest rank: the smallest value with at least 99% of them at or below it.\n- A p99 equal to the target is a {bad|miss} only when the toggle below is on.\n- With fewer than 100 values, the p99 is the {warn|largest} one.\n\n{muted|A percentile of a few values says little.}",
 			"default": 300,
 			"min": 1,
 			"max": 60000,

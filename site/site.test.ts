@@ -347,6 +347,19 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	// The input-details card (#215): the p99 target's details are closed, then open on a click.
+	it("the input-details card opens the details on a click", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#input-details`);
+		const host = page.locator("#input-details tool-host");
+		await host.locator("summary").waitFor({ timeout: 10_000 });
+		const open = () => host.evaluate((el) => (el.shadowRoot?.querySelector("details") as HTMLDetailsElement).open);
+		assert.equal(await open(), false);
+		await host.locator("summary").click();
+		assert.equal(await open(), true);
+		await page.close();
+	});
+
 	// The help-markup card (#217): its description is a list and two paragraphs, built as elements.
 	it("the help-markup card draws its description's list and tones", async () => {
 		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

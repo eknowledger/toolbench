@@ -6464,5 +6464,61 @@ describe("markup in an input's description (#217)", () => {
 		assert.equal(seen.code, seen.mono);
 		await page.close();
 	});
+});
 
+describe("details on an input, behind a disclosure (#215)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="slo"]') as HTMLElement;
+			const details = row.querySelector("details.tb-details") as HTMLDetailsElement | null;
+			const body = details?.querySelector(".tb-details-body") as HTMLElement | null;
+			return {
+				order: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				open: details?.open,
+				summary: details?.querySelector("summary")?.textContent,
+				body: body?.outerHTML,
+				bodyShown: body ? body.checkVisibility() : false,
+				describedBy: root.querySelector("#in-slo")?.getAttribute("aria-describedby"),
+				others: root.querySelectorAll("details").length,
+			};
+		});
+
+	/*
+	 * Written from the input-help manifest by hand: only the p99 target has details. The body is the same
+	 * markup a description takes, and the control is still described by the short hint alone.
+	 */
+	it("draws the details after the description, closed, and out of the control's description", async () => {
+		const page = await open();
+		const seen = await read(page);
+		assert.deepEqual(seen.order, ["label.tb-label", "input.tb-input", "p.tb-desc", "details.tb-details", "p.tb-sr"]);
+		assert.equal(seen.open, false);
+		assert.equal(seen.bodyShown, false, "closed, the body takes no room");
+		assert.equal(seen.summary, "More about p99 target", "the visible More, named for its input");
+		assert.equal(
+			seen.body,
+			'<div class="tb-details-body"><p>Compared with the p99 of what you paste, by nearest rank: the smallest value with at least 99% of them at or below it.</p><ul><li>A p99 equal to the target is a <span data-tone="bad">miss</span> only when the toggle below is on.</li><li>With fewer than 100 values, the p99 is the <span data-tone="warn">largest</span> one.</li></ul><p><span data-tone="muted">A percentile of a few values says little.</span></p></div>',
+		);
+		assert.equal(seen.describedBy, "in-slo-desc in-slo-err", "aria-describedby stays on the short hint");
+		assert.equal(seen.others, 1, "no other input has details");
+		await page.close();
+	});
+
+	it("opens from the keyboard, and closes again", async () => {
+		const page = await open();
+		await page.locator('#host >> [data-input="slo"] summary').focus();
+		await page.keyboard.press("Enter");
+		const opened = await read(page);
+		assert.equal(opened.open, true);
+		assert.equal(opened.bodyShown, true);
+		await page.keyboard.press("Space");
+		assert.equal((await read(page)).open, false);
+		await page.close();
+	});
 });

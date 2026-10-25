@@ -125,6 +125,8 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	if (o.share !== undefined && typeof o.share !== "boolean") fail(`${path}.share`, "must be true or false");
 	// An empty data-role matches no host selector, so it could only be a mistake.
 	if (o.role !== undefined && (typeof o.role !== "string" || o.role === "")) fail(`${path}.role`, "must be a non-empty string");
+	// An empty disclosure would offer the reader "More" and open on nothing.
+	if (o.details !== undefined && (typeof o.details !== "string" || o.details === "")) fail(`${path}.details`, "must be a non-empty string");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
 	if (o.lang !== undefined) {
 		// A one-line input has no room for structure to see, and nothing would paint it.
@@ -386,7 +388,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {
