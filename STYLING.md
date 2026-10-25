@@ -82,7 +82,7 @@ same order, so the cascade is the same.
 | `.tb-output` | Where the result is drawn |
 | `.tb-more`, `.tb-disclose`, `.tb-rest` | A truncated result's notice, its expand button, and the parts it reveals |
 | `.tb-copy-bar`, `.tb-copy`, `.tb-copy-note` | Under a code or table result: the row, its Copy button, and the note beside it saying whether the copy worked. Not on a closed card |
-| `.tb-foot` | Links under the tool |
+| `.tb-foot` | Links under the tool. Absent with `links="none"`, and holds only "Open the full tool" with `links="page"` |
 
 ### Result parts
 

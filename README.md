@@ -361,6 +361,25 @@ no Run, no status line) and the page drives it with the `values` setter and `run
 With `controls="none"` the host does not mark a result stale when values change either: whoever owns the
 control that changed it owns saying so. Neither attribute changes a card.
 
+### The links under a tool
+
+Outside a card, a tool draws its manifest's `links` underneath. In the middle of an article that row
+sits between the answer and the prose, and on a page that lists the references already it says them
+twice. `links` chooses what goes there:
+
+| Value | Shows |
+|---|---|
+| `all` | The manifest's links. The default outside a card |
+| `page` | Only "Open the full tool", pointing at `pageUrl(id)`, as a card does |
+| `none` | Nothing |
+
+```html
+<tool-host tool="percentiles" mode="embed" links="page"></tool-host>
+```
+
+It is a property too: `host.links = "none"`. A card shows "Open the full tool" for anything but `none`.
+A retired tool keeps its links whatever this says, because its notice names them as the way onward.
+
 ### Reset
 
 Once the reader has changed an input, a **Reset** button appears beside Run. It puts every input back to
@@ -730,7 +749,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.8 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 25.9 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.9 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |
