@@ -37,6 +37,7 @@
 .article-demo p { margin: 0 0 1rem; }
 .article-demo p:last-child { margin: 1rem 0 0; }
 .reveal-buttons { margin: 0 0 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.events-log { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--sunk); border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 
 

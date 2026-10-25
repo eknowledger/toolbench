@@ -344,6 +344,16 @@ export const GROUPS: Group[] = [
     </div>`,
 				code: (demo) => [demo, region("site/src/gallery.ts", "reveal")],
 			},
+			{
+				id: "events",
+				title: "Following the tool from your page",
+				text: "<code>tool-input</code> fires after the inputs change and <code>tool-run</code> after a run's result is drawn, for a deep link, analytics or a button of your own. Edit the form or press Run.",
+				demo: `<div class="events-demo">
+      <pre class="events-log" id="events-log">No events yet.</pre>
+      <tool-host tool="percentiles" mode="embed" id="events-host"></tool-host>
+    </div>`,
+				code: (demo) => [demo, region("site/src/gallery.ts", "events")],
+			},
 		],
 	},
 ];

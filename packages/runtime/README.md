@@ -41,6 +41,10 @@ host.values = { text: "hello" };
 host.run();
 ```
 
+The element dispatches `tool-input` (`detail: { values }`) after the inputs change, and `tool-run`
+(`detail: { values, ok, error? }`) after a run's result is drawn. Both bubble and are composed, and
+neither fires while the tool first opens. `ToolHostEvents` types them.
+
 ## What you get
 
 * **Three display modes.** A compact card, a full page, and an in-article embed, from one declaration.

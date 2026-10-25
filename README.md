@@ -549,6 +549,23 @@ trustworthy than a reader. An existing result goes stale, the same as typing. Th
 form has opened, so a card can be prefilled. A shareable `?in=…` deep link is then a host feature,
 with no further contract change.
 
+**A page can follow the tool** through two events on `<tool-host>`, so a deep link, analytics or a
+Copy button of the page's own does not have to listen for clicks inside the shadow root. Both bubble
+and are composed, so a listener on `document` hears every tool on the page:
+
+```ts
+host.addEventListener("tool-input", (e) => saveToUrl(e.detail.values));       // after every change
+host.addEventListener("tool-run", (e) => track(e.detail.ok, e.detail.error));  // after the result is drawn
+```
+
+`tool-input` fires once per change to the inputs, whatever made it: typing, a sample, a preset or a
+`values` write, which dispatches it before the setter returns. A write that leaves the values as they
+were fires nothing. `tool-run` fires once per run, from Run, `run()`, `reveal()` or an `autoRun` tool's
+typing, after the result or error is on screen and before `run()` resolves; `detail` is `{ values, ok,
+error? }`, with the values that run used. A run replaced by a newer one fires nothing. Neither fires
+while the tool first opens with its starting values, an `autoRun` tool's first answer included. The
+`ToolHostEvents` type names both, for a listener in TypeScript.
+
 **A page can link to one part of a result.** A tool gives a part an `id`, and `reveal(id)` brings it to
 the reader: it opens a closed card, shows the part if `parts` or `more` hid it, scrolls to it and moves
 focus there. It resolves `false` for an id the result does not have.
@@ -694,7 +711,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.3 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 25.5 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.9 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |

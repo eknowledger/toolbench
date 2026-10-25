@@ -1213,6 +1213,170 @@ describe("host values and run — runtime API", () => {
 	});
 });
 
+describe("host events: tool-input and tool-run (#212)", () => {
+	/*
+	 * A host keeping something in step with a tool (a deep link, analytics, its own Copy button) used to
+	 * listen for the browser's own input, change and click events leaking out of the shadow root, which
+	 * depends on how each control happens to be built and cannot see a run that nobody clicked. These are
+	 * browser facts: whether the events cross the shadow boundary, how many fire per change, and whether
+	 * the result is already drawn when `tool-run` arrives.
+	 */
+	type Seen = { type: string; values: Record<string, unknown>; ok?: boolean; error?: unknown; composed: boolean; bubbles: boolean; target: string; drawn: number; stale: boolean };
+	type HostApi = HTMLElement & { values: Record<string, string | number | boolean>; run: (options?: { focus?: boolean }) => Promise<void> };
+
+	/** Records every event on `document` from before the page's own scripts run, so upgrade is covered too. */
+	async function recording(path: string): Promise<Page> {
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const seen: unknown[] = [];
+			(window as unknown as { seen: unknown[] }).seen = seen;
+			for (const type of ["tool-input", "tool-run"]) {
+				document.addEventListener(type, (event) => {
+					const detail = (event as CustomEvent<Record<string, unknown>>).detail;
+					const host = event.target as HTMLElement;
+					const output = host.shadowRoot?.querySelector(".tb-output");
+					seen.push({
+						type,
+						...JSON.parse(JSON.stringify(detail)),
+						composed: event.composed,
+						bubbles: event.bubbles,
+						target: host.tagName,
+						drawn: output?.children.length ?? -1,
+						stale: output?.hasAttribute("data-stale") ?? false,
+					});
+				});
+			}
+		});
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		return page;
+	}
+	const seen = (page: Page) => page.evaluate(() => (window as unknown as { seen: Seen[] }).seen.splice(0));
+
+	it("dispatches nothing while the element upgrades with its initial values, an autoRun tool's first answer included", async () => {
+		const page = await recording("tool.html?id=percentiles");
+		await page.waitForTimeout(300);
+		assert.deepEqual(await seen(page), [], "opening a tool is not a change and not a run anyone asked for");
+		await page.close();
+
+		const auto = await recording("tool.html?id=histogram");
+		await auto.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		await auto.waitForTimeout(300);
+		assert.deepEqual(await seen(auto), [], "an autoRun tool computes its default answer on arrival, and that is still upgrade");
+		await auto.close();
+	});
+
+	it("dispatches tool-input once per keystroke and once per select change, composed and bubbling, with the new values", async () => {
+		const page = await recording("tool.html?id=percentiles");
+		await page.locator("#host >> .tb-textarea").focus();
+		await page.keyboard.press("End");
+		await page.keyboard.type(" 7 8");
+		const typed = await seen(page);
+		assert.equal(typed.length, 4, `four keystrokes, four events: ${typed.map((e) => e.type).join(", ")}`);
+		assert.ok(typed.every((e) => e.type === "tool-input" && e.composed && e.bubbles && e.target === "TOOL-HOST"), "a host listens on the element, or anywhere above it");
+		assert.match(String(typed.at(-1)?.values.values), / 7 8$/, "the detail carries the values after the change");
+
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		const picked = await seen(page);
+		assert.equal(picked.length, 1);
+		assert.equal(picked[0]?.values.method, "linear");
+		await page.close();
+	});
+
+	it("dispatches tool-input once for a sample, carrying every value the sample set", async () => {
+		const page = await recording("tool.html?id=percentiles");
+		await page.locator('#host >> .tb-sample:text-is("Definitions disagree")').click();
+		const events = await seen(page);
+		const now = await page.locator("#host").evaluate((el) => ({ ...(el as HostApi).values }));
+		assert.equal(events.length, 1, `one click, one event: ${events.length}`);
+		assert.equal(events[0]?.type, "tool-input");
+		assert.deepEqual(events[0]?.values, now, "the detail is what `values` reads after the sample");
+		await page.close();
+	});
+
+	it("dispatches tool-input once when the host sets values, with the clamped values, and not for a write that changes nothing", async () => {
+		const page = await recording("tool.html?id=queue-explorer");
+		const during = await page.locator("#host").evaluate((el) => {
+			(el as HostApi).values = { arrivals: 99999 };
+			return (window as unknown as { seen: Seen[] }).seen.length;
+		});
+		assert.equal(during, 1, "dispatched before the setter returns, so a host can rely on it in the same task");
+		const events = await seen(page);
+		assert.equal(events[0]?.values.arrivals, 5000, "the value the tool will run on, not the one the host wrote");
+
+		await page.locator("#host").evaluate((el) => {
+			(el as HostApi).values = { arrivals: 5000 };
+		});
+		assert.deepEqual(await seen(page), [], "the values did not change, so there is nothing to report");
+		await page.close();
+	});
+
+	it("dispatches tool-run once for Run and once for run(), after the result is drawn", async () => {
+		const page = await recording("tool.html?id=percentiles");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 15_000 });
+		await page.waitForTimeout(100);
+		const pressed = await seen(page);
+		assert.equal(pressed.length, 1, `one press, one event: ${pressed.map((e) => e.type).join(", ")}`);
+		assert.equal(pressed[0]?.type, "tool-run");
+		assert.equal(pressed[0]?.ok, true);
+		assert.ok((pressed[0]?.drawn ?? 0) > 0 && !pressed[0]?.stale, "a listener reading the result finds this run's, already on screen");
+		assert.equal(pressed[0]?.composed && pressed[0]?.bubbles, true);
+
+		const fromCode = await page.locator("#host").evaluate(async (el) => {
+			const host = el as HostApi;
+			host.values = { values: "1 2 3 4 5" };
+			(window as unknown as { seen: Seen[] }).seen.splice(0);
+			await host.run();
+			return (window as unknown as { seen: Seen[] }).seen.splice(0);
+		});
+		assert.equal(fromCode.length, 1, "run() from code is a run too, and settles before its promise does");
+		assert.equal(fromCode[0]?.values.values, "1 2 3 4 5", "the values the run used");
+		assert.ok((fromCode[0]?.drawn ?? 0) > 0 && !fromCode[0]?.stale);
+		await page.close();
+	});
+
+	it("reports an error result and a thrown error as ok false, with the message", async () => {
+		const page = await recording("tool.html?id=percentiles");
+		await page.locator('#host >> .tb-sample:text-is("Not a number")').click();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-error").waitFor({ timeout: 15_000 });
+		const refused = (await seen(page)).filter((e) => e.type === "tool-run");
+		assert.equal(refused.length, 1);
+		assert.equal(refused[0]?.ok, false);
+		assert.equal(typeof refused[0]?.error, "string");
+		assert.ok(String(refused[0]?.error).length > 0);
+		await page.close();
+
+		const crash = await recording("tool.html?id=stress");
+		await crash.locator("#host >> .tb-select").selectOption("throw");
+		await crash.locator("#host >> .tb-run").click();
+		await crash.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.textContent?.includes("hit a bug"), undefined, { timeout: 15_000 });
+		const thrown = (await seen(crash)).filter((e) => e.type === "tool-run");
+		assert.equal(thrown.length, 1);
+		assert.equal(thrown[0]?.ok, false);
+		assert.match(String(thrown[0]?.error), /hit a bug/, "the same message the reader sees");
+		await crash.close();
+	});
+
+	it("dispatches one tool-run for a burst of typing on an autoRun tool, not one per superseded run", async () => {
+		const page = await recording("tool.html?id=histogram");
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		await seen(page);
+		await page.locator("#host >> .tb-textarea").focus();
+		await page.keyboard.press("End");
+		await page.keyboard.type(" 3 4");
+		await page.waitForTimeout(600);
+		const events = await seen(page);
+		assert.equal(events.filter((e) => e.type === "tool-input").length, 4);
+		const runs = events.filter((e) => e.type === "tool-run");
+		assert.equal(runs.length, 1, `the debounce leaves one run: ${runs.length}`);
+		assert.match(String(runs[0]?.values.values), / 3 4$/);
+		await page.close();
+	});
+});
+
 describe("a repaint keeps what was on screen", () => {
 	/*
 	 * `#paint` rebuilds the shadow tree, and `mode` and `parts` are both in `observedAttributes`, so a
