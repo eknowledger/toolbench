@@ -1377,6 +1377,158 @@ describe("host events: tool-input and tool-run (#212)", () => {
 	});
 });
 
+describe("a Reset control (#208)", () => {
+	/*
+	 * A reader who changed several inputs, or picked a sample, had no way back to where the tool started
+	 * short of reloading the page. Whether the button is there only when it would do something, what it
+	 * restores on a page that opened on its own values, where focus lands when it hides itself, and whether
+	 * it costs the reader their undo are all browser facts.
+	 */
+	type HostApi = HTMLElement & { values: Record<string, string | number | boolean>; run: (options?: { focus?: boolean }) => Promise<void> };
+	const state = (page: Page, selector = "#host") =>
+		page.locator(selector).evaluate((el) => {
+			const host = el as HostApi;
+			const root = host.shadowRoot as ShadowRoot;
+			const reset = root.querySelector<HTMLButtonElement>(".tb-reset");
+			const output = root.querySelector(".tb-output");
+			return {
+				values: { ...host.values },
+				reset: reset ? (reset.hidden ? "hidden" : "shown") : "absent",
+				drawn: output?.children.length ?? -1,
+				stale: output?.hasAttribute("data-stale") ?? false,
+				focus: root.activeElement?.id || root.activeElement?.className || "",
+				status: root.querySelector(".tb-status")?.textContent ?? "",
+			};
+		});
+
+	async function open(path: string): Promise<Page> {
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const resets: unknown[] = [];
+			(window as unknown as { resets: unknown[] }).resets = resets;
+			document.addEventListener("tool-reset", (event) => resets.push((event as CustomEvent).detail));
+		});
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		return page;
+	}
+
+	it("is hidden at first, appears beside Run after an edit, and hides again when the values are back", async () => {
+		const page = await open("tool.html?id=percentiles");
+		assert.equal((await state(page)).reset, "hidden", "a button that would do nothing is not offered");
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		assert.equal((await state(page)).reset, "shown");
+		const button = page.locator("#host >> .tb-reset");
+		assert.equal(await button.textContent(), "Reset");
+		assert.equal(await button.getAttribute("aria-label"), "Reset inputs to their starting values");
+		assert.equal(await button.getAttribute("type"), "button");
+		assert.equal(await page.locator("#host >> .tb-actions > .tb-run + .tb-reset").count(), 1, "directly after Run, in the same row");
+		const heights = await Promise.all([page.locator("#host >> .tb-run").boundingBox(), button.boundingBox()]);
+		assert.ok(Math.abs((heights[0]?.height ?? 0) - (heights[1]?.height ?? -9)) < 0.5, `the pair stands the same height: ${heights.map((h) => h?.height).join(" vs ")}`);
+		await page.locator("#host >> .tb-select").selectOption("nearest");
+		assert.equal((await state(page)).reset, "hidden", "the reader put the value back by hand, so there is nothing to reset");
+		await page.close();
+	});
+
+	it("restores the first render's values after two edits and a run, clears the result, and moves focus to the first input", async () => {
+		const page = await open("tool.html?id=percentiles");
+		const first = await state(page);
+		await page.locator("#host >> .tb-textarea").fill("1 2 3");
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 15_000 });
+		await page.locator("#host >> .tb-reset").click();
+		const after = await state(page);
+		assert.deepEqual(after.values, first.values, "every input back to its first value");
+		assert.equal(await page.locator("#host >> .tb-textarea").inputValue(), String(first.values.values), "and the controls show it");
+		assert.equal(await page.locator("#host >> .tb-select").inputValue(), "nearest");
+		assert.equal(after.drawn, 0, "the result is cleared, as on first load");
+		assert.equal(after.stale, false);
+		assert.equal(after.reset, "hidden");
+		assert.equal(after.focus, "in-values", "the button hid itself, so focus goes to the first input rather than the page");
+		assert.equal(await page.locator("#host >> .tb-run[data-attention]").count(), 0);
+		const resets = await page.evaluate(() => (window as unknown as { resets: unknown[] }).resets);
+		assert.deepEqual(resets, [{ values: first.values }], "tool-reset once, with the restored values");
+		await page.close();
+	});
+
+	it("undoes a sample from the keyboard: Tab from Run reaches it, Enter presses it", async () => {
+		const page = await open("tool.html?id=percentiles");
+		const first = await state(page);
+		await page.locator('#host >> .tb-sample:text-is("Definitions disagree")').click();
+		assert.equal((await state(page)).reset, "shown");
+		await page.locator("#host >> .tb-run").focus();
+		await tabForward(page);
+		assert.equal((await state(page)).focus, "tb-reset", "the next stop after Run");
+		await page.keyboard.press("Enter");
+		const after = await state(page);
+		assert.deepEqual(after.values, first.values);
+		assert.equal(after.focus, "in-values");
+		assert.match(after.status, /reset/i, "the status line says what happened, the only confirmation a screen reader gets");
+		await page.close();
+	});
+
+	it("resets to the values a host opened the tool with, not the manifest's defaults", async () => {
+		const page = await open("tool.html?id=percentiles");
+		const embedded = await page.evaluate(() => {
+			const host = document.createElement("tool-host") as HostApi;
+			host.id = "prefilled";
+			host.values = { values: "5 6 7", method: "linear" };
+			host.setAttribute("tool", "percentiles");
+			host.setAttribute("mode", "embed");
+			document.body.append(host);
+			return { ...host.values };
+		});
+		// An embed activates near the viewport, and this one was appended below the page's own tool.
+		await page.locator("#prefilled").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#prefilled >> .tb-form");
+		assert.deepEqual(embedded, { values: "5 6 7", method: "linear" });
+		assert.equal((await state(page, "#prefilled")).reset, "hidden", "the host's values are the starting point");
+		await page.locator("#prefilled >> .tb-textarea").fill("9");
+		await page.locator("#prefilled >> .tb-reset").click();
+		assert.deepEqual((await state(page, "#prefilled")).values, embedded);
+		await page.close();
+	});
+
+	it("is not drawn with reset=\"none\", and goes when the attribute is set later", async () => {
+		const page = await open("tool.html?id=percentiles");
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		assert.equal((await state(page)).reset, "shown");
+		await page.locator("#host").evaluate((el) => el.setAttribute("reset", "none"));
+		assert.equal((await state(page)).reset, "absent", "a host opts out for a tool where it adds nothing");
+		await page.close();
+	});
+
+	it("redraws an autoRun tool's default answer, since that is what first load showed", async () => {
+		const page = await open("tool.html?id=histogram");
+		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
+		const table = () => page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? "");
+		const firstTable = await table();
+		const first = await state(page);
+		await page.locator('#host >> .tb-sample:text-is("One spike")').click();
+		await page.waitForFunction((previous) => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent ?? previous) !== previous, firstTable, { timeout: 10_000 });
+		await page.locator("#host >> .tb-reset").click();
+		await page.waitForFunction((wanted) => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-chart-data table")?.textContent === wanted, firstTable, { timeout: 10_000 });
+		assert.deepEqual((await state(page)).values, first.values);
+		await page.close();
+	});
+
+	it("keeps a typed burst one undo step, though the first key shows the button", async () => {
+		const page = await open("tool.html?id=percentiles");
+		const area = page.locator("#host >> .tb-textarea");
+		const before = await area.inputValue();
+		await area.click();
+		await area.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+		await page.keyboard.type("abc def\n", { delay: 30 });
+		assert.equal((await state(page)).reset, "shown");
+		await page.waitForTimeout(400);
+		await page.keyboard.press("ControlOrMeta+z");
+		assert.equal(await area.inputValue(), before, "one undo takes back the whole burst, as in a plain textarea");
+		await page.close();
+	});
+});
+
 describe("a repaint keeps what was on screen", () => {
 	/*
 	 * `#paint` rebuilds the shadow tree, and `mode` and `parts` are both in `observedAttributes`, so a
