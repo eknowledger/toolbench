@@ -31,6 +31,16 @@ import wideOutput from "./fixtures/wide-output/index.ts";
 const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
 
+/**
+ * Three frames. A chart is first drawn at a guessed width, before it is on the page, and replaced by one laid
+ * out at its measured width in the next rendering step, before anything is painted (#210). The redrawn figure
+ * is observed from the frame after, which may lay it out once more if its page's scrollbar moved. A test that
+ * finds an earlier drawing and acts on it is acting on an element about to be detached: in CI a key pressed
+ * on one stepped a readout that the next drawing then started again from its first value.
+ */
+const settled = (page: Page) =>
+	page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
+
 const ENGINES = { chromium, firefox, webkit } as const;
 type EngineName = keyof typeof ENGINES;
 
@@ -1609,6 +1619,7 @@ describe("expanding a truncated result in place", () => {
 		await h.locator(".tb-facade").click();
 		await h.locator(".tb-run").click();
 		await h.locator(".tb-disclose").waitFor({ timeout: 15_000 });
+		await settled(page);
 		const size = () =>
 			h.locator(".tb-out-chart svg").first().evaluate((svg) => {
 				const box = svg.getBoundingClientRect();
@@ -1618,6 +1629,8 @@ describe("expanding a truncated result in place", () => {
 		assert.equal(before.card, true, "a card draws its chart at card size");
 		await h.locator(".tb-disclose").click();
 		await h.locator(".tb-disclose[aria-expanded=true]").waitFor();
+		// Expanding draws the output again, and a chart's first drawing is replaced by its measured one (#210).
+		await settled(page);
 		const after = await size();
 		assert.deepEqual(after, before, "expanding shows more parts; it does not redraw the chart already on screen at another size");
 		await page.close();
@@ -1638,6 +1651,7 @@ describe("bar chart geometry", () => {
 		await page.locator("#host").scrollIntoViewIfNeeded();
 		// histogram is `autoRun`, so its default chart is drawn on arrival and there is no Run to press.
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 
 		const geometry = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
@@ -1683,6 +1697,7 @@ describe("bar chart geometry", () => {
 		await page.locator("#host").scrollIntoViewIfNeeded();
 		await page.locator("#host >> .tb-run").click();
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 
 		const flush = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
@@ -1720,6 +1735,7 @@ describe("charts over whole-number x values (#111)", () => {
 			await host.run();
 		}, value);
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 		const read = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
 			const num = (el: Element, name: string) => Number(el.getAttribute(name));
@@ -1757,6 +1773,7 @@ describe("charts over whole-number x values (#111)", () => {
 			host.values = { case: c };
 			await host.run();
 		}, value);
+		await settled(page);
 		await page.locator("#host >> .tb-out-chart svg .tb-marker").first().waitFor({ timeout: 15_000 });
 		const read = await page.evaluate(() => {
 			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
@@ -1844,7 +1861,8 @@ describe("charts over whole-number x values (#111)", () => {
 		const chart = await chartFor("signed-bars");
 		const zeroTick = chart.ticks.find((t) => t.anchor === "end" && t.text === "0");
 		assert.ok(zeroTick, `a 0 on the y axis, got ${chart.yLabels.join(", ")}`);
-		const zeroY = zeroTick.y - 4; // the label sits 4 units below its gridline
+		// The gridline the 0 label sits on: the nearest, since the label is centred on it by the face's measured box.
+		const zeroY = chart.grid.reduce((best, y) => (Math.abs(y - zeroTick.y) < Math.abs(best - zeroTick.y) ? y : best), Number.POSITIVE_INFINITY);
 		const [minus10, plus10, minus30, plus40] = chart.bars;
 		assert.ok(minus10 && plus10 && minus30 && plus40, "four bars");
 		assert.ok(Math.abs(plus10.y + plus10.height - zeroY) < 0.5, "a positive bar ends on zero");
@@ -1865,6 +1883,7 @@ describe("charts over whole-number x values (#111)", () => {
 			host.values = { case: "thresholds" };
 			await host.run();
 		});
+		await settled(page);
 		const read = await page.evaluate(() => {
 			const figure = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart");
 			return {
@@ -2151,6 +2170,10 @@ describe("charts over whole-number x values (#111)", () => {
 			host.values = { case: "many-categories" };
 			await host.run();
 		});
+		await settled(page);
+		// The measured drawing, not the first one: focused and stepped through, the first was replaced under the keys in CI.
+		await page.locator("#host >> .tb-plot svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		await page.keyboard.press("End");
 		const read = await page.evaluate(() => {
@@ -2173,6 +2196,7 @@ describe("charts over whole-number x values (#111)", () => {
 		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
 		await page.evaluate(() => (document.querySelector("#host") as HTMLElement & { run(): Promise<void> }).run());
 		await page.locator("#host >> .tb-out-chart svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 		const geometry = await page.evaluate(() => {
 			const svg = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-chart svg");
 			const centres = [...(svg?.querySelectorAll("rect.tb-bar") ?? [])].map((r) => Number(r.getAttribute("x")) + Number(r.getAttribute("width")) / 2);
@@ -2202,6 +2226,7 @@ describe("the chart readout (#112)", () => {
 			await host.run();
 		}, value);
 		await page.locator("#host >> .tb-plot svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 		await page.locator("#host >> .tb-plot").scrollIntoViewIfNeeded();
 		return page;
 	}
@@ -2221,9 +2246,15 @@ describe("the chart readout (#112)", () => {
 	async function pointAt(page: import("playwright").Page, frame: number) {
 		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
 		assert.ok(box);
-		// The plot spans viewBox x 56 to 620 of 640, and frames 1 to 20 span it edge to edge.
-		const vbX = 56 + ((frame - 1) / 19) * (620 - 56);
-		await page.mouse.move(box.x + (vbX / 640) * box.width, box.y + box.height * 0.4);
+		// Frames 1 to 20 span the x axis edge to edge, and the chart is laid out at its measured width (#210), so
+		// the axis's ends are read from the drawing rather than assumed.
+		const axis = await page.evaluate(() => {
+			const svg = document.querySelector("#host")!.shadowRoot!.querySelector<SVGSVGElement>(".tb-plot svg")!;
+			const line = svg.querySelectorAll(".tb-axis")[1]!;
+			return { from: Number(line.getAttribute("x1")), to: Number(line.getAttribute("x2")), width: svg.viewBox.baseVal.width };
+		});
+		const vbX = axis.from + ((frame - 1) / 19) * (axis.to - axis.from);
+		await page.mouse.move(box.x + (vbX / axis.width) * box.width, box.y + box.height * 0.4);
 	}
 
 	it("shows every series at the nearest frame, with the data's values, and hides when the pointer leaves", async () => {
@@ -2321,6 +2352,7 @@ describe("heatmaps (#121)", () => {
 			await host.run();
 		}, value);
 		await page.locator("#host >> .tb-heatmap svg").waitFor({ timeout: 15_000 });
+		await settled(page);
 		return { page, scripts };
 	}
 
@@ -2388,6 +2420,7 @@ describe("pies and donuts (#123)", () => {
 			await host.run();
 		}, value);
 		await page.locator("#host >> .tb-pie").waitFor({ timeout: 15_000 });
+		await settled(page);
 		const read = await page.evaluate(() => {
 			const root = document.querySelector("#host")?.shadowRoot;
 			return {
@@ -2405,11 +2438,14 @@ describe("pies and donuts (#123)", () => {
 		// 32, 4.8, 3.2 and 8 of 48 kb/s: 67%, 10%, 6.7% and 17%.
 		const { page, read } = await pieCase("pie");
 		assert.deepEqual(read.key, ["Opus audio67%32 kb/s", "RTP headers10%4.80 kb/s", "UDP headers6.7%3.20 kb/s", "IPv4 headers17%8 kb/s"]);
-		// The first slice runs from the centre to the top of the circle (cx 150, cy 130, r 112: y = 18).
-		assert.match(read.slices[0] ?? "", /^M150,130L150\.00,18\.00A/);
-		// Clockwise: the first slice ends right of centre, having swept two thirds of the way round.
+		// The first slice runs from the centre to the top of the circle: cy 130 and r 112 make y = 18, and the
+		// centre is the middle of the picture's width, which is measured (#210).
+		const start = /^M([\d.]+),130L([\d.]+),18\.00A112,112/.exec(read.slices[0] ?? "");
+		assert.ok(start && Math.abs(Number(start[1]) - Number(start[2])) < 0.01, `straight up from the centre: ${read.slices[0]}`);
+		const cx = Number(start[1]);
+		// Clockwise: the first slice ends left of centre and below it, having swept two thirds of the way round.
 		const end = /A112,112 0 \d 1 ([\d.]+),([\d.]+)Z$/.exec(read.slices[0] ?? "");
-		assert.ok(end && Number(end[1]) < 150 && Number(end[2]) > 130, `two thirds round, clockwise, ends lower left: ${end?.slice(1)}`);
+		assert.ok(end && Number(end[1]) < cx && Number(end[2]) > 130, `two thirds round, clockwise, ends lower left: ${end?.slice(1)}`);
 		await page.close();
 	});
 
@@ -2470,6 +2506,7 @@ describe("radar, treemap and Venn (#128, #129, #130)", () => {
 			await host.run();
 		}, value);
 		await page.locator(`#host >> ${selector}`).first().waitFor({ timeout: 15_000 });
+		await settled(page);
 		return page;
 	}
 
@@ -2481,18 +2518,19 @@ describe("radar, treemap and Venn (#128, #129, #130)", () => {
 			const tiles = [...(root?.querySelectorAll(".tb-tile") ?? [])].map((r) => ({ w: Number(r.getAttribute("width")), h: Number(r.getAttribute("height")) }));
 			const labels = [...(root?.querySelectorAll(".tb-tile-label") ?? [])].map((t) => t.textContent);
 			const rows = [...(root?.querySelectorAll(".tb-chart-data tbody tr") ?? [])].map((tr) => [...tr.children].map((c) => c.textContent));
-			return { tiles, labels, rows };
+			const box = root?.querySelector<SVGSVGElement>(".tb-treemap svg")?.viewBox.baseVal;
+			return { tiles, labels, rows, whole: (box?.width ?? 0) * (box?.height ?? 0) };
 		});
 		// Media and its six descendants, Speech and two, Model and two, Signalling: fourteen nodes.
 		assert.equal(read.rows.length, 14, "every node listed");
 		const total = read.rows.reduce((sum, r) => sum + (r[0] === "Media" || r[0] === "Speech" || r[0] === "Model" || r[0] === "Signalling" ? Number(r[1]) : 0), 0);
 		assert.equal(total, 401, "the groups add up to the whole");
 		assert.ok(read.rows.some((r) => r[0] === "Relays" && r[1] === "120"), "a group's value is the sum of its parts: Relays 38 + 52 + 30");
-		// Tile areas: the whole is 640 x 360; Inference's tile is 120 / 401 of it, less the 2-unit insets.
+		// Tile areas: the whole is the picture, laid out at its measured width (#210).
 		const areas = read.tiles.map((t) => t.w * t.h);
 		const largest = Math.max(...areas);
 		// Media is the largest group: 38 + 52 + 30 + 22 + 14 = 156 of 401.
-		assert.ok(Math.abs(largest / (640 * 360) - 156 / 401) < 0.01, `Media, the largest group, is ${(largest / (640 * 360)).toFixed(3)} of the area`);
+		assert.ok(Math.abs(largest / read.whole - 156 / 401) < 0.01, `Media, the largest group, is ${(largest / read.whole).toFixed(3)} of the area`);
 		await page.locator("#host >> .tb-plot").focus();
 		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
 		assert.match(title ?? "", / \/ /, `the readout names the path: ${title}`);
@@ -2547,14 +2585,19 @@ describe("radar, treemap and Venn (#128, #129, #130)", () => {
 				satelliteShapes: root?.querySelectorAll(".tb-radar-shape.tb-s3").length,
 				satelliteDots: root?.querySelectorAll(".tb-radar-dot.tb-s3").length,
 				rings: [...(root?.querySelectorAll(".tb-radar-ring-label") ?? [])].map((t) => t.textContent),
+				// The first spoke runs from the centre straight up to the outer ring: the centre and radius, whatever the width.
+				spoke: ["x1", "y1", "x2", "y2"].map((a) => Number(root?.querySelector('.tb-radar-spoke[data-k="0"]')?.getAttribute(a))),
 			};
 		});
-		// Centre (220, 170), radius 120. Fibre scores 9 on latency, the first spoke, straight up: (220, 62).
+		const [cx, cy, , top] = read.spoke as [number, number, number, number];
+		const R = cy - top;
+		assert.ok(R > 0, `the first spoke points up: ${JSON.stringify(read.spoke)}`);
+		// Fibre scores 9 of 10 on latency, the first spoke, straight up: nine tenths of the radius above the centre.
 		const latency = read.fibre.find((d) => d.k === 0);
-		assert.ok(latency && Math.abs(latency.x - 220) < 0.5 && Math.abs(latency.y - (170 - 108)) < 0.5, JSON.stringify(latency));
+		assert.ok(latency && Math.abs(latency.x - cx) < 0.5 && Math.abs(latency.y - (cy - 0.9 * R)) < 0.5, JSON.stringify(latency));
 		// Bandwidth, the fourth of five spokes, scores 10 of 10: on the outer ring, left of centre and below.
 		const bandwidth = read.fibre.find((d) => d.k === 3);
-		assert.ok(bandwidth && Math.abs(Math.hypot(bandwidth.x - 220, bandwidth.y - 170) - 120) < 0.5 && bandwidth.x < 220 && bandwidth.y > 170, JSON.stringify(bandwidth));
+		assert.ok(bandwidth && Math.abs(Math.hypot(bandwidth.x - cx, bandwidth.y - cy) - R) < 0.5 && bandwidth.x < cx && bandwidth.y > cy, JSON.stringify(bandwidth));
 		assert.equal(read.satelliteShapes, 0, "a broken shape is not filled");
 		assert.equal(read.satelliteDots, 4, "four of five values present");
 		assert.deepEqual(read.rings, ["2", "4", "6", "8", "10"]);
@@ -3411,6 +3454,7 @@ describe("layout and page-owned controls (#103)", () => {
 			host.values = { values: "1 2 3 4 100" };
 			await host.run();
 		});
+		await settled(page);
 		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
 		// Writing values again does not dim the answer or claim it is stale: the page owns that.
 		await page.evaluate(() => {
@@ -4622,6 +4666,7 @@ describe("graphs (#152)", () => {
 			host.values = { case: "injected" };
 			await host.run();
 		});
+		await settled(page);
 		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
 		await page.waitForTimeout(500);
 		const read = await page.evaluate(() => {
@@ -4691,6 +4736,7 @@ describe("graphs (#152)", () => {
 			host.values = { deps: "solo" };
 			await host.run();
 		});
+		await settled(page);
 		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
 		const rows = await page.evaluate(() => [...document.querySelector("#host")!.shadowRoot!.querySelectorAll(".tb-graph-data tbody tr")].map((tr) => [...tr.children].map((c) => c.textContent)));
 		assert.deepEqual(rows, [["solo", "no edges"]]);
@@ -5285,5 +5331,109 @@ describe("a wide graph fits its plot, and the reader can show it at full size (#
 		const back = await open(390, { "wide-toggle": "true" }, "&wideToggle=false");
 		assert.ok((await measure(back)).button?.hidden === false, "the attribute brings it back");
 		await back.close();
+	});
+});
+
+describe("chart labels keep their size at any width (#210)", () => {
+	/*
+	 * A chart was drawn into a 640-unit viewBox and scaled to its panel, text and all: measured, a tick was
+	 * 4.6px at a 330px panel and 22px at 1440, and a pie's slice share 3.2px. Every label of every
+	 * discrete-series case is read here as the reader gets it: font size times the drawing's scale, both
+	 * axes of that scale, and its box against the picture's and against every other label's.
+	 */
+	const cases = (JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", "discrete-series", "tool.json"), "utf8")).inputs[0].options as { value: string }[]).map((o) => o.value);
+
+	/** Every label that breaks a rule, at a panel `width` wide with the host's `style`, and each picture's width. */
+	async function labels(width: number, style = "", size: [number, number] = [11, 14]): Promise<{ wrong: string[]; widths: number[] }> {
+		const page = await browser.newPage({ viewport: { width: Math.max(1280, width + 64), height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=wide-output`, { waitUntil: "load" });
+		const read = await page.evaluate(
+			async ({ width, cases, style, size }) => {
+				await customElements.whenDefined("tool-host");
+				const box = document.createElement("div");
+				box.style.cssText = `width:${width}px;display:grid;gap:16px;margin:16px`;
+				document.body.prepend(box);
+				type Host = HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+				const hosts: Host[] = [];
+				for (const c of cases) {
+					const host = document.createElement("tool-host") as Host;
+					host.setAttribute("tool", "discrete-series");
+					host.setAttribute("mode", "embed");
+					host.setAttribute("controls", "none");
+					host.dataset.case = c;
+					// On the host itself: the runtime declares --tb-font on :host, which an ancestor's value would not reach past.
+					host.style.cssText = style;
+					box.append(host);
+					hosts.push(host);
+				}
+				for (const [i, host] of hosts.entries()) {
+					host.values = { case: cases[i] as string };
+					await host.run();
+				}
+				// Two frames and a pause, so a chart laid out again at its measured width has been.
+				await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+				await new Promise((r) => setTimeout(r, 100));
+				const out: string[] = [];
+				const widths: number[] = [];
+				for (const host of hosts) {
+					for (const picture of host.shadowRoot!.querySelectorAll<SVGSVGElement>(".tb-output svg[role=img]")) {
+						const frame = picture.getBoundingClientRect();
+						widths.push(frame.width);
+						const texts = [...picture.querySelectorAll<SVGTextElement>("text")].filter((t) => (t.textContent ?? "").trim() !== "");
+						const boxes = texts.map((t) => t.getBoundingClientRect());
+						texts.forEach((t, k) => {
+							const name = `${host.dataset.case} ${t.getAttribute("class")} "${t.textContent}"`;
+							const m = t.getScreenCTM()!;
+							const sx = Math.hypot(m.a, m.b);
+							const sy = Math.hypot(m.c, m.d);
+							const px = parseFloat(getComputedStyle(t).fontSize) * sy;
+							if (px < size[0] || px > size[1]) out.push(`${name}: ${px.toFixed(1)}px`);
+							if (Math.abs(sx - sy) > 0.01) out.push(`${name}: stretched ${sx.toFixed(2)} by ${sy.toFixed(2)}`);
+							const b = boxes[k]!;
+							if (b.left < frame.left - 1 || b.right > frame.right + 1 || b.top < frame.top - 1 || b.bottom > frame.bottom + 1) out.push(`${name}: outside its picture`);
+							for (let j = 0; j < k; j++) {
+								const o = boxes[j]!;
+								const overlap = Math.min(b.right, o.right) - Math.max(b.left, o.left) > 1 && Math.min(b.bottom, o.bottom) - Math.max(b.top, o.top) > 1;
+								if (overlap) out.push(`${name}: overlaps "${texts[j]!.textContent}"`);
+							}
+						});
+					}
+				}
+				return { wrong: out, widths };
+			},
+			{ width, cases, style, size },
+		);
+		await page.close();
+		return read;
+	}
+
+	for (const width of [330, 1440]) {
+		it(`draws every label between 11 and 14px, unstretched, inside its picture and clear of the others, at ${width}px`, async () => {
+			const { wrong } = await labels(width);
+			assert.deepEqual(wrong.slice(0, 40), [], `${wrong.length} labels wrong`);
+		});
+	}
+
+	it("draws labels at the size a host sets with --tb-chart-font, with room made for them", async () => {
+		// 16px, the size a host might want for a reader at arm's length; the donut's total is 1.15 times it.
+		const { wrong } = await labels(330, "--tb-chart-font: 16px", [15.9, 18.5]);
+		assert.deepEqual(wrong.slice(0, 40), [], `${wrong.length} labels wrong`);
+	});
+
+	it("stacks labels by the face's measured box, not by its size", async () => {
+		/*
+		 * In CI on Linux every engine failed the tests above on the treemap alone: a tile's value overlapped its
+		 * own name, because the value sat a fixed number of em below the name and the Linux faces' boxes are
+		 * taller at the same size. Noteworthy, a macOS face whose box is 1.6em, reproduced it here, 17 labels;
+		 * elsewhere it falls back to the default face, which the tests above already cover.
+		 */
+		const { wrong } = await labels(330, "--tb-font: Noteworthy, sans-serif; --tb-mono: Noteworthy, monospace");
+		assert.deepEqual(wrong.slice(0, 40), [], `${wrong.length} labels wrong`);
+	});
+
+	it("stops a chart growing past --tb-chart-max-width", async () => {
+		const { wrong, widths } = await labels(1440, "--tb-chart-max-width: 520px");
+		assert.deepEqual(wrong.slice(0, 40), [], `${wrong.length} labels wrong`);
+		assert.ok(widths.length > 30 && widths.every((w) => w <= 520.5), `every picture at most 520px: ${widths.map(Math.round).join(", ")}`);
 	});
 });

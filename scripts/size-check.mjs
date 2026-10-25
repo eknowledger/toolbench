@@ -258,11 +258,19 @@ const BUDGETS = [
 	 * Lowered from 11_500 to 9_000 when the stylesheet and the number format moved into plot-common, the
 	 * chunk every chart kind shares (#121): about 10.9 KB to 8,266. A line or bar page now fetches both, 11,191
 	 * together, 0.3 KB more than one chunk was, which buys a heatmap or pie page not fetching this one.
+	 *
+	 * Raised from 9_000 to 9_500 by labels that keep their size (#210): margins measured from the labels,
+	 * thinned ticks, and the narrow layout for horizontal bars with each name above its bars. 8,878 to 9,347,
+	 * measured with the stylesheets' comments stripped (#230), which this chunk never had.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 9_000 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 9_500 },
 	/*
 	 * What every chart kind shares: the chart stylesheet and the number format. Fetched with the series
 	 * chart, the heatmap or the pie, whichever a page draws first. 2,925 measured.
+	 *
+	 * #210 added `fitted`, which lays every chart kind out again at its measured width, the label helpers,
+	 * and measuring the faces' ascent, descent and character width, since constants in em overlapped labels
+	 * on Linux: 1,733 to 2,785 with the comments stripped (#230), inside the budget.
 	 */
 	{ label: "chart common", pattern: /^plot-common-[^/]+\.js$/, budget: 3_500 },
 	/*

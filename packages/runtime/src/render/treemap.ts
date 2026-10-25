@@ -12,10 +12,8 @@
 import type { Treemap, TreemapNode } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, cut, fitted, format, lineOf, textWidth, type Fit } from "./plot-common.ts";
 
-const W = 640;
-const H = 360;
 const MAX_DEPTH = 3;
 
 const TREEMAP_STYLES = /* css */ `
@@ -26,8 +24,8 @@ const TREEMAP_STYLES = /* css */ `
 .tb-tile.tb-hot { stroke: var(--tb-fg); }
 /* Text in the surface colour on the two strongest steps, in the text colour on the palest: in both themes the
    first two steps are far from the surface and the third is near it, so this keeps every label legible. */
-.tb-tile-label { fill: var(--tb-bg); font-family: var(--tb-font); font-size: 11px; font-weight: 600; pointer-events: none; }
-.tb-tile-value { fill: var(--tb-bg); font-family: var(--tb-mono); font-size: 10px; pointer-events: none; }
+.tb-tile-label { fill: var(--tb-bg); font-family: var(--tb-font); font-weight: 600; pointer-events: none; }
+.tb-tile-value { fill: var(--tb-bg); font-family: var(--tb-mono); pointer-events: none; }
 .tb-tile-label[data-depth="3"], .tb-tile-value[data-depth="3"] { fill: var(--tb-fg); }
 .tb-tree-row th { font-weight: 400; }
 `;
@@ -106,7 +104,7 @@ function squarify(areas: number[], rect: { x: number; y: number; w: number; h: n
 }
 
 /** Lay out a node's children inside its rectangle, recursively, to MAX_DEPTH. */
-function lay(node: TreemapNode, rect: { x: number; y: number; w: number; h: number }, path: string[], depth: number, group: number, into: Laid[]): void {
+function lay(node: TreemapNode, rect: { x: number; y: number; w: number; h: number }, path: string[], depth: number, group: number, into: Laid[], line: number): void {
 	const children = (node.children ?? []).filter((c) => valueOf(c) > 0);
 	const total = children.reduce((sum, c) => sum + valueOf(c), 0);
 	if (children.length === 0 || total === 0 || depth > MAX_DEPTH) return;
@@ -123,17 +121,25 @@ function lay(node: TreemapNode, rect: { x: number; y: number; w: number; h: numb
 		const laid: Laid = { node: child, value: valueOf(child), path: [...path, child.label], depth, group: g, ...r };
 		into.push(laid);
 		// A group's children sit inside it under a strip for its name, when there is room for one.
-		const strip = child.children && child.children.length > 0 && r.h > 40 && r.w > 60 ? 15 : 0;
-		lay(child, { x: r.x + 2, y: r.y + strip + 2, w: Math.max(0, r.w - 4), h: Math.max(0, r.h - strip - 4) }, laid.path, depth + 1, g, into);
+		const strip = child.children && child.children.length > 0 && r.h > 3 * line + 8 && r.w > 60 ? Math.ceil(line + 3) : 0;
+		lay(child, { x: r.x + 2, y: r.y + strip + 2, w: Math.max(0, r.w - 4), h: Math.max(0, r.h - strip - 4) }, laid.path, depth + 1, g, into, line);
 	});
 }
 
 export function renderTreemap(treemap: Treemap, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
+	return fitted((fit) => drawTreemap(treemap, compact, fit));
+}
+
+function drawTreemap(treemap: Treemap, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f } = fit;
+	// 0.56 of the width, as the 640 by 360 drawing was, within 240 and 420 pixels.
+	const H = Math.round(Math.max(240, Math.min(W * 0.56, 420)));
 	const unit = treemap.unit ? ` ${treemap.unit}` : "";
 	const total = valueOf(treemap.root);
 	const laid: Laid[] = [];
-	lay(treemap.root, { x: 0, y: 0, w: W, h: H }, [], 1, 0, laid);
+	const line = lineOf(fit);
+	lay(treemap.root, { x: 0, y: 0, w: W, h: H }, [], 1, 0, laid, line);
 
 	const marks: SVGElement[] = [];
 	laid.forEach((t, i) => {
@@ -150,12 +156,15 @@ export function renderTreemap(treemap: Treemap, options: RenderOptions = {}): HT
 			}),
 		);
 		// A name where it fits, and its value under it where that fits too.
-		const fits = t.w > Math.min(t.node.label.length, 18) * 6.4 + 10 && t.h > 18;
-		if (!fits) return;
-		const name = t.node.label.length > 18 ? `${t.node.label.slice(0, 17)}…` : t.node.label;
-		marks.push(svg("text", { class: "tb-tile-label", "data-depth": t.depth, x: t.x + 5, y: t.y + 13 }, name));
-		if (t.h > 32 && !(t.node.children && t.node.children.length > 0)) {
-			marks.push(svg("text", { class: "tb-tile-value", "data-depth": t.depth, x: t.x + 5, y: t.y + 26 }, `${format(t.value)}${unit}`));
+		const name = cut(t.node.label, Math.min(t.w - 10, textWidth("a".repeat(18), f)), f);
+		// A cut name says too little to be worth drawing below four characters: the readout has it whole.
+		const fits = name === t.node.label || name.length >= 5;
+		// The name's box from 2 pixels into the tile, and the value's box 2 under it: both measured, in any face.
+		if (!fits || t.h < line + 4 || textWidth(name, f) > t.w - 10) return;
+		marks.push(svg("text", { class: "tb-tile-label", "data-depth": t.depth, x: t.x + 5, y: t.y + 2 + fit.ascent }, name));
+		const value = `${format(t.value)}${unit}`;
+		if (t.h >= 2 * line + 6 && textWidth(value, f) <= t.w - 10 && !(t.node.children && t.node.children.length > 0)) {
+			marks.push(svg("text", { class: "tb-tile-value", "data-depth": t.depth, x: t.x + 5, y: t.y + 4 + line + fit.ascent }, value));
 		}
 	});
 
@@ -218,8 +227,8 @@ function attachTileReadout(figure: HTMLElement, plotSvg: SVGSVGElement, treemap:
 		live.textContent = `${t.path.join(", ")}: ${format(t.value)}${unit}, ${share(t.value, total)}`;
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
-		const cx = (t.x + t.w / 2) * (box.width / W);
-		const cy = (t.y + t.h / 2) * (box.height / H);
+		const cx = (t.x + t.w / 2) * (box.width / plotSvg.viewBox.baseVal.width);
+		const cy = (t.y + t.h / 2) * (box.height / plotSvg.viewBox.baseVal.height);
 		card.style.left = `${Math.round((at?.x ?? box.left + cx) - frame.left)}px`;
 		card.style.top = `${Math.round((at?.y ?? box.top + cy) - frame.top)}px`;
 		card.toggleAttribute("data-flip", (at ? at.x - box.left : cx) > box.width / 2);

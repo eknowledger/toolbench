@@ -12,16 +12,14 @@
  */
 import type { Chart, Series } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
-import { adoptChartStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, cut, fitted, format, lineOf, middleOf, textWidth, thin, type Fit } from "./plot-common.ts";
 
 const formatNumber = format;
 import { attachReadout, attachScatterReadout, type Geometry, type ScatterPoint } from "./readout.ts";
 import type { RenderOptions } from "./index.ts";
 
-const W = 640;
-const H = 300;
-/** `right` grows when a second axis needs room for its labels — otherwise they clip at the edge. */
-const PAD = { top: 18, right: 20, rightWithAxis: 58, bottom: 44, left: 56 };
+/** A chart's height for its width: 0.47 of it, as the 640 by 300 drawing was, within 220 and 400 pixels. */
+const heightFor = (width: number) => Math.round(Math.max(220, Math.min(width * 0.47, 400)));
 
 /**
  * A chart, and the same chart whether it is on a card or a page.
@@ -31,26 +29,30 @@ const PAD = { top: 18, right: 20, rightWithAxis: 58, bottom: 44, left: 56 };
  * falls from 74% to nothing into an unreadable band; the axis titles are the only thing saying what the
  * numbers are; and the annotation label is the "you are here" that gives the picture a point.
  *
- * None of it was needed, because the geometry is a viewBox scaled to the available width. A chart on a
- * narrow card is already smaller than one on a page, proportionally, with its aspect ratio intact. Halving
- * the height on top of that was solving a problem the SVG had already solved, and charging three
- * legibility failures for it.
+ * None of it was needed: a chart on a narrow card is already smaller than one on a page. Halving the height
+ * on top of that charged three legibility failures for a problem the width had already solved.
  *
- * What compact still changes is the SIZE, and only the size: the same drawing, capped narrower so a card
- * does not hand most of a landing page to one chart. Capping the width and letting the height follow the
- * viewBox is what keeps the aspect ratio, which is the part that was broken before.
+ * What compact still changes is the SIZE, and only the size: the same chart, capped narrower so a card does
+ * not hand most of a landing page to one chart.
+ *
+ * ⚠️ Laid out for its measured width (#210), not scaled to it. The drawing used to be a 640 by 300 viewBox
+ * stretched over the panel, text and all, so a tick was 4.6px on a 330px panel and 22px on a 1440px one, and
+ * a host could not size it. Now one viewBox unit is one CSS pixel, the text is `--tb-chart-font`, and the
+ * margins are measured from the labels. `fitted` draws it again when the width changes.
  */
 export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
-	if (chart.orientation === "horizontal") return renderHorizontal(chart, compact);
+	return fitted((fit) => (chart.orientation === "horizontal" ? renderHorizontal(chart, compact, fit) : drawChart(chart, compact, fit)));
+}
+
+function drawChart(chart: Chart, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f, ascent, descent } = fit;
+	const line = lineOf(fit);
+	const H = heightFor(W);
+	// Fewer gridlines on a narrow chart, where five labels down a short axis crowd each other.
+	const count = fit.narrow ? 3 : 5;
 	const left = chart.series.filter((s) => (s.axis ?? "left") === "left");
 	const right = chart.series.filter((s) => s.axis === "right");
-	const plot = {
-		x: PAD.left,
-		y: PAD.top,
-		w: W - PAD.left - (right.length > 0 ? PAD.rightWithAxis : PAD.right),
-		h: H - PAD.top - PAD.bottom,
-	};
 
 	/*
 	 * ⚠️ A bar is measured from zero, so a bar chart's scale always includes it. Without that, values of 32
@@ -74,13 +76,33 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		...series.flatMap((s) => s.points.filter((p): p is number => p !== null)),
 		...(chart.thresholds ?? []).filter((t) => (t.axis ?? "left") === axis).map((t) => t.y),
 	];
-	const leftScale = yLog ? logScale(valuesOf(left, "left")) : niceScale(reach(withStacks(withZero(scaleFor(left), left), left), "left"));
+	const leftScale = yLog ? logScale(valuesOf(left, "left")) : niceScale(reach(withStacks(withZero(scaleFor(left), left), left), "left"), count);
 	const rightScale =
 		right.length === 0
 			? undefined
 			: yLog
 				? logScale(valuesOf(right, "right"))
-				: niceScale(reach(withStacks(withZero(scaleFor(right), right), right), "right"));
+				: niceScale(reach(withStacks(withZero(scaleFor(right), right), right), "right"), count);
+	const powers = (scale: Scale) => Array.from({ length: scale.max - scale.min + 1 }, (_, k) => 10 ** (scale.min + k));
+	const leftTicks = leftScale.log ? powers(leftScale) : ticks(leftScale, count);
+	const axisFormat = leftScale.log ? powerLabel : formatterFor(leftTicks);
+	const rightTicks = rightScale ? (rightScale.log ? powers(rightScale) : ticks(rightScale, count)) : [];
+	const rightFormat = rightScale?.log ? powerLabel : formatterFor(rightTicks);
+	/*
+	 * The margins are the text's, measured at the size it is drawn: the rotated y title, then the widest tick
+	 * label, on each side that has an axis. Fixed margins sized for 10px labels cut 12px ones off at the edge.
+	 */
+	const title = Math.ceil(line + 6);
+	const widest = (labels: string[]) => Math.max(0, ...labels.map((l) => textWidth(l, f)));
+	const top = Math.ceil(line + 4);
+	const plot = {
+		x: Math.ceil(title + widest(leftTicks.map(axisFormat)) + 10),
+		y: top,
+		w: 0,
+		// Under the plot: the lowest y label's lower half, the x tick labels and the x title, each 3 apart.
+		h: H - top - Math.ceil(line / 2 + 3 + line + 3 + line + 2),
+	};
+	plot.w = W - plot.x - (rightScale ? Math.ceil(widest(rightTicks.map(rightFormat)) + 10 + (chart.yLabelRight ? title : 0)) : Math.ceil(f * 1.6 + 8));
 	/*
 	 * ⚠️ A bar chart needs half a slot of padding at each end, and without it the first bar is drawn
 	 * across the y axis.
@@ -132,40 +154,33 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	// Labels that must stay readable over the data, appended after every series.
 	const labelsOnTop: SVGElement[] = [];
 
-	// Gridlines and y labels, from the left scale — a second axis gets ticks but not its own grid.
-	const powers = (scale: Scale) => Array.from({ length: scale.max - scale.min + 1 }, (_, k) => 10 ** (scale.min + k));
-	const leftTicks = leftScale.log ? powers(leftScale) : ticks(leftScale);
-	const axisFormat = leftScale.log ? powerLabel : formatterFor(leftTicks);
-	for (const tick of leftTicks) {
+	// From the baseline to the middle of the label's box, so a label sits on its gridline.
+	const mid = middleOf(fit);
+	// Gridlines and y labels, from the left scale; a second axis gets ticks but not its own grid.
+	for (const tick of thin(leftTicks, (t) => py(t, leftScale), () => line, 2)) {
 		const y = py(tick, leftScale);
 		marks.push(svg("line", { class: "tb-grid", x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
-		marks.push(svg("text", { class: "tb-tick", x: plot.x - 8, y: y + 4, "text-anchor": "end" }, axisFormat(tick)));
+		marks.push(svg("text", { class: "tb-tick", x: plot.x - 8, y: y + mid, "text-anchor": "end" }, axisFormat(tick)));
 	}
 	/*
-	 * Every category is labelled while its slot holds a few characters; past that, every second, third ...
-	 * so labels never collide. A numeric axis keeps its round-value ticks.
+	 * Every category is labelled while its slot holds four characters; past that, every second, third ...
+	 * so labels never collide. A label is cut to the room its slots have, with the whole text kept in the data
+	 * table and the readout. Rotated labels were the alternative, and slanted text is harder to read than a
+	 * shortened word. A numeric axis keeps its round-value ticks, thinned until their labels clear each other.
 	 */
-	const every = categories ? Math.max(1, Math.ceil(36 / (plot.w / Math.max(1, xs.length)))) : 1;
-	const xTicks = categories ? xs.filter((i) => i % every === 0) : xLog ? powers(xScale) : scatter ? ticks(xScale, 5) : xTicksFor(xs, xScale, bars);
-	const xFormat = xLog ? powerLabel : formatterFor(xTicks);
-	/*
-	 * A category label is cut to the room its slot has, about six viewBox units a character at this size,
-	 * with the whole text kept in the data table and the readout. Rotated labels were the alternative, and
-	 * slanted text is harder to read than a shortened word.
-	 */
-	const room = Math.max(3, Math.floor(((plot.w / Math.max(1, xs.length)) * every) / 6.2));
-	const cut = (text: string) => (text.length > room ? `${text.slice(0, room - 1)}…` : text);
+	const slotW = plot.w / Math.max(1, xs.length);
+	const every = categories ? Math.max(1, Math.ceil((textWidth("abcd", f) + 8) / slotW)) : 1;
+	const numericTicks = xLog ? powers(xScale) : scatter ? ticks(xScale, count) : xTicksFor(xs, xScale, bars, count);
+	const xFormat = xLog ? powerLabel : formatterFor(numericTicks);
+	const xTicks = categories ? xs.filter((i) => i % every === 0) : thin(numericTicks, px, (t) => textWidth(xFormat(t), f));
 	for (const tick of xTicks) {
-		const label = categories ? cut(categories[tick] ?? "") : xFormat(tick);
-		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + 20, "text-anchor": "middle" }, label));
+		const label = categories ? cut(categories[tick] ?? "", slotW * every - 8, f) : xFormat(tick);
+		// Clear of the y axis's lowest label, which hangs half its height below the plot.
+		marks.push(svg("text", { class: "tb-tick", x: px(tick), y: plot.y + plot.h + line / 2 + 3 + ascent, "text-anchor": "middle" }, label));
 	}
 	if (rightScale) {
-		const rightTicks = rightScale.log ? powers(rightScale) : ticks(rightScale);
-		const rightFormat = rightScale.log ? powerLabel : formatterFor(rightTicks);
-		for (const tick of rightTicks) {
-			marks.push(
-				svg("text", { class: "tb-tick", x: plot.x + plot.w + 8, y: py(tick, rightScale) + 4, "text-anchor": "start" }, rightFormat(tick)),
-			);
+		for (const tick of thin(rightTicks, (t) => py(t, rightScale), () => line, 2)) {
+			marks.push(svg("text", { class: "tb-tick", x: plot.x + plot.w + 8, y: py(tick, rightScale) + mid, "text-anchor": "start" }, rightFormat(tick)));
 		}
 	}
 
@@ -176,16 +191,11 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		if (at < 0) continue;
 		const x = px(at);
 		marks.push(svg("line", { class: "tb-annotation", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		// Flip the label inward near the right edge, or it runs off the chart — which is exactly
-		// where "you are here" lands when a system is nearly saturated.
-		const nearRight = x > plot.x + plot.w * 0.62;
-		marks.push(
-			svg(
-				"text",
-				{ class: "tb-annotation-label", x: nearRight ? x - 5 : x + 5, y: plot.y + 11, "text-anchor": nearRight ? "end" : "start" },
-				annotation.label,
-			),
-		);
+		// Flip the label inward where it would run off the chart, which is exactly where "you are here"
+		// lands when a system is nearly saturated, and cut it where neither side has the room.
+		const flip = x + 5 + textWidth(annotation.label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
+		const label = cut(annotation.label, flip ? x - 5 - plot.x : plot.x + plot.w - x - 5, f);
+		marks.push(svg("text", { class: "tb-annotation-label", x: flip ? x - 5 : x + 5, y: plot.y + 2 + ascent, "text-anchor": flip ? "end" : "start" }, label));
 	}
 
 	/*
@@ -197,12 +207,12 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 		const y = py(threshold.y, scale);
 		const tone = threshold.tone ?? "normal";
 		marks.push(svg("line", { class: "tb-threshold", "data-tone": tone, x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
-		const below = y < plot.y + 14;
+		const below = y < plot.y + line + 4;
 		labelsOnTop.push(
 			svg(
 				"text",
-				{ class: "tb-threshold-label", "data-tone": tone, x: plot.x + plot.w - 4, y: below ? y + 12 : y - 5, "text-anchor": "end" },
-				threshold.label,
+				{ class: "tb-threshold-label", "data-tone": tone, x: plot.x + plot.w - 4, y: below ? y + 3 + ascent : y - 3 - descent, "text-anchor": "end" },
+				cut(threshold.label, plot.w - 8, f),
 			),
 		);
 	}
@@ -253,11 +263,12 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	marks.push(svg("line", { class: "tb-axis", x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h }));
 
 	const axisLabels = [
-		svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: H - 6, "text-anchor": "middle" }, withUnit(chart.xLabel, chart.xUnit)),
+		svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: H - descent - 2, "text-anchor": "middle" }, cut(withUnit(chart.xLabel, chart.xUnit), plot.w, f)),
+		// Turned a quarter left, its ascent points left: the baseline sits an ascent in from the edge.
 		svg(
 			"text",
-			{ class: "tb-axis-label", x: 12, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${plot.y + plot.h / 2})` },
-			withUnit(chart.yLabel, chart.yUnit),
+			{ class: "tb-axis-label", x: ascent + 2, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(-90 ${ascent + 2} ${plot.y + plot.h / 2})` },
+			cut(withUnit(chart.yLabel, chart.yUnit), plot.h, f),
 		),
 		/*
 		 * The second axis's title, on the right edge reading downward. Declared in the contract since the right
@@ -268,8 +279,8 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 			? [
 					svg(
 						"text",
-						{ class: "tb-axis-label", x: W - 8, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(90 ${W - 8} ${plot.y + plot.h / 2})` },
-						withUnit(chart.yLabelRight, right[0]?.unit),
+						{ class: "tb-axis-label", x: W - ascent - 2, y: plot.y + plot.h / 2, "text-anchor": "middle", transform: `rotate(90 ${W - ascent - 2} ${plot.y + plot.h / 2})` },
+						cut(withUnit(chart.yLabelRight, right[0]?.unit), plot.h, f),
 					),
 				]
 			: []),
@@ -294,7 +305,7 @@ export function renderChart(chart: Chart, options: RenderOptions = {}): HTMLElem
 	figure.append(el("div", { class: "tb-plot" }, picture));
 	// Two coloured lines with no key is decoration: a reader cannot tell which is which or in what unit.
 	if (chart.series.length > 1) figure.append(legend(chart.series));
-	const sizes = sizeKey(chart);
+	const sizes = sizeKey(chart, f);
 	if (sizes) figure.append(sizes);
 	// The same numbers, for anyone or anything that cannot see the picture.
 	const notes = [
@@ -378,62 +389,81 @@ function scatterTable(chart: Chart): HTMLElement {
  * with the rows, within a cap, rather than squeezing them. Everything a vertical bar chart has carries
  * over: grouping, stacking, thresholds (now vertical rules), the readout, the data table.
  */
-function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
+function renderHorizontal(chart: Chart, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f, narrow, ascent, descent } = fit;
+	const line = lineOf(fit);
 	// A mirrored chart (#125) draws negatives leftward and writes every number as its magnitude.
 	const fmt = chart.mirror === true ? (v: number) => format(Math.abs(v)) : format;
 	const categories = chart.x.map((v) => (typeof v === "string" ? v : format(v)));
 	const n = Math.max(1, categories.length);
 	const bars = chart.series.filter((series) => series.shape === "bar");
-	const longest = Math.max(4, ...categories.map((c) => c.length));
-	const labelRoom = Math.min(200, 12 + longest * 6.2);
-	const row = Math.max(18, Math.min(34, 300 / n));
-	const height = 18 + n * row + 44;
-	const plot = { x: labelRoom + 8, y: 18, w: W - labelRoom - 8 - 24, h: n * row };
+	const slots = barSlots(chart);
+	const count = narrow ? 3 : 5;
 
 	const { ranges, totals } = stackRanges(chart);
 	const values = bars.flatMap((s) => s.points.filter((p): p is number => p !== null));
 	const reached = [0, ...values, ...totals, ...(chart.thresholds ?? []).map((t) => t.y)];
-	const scale = niceScale({ min: Math.min(...reached), max: Math.max(...reached) });
+	const scale = niceScale({ min: Math.min(...reached), max: Math.max(...reached) }, count);
+	const valueTicks = ticks(scale, count);
+	const baseFormat = formatterFor(valueTicks);
+	const valueFormat = chart.mirror === true ? (v: number) => baseFormat(Math.abs(v)) : baseFormat;
+	// Half the widest value label each side, so the first and last stay inside the picture.
+	const edge = Math.ceil(Math.max(...valueTicks.map((t) => textWidth(valueFormat(t), f))) / 2) + 4;
+
+	/*
+	 * Narrow (#210): each name on its own line above its bars, which then take the whole width. Beside the
+	 * bars a long name takes a third of a phone's width and still has to be cut, and the bars get what is left.
+	 * Wide: the names in a column beside the bars, as wide as the longest within two fifths of the chart.
+	 */
+	const labelRoom = narrow ? 0 : Math.min(W * 0.4, Math.max(...categories.map((c) => textWidth(c, f)), textWidth("abcd", f)) + 12);
+	const thickness = narrow ? Math.max(4, Math.min(12, 24 / Math.max(1, slots.length))) : 0;
+	const row = narrow ? Math.ceil(line + 3 + slots.length * thickness + 10) : Math.max(line + 6, Math.min(34, 300 / n));
+	// A narrow chart's threshold labels get a line of their own above the plot, clear of the first name.
+	const plotTop = narrow && (chart.thresholds ?? []).length > 0 ? Math.ceil(line + 8) : narrow ? 4 : Math.ceil(line + 4);
+	const plot = { x: narrow ? edge : labelRoom + 8, y: plotTop, w: 0, h: n * row };
+	plot.w = W - plot.x - edge;
+	// Under the plot: the value labels and the title, each 3 apart, from their measured boxes.
+	const height = Math.ceil(plot.y + plot.h + 3 + line + 3 + line + 2);
 	const pv = (value: number) => plot.x + ((value - scale.min) / span(scale)) * plot.w;
-	const pc = (i: number) => plot.y + (i + 0.5) * row;
+	// A category's bars: the middle of its row, or under its name on a narrow chart.
+	const pc = (i: number) => (narrow ? plot.y + i * row + line + 3 + (slots.length * thickness) / 2 : plot.y + (i + 0.5) * row);
 
 	const marks: SVGElement[] = [];
 	const top: SVGElement[] = [];
-	const valueTicks = ticks(scale);
-	const baseFormat = formatterFor(valueTicks);
-	const valueFormat = chart.mirror === true ? (v: number) => baseFormat(Math.abs(v)) : baseFormat;
-	for (const tick of valueTicks) {
+	for (const tick of thin(valueTicks, pv, (t) => textWidth(valueFormat(t), f))) {
 		const x = pv(tick);
 		marks.push(svg("line", { class: "tb-grid", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		marks.push(svg("text", { class: "tb-tick", x, y: plot.y + plot.h + 16, "text-anchor": "middle" }, valueFormat(tick)));
+		marks.push(svg("text", { class: "tb-tick", x, y: plot.y + plot.h + 3 + ascent, "text-anchor": "middle" }, valueFormat(tick)));
 	}
-	const room = Math.floor(labelRoom / 6.2);
 	categories.forEach((name, i) => {
-		const text = name.length > room ? `${name.slice(0, room - 1)}…` : name;
-		marks.push(svg("text", { class: "tb-tick", x: plot.x - 8, y: pc(i) + 4, "text-anchor": "end" }, text));
+		marks.push(
+			narrow
+				? svg("text", { class: "tb-tick tb-category", x: plot.x, y: plot.y + i * row + ascent, "text-anchor": "start" }, cut(name, plot.w, f))
+				: svg("text", { class: "tb-tick", x: plot.x - 8, y: pc(i) + middleOf(fit), "text-anchor": "end" }, cut(name, labelRoom - 4, f)),
+		);
 	});
 	for (const threshold of chart.thresholds ?? []) {
 		const x = pv(threshold.y);
 		const tone = threshold.tone ?? "normal";
 		marks.push(svg("line", { class: "tb-threshold", "data-tone": tone, x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		const nearRight = x > plot.x + plot.w * 0.7;
+		const label = threshold.label;
+		const flip = x + 4 + textWidth(label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
 		top.push(
 			svg(
 				"text",
-				{ class: "tb-threshold-label", "data-tone": tone, x: nearRight ? x - 4 : x + 4, y: plot.y + 10, "text-anchor": nearRight ? "end" : "start" },
-				threshold.label,
+				{ class: "tb-threshold-label", "data-tone": tone, x: flip ? x - 4 : x + 4, y: narrow ? plot.y - 3 - descent : plot.y + 2 + ascent, "text-anchor": flip ? "end" : "start" },
+				cut(label, flip ? x - 4 - plot.x : plot.x + plot.w - x - 4, f),
 			),
 		);
 	}
 
-	const slots = barSlots(chart);
-	const thickness = Math.max(2, Math.min((row * 0.7) / Math.max(1, slots.length), 18));
+	const barThickness = narrow ? thickness : Math.max(2, Math.min((row * 0.7) / Math.max(1, slots.length), 18));
 	const zero = pv(clamp(0, scale));
 	chart.series.forEach((series, index) => {
 		if (series.shape !== "bar") return;
 		const cls = `tb-s${(index % 6) + 1}`;
 		const at = slots.indexOf(series.stack ?? series);
-		const offset = -(thickness * slots.length) / 2 + at * thickness;
+		const offset = -(barThickness * slots.length) / 2 + at * barThickness;
 		const stacked = ranges.get(series);
 		series.points.forEach((point, i) => {
 			if (point === null) return;
@@ -448,7 +478,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 					x: Math.min(base, end),
 					y: pc(i) + offset,
 					width: Math.abs(end - base),
-					height: thickness,
+					height: barThickness,
 				}),
 			);
 		});
@@ -457,7 +487,7 @@ function renderHorizontal(chart: Chart, compact: boolean): HTMLElement {
 	marks.push(svg("line", { class: "tb-axis", x1: zero, x2: zero, y1: plot.y, y2: plot.y + plot.h }));
 	marks.push(svg("line", { class: "tb-axis", x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h }));
 	marks.push(
-		svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: height - 6, "text-anchor": "middle" }, withUnit(chart.yLabel, chart.yUnit)),
+		svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: height - descent - 2, "text-anchor": "middle" }, cut(withUnit(chart.yLabel, chart.yUnit), plot.w, f)),
 	);
 
 	const figure = el("figure", {
@@ -630,7 +660,7 @@ function ticks(scale: Scale, count = 5): number[] {
  * between two bars. The step is therefore a whole multiple of the bars' own spacing, and the ticks are
  * data positions, at round values where there are any.
  */
-function xTicksFor(xs: number[], scale: Scale, bars: boolean): number[] {
+function xTicksFor(xs: number[], scale: Scale, bars: boolean, count = 5): number[] {
 	if (xs.length === 0) return [];
 	const lo = Math.min(...xs);
 	const hi = Math.max(...xs);
@@ -638,14 +668,14 @@ function xTicksFor(xs: number[], scale: Scale, bars: boolean): number[] {
 		const sorted = [...new Set(xs)].sort((a, b) => a - b);
 		const gaps = sorted.slice(1).map((x, i) => x - (sorted[i] as number));
 		const spacing = gaps.length > 0 ? Math.min(...gaps) : 1;
-		const multiple = niceStep(Math.max(spacing, (hi - lo) / 5), 1) / spacing;
+		const multiple = niceStep(Math.max(spacing, (hi - lo) / count), 1) / spacing;
 		const step = spacing * Math.max(1, Math.ceil(multiple - 1e-9));
 		const on = (x: number, origin: number) => Math.abs(((x - origin) / step) % 1) < 1e-9 || Math.abs(((x - origin) / step) % 1) > 1 - 1e-9;
 		const round = sorted.filter((x) => on(x, 0));
 		return round.length > 0 ? round : sorted.filter((x) => on(x, lo));
 	}
-	if (!xs.every((x) => Number.isInteger(x))) return ticks(scale, 5);
-	const step = Math.max(1, niceStep(Math.max(1, hi - lo), 5));
+	if (!xs.every((x) => Number.isInteger(x))) return ticks(scale, count);
+	const step = Math.max(1, niceStep(Math.max(1, hi - lo), count));
 	const out: number[] = [];
 	for (let value = Math.ceil(lo / step) * step; value <= hi; value += step) out.push(value);
 	return out;
@@ -729,8 +759,8 @@ function drawSeries(
 
 	if (shape === "bar") {
 		/*
-		 * Thin bars, with the rest of the slot left as air: each bar is capped at 32 viewBox units, about
-		 * 46px at full width. Three categories used to draw bars 95 units wide, slabs rather than marks.
+		 * Thin bars, with the rest of the slot left as air: each bar is capped at 32 pixels. Three categories
+		 * used to draw bars 95 units wide, slabs rather than marks.
 		 */
 		const count = Math.max(1, group.count);
 		const width = Math.max(1, Math.min(((plot.w / Math.max(1, xs.length)) * 0.7) / count, 32));
@@ -847,10 +877,10 @@ function bubbleRadius(size: number, largest: number): number {
 
 /**
  * The size key for bubbles (#127): three reference circles and their values, since size has no axis. Its
- * own small SVG at the chart's scale (160 of the chart's 640 units is a quarter of its width), so a key
- * circle is the same size as a bubble of that value.
+ * own small SVG at the chart's scale, one unit to a pixel, so a key circle is the same size as a bubble of
+ * that value.
  */
-function sizeKey(chart: Chart): HTMLElement | null {
+function sizeKey(chart: Chart, f: number): HTMLElement | null {
 	const sized = chart.series.find((s) => s.sizes && s.shape === "points");
 	if (!sized?.sizes) return null;
 	const largest = largestSize(chart);
@@ -861,12 +891,13 @@ function sizeKey(chart: Chart): HTMLElement | null {
 	for (const v of refs) {
 		const r = bubbleRadius(v, largest);
 		marks.push(svg("circle", { class: "tb-size-ref", cx: x, cy: 52 - r, r }));
-		marks.push(svg("text", { class: "tb-tick", x, y: 64, "text-anchor": "middle" }, format(v)));
-		x += 2 * r + 22;
+		marks.push(svg("text", { class: "tb-tick", x, y: 56 + f, "text-anchor": "middle" }, format(v)));
+		x += Math.max(2 * r, textWidth(format(v), f)) + 22;
 	}
 	const title = el("p", { class: "tb-size-title" });
 	title.textContent = sized.sizeLabel ?? "Size";
-	return el("div", { class: "tb-size-key" }, title, svg("svg", { viewBox: "0 0 160 68", "aria-hidden": "true" }, ...marks));
+	const h = Math.ceil(60 + f);
+	return el("div", { class: "tb-size-key" }, title, svg("svg", { viewBox: `0 0 ${Math.ceil(x)} ${h}`, width: Math.ceil(x), height: h, "aria-hidden": "true" }, ...marks));
 }
 
 /** Six marker shapes, in series order, each about 8 units across: circle, diamond, triangle, square, down-triangle, cross. */

@@ -16,9 +16,8 @@
 import type { Pie } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
 
-const W = 640;
 const H = 260;
 const MAX_SLICES = 6;
 
@@ -28,8 +27,8 @@ const PIE_STYLES = /* css */ `
 .tb-slice[data-tone="warn"] { fill: var(--tb-warn); }
 .tb-slice[data-tone="bad"] { fill: var(--tb-bad); }
 .tb-slice.tb-hot { stroke: var(--tb-fg); }
-.tb-slice-share { fill: var(--tb-bg); font-family: var(--tb-mono); font-size: 11px; font-weight: 600; pointer-events: none; }
-.tb-pie-total { fill: var(--tb-fg); font-family: var(--tb-mono); font-size: 18px; font-weight: 600; }
+.tb-slice-share { fill: var(--tb-bg); font-family: var(--tb-mono); font-weight: 600; pointer-events: none; }
+.tb-pie-total { fill: var(--tb-fg); font-family: var(--tb-mono); font-size: 1.15em; font-weight: 600; }
 .tb-pie-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.82rem; }
 .tb-pie-key li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 0.5rem; }
 .tb-pie-key .tb-share { font-family: var(--tb-mono); font-weight: 600; }
@@ -39,6 +38,8 @@ const PIE_STYLES = /* css */ `
 .tb-pie-key [data-tone="warn"] .tb-swatch-pie { background: var(--tb-warn); }
 .tb-pie-key [data-tone="bad"] .tb-swatch-pie { background: var(--tb-bad); }
 .tb-pie-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.9fr); gap: 1rem; align-items: center; }
+/* Narrow (#210): the key under the pie. Beside it, on a phone, the pie was 88 pixels across. */
+.tb-pie[data-narrow] .tb-pie-body { grid-template-columns: minmax(0, 1fr); }
 .tb-pie-message { margin: 0; padding: 0.75rem; border: 1px dashed var(--tb-border); border-radius: 8px; color: var(--tb-muted); font-size: 0.86rem; }
 `;
 
@@ -52,8 +53,13 @@ interface Slice {
 
 export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
+	return fitted((fit) => drawPie(pie, compact, fit));
+}
+
+function drawPie(pie: Pie, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f } = fit;
 	const unit = pie.unit ? ` ${pie.unit}` : "";
-	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card tb-pie" : "tb-out-chart tb-pie" });
+	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card tb-pie" : "tb-out-chart tb-pie", ...(fit.narrow ? { "data-narrow": "" } : {}) });
 	adoptChartStyles(figure);
 	adoptStyles(figure, "pie", () => PIE_STYLES);
 
@@ -76,11 +82,13 @@ export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 		slices = [...slices.filter((s) => keep.has(s)), { label: "Other", value: other, share: other / total }];
 	}
 
-	const cx = 150;
+	// Drawn at its own size in the middle of its box, at most 260 pixels across, whatever the box's width.
+	const cx = W / 2;
 	const cy = H / 2;
 	// Room for an exploded slice to move out without leaving the picture.
-	const r = slices.some((s) => s.explode === true) ? 104 : 112;
-	const inner = pie.donut ? 68 : 0;
+	const full = Math.max(40, Math.min(H, W) / 2 - 18);
+	const r = slices.some((s) => s.explode === true) ? full - 8 : full;
+	const inner = pie.donut ? r * 0.6 : 0;
 	const marks: SVGElement[] = [];
 	let angle = -Math.PI / 2;
 	slices.forEach((slice, i) => {
@@ -114,23 +122,23 @@ export function renderPie(pie: Pie, options: RenderOptions = {}): HTMLElement {
 				d,
 			}),
 		);
-		// The share on the slice where it fits; the key beside the pie always has it.
-		if (sweep > 0.42) {
-			const at = (inner + r) / 2 + push;
+		// The share on the slice where its arc has room for it; the key beside the pie always has it.
+		const at = (inner + r) / 2 + push;
+		if (sweep * at >= textWidth(percent(slice.share), f) + 8 && r - inner >= lineOf(fit) + 4) {
 			marks.push(
 				svg(
 					"text",
-					{ class: "tb-slice-share", x: cx + at * Math.cos(mid), y: cy + at * Math.sin(mid) + 4, "text-anchor": "middle" },
+					{ class: "tb-slice-share", x: cx + at * Math.cos(mid), y: cy + at * Math.sin(mid) + middleOf(fit), "text-anchor": "middle" },
 					percent(slice.share),
 				),
 			);
 		}
 		angle = end;
 	});
-	if (pie.donut && pie.total) marks.push(svg("text", { class: "tb-pie-total", x: cx, y: cy + 6, "text-anchor": "middle" }, pie.total));
+	if (pie.donut && pie.total) marks.push(svg("text", { class: "tb-pie-total", x: cx, y: cy + middleOf(fit) * 1.15, "text-anchor": "middle" }, pie.total));
 
 	const description = `${pie.label}: ${slices.map((s) => `${s.label} ${percent(s.share)}`).join(", ")}`;
-	const picture = svg("svg", { viewBox: `0 0 300 ${H}`, role: "img", "aria-label": description, preserveAspectRatio: "xMidYMid meet" }, ...marks) as SVGSVGElement;
+	const picture = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": description, preserveAspectRatio: "xMidYMid meet" }, ...marks) as SVGSVGElement;
 	const key = el(
 		"ul",
 		{ class: "tb-pie-key" },

@@ -105,6 +105,29 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 A chart's internal markup, the SVG and its classes, is not part of this contract. Style a chart through its
 root and the series colour properties. Its insides are drawn geometry and will change.
 
+### Chart text and width
+
+A chart is laid out for the width it is given, one SVG unit to one CSS pixel, and laid out again when that
+width changes. Its labels are therefore the size you set at any width, and nothing in it is stretched. Two
+properties size it, set on `tool-host` or anything around it:
+
+| Property | Default | What it does |
+|---|---|---|
+| `--tb-chart-font` | `0.75rem` | The size of every label inside a chart. The margins are measured from the labels, so a larger size makes room for itself rather than overlapping |
+| `--tb-chart-max-width` | `100%` | The widest a chart is drawn. Wider than this, the chart keeps this width at the start of its row |
+
+```css
+/* Larger chart labels, and no chart wider than a reading column. */
+tool-host { --tb-chart-font: 0.875rem; --tb-chart-max-width: 48rem; }
+```
+
+Below 480px a chart takes a narrow layout: fewer gridlines, each horizontal bar's name on its own line above
+its bars, a pie's key under the pie, and a Venn diagram's set names in a key under the picture.
+
+⚠️ A chart's first drawing, made before it is on the page, is at a guessed width of 640 pixels. It is
+replaced by one at the measured width before anything is painted, so a script that keeps a reference to the
+figure returned by `render` holds the replaced one. Find it again by `data-kind` or `data-part` instead.
+
 ### Inside a graph
 
 A graph's picture is different: a tool names its nodes, edges, groups and lanes, so a host can style them

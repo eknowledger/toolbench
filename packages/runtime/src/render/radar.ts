@@ -11,10 +11,8 @@
 import type { Radar } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, cut, fitted, format, lineOf, middleOf, textWidth, thin, type Fit } from "./plot-common.ts";
 
-const W = 640;
-const H = 340;
 const MAX_SERIES = 4;
 
 const RADAR_STYLES = /* css */ `
@@ -24,8 +22,8 @@ const RADAR_STYLES = /* css */ `
 .tb-radar-dot.tb-hot { stroke-width: 3; }
 .tb-radar-ring, .tb-radar-spoke { fill: none; stroke: var(--tb-border); stroke-width: 1; }
 .tb-radar-spoke.tb-hot { stroke: var(--tb-muted); stroke-dasharray: 3 3; }
-.tb-radar-axis { fill: var(--tb-muted); font-family: var(--tb-font); font-size: 11px; }
-.tb-radar-ring-label { fill: var(--tb-faint); font-family: var(--tb-mono); font-size: 10px; stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; }
+.tb-radar-axis { fill: var(--tb-muted); font-family: var(--tb-font); }
+.tb-radar-ring-label { fill: var(--tb-faint); font-family: var(--tb-mono); stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; }
 `;
 
 /** A "nice" ceiling for the shared scale: 1, 2 or 5 times a power of ten at or above the largest value. */
@@ -37,13 +35,28 @@ function ceiling(max: number): number {
 
 export function renderRadar(radar: Radar, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
+	return fitted((fit) => drawRadar(radar, compact, fit));
+}
+
+function drawRadar(radar: Radar, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f } = fit;
 	const unit = radar.unit ? ` ${radar.unit}` : "";
 	const series = radar.series.slice(0, MAX_SERIES);
 	const left = radar.series.length - series.length;
 	const n = Math.max(3, radar.axes.length);
-	const cx = 220;
+	/*
+	 * The radius is what the spoke labels leave: the widest label beside the circle on each side, within 50 and
+	 * 140 pixels. A label still too wide for what is left is cut; the table has it whole.
+	 */
+	const axisText = (k: number) => {
+		const axis = radar.axes[k];
+		return axis ? (axis.max !== undefined ? `${axis.label} (of ${format(axis.max)})` : axis.label) : "";
+	};
+	const widest = Math.max(0, ...radar.axes.map((_, k) => textWidth(axisText(k), f)));
+	const R = Math.round(Math.max(50, Math.min(140, W / 2 - widest - 22)));
+	const H = Math.ceil(2 * (R + 14 + lineOf(fit) + 4));
+	const cx = W / 2;
 	const cy = H / 2;
-	const R = 120;
 	const values = series.flatMap((s) => s.values.filter((v): v is number => v !== null && Number.isFinite(v)));
 	const shared = ceiling(Math.max(0, ...values));
 	const ownScales = radar.axes.some((a) => a.max !== undefined);
@@ -64,22 +77,25 @@ export function renderRadar(radar: Radar, options: RenderOptions = {}): HTMLElem
 	const fifth = shared / 5;
 	const roundFifth = [1, 2, 5].some((m) => Math.abs(fifth / 10 ** Math.floor(Math.log10(fifth)) - m) < 1e-9);
 	const steps = ownScales ? 4 : roundFifth ? 5 : 4;
+	// A ring is labelled while its label clears the next one in; on a small radar, every other ring.
+	const labelled = new Set(thin(Array.from({ length: steps }, (_, i) => i + 1), (i) => (i / steps) * R, () => lineOf(fit), 2));
 	for (let i = 1; i <= steps; i++) {
-		const f = i / steps;
+		const frac = i / steps;
 		const ring = radar.axes.map((_, k) => {
-			const r = f * R;
+			const r = frac * R;
 			return `${(cx + r * Math.cos(angle(k))).toFixed(2)},${(cy + r * Math.sin(angle(k))).toFixed(2)}`;
 		});
 		marks.push(svg("polygon", { class: "tb-radar-ring", points: ring.join(" ") }));
-		onTop.push(svg("text", { class: "tb-radar-ring-label", x: cx + 4, y: cy - f * R + 11, "text-anchor": "start" }, ownScales ? `${f * 100}%` : format(f * shared)));
+		if (labelled.has(i)) onTop.push(svg("text", { class: "tb-radar-ring-label", x: cx + 4, y: cy - frac * R + 1 + fit.ascent, "text-anchor": "start" }, ownScales ? `${frac * 100}%` : format(frac * shared)));
 	}
 	radar.axes.forEach((axis, k) => {
 		const end = { x: cx + R * Math.cos(angle(k)), y: cy + R * Math.sin(angle(k)) };
 		marks.push(svg("line", { class: "tb-radar-spoke", "data-k": k, x1: cx, y1: cy, x2: end.x, y2: end.y }));
 		const lx = cx + (R + 14) * Math.cos(angle(k));
-		const ly = cy + (R + 14) * Math.sin(angle(k)) + 4;
+		const ly = cy + (R + 14) * Math.sin(angle(k)) + middleOf(fit);
 		const anchor = Math.abs(Math.cos(angle(k))) < 0.2 ? "middle" : Math.cos(angle(k)) > 0 ? "start" : "end";
-		marks.push(svg("text", { class: "tb-radar-axis", x: lx, y: ly, "text-anchor": anchor }, axis.max !== undefined ? `${axis.label} (of ${format(axis.max)})` : axis.label));
+		const room = anchor === "middle" ? W - 8 : anchor === "start" ? W - lx - 4 : lx - 4;
+		marks.push(svg("text", { class: "tb-radar-axis", x: lx, y: ly, "text-anchor": anchor }, cut(axisText(k), room, f)));
 	});
 
 	series.forEach((s, i) => {
@@ -125,7 +141,7 @@ export function renderRadar(radar: Radar, options: RenderOptions = {}): HTMLElem
 		}),
 	);
 	figure.append(el("div", { class: "tb-plot" }, picture), legend, table(radar, series, unit, left > 0 ? `${left} series not drawn: more than ${MAX_SERIES} overlap past reading` : undefined));
-	attachSpokeReadout(figure, picture, radar, series, unit, { cx, cy, n, angle });
+	attachSpokeReadout(figure, picture, radar, series, unit, { cx, cy, n, angle, R });
 	adoptChartStyles(figure);
 	adoptStyles(figure, "radar", () => RADAR_STYLES);
 	return figure;
@@ -151,7 +167,7 @@ function attachSpokeReadout(
 	radar: Radar,
 	series: Radar["series"],
 	unit: string,
-	g: { cx: number; cy: number; n: number; angle: (k: number) => number },
+	g: { cx: number; cy: number; n: number; angle: (k: number) => number; R: number },
 ): void {
 	const card = el("div", { class: "tb-readout", hidden: true, "aria-hidden": "true" });
 	const live = el("p", { class: "tb-sr", role: "status", "aria-live": "polite" });
@@ -189,12 +205,20 @@ function attachSpokeReadout(
 		live.textContent = `${axis.label}: ${spoken.join(", ")}`;
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
-		const scale = box.width / W;
-		const px = g.cx + 130 * Math.cos(g.angle(k));
-		const py = g.cy + 130 * Math.sin(g.angle(k));
-		card.style.left = `${Math.round(box.left - frame.left + px * scale)}px`;
+		const scale = box.width / plotSvg.viewBox.baseVal.width;
+		const px = g.cx + (g.R + 10) * Math.cos(g.angle(k));
+		const py = g.cy + (g.R + 10) * Math.sin(g.angle(k));
+		/*
+		 * Beside the spoke's end, on whichever side has room for the card. On a narrow radar neither side may,
+		 * so it is pulled in to end at the figure's edge: placed by the spoke alone, it ran 137 pixels past a
+		 * 286-pixel figure (#210).
+		 */
+		const at = box.left - frame.left + px * scale;
+		const wide = card.offsetWidth + 12;
+		const flip = at + wide > frame.width && at - wide >= 0;
+		card.style.left = `${Math.round(flip ? at : Math.min(at, frame.width - wide))}px`;
 		card.style.top = `${Math.round(box.top - frame.top + py * scale)}px`;
-		card.toggleAttribute("data-flip", Math.cos(g.angle(k)) < -0.2);
+		card.toggleAttribute("data-flip", flip);
 	};
 	const hide = () => {
 		current = -1;
@@ -203,10 +227,10 @@ function attachSpokeReadout(
 	};
 	plotSvg.addEventListener("pointermove", (event) => {
 		const box = plotSvg.getBoundingClientRect();
-		const scale = box.width / W;
+		const scale = box.width / plotSvg.viewBox.baseVal.width;
 		const x = (event.clientX - box.left) / scale - g.cx;
 		const y = (event.clientY - box.top) / scale - g.cy;
-		if (Math.hypot(x, y) > 150) {
+		if (Math.hypot(x, y) > g.R + 30) {
 			if (event.pointerType === "mouse") hide();
 			return;
 		}
