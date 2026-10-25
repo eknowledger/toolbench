@@ -20,8 +20,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
-import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
-import type { Ctx, Output, Tool } from "../packages/sdk/src/types.ts";
+import { type Browser, type BrowserType, chromium, firefox, type Locator, type Page, webkit } from "playwright";
+import type { Ctx, Graph, Output, Tool } from "../packages/sdk/src/types.ts";
 import type { GraphLayout } from "../packages/runtime/src/graph/model.ts";
 import { layout } from "../packages/runtime/test/graph/all.ts";
 import discreteSeries from "./fixtures/discrete-series/index.ts";
@@ -4638,6 +4638,50 @@ describe("graphs (#152)", () => {
 		await page.close();
 	});
 
+	/** A closed card seeded with `graph`, alone on a fresh page, so no other host has fetched a chunk it needs. */
+	async function seededGraphCard(page: Page, graph: Graph): Promise<Locator> {
+		await page.goto(`${BASE}/tool.html?id=wide-output`, { waitUntil: "load" });
+		await page.evaluate(async (graph) => {
+			await customElements.whenDefined("tool-host");
+			const host = document.createElement("tool-host") as HTMLElement & { seed: unknown };
+			host.id = "seeded-graph";
+			host.setAttribute("tool", "graph-families");
+			host.setAttribute("mode", "card");
+			host.seed = { kind: "graph", graph };
+			document.body.prepend(host);
+		}, graph);
+		const card = page.locator("#seeded-graph");
+		await card.locator(".tb-facade").waitFor({ timeout: 15_000 });
+		return card;
+	}
+
+	it("draws every graph family in a closed seeded card, the chunks its layout asks for included (#201)", async () => {
+		/*
+		 * The bipartite graph's layout asks for the crossing search only once it sees what the base placement
+		 * left, so it is not in `needs()`, and the seed was painted without it: the card said "The chart could
+		 * not be loaded." in place of the graph. One page per case, because a chunk fetched for one graph would
+		 * hide the miss in the next.
+		 */
+		const wrong: string[] = [];
+		for (const [id, graph] of Object.entries(graphs)) {
+			const page = await browser.newPage();
+			const card = await seededGraphCard(page, graph);
+			const text = (await card.locator(".tb-facade").textContent()) ?? "";
+			const figures = await card.locator(".tb-out-graph").count();
+			if (/could not be loaded/.test(text) || figures !== 1) wrong.push(`${id}: ${figures} figures, "${text.replace(/\s+/g, " ").trim().slice(0, 80)}"`);
+			await page.close();
+		}
+		assert.deepEqual(wrong, [], "every seeded graph is drawn as a graph");
+	});
+
+	it("says the graph, not the chart, could not be loaded when its chunk is refused", async () => {
+		const page = await browser.newPage();
+		await page.route(/\/assets\/graph-[A-Za-z0-9_-]{8}\.js$/, (route) => route.abort());
+		const card = await seededGraphCard(page, graphs["state-orthogonal"]!);
+		assert.equal(await card.locator(".tb-facade .tb-status").textContent(), "The graph could not be loaded.");
+		await page.close();
+	});
+
 	it("lists a node with no edges as one, so a reader of the table alone still finds it", async () => {
 		const page = await browser.newPage();
 		await page.goto(`${BASE}/tool.html?id=build-order`, { waitUntil: "load" });
@@ -4984,8 +5028,8 @@ describe("a result wider than its tool scrolls inside it, and is never clipped (
 						await host.run();
 					}
 				}
-				// Or degraded to a status line, which a seed whose graph needs a chunk not yet loaded does; its frame is still measured.
-				const drawn = (h: Host) => h.shadowRoot?.querySelector("[data-kind], .tb-facade .tb-status");
+				// Drawn, not degraded: a seeded graph used to fall back to a status line here when its layout asked for a chunk (#201).
+				const drawn = (h: Host) => h.shadowRoot?.querySelector("[data-kind]");
 				const deadline = Date.now() + 15_000;
 				while (!hosts.every(drawn)) {
 					if (Date.now() > deadline) throw new Error(`never drew: ${hosts.filter((h) => !drawn(h)).map((h) => h.dataset.case)}`);
