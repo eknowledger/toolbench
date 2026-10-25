@@ -594,7 +594,37 @@ host.addEventListener("tool-input", (e) => saveToUrl(e.detail.values));       //
 host.addEventListener("tool-run", (e) => track(e.detail.ok, e.detail.error));  // after the result is drawn
 ```
 
-A third, `tool-reset`, fires when the reader presses Reset (see [Reset](#reset)).
+A third, `tool-reset`, fires when the reader presses Reset (see [Reset](#reset)), and a fourth,
+`tool-share`, when the reader presses the share button (below).
+
+**A reader can share a link to the tool with its inputs.** A `page` or `embed` tool has a small link
+icon, named "Copy a link to this tool with its inputs". It copies this page's address with the tool's
+inputs added as query parameters, each named `<tool id>.<input id>`:
+
+```
+https://example.com/latency?percentiles.values=12+14+15&percentiles.method=linear
+```
+
+The page's own parameters stay, and any parameter of this tool's already in the address is replaced.
+The tool's id in each name is what lets several tools share one address; the same tool twice on one page
+reads the same parameters. A tool opening on a page with such parameters starts with those values, and
+they count as its starting values, so Reset goes back to them. An input marked `share: false` is never
+written or read. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
+refuses, the link is shown, selected, to copy by hand. The element then dispatches `tool-share` with
+`{ url, values }`.
+
+| | Attribute | `defineToolHost` option |
+|---|---|---|
+| Remove the button, and read nothing from the address | `share="none"` | `share: "none"` |
+| Text beside the icon | `share-label="Copy link"` | `shareLabel` |
+| Where it sits: `top`, the end of the title row, or `actions`, the end of the Run row | `share-position` | `sharePosition` |
+| Your own link scheme | | `share: { url(id, values), read(id) }` |
+
+`top` is the default on a page and `actions` in an embed, where a button at the top would sit on the
+first input on a phone. A card has no share button, and neither has `controls="none"`, where the page
+owns the controls. An attribute overrides the option. A scheme of your own is a pair because a tool opens
+with what `read` returns, so a `url` without its `read` would copy links that open on the defaults. The
+button is `::part(share)` for styling from outside the shadow root.
 
 `tool-input` fires once per change to the inputs, whatever made it: typing, a sample, a preset or a
 `values` write, which dispatches it before the setter returns. A write that leaves the values as they
@@ -749,7 +779,8 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 25.9 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 26.3 KB |
+| Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 4.9 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |

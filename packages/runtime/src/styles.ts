@@ -151,7 +151,7 @@ export const STYLES = /* css */ `
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
 .tb-input[type="number"] { font-family: var(--tb-mono); }
 /* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
-.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-reset:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
+.tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-reset:focus-visible, .tb-share:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
@@ -200,6 +200,7 @@ export const STYLES = /* css */ `
    without it Reset stood taller than Run beside it. */
 .tb-reset { color: var(--tb-fg); background: none; border: 1px solid var(--tb-border); padding: calc(0.4375rem - 1px) 0.875rem; }
 .tb-reset:hover { border-color: var(--tb-muted); }
+/* The share button's rules live in its chunk (share.ts), adopted when it is wired (#227). */
 
 /* Quieter than the filled accent of .tb-run on purpose: a sample fills the form, it does not run the
    tool. No margin: the .tb-body grid already spaces its children. */

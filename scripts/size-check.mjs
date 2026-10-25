@@ -177,8 +177,15 @@ const BUDGETS = [
 	 * Lowered to 26_000 when the build began stripping the comments from the runtime's stylesheets
 	 * (packages/runtime/scripts/strip-css-comments.mjs): 28,582 measured before, 25,319 after. Every comment
 	 * in a `/* css *\/` literal had been a string each reader downloaded.
+	 *
+	 * Raised from 26_000 to 26_500 by the share button (#227), in the commit that spent it: 25,883 to 26,346
+	 * measured, 463 bytes. Reading a link as a tool opens (the query parameters or a host's `read`, the toggle
+	 * rule, never a `share: false` input), deciding where the button goes, fetching its chunk with the tool's
+	 * code, and the three attributes; about 43 of it is the bench registry's entries for the `share-private`
+	 * fixture. The button, the link writer, the clipboard and the button's styles are the share chunk, below,
+	 * not here. 26_000 would have left the build 346 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -309,6 +316,13 @@ const BUDGETS = [
 	 */
 	{ label: "copy action", pattern: /^copy-[^/]+\.js$/, budget: 1_000 },
 	/*
+	 * The share button (#227): drawing it, its styles, the default link writer, the clipboard write and its
+	 * fallback, and the words for each outcome. Fetched with a tool's code when the tool draws the button, so
+	 * a page of cards, or one with sharing turned off, pays nothing. Reader cost: every reader of a page or
+	 * embed tool downloads it. 1,436 measured.
+	 */
+	{ label: "share action", pattern: /^share-[^/]+\.js$/, budget: 2_000 },
+	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
 	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
@@ -415,6 +429,8 @@ const BUDGETS = [
 	{ label: "bench fixture: styled-output", pattern: /^tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Select presets (#151) on screen for the browser tests. 248 measured.
 	{ label: "bench fixture: presets", pattern: /^tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// An input marked share: false beside one that is not (#227), for the share button's tests. 143 measured.
+	{ label: "bench fixture: share-private", pattern: /^tool-share-private-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// A textarea declaring `lang` (#153) on screen for the browser tests. 228 measured.
 	{ label: "bench fixture: highlighted-input", pattern: /^tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// The graph families (#152), the layout's test data drawn through a tool, for the graphs page. 5,871 measured.
@@ -451,6 +467,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture discrete-series", pattern: /^worker-tool-discrete-series-[^/]+\.js$/, budget: 5_000, deployOnly: true },
 	{ label: "worker copy: bench fixture styled-output", pattern: /^worker-tool-styled-output-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture presets", pattern: /^worker-tool-presets-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture share-private", pattern: /^worker-tool-share-private-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture highlighted-input", pattern: /^worker-tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: build-order", pattern: /^worker-tool-build-order-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
@@ -526,9 +543,13 @@ for (const file of unclaimed) {
  *
  * Lowered to 32_000 once the build stripped the comments from the runtime's stylesheets: 31,332 measured,
  * from 34,523.
+ *
+ * Raised to 33_000 by the share button (#227), in the commit that spent it: 31,985 to 32,527 measured, 542
+ * bytes: the runtime's reading of a link and placing of the button, as in boot, and the landing page's own
+ * tools now fetching the share chunk with their code. 32_000 would have been 527 over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 32_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
