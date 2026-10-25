@@ -377,6 +377,14 @@ Things the validator will hold you to, and why:
   rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card
   shows the first input. Every input is shown on the full tool either way.
 * **`dir: "ltr"`** on anything that is not prose: bytes, code, patterns, identifiers.
+* **`"share": false` on an input whose value must never be in a URL** (contract version 8): a password,
+  a token, a private key, or a textarea a reader pastes private material into. A host building a link
+  from `host.values` leaves it out, and does not read it back from one (`shareableInputs(manifest)` in
+  the SDK lists the rest), because a URL ends up in browser
+  history, server logs, chat previews and referrer headers. It is a hint to hosts, not access control:
+  the runtime builds no links, so it enforces nothing, and `host.values` still fills the input. With no
+  `share`, an input is shareable, as every input was before version 8. The value must be `true` or
+  `false`.
 * **`maxLength` bounds typing and samples, not `default`.** The browser `maxlength` attribute stops a
   reader typing past it, and `validateSamples` refuses an over-long sample because assigning `value`
   walks past that attribute. The same check is not applied to `default`: adding it would reject

@@ -1,5 +1,5 @@
 {
-	"sdk": 7,
+	"sdk": 8,
 	"id": "share-private",
 	"name": "Share a private input",
 	"blurb": "One input that may go in a link and one marked share: false, which the share button leaves out and never reads back.",

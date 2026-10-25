@@ -10,7 +10,7 @@ import type { InputValues, Manifest } from "@toolbench/sdk";
 import { el, svg } from "./dom.ts";
 import type { ToolHostConfig } from "./element.ts";
 import { adoptStyles } from "./styles.ts";
-import { shareableInputs } from "./values.ts";
+import { shareableInputs } from "@toolbench/sdk";
 
 /*
  * The button's rules, here rather than in the runtime's sheet: a 28px icon in the Copy button's quiet

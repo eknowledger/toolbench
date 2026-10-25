@@ -220,8 +220,8 @@ const BUDGETS = [
 	 * as overflow of the tool. Bench-only.
 	 *
 	 * Raised from 6_000 to 7_500 by contract v8's fixtures, in the commit that crossed it: 6,012 measured with
-	 * field-faces (#209) on top of 0.13.0's share-private, and share-hint, input-help and narrow-table still to
-	 * come in the same release. Bench-only.
+	 * field-faces (#209) on top of 0.13.0's share-private, and input-help and narrow-table still to come in the
+	 * same release. Bench-only.
 	 */
 	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_500, deployOnly: true },
 	/*

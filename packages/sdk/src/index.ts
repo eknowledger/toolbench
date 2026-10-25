@@ -62,6 +62,7 @@ export {
 
 export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
 export { isSafeLinkHref } from "./links.ts";
+export { shareableInputs } from "./share.ts";
 export { graphProblem } from "./graph.ts";
 export { checkManifestFeatures, outputFeatureProblem } from "./features.ts";
 

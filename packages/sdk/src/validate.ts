@@ -121,6 +121,8 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	optStr(o, "unit", `${path}.`);
 	if (o.primary !== undefined && typeof o.primary !== "boolean") fail(`${path}.primary`, "must be a boolean");
 	if (o.dir !== undefined) oneOf(o.dir, ["ltr", "auto"] as const, `${path}.dir`);
+	// A host's rule is `share !== false`, so "no" or 0 would put the value in a link the author meant to keep it out of.
+	if (o.share !== undefined && typeof o.share !== "boolean") fail(`${path}.share`, "must be true or false");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
 	if (o.lang !== undefined) {
 		// A one-line input has no room for structure to see, and nothing would paint it.
@@ -382,7 +384,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

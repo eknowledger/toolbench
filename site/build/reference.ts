@@ -177,6 +177,7 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A select's default is one of its options", change: (m) => (input(m, 1).default = "slow") },
 	{ rule: "`lang` only on a textarea", change: (m) => (input(m, 2).lang = "json") },
 	{ rule: "`grammar` needs `lang` beside it", change: (m) => Object.assign(input(m, 2), { type: "textarea", grammar: { keywords: ["on"] } }) },
+	{ rule: "`share` is `true` or `false`", change: (m) => (input(m, 2).share = "no") },
 ];
 
 /** For each type: a real input from the repository to show, and the gallery card that runs one. */
