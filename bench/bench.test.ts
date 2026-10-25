@@ -1529,6 +1529,105 @@ describe("a Reset control (#208)", () => {
 	});
 });
 
+describe("the links attribute (#216)", () => {
+	/*
+	 * Outside a card the element draws the manifest's links under the tool. Embedded in an article, a tool
+	 * with several references put a line of links between its answer and the prose that continues below,
+	 * and on a page that already lists them they appeared twice. Hiding `.tb-foot` with CSS worked, but it
+	 * lived in a stylesheet rather than in the element's API. What is drawn for each value is a DOM fact.
+	 */
+	type HostApi = HTMLElement & { links: string; run: () => Promise<void> };
+	const foot = (page: Page, selector = "#host") =>
+		page.locator(selector).evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot;
+			return {
+				rows: root.querySelectorAll(".tb-foot").length,
+				links: [...root.querySelectorAll(".tb-foot a")].map((a) => `${a.textContent} ${a.getAttribute("href")}`),
+				property: (el as HostApi).links,
+			};
+		});
+	async function open(path: string): Promise<Page> {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		return page;
+	}
+	const set = (page: Page, value: string, selector = "#host") => page.locator(selector).evaluate((el, v) => el.setAttribute("links", v), value);
+
+	it("draws the manifest's links by default outside a card, and for a value it does not know", async () => {
+		const page = await open("tool.html?id=queue-explorer");
+		const all = await foot(page);
+		assert.equal(all.links.length, 2, `queue-explorer declares two: ${all.links.join(" | ")}`);
+		assert.equal(all.property, "all");
+		await set(page, "some");
+		assert.deepEqual((await foot(page)).links, all.links, "a typo keeps today's behaviour rather than hiding the links");
+		await page.close();
+	});
+
+	it("page: only \"Open the full tool\", pointing at the tool's page", async () => {
+		const page = await open("tool.html?id=queue-explorer");
+		await set(page, "page");
+		const shown = await foot(page);
+		assert.deepEqual(shown.links, ["Open the full tool ./tool.html?id=queue-explorer"]);
+		assert.equal(shown.property, "page");
+		await page.close();
+	});
+
+	it("none: no row at all; the property writes the attribute and reads it back", async () => {
+		const page = await open("tool.html?id=queue-explorer");
+		const attribute = await page.locator("#host").evaluate((el) => {
+			(el as HostApi).links = "none";
+			return el.getAttribute("links");
+		});
+		assert.equal(attribute, "none");
+		assert.deepEqual(await foot(page), { rows: 0, links: [], property: "none" });
+		await page.close();
+	});
+
+	it("keeps the reader's inputs and result when it changes", async () => {
+		const page = await open("tool.html?id=utf8-bytes");
+		await page.locator("#host >> .tb-textarea").fill("abc");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output > *").first().waitFor({ timeout: 15_000 });
+		const drawn = await page.locator("#host >> .tb-output").textContent();
+		await set(page, "none");
+		assert.equal(await page.locator("#host >> .tb-textarea").inputValue(), "abc");
+		assert.equal(await page.locator("#host >> .tb-output").textContent(), drawn);
+		await page.close();
+	});
+
+	it("leaves a retired tool's links, which its notice names as the way onward", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const selector = 'tool-host[tool=retired][mode="page"]';
+		await page.locator(`${selector} >> .tb-retired`).waitFor();
+		const before = await foot(page, selector);
+		assert.equal(before.links.length, 2);
+		for (const value of ["page", "none"]) {
+			await set(page, value, selector);
+			assert.deepEqual((await foot(page, selector)).links, before.links, `links="${value}" on a retired tool`);
+		}
+		await page.close();
+	});
+
+	it("takes a card's \"Open the full tool\" away with none, and leaves it for anything else", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const selector = "tool-host[tool=percentiles][data-seed]";
+		await page.locator(`${selector} >> .tb-facade`).click();
+		await page.locator(`${selector} >> .tb-form`).waitFor();
+		const card = await foot(page, selector);
+		assert.deepEqual(card.links, ["Open the full tool ./tool.html?id=percentiles"]);
+		assert.equal(card.property, "page", "a card's default is the link to the full tool");
+		await set(page, "all", selector);
+		assert.deepEqual((await foot(page, selector)).links, card.links, "a card has no room for the manifest's links");
+		await set(page, "none", selector);
+		assert.equal((await foot(page, selector)).rows, 0);
+		await page.close();
+	});
+});
+
 describe("a repaint keeps what was on screen", () => {
 	/*
 	 * `#paint` rebuilds the shadow tree, and `mode` and `parts` are both in `observedAttributes`, so a

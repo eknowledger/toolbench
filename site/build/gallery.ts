@@ -181,6 +181,18 @@ export const GROUPS: Group[] = [
 				demo: `<tool-host tool="percentiles" mode="embed" parts="1" more="expand" data-run></tool-host>`,
 				code: (demo) => [demo],
 			},
+			{
+				id: "links",
+				title: "The links under a tool",
+				text: "<code>links=\"all\"</code>, the default, draws the manifest's links. <code>page</code> draws only a link to the tool's own page, and <code>none</code> draws nothing, for a tool in an article that lists its references already.",
+				wide: true,
+				demo: `<div class="demo-grid links-demo">
+      <div><p><code>links="all"</code></p><tool-host tool="utf8-bytes" mode="embed"></tool-host></div>
+      <div><p><code>links="page"</code></p><tool-host tool="utf8-bytes" mode="embed" links="page"></tool-host></div>
+      <div><p><code>links="none"</code></p><tool-host tool="utf8-bytes" mode="embed" links="none"></tool-host></div>
+    </div>`,
+				code: (demo) => [demo],
+			},
 		],
 	},
 	{

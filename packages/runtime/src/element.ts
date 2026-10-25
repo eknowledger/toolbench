@@ -97,6 +97,14 @@ export interface ToolHostAttributes {
 	 * @default "default"
 	 */
 	reset?: "default" | "none";
+	/**
+	 * What goes under the tool: `all`, the manifest's links; `page`, only "Open the full tool", pointing at
+	 * `pageUrl(id)`; `none`, nothing. For a tool embedded in an article, where a row of references sits between
+	 * the answer and the prose. A card shows "Open the full tool" for anything but `none`. A retired tool
+	 * keeps its links whatever this says, because its notice points at them. Also a property, `host.links`.
+	 * @default "all"
+	 */
+	links?: "all" | "page" | "none";
 }
 
 /**
@@ -199,7 +207,7 @@ export function setHostStyles(styles: HostStyles | undefined): void {
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle", "reset"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle", "reset", "links"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -438,6 +446,22 @@ export class ToolHost extends HTMLElement {
 	 * `values` and `run()` (#103). Without it, any controls a page built were duplicated by the ones inside
 	 * the shadow root. Ignored by a card.
 	 */
+	/**
+	 * What goes under the tool (#216): `all`, the manifest's links; `page`, only "Open the full tool"; `none`,
+	 * nothing. A card has no room for the manifest's links, so it reads anything but `none` as `page`, which
+	 * is what it always drew. Anything unrecognised is the default, so a typo does not hide the links.
+	 *
+	 * A retired tool does not ask: its notice says the links below are the way onward, so they stay.
+	 */
+	get links(): "all" | "page" | "none" {
+		const value = this.getAttribute("links");
+		return value === "none" ? "none" : value === "page" || this.mode === "card" ? "page" : "all";
+	}
+
+	set links(value: "all" | "page" | "none") {
+		this.setAttribute("links", value);
+	}
+
 	/** `none`: no Reset button (#208). Anything else draws one. */
 	get reset(): "default" | "none" {
 		return this.getAttribute("reset") === "none" ? "none" : "default";
@@ -1073,16 +1097,10 @@ export class ToolHost extends HTMLElement {
 		body.append(...(answerFirst ? [...answerParts, ...controlParts] : [...controlParts, ...answerParts]));
 		frame.append(body);
 
-		if (mode !== "card" && (manifest.links?.length ?? 0) > 0) {
-			frame.append(
-				el(
-					"div",
-					{ class: "tb-foot" },
-					...(manifest.links ?? []).map(linkTo),
-				),
-			);
-		}
-		if (compact && pageUrl) {
+		const links = this.links;
+		if (links === "all" && (manifest.links?.length ?? 0) > 0) {
+			frame.append(el("div", { class: "tb-foot" }, ...(manifest.links ?? []).map(linkTo)));
+		} else if (links === "page" && pageUrl) {
 			frame.append(el("div", { class: "tb-foot" }, el("a", { href: pageUrl }, "Open the full tool")));
 		}
 
