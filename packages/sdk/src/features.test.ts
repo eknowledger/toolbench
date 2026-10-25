@@ -215,6 +215,17 @@ describe("a result using a feature newer than its tool's sdk is reported (#170)"
 	 * declares it needs, and a rule that let one value of a key through under an older sdk would be a
 	 * second rule for an author to remember.
 	 */
+	it("sees wrap on a column and on a cell, at version 8", () => {
+		const table: Output = { kind: "table", columns: [{ label: "Note", wrap: "prose" }, { label: "Date" }], rows: [["a", { text: "2025-02-27", wrap: "none" }]] };
+		assert.equal(
+			outputFeatureProblem(table, 7),
+			'output.columns[0].wrap: column wrap is from contract version 8, but the tool declares "sdk": 7. Declare "sdk": 8.',
+		);
+		const cellOnly: Output = { kind: "table", columns: [{ label: "Date" }], rows: [[{ text: "2025-02-27", wrap: "none" }]] };
+		assert.match(String(outputFeatureProblem(cellOnly, 7)), /^output\.rows\[0\]\[0\]\.wrap: cell wrap is from contract version 8/);
+		assert.equal(outputFeatureProblem(table, 8), undefined);
+	});
+
 	it("sees mono on a field, at version 8, inside a group", () => {
 		const faces: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "Address", value: "192.0.2.10", mono: true }, { label: "Integrity", value: "none present", mono: false }] }] };
 		assert.equal(

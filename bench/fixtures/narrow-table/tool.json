@@ -1,0 +1,23 @@
+{
+	"sdk": 8,
+	"id": "narrow-table",
+	"name": "Per instance",
+	"blurb": "Six columns that must survive a phone: short tokens kept on one line, and one column of sentences.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"autoRun": true,
+	"kinds": ["table", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "sort",
+			"type": "toggle",
+			"label": "Slowest first",
+			"description": "Sort the instances by their p99.",
+			"default": true,
+			"primary": true
+		}
+	]
+}
