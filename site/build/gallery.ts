@@ -364,6 +364,17 @@ export const GROUPS: Group[] = [
 				code: (demo) => [demo, region("site/src/gallery.ts", "reveal")],
 			},
 			{
+				id: "share",
+				title: "A link to the tool with its inputs",
+				text: "The link icon copies this page's address with the tool's inputs in it, and a tool opens with the inputs a link carries. An input marked <code>share: false</code>, the token here, is never put in a link or read from one.",
+				wide: true,
+				demo: `<div class="demo-grid">
+      <tool-host tool="share-private" mode="embed"></tool-host>
+      <tool-host tool="share-private" mode="embed" share-position="top" share-label="Copy link"></tool-host>
+    </div>`,
+				code: (demo) => [demo, input(`${FIX}/share-private`, "token")],
+			},
+			{
 				id: "events",
 				title: "Following the tool from your page",
 				text: "<code>tool-input</code> fires after the inputs change and <code>tool-run</code> after a run's result is drawn, for a deep link, analytics or a button of your own. Edit the form or press Run.",

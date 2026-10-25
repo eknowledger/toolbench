@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { InputSpec, InputValues } from "@toolbench/sdk";
-import { applyPartialValues, coerce } from "./values.ts";
+import { applyPartialValues, coerce, shareableInputs } from "./values.ts";
 
 const numberSpec = {
 	id: "arrivals",
@@ -110,5 +110,20 @@ describe("applyPartialValues", () => {
 	it("is a no-op for an empty partial", () => {
 		const before = current();
 		assert.deepEqual(applyPartialValues(inputs, before, {}), before);
+	});
+});
+
+describe("shareableInputs: the one rule the share button writes and reads by (#227)", () => {
+	it("keeps every input but one marked share: false, in the manifest's order", () => {
+		const manifest = { inputs: [{ id: "user" }, { id: "password", share: false }, { id: "count", share: true }] };
+		assert.deepEqual(shareableInputs(manifest), ["user", "count"]);
+	});
+
+	it("marks an input private only with the boolean false, the test the SDK's own helper makes", () => {
+		assert.deepEqual(shareableInputs({ inputs: [{ id: "a", share: "false" }, { id: "b", share: 0 }] }), ["a", "b"]);
+	});
+
+	it("survives a manifest with no inputs", () => {
+		assert.deepEqual(shareableInputs({}), []);
 	});
 });

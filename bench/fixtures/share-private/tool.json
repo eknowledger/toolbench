@@ -1,0 +1,16 @@
+{
+	"sdk": 7,
+	"id": "share-private",
+	"name": "Share a private input",
+	"blurb": "One input that may go in a link and one marked share: false, which the share button leaves out and never reads back.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{ "id": "count", "type": "number", "label": "Count", "default": 3, "min": 1, "max": 9, "primary": true },
+		{ "id": "token", "type": "text", "label": "Token", "description": "Never put in a link.", "default": "", "maxLength": 64, "dir": "ltr", "share": false }
+	]
+}

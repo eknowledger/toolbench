@@ -1628,6 +1628,230 @@ describe("the links attribute (#216)", () => {
 	});
 });
 
+describe("the share button (#227)", () => {
+	/*
+	 * Every host that wanted shareable links wrote the same code: a button, `host.values`, a filter for the
+	 * inputs that must not go in a URL, a URL, and on load the same URL parsed back into `host.values`. Where
+	 * the button lands in each mode, what it writes to the clipboard, and what a tool opens with from a link
+	 * are browser facts. The clipboard is stubbed, as the Copy tests do, because Firefox and WebKit give an
+	 * automated page no clipboard permission; one Chromium test reads the real one back.
+	 */
+	type Clipboard = "records" | "refuses" | "missing";
+	type HostApi = HTMLElement & { values: Record<string, string | number | boolean> };
+	const DEFAULT_VALUES = "12+14+15+15+16+18+19+21+24+28+31+35+42+51+68+91+140+220+480+1200";
+
+	async function open(path: string, clipboard: Clipboard = "records", form = true): Promise<Page> {
+		const page = await browser.newPage();
+		await page.addInitScript((mode: Clipboard) => {
+			const w = window as unknown as { copied: string[]; events: { type: string; detail: unknown }[] };
+			w.copied = [];
+			w.events = [];
+			for (const type of ["tool-share", "tool-input"]) document.addEventListener(type, (event) => w.events.push({ type, detail: (event as CustomEvent).detail }));
+			const stub =
+				mode === "missing"
+					? undefined
+					: {
+							writeText: (text: string) => {
+								if (mode === "refuses") return Promise.reject(new DOMException("Write permission denied.", "NotAllowedError"));
+								w.copied.push(text);
+								return Promise.resolve();
+							},
+						};
+			Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => stub });
+		}, clipboard);
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		if (form) {
+			await page.locator("#host").scrollIntoViewIfNeeded();
+			await page.waitForSelector("#host >> .tb-form");
+		}
+		return page;
+	}
+	const where = (page: Page, selector = "#host") =>
+		page.locator(selector).evaluate((el) => {
+			const button = el.shadowRoot?.querySelector<HTMLButtonElement>('[part~="share"]');
+			if (!button) return "absent";
+			return button.closest(".tb-head") ? "top" : button.closest(".tb-actions") ? "actions" : button.closest(".tb-share-top") ? "top" : "elsewhere";
+		});
+	const share = (page: Page) => page.locator('#host >> [part~="share"]');
+	const recorded = (page: Page) =>
+		page.evaluate(() => {
+			const w = window as unknown as { copied: string[]; events: { type: string; detail: { url?: string; values?: Record<string, unknown> } }[] };
+			return { copied: w.copied, events: w.events };
+		});
+
+	it("sits at the title row's end on a page, at the Run row's end in an embed, and nowhere on a card", async () => {
+		const page = await open("tool.html?id=percentiles");
+		assert.equal(await where(page), "top");
+		assert.equal(await share(page).getAttribute("aria-label"), "Copy a link to this tool with its inputs");
+		assert.equal(await share(page).getAttribute("type"), "button");
+		const box = await share(page).boundingBox();
+		assert.ok(box && Math.abs(box.width - 28) < 0.5 && Math.abs(box.height - 28) < 0.5, `a 28px icon button: ${box?.width} x ${box?.height}`);
+		await page.close();
+
+		const embed = await open("tool.html?id=percentiles&mode=embed");
+		assert.equal(await where(embed), "actions");
+		assert.equal(await embed.locator("#host >> .tb-actions > :last-child").evaluate((el) => el.matches(".tb-share-bar")), true, "the last thing in the row");
+		await embed.close();
+
+		const cards = await open("index.html", "records", false);
+		const card = cards.locator("tool-host[tool=percentiles][data-seed]");
+		await card.locator(".tb-facade").click();
+		await card.locator(".tb-form").waitFor();
+		assert.equal(await where(cards, "tool-host[tool=percentiles][data-seed]"), "absent", "a card has room for one input and Run");
+		await cards.close();
+	});
+
+	it("moves with share-position or the host's sharePosition, and goes with share=none or the host's share: none", async () => {
+		for (const [query, wanted] of [
+			["&share-position=actions", "actions"],
+			["&mode=embed&share-position=top", "top"],
+			["&mode=embed&hostSharePosition=top", "top"],
+			["&hostSharePosition=top&share-position=actions", "actions"],
+			["&share=none", "absent"],
+			["&hostShare=none", "absent"],
+		] as const) {
+			const page = await open(`tool.html?id=percentiles${query}`);
+			assert.equal(await where(page), wanted, query);
+			await page.close();
+		}
+	});
+
+	it("shows a label beside the icon when given one, with the label first in its name", async () => {
+		for (const query of ["&share-label=Copy+link", "&hostShareLabel=Copy+link"]) {
+			const page = await open(`tool.html?id=percentiles${query}`);
+			assert.equal((await share(page).textContent())?.trim(), "Copy link");
+			assert.equal(await share(page).getAttribute("aria-label"), "Copy link: a link to this tool with its inputs");
+			await page.close();
+		}
+	});
+
+	it("copies the page URL with the inputs under the tool's id, says so for two seconds, and dispatches tool-share", async () => {
+		const page = await open("tool.html?id=percentiles");
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		await share(page).click();
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length > 0);
+		const url = `${BASE}/tool.html?id=percentiles&percentiles.values=${DEFAULT_VALUES}&percentiles.method=linear`;
+		const { copied, events } = await recorded(page);
+		assert.deepEqual(copied, [url], "the page's own query kept, each input as <tool id>.<input id>");
+		const shared = events.filter((e) => e.type === "tool-share");
+		assert.deepEqual(shared.map((e) => e.detail), [{ url, values: { values: DEFAULT_VALUES.replace(/\+/g, " "), method: "linear" } }]);
+		const state = () =>
+			page.locator("#host").evaluate((el) => {
+				const root = el.shadowRoot as ShadowRoot;
+				return { note: root.querySelector(".tb-share-note")?.textContent ?? "", announced: root.querySelector(".tb-announce")?.textContent ?? "", copied: root.querySelector('[part~="share"]')?.hasAttribute("data-copied") ?? false };
+			});
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Link copied");
+		assert.deepEqual(await state(), { note: "Link copied", announced: "Link copied", copied: true }, "a check mark and a note, heard through the status region");
+		await page.waitForTimeout(2300);
+		const later = await state();
+		assert.equal(later.note, "", "the note goes, or it would claim a copy the reader has since replaced");
+		assert.equal(later.copied, false, "and the icon is the link again");
+		await page.close();
+	});
+
+	it("is reached by Tab from the Run row and pressed with Enter, in an embed", async () => {
+		const page = await open("tool.html?id=utf8-bytes&mode=embed");
+		await page.locator("#host >> .tb-run").focus();
+		await tabForward(page);
+		assert.equal(await page.locator("#host").evaluate((el) => el.shadowRoot?.activeElement?.getAttribute("part")), "share");
+		await page.keyboard.press("Enter");
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length > 0);
+		await page.close();
+	});
+
+	it("opens with the values in the URL, as its starting values, and says nothing about it", async () => {
+		const page = await open("tool.html?id=percentiles&percentiles.values=1+2+3&percentiles.method=linear&other.method=nearest");
+		assert.equal(await page.locator("#host >> .tb-textarea").inputValue(), "1 2 3");
+		assert.equal(await page.locator("#host >> .tb-select").inputValue(), "linear");
+		assert.equal(await page.locator("#host >> .tb-reset").evaluate((el) => (el as HTMLElement).hidden), true, "a link's values are where Reset goes back to");
+		assert.deepEqual((await recorded(page)).events, [], "opening a link is not a change");
+		await page.close();
+
+		const toggle = await open("tool.html?id=styled-output&styled-output.fixed=true");
+		assert.equal(await toggle.locator("#host >> .tb-checkbox").isChecked(), true, "a toggle reads \"true\", not any non-empty string");
+		await toggle.close();
+		const off = await open("tool.html?id=styled-output&styled-output.fixed=false");
+		assert.equal(await off.locator("#host >> .tb-checkbox").isChecked(), false);
+		await off.close();
+	});
+
+	it("never writes or reads an input marked share: false", async () => {
+		const page = await open("tool.html?id=share-private&share-private.count=5&share-private.token=leaked");
+		assert.equal(await page.locator("#host >> #in-count").inputValue(), "5");
+		assert.equal(await page.locator("#host >> #in-token").inputValue(), "", "a private input is not read from a link");
+		await page.locator("#host >> #in-token").fill("secret");
+		await share(page).click();
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length > 0);
+		const { copied, events } = await recorded(page);
+		assert.deepEqual(copied, [`${BASE}/tool.html?id=share-private&share-private.count=5`], "the stale private value in the address is dropped too");
+		assert.deepEqual(events.find((e) => e.type === "tool-share")?.detail.values, { count: 5 });
+		await page.close();
+
+		// A host's own reader handing back the private input, as a crafted link would, is filtered the same way.
+		const crafted = await open(`tool.html?id=share-private&hostShareScheme=hash#${new URLSearchParams({ "share-private": JSON.stringify({ count: 7, token: "leaked" }) })}`);
+		assert.equal(await crafted.locator("#host >> #in-count").inputValue(), "7");
+		assert.equal(await crafted.locator("#host >> #in-token").inputValue(), "", "the same rule for the host's reader as for the default one");
+		await crafted.locator("#host >> #in-token").fill("secret");
+		await share(crafted).click();
+		await crafted.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length > 0);
+		assert.deepEqual((await recorded(crafted)).events.find((e) => e.type === "tool-share")?.detail.values, { count: 7 }, "and the host's writer is never handed it");
+		await crafted.close();
+	});
+
+	it("uses a host's own scheme, writing with its url and opening with its read", async () => {
+		const page = await open("tool.html?id=percentiles&hostShareScheme=hash");
+		await page.locator("#host >> .tb-select").selectOption("linear");
+		await share(page).click();
+		await page.waitForFunction(() => (window as unknown as { copied: string[] }).copied.length > 0);
+		const values = { values: DEFAULT_VALUES.replace(/\+/g, " "), method: "linear" };
+		const url = `${BASE}/tool.html?id=percentiles&hostShareScheme=hash#${new URLSearchParams({ percentiles: JSON.stringify(values) })}`;
+		assert.deepEqual((await recorded(page)).copied, [url]);
+		await page.close();
+
+		const opened = await open(`tool.html?id=percentiles&hostShareScheme=hash&percentiles.method=midpoint#${new URLSearchParams({ percentiles: JSON.stringify({ values: "4 5", method: "linear" }) })}`);
+		assert.equal(await opened.locator("#host >> .tb-textarea").inputValue(), "4 5", "the host's reader, not the default one");
+		assert.equal(await opened.locator("#host >> .tb-select").inputValue(), "linear");
+		await opened.close();
+	});
+
+	for (const clipboard of ["refuses", "missing"] as const) {
+		it(`says so when the clipboard ${clipboard === "refuses" ? "refuses the write" : "does not exist"}, and shows the link to copy by hand`, async () => {
+			const page = await open("tool.html?id=utf8-bytes", clipboard);
+			await share(page).click();
+			await page.waitForFunction(() => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent ?? "").length > 0);
+			const state = await page.locator("#host").evaluate((el) => {
+				const root = el.shadowRoot as ShadowRoot & { getSelection?: () => Selection | null };
+				return {
+					note: root.querySelector(".tb-share-note")?.textContent ?? "",
+					announced: root.querySelector(".tb-announce")?.textContent ?? "",
+					selected: root.getSelection?.()?.toString() ?? document.getSelection()?.toString() ?? "",
+				};
+			});
+			// The default "Héllo, 世界 👋" form-encoded by hand: é is C3 A9, 世 E4 B8 96, 界 E7 95 8C, the wave F0 9F 91 8B.
+			const url = `${BASE}/tool.html?id=utf8-bytes&utf8-bytes.text=H%C3%A9llo%2C+%E4%B8%96%E7%95%8C+%F0%9F%91%8B`;
+			assert.equal(state.note, url, "the link itself, where the reader can see it");
+			assert.equal(state.selected, url, "and selected, ready to copy");
+			assert.equal(state.announced, "Copy failed. The link is selected, so you can copy it yourself");
+			await page.close();
+		});
+	}
+
+	it("puts the link on the real clipboard (Chromium, the one engine that lets an automated page read it back)", async () => {
+		if (engineName !== "chromium") return;
+		const context = await browser.newContext();
+		await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+		const page = await context.newPage();
+		await page.goto(`${BASE}/tool.html?id=utf8-bytes`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		await page.locator("#host >> .tb-textarea").fill("abc");
+		await share(page).click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Link copied");
+		assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `${BASE}/tool.html?id=utf8-bytes&utf8-bytes.text=abc`);
+		await context.close();
+	});
+});
+
 describe("a repaint keeps what was on screen", () => {
 	/*
 	 * `#paint` rebuilds the shadow tree, and `mode` and `parts` are both in `observedAttributes`, so a
@@ -3439,8 +3663,8 @@ describe("host stylesheets and the styling contract (#157, #154, #156)", () => {
 		const counts = await page.evaluate(() =>
 			Object.fromEntries(["audit", "narrow-percentiles"].map((id) => [id, document.getElementById(id)?.shadowRoot?.adoptedStyleSheets.length])),
 		);
-		// The runtime's sheet, then the two shared ones; the fixture also gets its two of its own.
-		assert.deepEqual(counts, { audit: 5, "narrow-percentiles": 3 });
+		// The runtime's sheet and the share button's (#227), then the two shared ones; the fixture also gets its two of its own.
+		assert.deepEqual(counts, { audit: 6, "narrow-percentiles": 4 });
 		await page.close();
 	});
 
@@ -3450,7 +3674,7 @@ describe("host stylesheets and the styling contract (#157, #154, #156)", () => {
 		assertPx(await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "font-size"), 13.6);
 		assert.equal(await style(page, "narrow-audit", "thead", "display"), "table-header-group");
 		const off = await page.evaluate(() => document.getElementById("audit")?.shadowRoot?.adoptedStyleSheets.length);
-		assert.equal(off, 1, "only the runtime's sheet is left");
+		assert.equal(off, 2, "only the runtime's sheets are left: its own and the share button's (#227)");
 		await page.click("#toggle-styles");
 		assertPx(await style(page, "audit", '.tb-field[data-role="verdict"] .tb-value', "font-size"), 21.6);
 		await page.close();

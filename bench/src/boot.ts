@@ -6,7 +6,7 @@
  */
 import { defineToolHost, RegistrySource } from "@toolbench/runtime";
 import { hostHighlight } from "./highlight.ts";
-import { hostWide } from "./host-options.ts";
+import { hostShare, hostWide } from "./host-options.ts";
 import { registry } from "./registry.ts";
 import { installThemeControl } from "./theme.ts";
 
@@ -35,4 +35,5 @@ defineToolHost({
 	pageUrl: (id) => `./tool.html?id=${encodeURIComponent(id)}`,
 	...(hostHook ? { highlight: hostHook } : {}),
 	...hostWide(location.search),
+	...hostShare(location.search),
 });

@@ -40,7 +40,7 @@ import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./prot
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
-import { applyPartialValues, coerce } from "./values.ts";
+import { applyPartialValues, coerce, shareableInputs } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
 
@@ -105,6 +105,35 @@ export interface ToolHostAttributes {
 	 * @default "all"
 	 */
 	links?: "all" | "page" | "none";
+	/**
+	 * `none` leaves out the share button, and the tool then reads nothing from the page's URL either.
+	 * Overrides `defineToolHost({ share })`.
+	 * @default "default"
+	 */
+	share?: "default" | "none";
+	/**
+	 * Text beside the share button's icon, which is otherwise shown alone. Overrides `defineToolHost({ shareLabel })`.
+	 * @default ""
+	 */
+	"share-label"?: string;
+	/**
+	 * Where the share button sits: `top`, the end of the title row, or `actions`, the end of the Run row.
+	 * Overrides `defineToolHost({ sharePosition })`.
+	 * @default "top" on a page, "actions" in an embed
+	 */
+	"share-position"?: "top" | "actions";
+}
+
+/**
+ * A host's own link scheme for the share button (#227): how to write a link, and how to read one back.
+ * They are a pair because a tool opens with whatever `read` finds, so a `url` with no matching `read`
+ * would copy links that open on the defaults.
+ */
+export interface ShareScheme {
+	/** The link to copy, for a tool's id and the values of its inputs that may go in a link. */
+	url(id: string, values: InputValues): string;
+	/** The values a link on this page carries for a tool, or `undefined`. Read once, as the tool opens. */
+	read(id: string): InputValues | undefined;
 }
 
 /**
@@ -141,6 +170,11 @@ export interface ToolHostEvents {
 	 * and after the `tool-input` for the same change. `values` are the starting values.
 	 */
 	"tool-reset": CustomEvent<{ values: InputValues }>;
+	/**
+	 * The reader pressed the share button. After the copy is attempted, whether or not the clipboard took it.
+	 * `url` is the link, `values` the inputs it carries: every input but one marked `share: false`.
+	 */
+	"tool-share": CustomEvent<{ url: string; values: InputValues }>;
 }
 
 /** How long a run must last before its progress bar is worth showing. */
@@ -178,6 +212,23 @@ export interface ToolHostConfig {
 	wide?: "fit" | "scroll";
 	/** Whether a scaled graph offers the reader a button to switch between the two. Default true. */
 	wideToggle?: boolean;
+	/**
+	 * The share button on `page` and `embed` tools (#227), a link icon that copies a link to the tool with its
+	 * inputs. By default the link is this page's URL with each input as a query parameter named
+	 * `<tool id>.<input id>`, `?percentiles.method=linear`, and a tool opening on a page reads its values back
+	 * from those. `"none"` removes the button and reads nothing; a `{ url, read }` pair is your own scheme.
+	 * Inputs marked `share: false` are never written or read. A tool's `share` attribute overrides it.
+	 * @default the query-parameter scheme
+	 */
+	share?: "none" | ShareScheme;
+	/** Text beside the share button's icon, which is otherwise shown alone. A tool's `share-label` overrides it. */
+	shareLabel?: string;
+	/**
+	 * Where the share button sits: `top`, the end of the title row, or `actions`, the end of the Run row. A
+	 * tool's `share-position` overrides it.
+	 * @default "top" on a page, "actions" in an embed
+	 */
+	sharePosition?: "top" | "actions";
 }
 
 let config: ToolHostConfig | undefined;
@@ -186,6 +237,10 @@ let config: ToolHostConfig | undefined;
 const live = new Set<() => void>();
 /** The painted-textarea chunk (#153), once a tool that needs it has activated. */
 let painter: typeof import("./paint.ts") | undefined;
+/** The share chunk (#227), and the one fetch of it every host on the page waits on. */
+let sharer: typeof import("./share.ts") | undefined;
+let shareLoad: Promise<void> | undefined;
+const loadShare = () => (shareLoad ??= import("./share.ts").then((module) => void (sharer = module)));
 
 /** Defines the element. Call once, with the source your host provides. */
 export function defineToolHost(options: ToolHostConfig, tagName = "tool-host"): void {
@@ -207,7 +262,7 @@ export function setHostStyles(styles: HostStyles | undefined): void {
 }
 
 export class ToolHost extends HTMLElement {
-	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle", "reset", "links"];
+	static readonly observedAttributes = ["tool", "mode", "parts", "more", "layout", "controls", "wide", "wide-toggle", "reset", "links", "share", "share-label", "share-position"];
 
 	#root: ShadowRoot;
 	#runner: Runner | undefined;
@@ -462,6 +517,40 @@ export class ToolHost extends HTMLElement {
 		this.setAttribute("links", value);
 	}
 
+	/**
+	 * Whether this tool has a share button, and so reads a link on load (#227). Not on a card, which has room
+	 * for one input and Run, not with `controls="none"`, where the page owns the controls and so its links,
+	 * and not when the tool or the host said `none`.
+	 */
+	get #shares(): boolean {
+		return this.mode !== "card" && this.controls !== "none" && this.getAttribute("share") !== "none" && config?.share !== "none";
+	}
+
+	/**
+	 * What a link on this page says this tool's inputs are: the host's `read`, else the query parameters named
+	 * `<tool id>.<input id>`. Never an input marked `share: false`, whatever the link says, so a crafted link
+	 * cannot fill a password field. A toggle reads `"true"`; any other string would otherwise be true.
+	 */
+	#fromLink(manifest: Manifest): InputValues {
+		const scheme = config?.share;
+		let found: InputValues | undefined = {};
+		try {
+			if (typeof scheme === "object") found = scheme.read(manifest.id);
+			else for (const [key, value] of new URLSearchParams(location.search)) if (key.startsWith(`${manifest.id}.`)) found[key.slice(manifest.id.length + 1)] = value;
+		} catch {
+			// A host reader that throws leaves the tool on its own values: a broken link is not a broken page.
+			found = undefined;
+		}
+		const out: InputValues = {};
+		const shareable = shareableInputs(manifest);
+		for (const spec of manifest.inputs ?? []) {
+			const value = found?.[spec.id];
+			if (value === undefined || !shareable.includes(spec.id)) continue;
+			out[spec.id] = spec.type === "toggle" && typeof value === "string" ? value === "true" : value;
+		}
+		return out;
+	}
+
 	/** `none`: no Reset button (#208). Anything else draws one. */
 	get reset(): "default" | "none" {
 		return this.getAttribute("reset") === "none" ? "none" : "default";
@@ -547,6 +636,8 @@ export class ToolHost extends HTMLElement {
 			const overlay: InputValues = { ...this.#queued };
 			this.#queued = {};
 			if (this.#hostWroteValues) Object.assign(overlay, this.#values);
+			// A shared link wins over the page's own prefill: it is the reader's, and it is why they came.
+			if (this.#shares) Object.assign(overlay, this.#fromLink(manifest));
 			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
 			// A prefill that arrived before the manifest follows the same preset rule as one after it.
@@ -650,9 +741,12 @@ export class ToolHost extends HTMLElement {
 				!painter && this.#manifest?.inputs.some((input) => input.type === "textarea" && input.lang && (cfg.highlight || input.grammar))
 					? import("./paint.ts").then((module) => void (painter = module), () => undefined)
 					: undefined;
+			// With the tool's code, so the button is live when the form appears. A failed fetch leaves it disabled.
+			const share = this.#shares ? loadShare().catch(() => undefined) : undefined;
 			this.#loaded = await this.#resolve(cfg);
 			await chart;
 			await paint;
+			await share;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -890,16 +984,29 @@ export class ToolHost extends HTMLElement {
 
 		const body = el("div", { class: "tb-body" });
 		const frame = el("div", { class: "tb" });
+		/*
+		 * Only on the active form: a facade has nothing to share yet, and its values are not the reader's. The
+		 * chunk draws the button, and activation waits for it, so the button is never one with nothing behind
+		 * it. If it could not be fetched there is no button; turned on after activation, it fetches and repaints.
+		 */
+		const sharing = this.#activated && !this.#loading && this.#shares;
+		if (sharing && !sharer) void loadShare().then(() => this.#paint(), () => undefined);
+		const shareBar = sharing ? sharer?.shareBar(this, manifest, () => this.#values, config as ToolHostConfig, () => this.#els.announce) : undefined;
+		const position = this.getAttribute("share-position");
+		const atTop = shareBar && (position === "top" || position === "actions" ? position : (config?.sharePosition ?? (mode === "page" ? "top" : "actions"))) === "top";
+		const title = titleRow(manifest, compact, pageUrl);
 
 		if (mode !== "embed") {
 			frame.append(
 				el(
 					"div",
 					{ class: "tb-head" },
-					titleRow(manifest, compact, pageUrl),
+					atTop ? el("div", { class: "tb-share-top" }, title, shareBar) : title,
 					mode === "page" ? el("p", { class: "tb-blurb" }, manifest.blurb) : null,
 				),
 			);
+		} else if (atTop) {
+			body.append(el("div", { class: "tb-share-top" }, shareBar));
 		}
 
 		if (!this.#activated || this.#loading) {
@@ -1081,7 +1188,8 @@ export class ToolHost extends HTMLElement {
 		 * bar stays, for the rare slow run.
 		 */
 		const autoRun = manifest.autoRun === true;
-		const actions = autoRun && !reset ? progress : el("div", { class: "tb-actions" }, autoRun ? null : run, reset ?? null, progress);
+		const inRow = atTop ? undefined : shareBar;
+		const actions = autoRun && !reset && !inRow ? progress : el("div", { class: "tb-actions" }, autoRun ? null : run, reset ?? null, progress, inRow ?? null);
 		/*
 		 * `controls="none"` and `layout="answer-first"` (#103), neither of which a card honours: a card has
 		 * not been opened, and is answer-forward already.

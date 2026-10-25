@@ -77,6 +77,7 @@ same order, so the cascade is the same.
 | `.tb-facade`, `.tb-facade-hint` | A closed card, and its "Try it" control |
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
+| `.tb-share-bar`, `.tb-share`, `.tb-share-note`, `.tb-share-top` | The share button (#227), the note beside it, and the row that puts it at the end of the title. The button carries `data-copied` while it shows the check mark, and is also `::part(share)` |
 | `.tb-actions`, `.tb-run`, `.tb-reset`, `.tb-progress` | The Run button, the Reset button beside it (carries `hidden` while the inputs are at their starting values), and the progress bar |
 | `.tb-status` | The visible status line |
 | `.tb-output` | Where the result is drawn |
@@ -159,6 +160,14 @@ page's own stylesheet can reach it from outside the shadow root, where a `styles
 /* In the page's stylesheet, not in `styles`: ::part is how a page reaches into the shadow root. */
 tool-host::part(wide-toggle) { border-radius: 999px; color: var(--tb-accent-text); }
 tool-host::part(wide-toggle):hover { border-color: var(--tb-accent); }
+```
+
+The share button (#227) is `part="share"` the same way, so a page can restyle it without a
+`styles` sheet:
+
+```css
+tool-host::part(share) { border-radius: 999px; }
+tool-host::part(share):hover { border-color: var(--tb-accent); }
 ```
 
 ```css

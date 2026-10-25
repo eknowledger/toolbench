@@ -31,6 +31,14 @@ level as any script on the page, and the host is first-party code by the paragra
 stating because these tools invite people to paste real data. If you need input the embedding page cannot
 see, this is the wrong design for the same reason worker mode is not a sandbox.
 
+**A link can fill a tool's form.** With the share button on, which is the default for `page` and `embed`, a
+tool opens with the values its page's address carries (#227), so anyone who can send a reader a link
+chooses that reader's starting inputs. They go through the same clamping and refusal as typing, run the
+tool only as opening it would (an `autoRun` tool computes its first answer from them), and never reach an
+input marked `share: false`; one rule decides that for both the
+link the button writes and the link a tool reads. What a tool does with a crafted input is the tool's
+concern, as it is for typed input. A host that does not want this sets `share: "none"`.
+
 **In scope**, and worth reporting:
 
 * an XSS path through tool output, a manifest, or a seed. Every node is built through the three helpers
