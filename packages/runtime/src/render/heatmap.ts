@@ -12,10 +12,9 @@
  */
 import type { Heatmap } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
-import { adoptChartStyles, adoptStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, cut, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
 import type { RenderOptions } from "./index.ts";
 
-const W = 640;
 // Ids are per render: two heatmaps in one shadow root would otherwise share a hatch and a key gradient.
 let serial = 0;
 
@@ -47,19 +46,31 @@ const HEATMAP_STYLES = /* css */ `
 
 export function renderHeatmap(heatmap: Heatmap, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
+	return fitted((fit) => drawHeatmap(heatmap, compact, fit));
+}
+
+function drawHeatmap(heatmap: Heatmap, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f, ascent, descent } = fit;
 	const text = (v: number | string) => (typeof v === "string" ? v : format(v));
 	const xs = heatmap.x.map(text);
 	const ys = heatmap.y.map(text);
 	const cols = Math.max(1, xs.length);
 	const rows = Math.max(1, ys.length);
 
-	const longest = Math.max(3, ...ys.map((y) => y.length));
-	const labelRoom = Math.min(180, 10 + longest * 6.2);
-	const cellH = Math.max(14, Math.min(30, 260 / rows));
-	const plot = { x: labelRoom + 8, y: 22, w: W - labelRoom - 8 - 16, h: rows * cellH };
+	// The row names' column: as wide as the longest, within a third of the chart, and cut past that.
+	const labelRoom = Math.min(W / 3, 10 + Math.max(textWidth("abc", f), ...ys.map((y) => textWidth(y, f))));
+	const cellH = Math.max(lineOf(fit) + 4, Math.min(30, 260 / rows));
+	const plot = { x: labelRoom + 8, y: Math.ceil(lineOf(fit) + 10), w: W - labelRoom - 8 - 16, h: rows * cellH };
 	const cellW = plot.w / cols;
-	const keyY = plot.y + plot.h + 34;
-	const height = keyY + 34;
+	/*
+	 * Baselines down from the plot, each label's box clear of the one above, from the measured ascent and
+	 * descent. Offsets in fixed pixels let the x title and the key's title touch once the labels were 16px.
+	 * The key's title sits on the strip's line, so the strip moves down far enough for the title to clear.
+	 */
+	const tickY = plot.y + plot.h + 2 + ascent;
+	const titleY = tickY + descent + 3 + ascent;
+	const keyY = Math.ceil(titleY + descent + 3 + Math.max(0, ascent - 8));
+	const height = Math.ceil(keyY + 10 + ascent + descent + 3);
 
 	const values = heatmap.values.flat().filter((v): v is number => v !== null && Number.isFinite(v));
 	const min = values.length > 0 ? Math.min(...values) : 0;
@@ -92,19 +103,16 @@ export function renderHeatmap(heatmap: Heatmap, options: RenderOptions = {}): HT
 		),
 	];
 
-	const room = Math.max(2, Math.floor(cellW / 6.2));
-	const every = Math.max(1, Math.ceil(36 / cellW));
+	// Every column labelled while it holds four characters, then every second, third ... so none collide.
+	const every = Math.max(1, Math.ceil((textWidth("abcd", f) + 6) / cellW));
 	xs.forEach((name, c) => {
 		if (c % every !== 0) return;
-		const label = name.length > room * every ? `${name.slice(0, room * every - 1)}…` : name;
-		marks.push(svg("text", { class: "tb-tick", x: plot.x + (c + 0.5) * cellW, y: plot.y + plot.h + 14, "text-anchor": "middle" }, label));
+		marks.push(svg("text", { class: "tb-tick", x: plot.x + (c + 0.5) * cellW, y: tickY, "text-anchor": "middle" }, cut(name, cellW * every - 6, f)));
 	});
 	// The y axis's title sits above its labels: the column of row names leaves no room to rotate it beside them.
-	marks.push(svg("text", { class: "tb-axis-label", x: plot.x - 6, y: plot.y - 8, "text-anchor": "end" }, heatmap.yLabel));
-	const yRoom = Math.floor(labelRoom / 6.2);
+	marks.push(svg("text", { class: "tb-axis-label", x: plot.x - 6, y: plot.y - 8, "text-anchor": "end" }, cut(heatmap.yLabel, plot.x - 6, f)));
 	ys.forEach((name, r) => {
-		const label = name.length > yRoom ? `${name.slice(0, yRoom - 1)}…` : name;
-		marks.push(svg("text", { class: "tb-tick", x: plot.x - 6, y: plot.y + (r + 0.5) * cellH + 4, "text-anchor": "end" }, label));
+		marks.push(svg("text", { class: "tb-tick", x: plot.x - 6, y: plot.y + (r + 0.5) * cellH + middleOf(fit), "text-anchor": "end" }, cut(name, labelRoom - 2, f)));
 	});
 
 	heatmap.y.forEach((_, r) => {
@@ -125,24 +133,26 @@ export function renderHeatmap(heatmap: Heatmap, options: RenderOptions = {}): HT
 	});
 
 	// The key: the scale as a strip, its ends and, when diverging, its midpoint, so colour is never the only reading.
-	const keyW = Math.min(240, plot.w);
-	const keyX = plot.x + plot.w - keyW;
-	marks.push(svg("rect", { x: keyX, y: keyY, width: keyW, height: 8, rx: 2, fill: `url(#${id}-key)` }));
+	// The strip takes what the key's title leaves, up to 240 pixels: on a narrow chart the title and strip share a line.
+	const keyTitle = heatmap.unit ? `${heatmap.label} (${heatmap.unit})` : heatmap.label;
 	const lo = diverging ? midpoint - reach : min;
 	const hi = diverging ? midpoint + reach : max;
-	marks.push(svg("text", { class: "tb-tick", x: keyX, y: keyY + 22, "text-anchor": "start" }, format(lo)));
-	if (diverging) marks.push(svg("text", { class: "tb-tick", x: keyX + keyW / 2, y: keyY + 22, "text-anchor": "middle" }, format(midpoint)));
-	marks.push(svg("text", { class: "tb-tick", x: keyX + keyW, y: keyY + 22, "text-anchor": "end" }, format(hi)));
-	marks.push(
-		svg("text", { class: "tb-axis-label", x: keyX - 8, y: keyY + 8, "text-anchor": "end" }, heatmap.unit ? `${heatmap.label} (${heatmap.unit})` : heatmap.label),
-	);
-	marks.push(svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: plot.y + plot.h + 28, "text-anchor": "middle" }, heatmap.xLabel));
+	// Never so short that its end labels, and a diverging key's midpoint, run into each other.
+	const ends = 2 * Math.max(textWidth(format(lo), f), textWidth(format(hi), f)) + (diverging ? textWidth(format(midpoint), f) : 0) + 16;
+	const keyW = Math.max(60, ends, Math.min(240, plot.w, W - 16 - 8 - textWidth(keyTitle, f) - 4));
+	const keyX = plot.x + plot.w - keyW;
+	marks.push(svg("rect", { x: keyX, y: keyY, width: keyW, height: 8, rx: 2, fill: `url(#${id}-key)` }));
+	marks.push(svg("text", { class: "tb-tick", x: keyX, y: keyY + 10 + ascent, "text-anchor": "start" }, format(lo)));
+	if (diverging) marks.push(svg("text", { class: "tb-tick", x: keyX + keyW / 2, y: keyY + 10 + ascent, "text-anchor": "middle" }, format(midpoint)));
+	marks.push(svg("text", { class: "tb-tick", x: keyX + keyW, y: keyY + 10 + ascent, "text-anchor": "end" }, format(hi)));
+	marks.push(svg("text", { class: "tb-axis-label", x: keyX - 8, y: keyY + 8, "text-anchor": "end" }, cut(keyTitle, keyX - 8, f)));
+	marks.push(svg("text", { class: "tb-axis-label", x: plot.x + plot.w / 2, y: titleY, "text-anchor": "middle" }, cut(heatmap.xLabel, plot.w, f)));
 
 	const description = `${heatmap.label} by ${heatmap.yLabel} and ${heatmap.xLabel}`;
 	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card tb-heatmap" : "tb-out-chart tb-heatmap" });
 	const picture = svg("svg", { viewBox: `0 0 ${W} ${height}`, role: "img", "aria-label": description, preserveAspectRatio: "none" }, ...marks) as SVGSVGElement;
 	figure.append(el("div", { class: "tb-plot" }, picture), table(heatmap, xs, ys, description));
-	attachCellReadout(figure, picture, heatmap, xs, ys, { plot, cellW, cellH, height });
+	attachCellReadout(figure, picture, heatmap, xs, ys, { plot, cellW, cellH, width: W, height });
 	adoptChartStyles(figure);
 	adoptStyles(figure, "heatmap", () => HEATMAP_STYLES);
 	return figure;
@@ -179,7 +189,7 @@ function attachCellReadout(
 	heatmap: Heatmap,
 	xs: string[],
 	ys: string[],
-	g: { plot: { x: number; y: number; w: number; h: number }; cellW: number; cellH: number; height: number },
+	g: { plot: { x: number; y: number; w: number; h: number }; cellW: number; cellH: number; width: number; height: number },
 ): void {
 	const card = el("div", { class: "tb-readout", hidden: true, "aria-hidden": "true" });
 	const live = el("p", { class: "tb-sr", role: "status", "aria-live": "polite" });
@@ -212,7 +222,7 @@ function attachCellReadout(
 		const frame = figure.getBoundingClientRect();
 		const cx = g.plot.x + (c + 0.5) * g.cellW;
 		const cy = g.plot.y + (r + 0.5) * g.cellH;
-		card.style.left = `${Math.round(box.left - frame.left + cx * (box.width / W))}px`;
+		card.style.left = `${Math.round(box.left - frame.left + cx * (box.width / g.width))}px`;
 		card.style.top = `${Math.round(box.top - frame.top + cy * (box.height / g.height))}px`;
 		card.toggleAttribute("data-flip", cx > g.plot.x + g.plot.w / 2);
 	};

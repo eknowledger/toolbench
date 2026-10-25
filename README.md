@@ -666,6 +666,10 @@ Defaults use `light-dark()`, so a tool follows the page's colour scheme before a
 anything. The full list is at the top of
 [`packages/runtime/src/styles.ts`](packages/runtime/src/styles.ts).
 
+A chart's labels are `--tb-chart-font` (default `0.75rem`) at any width, because a chart is laid out for
+its measured width rather than scaled to it, and `--tb-chart-max-width` caps how wide one is drawn. See
+[STYLING.md](STYLING.md#chart-text-and-width).
+
 ### Host stylesheets
 
 For anything a custom property cannot say, such as a verdict drawn large, stat tiles, bordered tables or

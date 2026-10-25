@@ -14,15 +14,14 @@
 import type { Venn } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, format } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, fitted, format, middleOf, textWidth, type Fit } from "./plot-common.ts";
 
-const W = 640;
 const H = 320;
 
 const VENN_STYLES = /* css */ `
 .tb-venn-circle { fill: var(--c); fill-opacity: 0.22; stroke: var(--c); stroke-width: 2; }
-.tb-venn-count { fill: var(--tb-fg); font-family: var(--tb-mono); font-size: 12px; font-weight: 600; stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; pointer-events: none; }
-.tb-venn-set { fill: var(--tb-muted); font-family: var(--tb-font); font-size: 12px; font-weight: 600; pointer-events: none; }
+.tb-venn-count { fill: var(--tb-fg); font-family: var(--tb-mono); font-weight: 600; stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; pointer-events: none; }
+.tb-venn-set { fill: var(--tb-muted); font-family: var(--tb-font); font-weight: 600; pointer-events: none; }
 .tb-venn-message { margin: 0; padding: 0.75rem; border: 1px dashed var(--tb-border); border-radius: 8px; color: var(--tb-muted); font-size: 0.86rem; }
 `;
 
@@ -100,6 +99,11 @@ function regions(venn: Venn): Region[] | string {
 
 export function renderVenn(venn: Venn, options: RenderOptions = {}): HTMLElement {
 	const compact = (options.cardChart ?? options.compact) === true;
+	return fitted((fit) => drawVenn(venn, compact, fit));
+}
+
+function drawVenn(venn: Venn, compact: boolean, fit: Fit): HTMLElement {
+	const { width: W, font: f } = fit;
 	const unit = venn.unit ? ` ${venn.unit}` : "";
 	const figure = el("figure", { class: compact ? "tb-out-chart tb-out-chart-card tb-venn" : "tb-out-chart tb-venn" });
 	adoptChartStyles(figure);
@@ -134,7 +138,14 @@ export function renderVenn(venn: Venn, options: RenderOptions = {}): HTMLElement
 	const maxX = Math.max(...centres.map((c, i) => c.x + (radii[i] as number)));
 	const minY = Math.min(...centres.map((c, i) => c.y - (radii[i] as number)));
 	const maxY = Math.max(...centres.map((c, i) => c.y + (radii[i] as number)));
-	const scale = Math.min((W - 240) / (maxX - minX), (H - 70) / (maxY - minY));
+	/*
+	 * Room beside the circles for the widest set name, so a name never runs off the picture. On a narrow chart
+	 * that would leave the circles a sliver, so the names go in a key under the picture instead (#210).
+	 */
+	const names = venn.sets.map((set) => `${set.label} (${format(set.size)})`);
+	const side = Math.ceil(Math.max(...names.map((n) => textWidth(n, f))) + 20);
+	const outside = !fit.narrow && W - 2 * side >= 160;
+	const scale = Math.min((W - (outside ? 2 * side : 16)) / (maxX - minX), (H - 70) / (maxY - minY));
 	const ox = (W - (maxX - minX) * scale) / 2 - minX * scale;
 	const oy = 35 + (H - 70 - (maxY - minY) * scale) / 2 - minY * scale;
 	const circles = centres.map((c, i) => ({ x: ox + c.x * scale, y: oy + c.y * scale, r: (radii[i] as number) * scale }));
@@ -163,7 +174,7 @@ export function renderVenn(venn: Venn, options: RenderOptions = {}): HTMLElement
 	found.forEach((region, r) => {
 		const sum = sums[r];
 		if (!sum || sum.n === 0) return;
-		marks.push(svg("text", { class: "tb-venn-count", x: sum.x / sum.n, y: sum.y / sum.n + 4, "text-anchor": "middle" }, format(region.count)));
+		marks.push(svg("text", { class: "tb-venn-count", x: sum.x / sum.n, y: sum.y / sum.n + middleOf(fit), "text-anchor": "middle" }, format(region.count)));
 	});
 	/*
 	 * Each set's name goes outside the diagram, on the line from the middle of all the centres through its own
@@ -171,18 +182,18 @@ export function renderVenn(venn: Venn, options: RenderOptions = {}): HTMLElement
 	 * whenever a circle sits below them.
 	 */
 	const mid = { x: circles.reduce((a, c) => a + c.x, 0) / circles.length, y: circles.reduce((a, c) => a + c.y, 0) / circles.length };
-	venn.sets.forEach((set, i) => {
+	venn.sets.forEach((_, i) => {
 		const c = circles[i];
-		if (!c) return;
+		if (!c || !outside) return;
 		let dx = c.x - mid.x;
 		let dy = c.y - mid.y;
 		const len = Math.hypot(dx, dy);
 		if (len < 1e-6) [dx, dy] = [0, -1];
 		else [dx, dy] = [dx / len, dy / len];
 		const x = c.x + dx * (c.r + 14);
-		const y = c.y + dy * (c.r + 14) + 4;
+		const y = c.y + dy * (c.r + 14) + middleOf(fit);
 		const anchor = Math.abs(dx) < 0.35 ? "middle" : dx > 0 ? "start" : "end";
-		marks.push(svg("text", { class: "tb-venn-set", x, y: Math.min(H - 4, Math.max(14, y)), "text-anchor": anchor }, `${set.label} (${format(set.size)})`));
+		marks.push(svg("text", { class: "tb-venn-set", x, y: Math.min(H - fit.descent - 2, Math.max(fit.ascent + 2, y)), "text-anchor": anchor }, names[i] as string));
 	});
 
 	const approximate = venn.sets.length === 3;
@@ -197,6 +208,20 @@ export function renderVenn(venn: Venn, options: RenderOptions = {}): HTMLElement
 	const caption = approximate ? `${venn.label}. Three circles cannot in general show every overlap exactly, so the areas are approximate; the counts are exact.` : venn.label;
 	figure.append(
 		el("div", { class: "tb-plot" }, picture),
+		// The names, keyed by each circle's colour, when the picture has no room beside the circles for them.
+		...(outside
+			? []
+			: [
+					el(
+					"ul",
+					{ class: "tb-legend" },
+					...names.map((name, i) => {
+						const text = el("span", {});
+						text.textContent = name;
+						return el("li", {}, el("span", { class: `tb-swatch-marker tb-s${i + 1}`, "data-marker": "0", "aria-hidden": "true" }), text);
+					}),
+				),
+				]),
 		el("details", { class: "tb-chart-data" }, el("summary", {}, "Show the data as a table"), el("table", {}, el("caption", {}, caption), el("thead", {}, head), el("tbody", {}, ...rows))),
 	);
 	attachRegionReadout(figure, picture, venn, found, inside, sums, unit);
@@ -236,7 +261,7 @@ function attachRegionReadout(
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
 		const sum = sums[r];
-		const k = box.width / W;
+		const k = box.width / plotSvg.viewBox.baseVal.width;
 		const x = at?.x ?? box.left + ((sum?.x ?? 0) / Math.max(1, sum?.n ?? 1)) * k;
 		const y = at?.y ?? box.top + ((sum?.y ?? 0) / Math.max(1, sum?.n ?? 1)) * k;
 		card.style.left = `${Math.round(x - frame.left)}px`;
@@ -249,7 +274,7 @@ function attachRegionReadout(
 	};
 	plotSvg.addEventListener("pointermove", (event) => {
 		const box = plotSvg.getBoundingClientRect();
-		const k = box.width / W;
+		const k = box.width / plotSvg.viewBox.baseVal.width;
 		const key = inside((event.clientX - box.left) / k, (event.clientY - box.top) / k).join(",");
 		const r = found.findIndex((f) => f.members.join(",") === key);
 		if (r >= 0) show(r, { x: event.clientX, y: event.clientY });
