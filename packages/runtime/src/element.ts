@@ -1300,7 +1300,8 @@ export class ToolHost extends HTMLElement {
 		const id = `in-${spec.id}`;
 		const describedBy: string[] = [];
 		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
-		const row = el("div", { class: "tb-field-row" });
+		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
+		const row = el("div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
 		const desc = spec.description ? el("p", { class: "tb-desc", id: `${id}-desc` }, spec.description) : null;
 		if (desc) describedBy.push(`${id}-desc`);
 		const errorId = `${id}-err`;

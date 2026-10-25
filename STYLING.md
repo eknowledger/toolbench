@@ -184,7 +184,9 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | Attribute | On | Values |
 |---|---|---|
 | `data-kind` | Every part's root | The part's kind |
-| `data-role` | A part's root, or a `.tb-field` | Whatever `role` the tool set. Absent when it set none |
+| `data-role` | A part's root, a `.tb-field`, or a `.tb-field-row` | Whatever `role` the tool set on the part, field or input. Absent when it set none |
+| `data-input` | `.tb-field-row` | The input's `id` |
+| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle` |
 | `data-part` | A part's root | Whatever `id` the tool set, unique in the result. Absent when it set none. `host.reveal(id)` goes to it |
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |
@@ -200,6 +202,16 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 `role` is the tool's to set: `{ kind: "fields", role: "stats", fields }` names a part, and
 `{ label, value, role: "verdict" }` names one field. The runtime attaches no meaning to it, so a host
 that styles nothing sees no difference.
+
+The form is named the same way (contract version 8 for `role`): each `.tb-field-row` carries `data-input`
+and `data-type`, and `data-role` when the input has a `role`. Its controls read `--tb-input-bg`,
+`--tb-input-border` and `--tb-input-fg`, and its description `--tb-desc-fg`, so a host can recolour one
+input by setting a property on its row rather than restating the runtime's rules:
+
+```css
+.tb-field-row[data-role="threshold"] { --tb-input-border: var(--tb-accent); }
+.tb-field-row[data-input="values"] { --tb-desc-fg: var(--tb-muted); }
+```
 
 `.tb-mono` is the one class for "this value is a token", on a field's `<dd>` and on a table cell alike, so
 one rule reaches both: `.tb-mono { font-family: var(--tb-mono); }` is the runtime's, and a host that wants

@@ -442,6 +442,20 @@ describe("validateManifest: lang on a textarea", () => {
 	});
 });
 
+// A name for one input, for host stylesheets (#224), as a result part has.
+describe("validateManifest: role on an input", () => {
+	const name = { id: "name", type: "text", label: "Name", default: "" };
+
+	it("accepts a role on any input, and leaves it as written", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...name, role: "credential" }, { id: "on", type: "toggle", label: "On", default: false, role: "advanced" }] });
+		assert.deepEqual(m.inputs.map((i) => i.role), ["credential", "advanced"]);
+	});
+	it("refuses a role that is not a non-empty string, which no selector could match", () => {
+		failsWith((m) => { m.inputs = [{ ...name, role: "" }]; }, "inputs[0].role", "non-empty string");
+		failsWith((m) => { m.inputs = [{ ...name, role: 3 }]; }, "inputs[0].role", "non-empty string");
+	});
+});
+
 // Keeping an input out of a host's links (#211): a hint on any input type, and only a boolean.
 describe("validateManifest: share on an input", () => {
 	const inputs = [

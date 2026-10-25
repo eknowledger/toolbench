@@ -371,6 +371,13 @@ export const GROUPS: Group[] = [
 				code: (demo) => [demo, region("site/src/gallery.ts", "reveal")],
 			},
 			{
+				id: "input-styles",
+				title: "Styling one input",
+				text: "Each input's row is named by <code>data-input</code>, <code>data-type</code> and the tool's <code>role</code>, and the controls read four properties of their own. Set one on a row and only that input changes.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "slo"), region("site/src/gallery-host.ts", "input-styles")],
+			},
+			{
 				id: "share",
 				title: "A link to the tool with its inputs",
 				text: "The link icon copies this page's address with the tool's inputs in it, and a tool opens with the inputs a link carries. An input marked <code>share: false</code>, the token here, is never put in a link or read from one.",

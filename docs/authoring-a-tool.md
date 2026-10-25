@@ -377,6 +377,9 @@ Things the validator will hold you to, and why:
   rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card
   shows the first input. Every input is shown on the full tool either way.
 * **`dir: "ltr"`** on anything that is not prose: bytes, code, patterns, identifiers.
+* **`role` on an input a host may want to style by name** (contract version 8): `"credential"`,
+  `"advanced"`. It is rendered as `data-role` on the input's row, beside `data-input` and `data-type`, and
+  the runtime gives it no meaning. It must be a non-empty string. See [STYLING.md](../STYLING.md).
 * **`"share": false` on an input whose value must never be in a URL** (contract version 8): a password,
   a token, a private key, or a textarea a reader pastes private material into. A host building a link
   from `host.values` leaves it out, and does not read it back from one (`shareableInputs(manifest)` in
