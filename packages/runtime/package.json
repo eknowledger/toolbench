@@ -54,7 +54,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b && node scripts/strip-css-comments.mjs"
   },
   "dependencies": {
     "@toolbench/sdk": "workspace:^"

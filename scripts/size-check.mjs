@@ -173,8 +173,12 @@ const BUDGETS = [
 	 * 28,534 measured, 110 bytes. The two `defineToolHost` options, the two attributes and passing both to the
 	 * renderer; the bench's import of its own query switches is in that, their code is not. Fitting, the
 	 * button and its icons are in the graph chunk, never here. 28_500 would have left the build 34 over.
+	 *
+	 * Lowered to 26_000 when the build began stripping the comments from the runtime's stylesheets
+	 * (packages/runtime/scripts/strip-css-comments.mjs): 28,582 measured before, 25,319 after. Every comment
+	 * in a `/* css *\/` literal had been a string each reader downloaded.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -511,9 +515,12 @@ for (const file of unclaimed) {
  * grammar and the fix that lets a wide result scroll, all spent in the runtime and paid by every consumer
  * too. The page's own script and stylesheet are 7,039, 39 fewer than before. 34_000 would have been 610
  * bytes over.
+ *
+ * Lowered to 32_000 once the build stripped the comments from the runtime's stylesheets: 31,332 measured,
+ * from 34,523.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 35_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 32_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
