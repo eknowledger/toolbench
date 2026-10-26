@@ -14,6 +14,8 @@
  *   <!-- version -->                           the runtime's version, from packages/runtime/package.json
  *   <!-- runtime-kb -->                        the runtime's gzipped size, as size-check.mjs publishes it
  *   <!-- fonts -->                             the web font, only when built with SITE_FONT=atkinson
+ *   <!-- whats-new -->                         the What's new page, from the two CHANGELOG.md files
+ *   <!-- whats-new-line -->                    the landing page's line naming the latest release
  *
  * `transformIndexHtml` runs in dev and in the build alike, so the dev server shows what ships.
  */
@@ -26,6 +28,7 @@ import { codeBlock, escapeHtml, highlight } from "./highlight.ts";
 import { renderMarkdown, slugify, type Rendered } from "./markdown.ts";
 import { hostReference, inputsReference, llmsText, manifestReference, referenceData, resultsReference, tokensReference } from "./reference.ts";
 import { browsers, stats } from "./stats.ts";
+import { CHANGELOGS, checkReleases, clearReleases, latestLine, shotDialog, whatsNewBody } from "./whats-new.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const GITHUB = "https://github.com/eknowledger/toolbench";
@@ -214,12 +217,15 @@ function toc(doc: Doc): string {
 	return `${html}</ol>`.replace(/<ol><\/ol>/g, "");
 }
 
-function docPage(doc: Doc): string {
-	const link = (d: Doc) => `<li><a href="./${d.page}"${d === doc ? ' aria-current="page"' : ""}>${escapeHtml(d.title)}</a></li>`;
+/** Pages in the docs sidebar that are not rendered from a markdown file. */
+const EXTRA_LINKS: { page: string; title: string; group: Doc["group"] }[] = [{ page: "whats-new.html", title: "What's new", group: "Project" }];
+
+/** The docs sidebar, with the page being built marked. */
+function docsNav(current: string): string {
+	const link = (page: string, title: string) => `<li><a href="./${page}"${page === current ? ' aria-current="page"' : ""}>${escapeHtml(title)}</a></li>`;
 	const nav = (["Guide", "Reference", "Project"] as const)
-		.map((g) => `<h2>${g}</h2><ul>${DOCS.filter((d) => d.group === g).map(link).join("")}</ul>`)
+		.map((g) => `<h2>${g}</h2><ul>${[...DOCS.filter((d) => d.group === g), ...EXTRA_LINKS.filter((e) => e.group === g)].map((d) => link(d.page, d.title)).join("")}</ul>`)
 		.join("");
-	const { html } = rendered(doc);
 	return `
   <nav class="docs-nav panel" aria-label="Documentation">
     ${panelBar("docs-nav")}
@@ -231,7 +237,23 @@ function docPage(doc: Doc): string {
         <li><a href="${BLOB}/ROADMAP.md">Roadmap</a></li>
       </ul>
     </div>
+  </nav>`;
+}
+
+function whatsNewPage(): string {
+	const { article, toc } = whatsNewBody();
+	return `${docsNav("whats-new.html")}
+  ${article}
+  <nav class="docs-toc panel" aria-label="Releases">
+    ${panelBar("docs-toc", "Releases")}
+    <div class="panel-body" id="docs-toc-body">${toc}</div>
   </nav>
+  ${shotDialog()}`;
+}
+
+function docPage(doc: Doc): string {
+	const { html } = rendered(doc);
+	return `${docsNav(doc.page)}
   <article class="prose">
     <h1>${escapeHtml(doc.title)}</h1>
     <p class="doc-meta">${escapeHtml(doc.summary)}</p>
@@ -318,8 +340,8 @@ function list(words: string[]): string {
 const PANELS: Record<string, string> = { "docs-nav": "Documentation", "docs-toc": "On this page", "gallery-nav": "In the gallery" };
 
 /** A sidebar's heading and the button that collapses it. See src/panels.ts. */
-function panelBar(name: string): string {
-	const title = PANELS[name] ?? name;
+function panelBar(name: string, heading?: string): string {
+	const title = heading ?? PANELS[name] ?? name;
 	return `<div class="panel-bar"><h2 class="panel-title">${escapeHtml(title)}</h2><button type="button" class="panel-toggle" data-panel-toggle="${name}" aria-expanded="true" aria-controls="${name}-body"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="visually-hidden">${escapeHtml(title)}</span></button></div>`;
 }
 
@@ -376,6 +398,8 @@ export function siteContent(): Plugin {
 		async buildStart() {
 			await generateReference();
 			checkDiagrams(diagramSources());
+			// `pnpm site:shots` builds the site to photograph it, so it is the one build allowed to lack them.
+			checkReleases({ allowMissingShots: process.env.SITE_SHOTS === "pending" });
 		},
 		// The reference for a tool or an assistant to read, written beside the pages: the same data as JSON,
 		// and every reference page as one text file. Linked from the footer, not from the pages.
@@ -387,9 +411,11 @@ export function siteContent(): Plugin {
 		configureServer(server) {
 			// The markdown lives outside the Vite root, so tell the watcher, and reload the page on an edit.
 			for (const d of DOCS) server.watcher.add(join(ROOT, d.file));
+			for (const f of CHANGELOGS) server.watcher.add(join(ROOT, f));
 			server.watcher.on("change", (file) => {
 				if (file.endsWith(".md") || file.endsWith("tool.json")) {
 					cache.clear();
+					clearReleases();
 					server.ws.send({ type: "full-reload" });
 				}
 			});
@@ -431,6 +457,10 @@ export function siteContent(): Plugin {
 							return escapeHtml((JSON.parse(read("packages/runtime/package.json")) as { version: string }).version);
 						case "fonts":
 							return fonts();
+						case "whats-new":
+							return whatsNewPage();
+						case "whats-new-line":
+							return latestLine();
 						case "panel-bar":
 							return panelBar(arg);
 						case "logo":

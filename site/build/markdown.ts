@@ -39,7 +39,7 @@ export function slugify(text: string): string {
 		.replace(/\s/g, "-");
 }
 
-function inline(text: string, opts: RenderOptions): string {
+export function inline(text: string, opts: RenderOptions = {}): string {
 	// Code spans first, set aside so nothing inside them is treated as markup.
 	const codes: string[] = [];
 	let s = text.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks, code: string) => {

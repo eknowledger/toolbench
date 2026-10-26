@@ -1,0 +1,49 @@
+/* The What's new page, on top of site.css's docs layout. Its own file, so the landing page does not pay for it. */
+.wn .doc-meta { margin-bottom: 1.25rem; }
+.wn-jump { display: none; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+.wn-jump a { font: 600 0.875rem var(--mono); padding: 0.25rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; color: var(--ink); }
+@media (max-width: 1100px) { .wn-jump { display: flex; } }
+
+.wn-release h2 { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-top: 2.25rem; }
+.wn-release:first-of-type h2 { margin-top: 1rem; }
+.wn-ver { font-family: var(--mono); }
+.wn-release h2 time, .wn-unreleased { font-size: 0.9375rem; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+
+.wn-group { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9375rem; margin: 1.25rem 0 0.4rem; color: var(--muted); }
+.wn-group::before { content: ""; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--amber); }
+.wn-fixed::before { background: var(--muted); }
+.wn-changed::before { box-sizing: border-box; background: transparent; border: 2px solid var(--amber); }
+
+.wn-list { margin: 0; padding-left: 1.25rem; }
+.prose .wn-list li + li { margin-top: 0.3rem; }
+/*
+ * ⚠️ Each link unbroken, not the group. With `nowrap` on the whole group Chrome found no break before it
+ * and carried the sentence's last word down with it: "...for its maximum" then "width. Try it Docs".
+ */
+.wn-links { font-size: 0.875rem; }
+.wn-links a { margin-left: 0.7rem; white-space: nowrap; }
+.prose .wn-links a { color: var(--amber-text); }
+.wn-flag { display: inline-block; margin-left: 0.35rem; font-size: 0.75rem; line-height: 1.5; padding: 0 0.45rem; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber-text); vertical-align: 0.1em; white-space: nowrap; }
+
+.wn-more { margin: 0.3rem 0 0; }
+.wn-more summary { cursor: pointer; width: fit-content; color: var(--amber-text); font-size: 0.9375rem; padding: 0.15rem 0; }
+.wn-more[open] summary { margin-bottom: 0.3rem; }
+
+.docs-toc li a { display: flex; flex-direction: column; }
+.wn-toc-ver { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+.wn-toc-meta { font-size: 0.8125rem; }
+
+.wn-shot { max-width: min(72rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); }
+.wn-shot::backdrop { background: rgb(0 0 0 / 0.6); }
+.wn-shot-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.75rem 0.6rem 1rem; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+.wn-shot-title { margin: 0; font-weight: 700; }
+.wn-shot form { margin: 0; }
+.wn-shot img { max-width: 100%; height: auto; margin: 0 auto; }
+.wn-shot-light { display: block; }
+.wn-shot-dark { display: none; }
+:root[data-theme=dark] .wn-shot-dark { display: block; }
+:root[data-theme=dark] .wn-shot-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme=light]) .wn-shot-dark { display: block; }
+  :root:not([data-theme=light]) .wn-shot-light { display: none; }
+}

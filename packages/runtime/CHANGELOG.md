@@ -4,40 +4,57 @@
 
 ### Minor Changes
 
-- [#228](https://github.com/eknowledger/toolbench/pull/228) [`cbc515c`](https://github.com/eknowledger/toolbench/commit/cbc515ce95725c48528ae51368fdc0b6032aafa5) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: chart labels stay readable at any width.** A chart is now laid out for the width it is drawn at, so its labels are 12px on a phone and on a wide screen, where they used to be about 5px and 22px. ([#210](https://github.com/eknowledger/toolbench/issues/210))
+- [#232](https://github.com/eknowledger/toolbench/pull/232) [`eb171da`](https://github.com/eknowledger/toolbench/commit/eb171dae74da06469314d7c55a8a118dbe3cbd42) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Reset button.** Puts a tool's inputs back where they started. <!-- whats-new: gallery=reset docs=docs.html#reset shot=reset -->
   
-  - **New:** `--tb-chart-font` sets the size of every label in a chart, and `--tb-chart-max-width` caps how wide a chart is drawn. See STYLING.md.
-  - Below 480px, horizontal bars put each name above its bars, a pie's key goes under the pie, and a Venn diagram's set names go in a key.
-  - ⚠️ Heads-up: a chart is drawn again when its width changes, so a reference to the figure `render` returned can go stale. Find it by `data-kind` or `data-part`.
-
-- [#231](https://github.com/eknowledger/toolbench/pull/231) [`eb76ee3`](https://github.com/eknowledger/toolbench/commit/eb76ee32437b8394607f0652a9484f21555289c3) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: follow a tool from your page.** `<tool-host>` dispatches `tool-input` with `{ values }` after the inputs change, and `tool-run` with `{ values, ok, error? }` after a run's result is drawn, so a deep link, analytics or your own Copy button no longer has to listen for clicks inside the shadow root. ([#212](https://github.com/eknowledger/toolbench/issues/212))
-  
-  - Both bubble and are composed, so one listener on `document` hears every tool.
-  - Neither fires while a tool first opens with its starting values. The `ToolHostEvents` type names both.
-
-- [#233](https://github.com/eknowledger/toolbench/pull/233) [`491888d`](https://github.com/eknowledger/toolbench/commit/491888dbc90cc53930401f32846f4fff8d4a9f74) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: choose the links under a tool.** `links="page"` shows only "Open the full tool" and `links="none"` shows nothing, for a tool in an article that lists its references already. The default, `all`, keeps the manifest's links. Also a property: `host.links = "none"`. ([#216](https://github.com/eknowledger/toolbench/issues/216))
-  
-  A retired tool keeps its links whatever this says, because its notice points at them.
-
-- [#232](https://github.com/eknowledger/toolbench/pull/232) [`eb171da`](https://github.com/eknowledger/toolbench/commit/eb171dae74da06469314d7c55a8a118dbe3cbd42) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a Reset button beside Run.** Once a reader changes an input, Reset puts every input back to the values the tool opened with (your page's prefill, or the defaults) and clears the result. ([#208](https://github.com/eknowledger/toolbench/issues/208))
+  Once a reader changes an input, Reset puts every input back to the values the tool opened with (your page's prefill, or the defaults) and clears the result. ([#208](https://github.com/eknowledger/toolbench/issues/208))
   
   - Hidden while the inputs are already at their starting values. Dispatches `tool-reset` with `{ values }`.
   - `reset="none"` leaves it out, for a tool where it adds nothing.
   - **⚠️ Heads-up:** a host stylesheet that styles every `button` in `.tb-actions` now reaches Reset as well. Its class is `.tb-reset`.
 
-- [#234](https://github.com/eknowledger/toolbench/pull/234) [`fe9e82a`](https://github.com/eknowledger/toolbench/commit/fe9e82a7a4535d5a8e177ef5b4cdaab2a04028a2) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: readers can share a link to a tool with its inputs.** A `page` or `embed` tool now has a link icon that copies the page's address with the tool's inputs in it, and a tool opens with the inputs a link carries. ([#227](https://github.com/eknowledger/toolbench/issues/227))
+- [#234](https://github.com/eknowledger/toolbench/pull/234) [`fe9e82a`](https://github.com/eknowledger/toolbench/commit/fe9e82a7a4535d5a8e177ef5b4cdaab2a04028a2) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Share a link.** A link icon copies the page address with the tool's inputs in it. <!-- whats-new: gallery=share docs=docs-ref-host.html#element-attributes shot=share label="On by default" -->
+  
+  A `page` or `embed` tool now has a link icon that copies the page's address with the tool's inputs in it, and a tool opens with the inputs a link carries. ([#227](https://github.com/eknowledger/toolbench/issues/227))
   
   - Inputs go in the query as `<tool id>.<input id>`, and an input marked `share: false` is never written or read.
   - `share="none"`, `share-label` and `share-position` (`top` or `actions`), or the same as `defineToolHost` options. `share: { url, read }` is your own scheme. `tool-share` fires with `{ url, values }`.
   - **⚠️ Heads-up:** the button is on by default. A page that builds its own share links should set `share: "none"`, or its tools will also read their values from the address.
 
+- [#231](https://github.com/eknowledger/toolbench/pull/231) [`eb76ee3`](https://github.com/eknowledger/toolbench/commit/eb76ee32437b8394607f0652a9484f21555289c3) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Events.** Your page hears when a tool's inputs change and when a run finishes. <!-- whats-new: gallery=events docs=docs-ref-host.html#events -->
+  
+  `<tool-host>` dispatches `tool-input` with `{ values }` after the inputs change, and `tool-run` with `{ values, ok, error? }` after a run's result is drawn, so a deep link, analytics or your own Copy button no longer has to listen for clicks inside the shadow root. ([#212](https://github.com/eknowledger/toolbench/issues/212))
+  
+  - Both bubble and are composed, so one listener on `document` hears every tool.
+  - Neither fires while a tool first opens with its starting values. The `ToolHostEvents` type names both.
+
+- [#233](https://github.com/eknowledger/toolbench/pull/233) [`491888d`](https://github.com/eknowledger/toolbench/commit/491888dbc90cc53930401f32846f4fff8d4a9f74) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Links under a tool.** Show them all, only "Open the full tool", or none. <!-- whats-new: gallery=links docs=docs.html#the-links-under-a-tool shot=links -->
+  
+  `links="page"` shows only "Open the full tool" and `links="none"` shows nothing, for a tool in an article that lists its references already. The default, `all`, keeps the manifest's links. Also a property: `host.links = "none"`. ([#216](https://github.com/eknowledger/toolbench/issues/216))
+  
+  A retired tool keeps its links whatever this says, because its notice points at them.
+
+- [#228](https://github.com/eknowledger/toolbench/pull/228) [`cbc515c`](https://github.com/eknowledger/toolbench/commit/cbc515ce95725c48528ae51368fdc0b6032aafa5) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Readable chart labels.** Chart labels are the same size on a phone as on a wide screen. <!-- whats-new: gallery=chart-horizontal docs=docs-charts.html#9-charts shot=chart-phone -->
+  
+  A chart is now laid out for the width it is drawn at, so its labels are 12px on a phone and on a wide screen, where they used to be about 5px and 22px. ([#210](https://github.com/eknowledger/toolbench/issues/210))
+  
+  - Below 480px, horizontal bars put each name above its bars, a pie's key goes under the pie, and a Venn diagram's set names go in a key.
+  - ⚠️ Heads-up: a chart is drawn again when its width changes, so a reference to the figure `render` returned can go stale. Find it by `data-kind` or `data-part`.
+  
+  **New: Chart settings.** One setting for every chart's text size, one for its maximum width. <!-- whats-new: gallery=charts docs=docs-styling.html#chart-text-and-width -->
+  
+  `--tb-chart-font` sets the size of every label in a chart, and `--tb-chart-max-width` caps how wide a chart is drawn. See STYLING.md.
+
 ### Patch Changes
 
-- [#225](https://github.com/eknowledger/toolbench/pull/225) [`5522d5b`](https://github.com/eknowledger/toolbench/commit/5522d5b691711d295fc4f8afacec9e64be20e7c6) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a closed card seeded with a graph draws the graph.** A graph whose layout needs the crossing search, or one past 100 nodes, showed "The chart could not be loaded." instead. ([#201](https://github.com/eknowledger/toolbench/issues/201))
+- [#225](https://github.com/eknowledger/toolbench/pull/225) [`5522d5b`](https://github.com/eknowledger/toolbench/commit/5522d5b691711d295fc4f8afacec9e64be20e7c6) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Graphs in closed cards.** A graph in a closed card is drawn when it opens, instead of showing an error. <!-- whats-new: gallery=graphs docs=docs-ref-results.html#graph -->
+  
+  A graph whose layout needs the crossing search, or one past 100 nodes, showed "The chart could not be loaded." instead. ([#201](https://github.com/eknowledger/toolbench/issues/201))
   
   When a graph really cannot be loaded, the line now says "graph", not "chart".
 
-- [#230](https://github.com/eknowledger/toolbench/pull/230) [`f922b36`](https://github.com/eknowledger/toolbench/commit/f922b3654b326428e62509172133d924beb15f5b) Thanks [@eknowledger](https://github.com/eknowledger)! - **Smaller: the runtime's stylesheets no longer ship their comments.** Every comment written inside the CSS to explain a rule was a string each reader downloaded: 3,263 of the 28,582 gzipped bytes of the chunk every page loads. The build now strips them, and the chunk is 25,319 bytes. The comments stay in the source. No style changes.
+- [#230](https://github.com/eknowledger/toolbench/pull/230) [`f922b36`](https://github.com/eknowledger/toolbench/commit/f922b3654b326428e62509172133d924beb15f5b) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Smaller first load.** The runtime's stylesheets no longer ship their comments. <!-- whats-new: docs=docs.html#size-and-cost -->
+  
+  Every comment written inside the CSS to explain a rule was a string each reader downloaded: 3,263 of the 28,582 gzipped bytes of the chunk every page loads. The build now strips them, and the chunk is 25,319 bytes. The comments stay in the source. No style changes.
 - Updated dependencies []:
   - @toolbench/sdk@0.13.0
 
@@ -45,7 +62,9 @@
 
 ### Minor Changes
 
-- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: `ToolHostAttributes`**, a type for the attributes `<tool-host>` reads (`tool`, `mode`, `parts`, `more`, `layout`, `controls`, `wide`, `wide-toggle`), each with its default and meaning, for a host typing its own markup. Types only: nothing is added to the bundle. `RegistryEntry`'s two members are described too.
+- [#206](https://github.com/eknowledger/toolbench/pull/206) [`0b9a386`](https://github.com/eknowledger/toolbench/commit/0b9a3866c577274158f0ef0e60b39479107ddf79) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Typed markup.** One type lists every `<tool-host>` attribute with its default. <!-- whats-new: docs=docs-ref-host.html#element-attributes -->
+  
+  , a type for the attributes `<tool-host>` reads (`tool`, `mode`, `parts`, `more`, `layout`, `controls`, `wide`, `wide-toggle`), each with its default and meaning, for a host typing its own markup. Types only: nothing is added to the bundle. `RegistryEntry`'s two members are described too.
 
 ### Patch Changes
 
@@ -56,7 +75,9 @@
 
 ### Minor Changes
 
-- [#200](https://github.com/eknowledger/toolbench/pull/200) [`2050245`](https://github.com/eknowledger/toolbench/commit/2050245cfc8578c4dad64f7100003bfef89cbf76) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a wide graph fits its tool, with a button to show it at full size.** A graph wider than its plot is scaled down to fit, never up, and a small button above it switches to full size in a plot that scrolls, keeping the reader's focus, selection and highlighted path. ([#198](https://github.com/eknowledger/toolbench/issues/198))
+- [#200](https://github.com/eknowledger/toolbench/pull/200) [`2050245`](https://github.com/eknowledger/toolbench/commit/2050245cfc8578c4dad64f7100003bfef89cbf76) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Wide graphs fit.** A graph wider than its tool shrinks to fit, with a button to see it at full size. <!-- whats-new: gallery=graph-nested docs=docs.html#a-graph-wider-than-its-tool shot=graph-nested label="Changes a default" -->
+  
+  A graph wider than its plot is scaled down to fit, never up, and a small button above it switches to full size in a plot that scrolls, keeping the reader's focus, selection and highlighted path. ([#198](https://github.com/eknowledger/toolbench/issues/198))
   
   - `defineToolHost({ wide: "scroll" })`, or `wide="scroll"` on one `<tool-host>`, keeps the previous behaviour: full size, scrolling.
   - `wideToggle: false`, or `wide-toggle="false"`, hides the button. Style it as `::part(wide-toggle)`.
@@ -71,7 +92,9 @@
 
 ### Patch Changes
 
-- [#195](https://github.com/eknowledger/toolbench/pull/195) [`76e95be`](https://github.com/eknowledger/toolbench/commit/76e95be9a8d7e37596d37656299fe2d3f563a688) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a result wider than its tool scrolls instead of being cut off.** A wide graph, a long code line, a hex dump or a chart's data table was clipped at the tool's right edge with no way to reach the rest; each now scrolls inside the tool, and unbroken text such as a digest or a URL wraps. ([#194](https://github.com/eknowledger/toolbench/issues/194))
+- [#195](https://github.com/eknowledger/toolbench/pull/195) [`76e95be`](https://github.com/eknowledger/toolbench/commit/76e95be9a8d7e37596d37656299fe2d3f563a688) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Wide results.** A result wider than its tool scrolls instead of being cut off. <!-- whats-new: gallery=bytes docs=docs.html#result-shapes -->
+  
+  A wide graph, a long code line, a hex dump or a chart's data table was clipped at the tool's right edge with no way to reach the rest; each now scrolls inside the tool, and unbroken text such as a digest or a URL wraps. ([#194](https://github.com/eknowledger/toolbench/issues/194))
 - Updated dependencies []:
   - @toolbench/sdk@0.10.1
 
@@ -79,46 +102,62 @@
 
 ### Minor Changes
 
-- [#187](https://github.com/eknowledger/toolbench/pull/187) [`aac09a6`](https://github.com/eknowledger/toolbench/commit/aac09a61d3417dd4ce2aa366d96451625c68465d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: highlighted byte ranges are told apart by colour.** ([#148](https://github.com/eknowledger/toolbench/issues/148)) A `bytes` range with no `tone` is drawn in the next chart series colour, `--tb-s1` to `--tb-s6`, round again after six, and its legend swatch matches. Eight labelled fields of one message are no longer eight identical blocks.
+- [#181](https://github.com/eknowledger/toolbench/pull/181) [`dde82c6`](https://github.com/eknowledger/toolbench/commit/dde82c61e23eb4624304e1f92305b20557c06b87) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Graphs.** Return nodes and edges, and the runtime lays them out and draws them. <!-- whats-new: gallery=graph-flowchart docs=docs-ref-results.html#graph shot=graph -->
   
-  - No contract change: tools need nothing new, and a range with a `tone` looks as it did.
-  - The digits on every mark keep 4.5:1 contrast or better in light and dark. The label stays in the legend and the hover text.
-  - A host can select a range's colour with `data-series` on `.tb-byte` and the legend entry (see STYLING.md).
+  ([#152](https://github.com/eknowledger/toolbench/issues/152)) A tool can return `{ kind: "graph", graph }`, nodes and edges, and the runtime lays it out and draws it: ranks along a direction, ports centred on the side facing the other end, orthogonal edges that never share a stretch of line, labels clear of everything, and the same picture in every browser. Every edge is also listed in a table under the picture, and the picture is one tab stop that follows the edges with the arrow keys.
+  
+  * Nodes take a label, a note, a shape, a tone or colour, a badge and a fixed rank; edges a label, a line style and width, markers, and a side to leave or arrive on. A path can be highlighted, and a tool can set its own `limits`, past which the graph is listed instead of drawn.
+  * The graph kind is a chunk of its own, fetched only by a page that draws a graph.
+  * This raises the contract to version 7: a tool returning a graph declares `"sdk": 7`, and every older manifest loads unchanged. `graphProblem` in the SDK checks a graph's structure, and the fixture runner fails a case whose graph the runtime would refuse.
 
-- [#188](https://github.com/eknowledger/toolbench/pull/188) [`f7f5336`](https://github.com/eknowledger/toolbench/commit/f7f5336b1fdb112732ee45b4f23061f500106842) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: copy a code result or a table in one press.** ([#155](https://github.com/eknowledger/toolbench/issues/155)) Every `code` result has a "Copy code" button that copies its source exactly, and every `table` a "Copy table" button that copies it as tab-separated text, so it pastes into a spreadsheet as cells.
+- [#188](https://github.com/eknowledger/toolbench/pull/188) [`f7f5336`](https://github.com/eknowledger/toolbench/commit/f7f5336b1fdb112732ee45b4f23061f500106842) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Copy buttons.** Copy a code result exactly, or a table straight into a spreadsheet. <!-- whats-new: gallery=copy docs=docs-ref-results.html#code shot=copy -->
+  
+  ([#155](https://github.com/eknowledger/toolbench/issues/155)) Every `code` result has a "Copy code" button that copies its source exactly, and every `table` a "Copy table" button that copies it as tab-separated text, so it pastes into a spreadsheet as cells.
   
   - The outcome is announced to screen readers and shown beside the button. Where the clipboard is missing or refused, it says "Copy failed" and selects the text so the reader can copy it with the keyboard.
   - A closed card shows no Copy button. Style it with `.tb-copy-bar`, `.tb-copy` and `.tb-copy-note` (see STYLING.md).
   - What the button does is a chunk of its own, about 0.5 KB, fetched when the first code or table result is drawn. Until it arrives the button shows disabled.
   - **Fixed:** a copied table cannot carry a spreadsheet formula. A cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'`, so Excel and Sheets paste it as text. Plain numbers such as -5 are unchanged.
 
-- [#181](https://github.com/eknowledger/toolbench/pull/181) [`dde82c6`](https://github.com/eknowledger/toolbench/commit/dde82c61e23eb4624304e1f92305b20557c06b87) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: graphs.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) A tool can return `{ kind: "graph", graph }`, nodes and edges, and the runtime lays it out and draws it: ranks along a direction, ports centred on the side facing the other end, orthogonal edges that never share a stretch of line, labels clear of everything, and the same picture in every browser. Every edge is also listed in a table under the picture, and the picture is one tab stop that follows the edges with the arrow keys.
+- [#187](https://github.com/eknowledger/toolbench/pull/187) [`aac09a6`](https://github.com/eknowledger/toolbench/commit/aac09a61d3417dd4ce2aa366d96451625c68465d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Byte ranges in colour.** Each highlighted range in a hex dump gets its own colour. <!-- whats-new: gallery=bytes docs=docs-ref-results.html#bytes shot=bytes -->
   
-  * Nodes take a label, a note, a shape, a tone or colour, a badge and a fixed rank; edges a label, a line style and width, markers, and a side to leave or arrive on. A path can be highlighted, and a tool can set its own `limits`, past which the graph is listed instead of drawn.
-  * The graph kind is a chunk of its own, fetched only by a page that draws a graph.
-  * This raises the contract to version 7: a tool returning a graph declares `"sdk": 7`, and every older manifest loads unchanged. `graphProblem` in the SDK checks a graph's structure, and the fixture runner fails a case whose graph the runtime would refuse.
-
-- [#182](https://github.com/eknowledger/toolbench/pull/182) [`85f7ed9`](https://github.com/eknowledger/toolbench/commit/85f7ed9305812f56cfd21cbca0f6c0451c77e5e7) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: every kind of graph.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) Beyond layered graphs, a `graph` can be a tidy tree, a radial mind map, a force-laid network or nodes placed by hand, with straight, curved, spline or polyline edges. It can draw hexagons, parallelograms, cylinders and documents, record nodes whose rows each have a port, crow's-foot and UML markers, nested groups a reader can close and open, and swimlanes. Each of these is a small chunk fetched by the first graph that uses it, so a page pays only for the graphs it draws.
-
-- [#183](https://github.com/eknowledger/toolbench/pull/183) [`e06d31a`](https://github.com/eknowledger/toolbench/commit/e06d31a22472c880eaea6d2df9a19ba278710276) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: large and dense graphs.** ([#152](https://github.com/eknowledger/toolbench/issues/152)) A graph past a hundred nodes is laid out off the main thread, in a worker made with the `workerFactory` you already pass for worker-mode tools: its edge table shows at once and the picture follows, so the page never stops. A dense layered graph of up to 60 nodes gets a crossing search that redraws it with fewer crossings, fetched only for the graphs that need it.
+  ([#148](https://github.com/eknowledger/toolbench/issues/148)) A `bytes` range with no `tone` is drawn in the next chart series colour, `--tb-s1` to `--tb-s6`, round again after six, and its legend swatch matches. Eight labelled fields of one message are no longer eight identical blocks.
   
-  * Without a `workerFactory`, a large graph is laid out on the main thread after a frame.
+  - No contract change: tools need nothing new, and a range with a `tone` looks as it did.
+  - The digits on every mark keep 4.5:1 contrast or better in light and dark. The label stays in the legend and the hover text.
+  - A host can select a range's colour with `data-series` on `.tb-byte` and the legend entry (see STYLING.md).
 
-- [#192](https://github.com/eknowledger/toolbench/pull/192) [`31d4db5`](https://github.com/eknowledger/toolbench/commit/31d4db5dd1a1d6c867e41a91f1a5b7c221ce2f78) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a tool's `sdk` now has to cover what it uses.** ([#170](https://github.com/eknowledger/toolbench/issues/170)) A manifest declaring `"sdk": 4` that used v6's `lang` used to validate, and a v4 runtime then loaded it and silently dropped the highlighting. Now it is refused: `inputs[0].lang: is from contract version 6, but the tool declares "sdk": 4 ... Declare "sdk": 6.`
+- [#193](https://github.com/eknowledger/toolbench/pull/193) [`10678a9`](https://github.com/eknowledger/toolbench/commit/10678a9872cf10465c7ee11fd1774e22cc7d0451) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Textarea grammar.** A tool can highlight its own notation, with no highlighter on the page. <!-- whats-new: gallery=grammar-input docs=docs-ref-inputs.html#grammar-attributes shot=grammar -->
   
-  - `upgradeManifest` checks before it stamps the current version, so every path that loads a manifest refuses, a host's own included. `validateManifest` checks a manifest validated as written. The `@toolbench/sdk/fixtures` harness also checks every case's expected output and every sample's result.
-  - New: `checkManifestFeatures(raw)` and `outputFeatureProblem(output, sdk)`, the same checks on their own.
-  - ⚠️ Heads-up: a manifest that under-declares its `sdk` now fails to load. Raise its `sdk` to the version the message names. Every tool and fixture in this repository already declared enough.
-
-- [#193](https://github.com/eknowledger/toolbench/pull/193) [`10678a9`](https://github.com/eknowledger/toolbench/commit/10678a9872cf10465c7ee11fd1774e22cc7d0451) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a tool can ship a grammar for its own textarea language.** ([#163](https://github.com/eknowledger/toolbench/issues/163)) Beside `lang`, a textarea's `grammar` lists `keywords`, a `comment` prefix, `operators` and `strings` delimiters, and the runtime paints what the reader types with them, so a notation no host highlighter knows is highlighted anyway.
+  ([#163](https://github.com/eknowledger/toolbench/issues/163)) Beside `lang`, a textarea's `grammar` lists `keywords`, a `comment` prefix, `operators` and `strings` delimiters, and the runtime paints what the reader types with them, so a notation no host highlighter knows is highlighted anyway.
   
   - No patterns: a tool cannot ship a regular expression that freezes the page, any other key is refused, and every list is capped.
   - A host `highlight` hook that paints the `lang` still wins. The paint is the same as `lang`'s: behind the real textarea, `aria-hidden`, so the caret, selection, undo and screen reader are the browser's own.
   - The tokeniser is in the lazily fetched paint chunk, now about 1.5 KB, which a tool with a grammar fetches even on a host with no hook. Contract version 7.
 
+- [#182](https://github.com/eknowledger/toolbench/pull/182) [`85f7ed9`](https://github.com/eknowledger/toolbench/commit/85f7ed9305812f56cfd21cbca0f6c0451c77e5e7) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Every kind of graph.** Trees, mind maps, networks, ER diagrams, swimlanes and nested groups. <!-- whats-new: gallery=graph-mind docs=docs-charts.html#9b-graphs -->
+  
+  ([#152](https://github.com/eknowledger/toolbench/issues/152)) Beyond layered graphs, a `graph` can be a tidy tree, a radial mind map, a force-laid network or nodes placed by hand, with straight, curved, spline or polyline edges. It can draw hexagons, parallelograms, cylinders and documents, record nodes whose rows each have a port, crow's-foot and UML markers, nested groups a reader can close and open, and swimlanes. Each of these is a small chunk fetched by the first graph that uses it, so a page pays only for the graphs it draws.
+
+- [#183](https://github.com/eknowledger/toolbench/pull/183) [`e06d31a`](https://github.com/eknowledger/toolbench/commit/e06d31a22472c880eaea6d2df9a19ba278710276) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Large graphs.** Past a hundred nodes, a graph is laid out off the main thread, so the page never stalls. <!-- whats-new: gallery=graphs docs=docs-charts.html#9b-graphs -->
+  
+  ([#152](https://github.com/eknowledger/toolbench/issues/152)) A graph past a hundred nodes is laid out off the main thread, in a worker made with the `workerFactory` you already pass for worker-mode tools: its edge table shows at once and the picture follows, so the page never stops. A dense layered graph of up to 60 nodes gets a crossing search that redraws it with fewer crossings, fetched only for the graphs that need it.
+  
+  * Without a `workerFactory`, a large graph is laid out on the main thread after a frame.
+
+- [#192](https://github.com/eknowledger/toolbench/pull/192) [`31d4db5`](https://github.com/eknowledger/toolbench/commit/31d4db5dd1a1d6c867e41a91f1a5b7c221ce2f78) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Version check.** A tool using a feature newer than its declared `sdk` is refused, with a message saying why. <!-- whats-new: gallery=refused docs=docs-versioning.html label="May refuse a tool" -->
+  
+  ([#170](https://github.com/eknowledger/toolbench/issues/170)) A manifest declaring `"sdk": 4` that used v6's `lang` used to validate, and a v4 runtime then loaded it and silently dropped the highlighting. Now it is refused: `inputs[0].lang: is from contract version 6, but the tool declares "sdk": 4 ... Declare "sdk": 6.`
+  
+  - `upgradeManifest` checks before it stamps the current version, so every path that loads a manifest refuses, a host's own included. `validateManifest` checks a manifest validated as written. The `@toolbench/sdk/fixtures` harness also checks every case's expected output and every sample's result.
+  - New: `checkManifestFeatures(raw)` and `outputFeatureProblem(output, sdk)`, the same checks on their own.
+  - ⚠️ Heads-up: a manifest that under-declares its `sdk` now fails to load. Raise its `sdk` to the version the message names. Every tool and fixture in this repository already declared enough.
+
 ### Patch Changes
 
-- [#186](https://github.com/eknowledger/toolbench/pull/186) [`f88acbe`](https://github.com/eknowledger/toolbench/commit/f88acbec9fa7c89be2b88ce9858ea25995b13073) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: no em dashes in what the runtime and the SDK write.** ([#42](https://github.com/eknowledger/toolbench/issues/42))
+- [#186](https://github.com/eknowledger/toolbench/pull/186) [`f88acbe`](https://github.com/eknowledger/toolbench/commit/f88acbec9fa7c89be2b88ce9858ea25995b13073) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Plain wording.** Status lines and messages no longer use em dashes. <!-- whats-new: label="Wording changed" -->
+  
+  ([#42](https://github.com/eknowledger/toolbench/issues/42))
   
   - The status line now reads "inputs changed. Press Run", "filled with "…". Press Run" and "showing the default result. Press Run to try your own".
   - A bytes legend entry reads "U+00E9 é: 2 bytes at 0x0001".
@@ -133,9 +172,13 @@
 
 ### Patch Changes
 
-- [#180](https://github.com/eknowledger/toolbench/pull/180) [`7f3b459`](https://github.com/eknowledger/toolbench/commit/7f3b4590fe04a3078eb3db5cc00c4af5d8bddd2e) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a manifest link could run script in the host page.** `links[].href` was checked only as a string and written straight into `<a href>`, so a manifest carrying `javascript:...` rendered a link that ran in the host's origin when a reader followed it. The validator now refuses a link that does not resolve to `http`, `https` or `mailto`, or that contains a space or a control character, and the element renders such a link as plain text even from a source that never validated. The check asks the browser's own URL parser for the scheme, because the parser strips tab and newline before reading it and a pattern on the text can be walked past.
+- [#180](https://github.com/eknowledger/toolbench/pull/180) [`7f3b459`](https://github.com/eknowledger/toolbench/commit/7f3b4590fe04a3078eb3db5cc00c4af5d8bddd2e) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Safe manifest links.** A manifest link that is not http, https or mailto is refused, and drawn as plain text. <!-- whats-new: docs=docs-security.html label="May refuse a tool" -->
   
-  **Fixed: a code result could add any class to its element.** `lang` was written into `class="language-<lang>"`, and a class attribute is a list, so `json tb-hidden` put a class of the tool's choosing on the element. The class is now written only when `lang` is a single language name.
+  `links[].href` was checked only as a string and written straight into `<a href>`, so a manifest carrying `javascript:...` rendered a link that ran in the host's origin when a reader followed it. The validator now refuses a link that does not resolve to `http`, `https` or `mailto`, or that contains a space or a control character, and the element renders such a link as plain text even from a source that never validated. The check asks the browser's own URL parser for the scheme, because the parser strips tab and newline before reading it and a pattern on the text can be walked past.
+  
+  **Fixed: Code result classes.** A code result's `lang` can no longer add a class of its own. <!-- whats-new: gallery=code-result docs=docs-security.html -->
+  
+  `lang` was written into `class="language-<lang>"`, and a class attribute is a list, so `json tb-hidden` put a class of the tool's choosing on the element. The class is now written only when `lang` is a single language name.
   
   ⚠️ **Heads-up:** validation is narrower. A manifest whose link has a space in it, or another scheme such as `ftp:`, was accepted before and is now refused with the field named. Encode the space as `%20`.
 - Updated dependencies [[`7f3b459`](https://github.com/eknowledger/toolbench/commit/7f3b4590fe04a3078eb3db5cc00c4af5d8bddd2e)]:
@@ -145,13 +188,19 @@
 
 ### Minor Changes
 
-- [#171](https://github.com/eknowledger/toolbench/pull/171) [`a2b3c13`](https://github.com/eknowledger/toolbench/commit/a2b3c13fe00972c37debaacd318236666841476d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: presets on a select.** ([#151](https://github.com/eknowledger/toolbench/issues/151)) A select option can carry `sets`, the values it writes into other inputs when it is chosen, so a "Library" select can fill the read timeout and retries with that library's defaults for the reader to edit. Choosing one behaves like a sample: the result goes stale and the status line names it. The select then follows the form: once the values stop matching it, it shows the preset they do match, or the first option with no `sets`, and says so. A host writing the select through `values` fills nothing. `sets` is validated like a sample's `input`, may not name its own select or another preset select, must differ between options, and on the default option must equal those inputs' defaults. The sample range message now reads "fix the value" rather than "fix the example". This raises the contract to version 6: a tool using `sets` declares `"sdk": 6`, and every older manifest loads unchanged.
+- [#171](https://github.com/eknowledger/toolbench/pull/171) [`a2b3c13`](https://github.com/eknowledger/toolbench/commit/a2b3c13fe00972c37debaacd318236666841476d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Presets on a select.** Choosing an option can fill other inputs with that option's values. <!-- whats-new: gallery=presets docs=docs-authoring.html#4c-presets-on-a-select shot=presets -->
+  
+  ([#151](https://github.com/eknowledger/toolbench/issues/151)) A select option can carry `sets`, the values it writes into other inputs when it is chosen, so a "Library" select can fill the read timeout and retries with that library's defaults for the reader to edit. Choosing one behaves like a sample: the result goes stale and the status line names it. The select then follows the form: once the values stop matching it, it shows the preset they do match, or the first option with no `sets`, and says so. A host writing the select through `values` fills nothing. `sets` is validated like a sample's `input`, may not name its own select or another preset select, must differ between options, and on the default option must equal those inputs' defaults. The sample range message now reads "fix the value" rather than "fix the example". This raises the contract to version 6: a tool using `sets` declares `"sdk": 6`, and every older manifest loads unchanged.
 
-- [#173](https://github.com/eknowledger/toolbench/pull/173) [`f6a085a`](https://github.com/eknowledger/toolbench/commit/f6a085a40402c84240e1045e8b7ffba65a4f3fb0) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: highlighted textareas.** ([#153](https://github.com/eknowledger/toolbench/issues/153)) A `textarea` input can declare `lang`, and a host that passes `highlight` to `defineToolHost` paints what the reader types with the same hook `code` results use. The paint sits behind the real textarea, `aria-hidden`, with the same box and font, so the caret, selection, undo, paste and screen reader stay the browser's own. It catches up 250 ms after typing stops and is skipped past 20,000 characters. A missing hook, a hook that throws, or a hook whose text differs from the source leaves the plain textarea. Its code is a chunk of its own, about 1 KB gzipped, fetched only by a tool that declares `lang` on a host with a hook. `lang` is refused on any other input type.
+- [#173](https://github.com/eknowledger/toolbench/pull/173) [`f6a085a`](https://github.com/eknowledger/toolbench/commit/f6a085a40402c84240e1045e8b7ffba65a4f3fb0) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Highlighted textareas.** What a reader types is painted by the page's own highlighter. <!-- whats-new: gallery=highlighted-input docs=docs-ref-inputs.html#textarea -->
+  
+  ([#153](https://github.com/eknowledger/toolbench/issues/153)) A `textarea` input can declare `lang`, and a host that passes `highlight` to `defineToolHost` paints what the reader types with the same hook `code` results use. The paint sits behind the real textarea, `aria-hidden`, with the same box and font, so the caret, selection, undo, paste and screen reader stay the browser's own. It catches up 250 ms after typing stops and is skipped past 20,000 characters. A missing hook, a hook that throws, or a hook whose text differs from the source leaves the plain textarea. Its code is a chunk of its own, about 1 KB gzipped, fetched only by a tool that declares `lang` on a host with a hook. `lang` is refused on any other input type.
 
 ### Patch Changes
 
-- [#172](https://github.com/eknowledger/toolbench/pull/172) [`314d1e3`](https://github.com/eknowledger/toolbench/commit/314d1e37de1f7ebc7b241cbc4ee50f3fc24b3306) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: undo in Chrome took back one character at a time.** Once a result was on screen, every keystroke rewrote the status line, and Chrome ends an undo group whenever a node is inserted anywhere in the page, so typing "abc def" took 7 presses of undo to take back. The status line is now written only when its text changes, and one undo takes back the burst, as it does in Firefox and WebKit.
+- [#172](https://github.com/eknowledger/toolbench/pull/172) [`314d1e3`](https://github.com/eknowledger/toolbench/commit/314d1e37de1f7ebc7b241cbc4ee50f3fc24b3306) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Undo in Chrome.** One undo takes back a burst of typing, not one character.
+  
+  Once a result was on screen, every keystroke rewrote the status line, and Chrome ends an undo group whenever a node is inserted anywhere in the page, so typing "abc def" took 7 presses of undo to take back. The status line is now written only when its text changes, and one undo takes back the burst, as it does in Firefox and WebKit.
 - Updated dependencies [[`a2b3c13`](https://github.com/eknowledger/toolbench/commit/a2b3c13fe00972c37debaacd318236666841476d), [`f6a085a`](https://github.com/eknowledger/toolbench/commit/f6a085a40402c84240e1045e8b7ffba65a4f3fb0)]:
   - @toolbench/sdk@0.9.0
 
@@ -159,12 +208,14 @@
 
 ### Minor Changes
 
-- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: style tool output with your own CSS.** Pass `styles` to `defineToolHost` and the runtime adopts
+- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Your own CSS.** Pass stylesheets to `defineToolHost` and they style every tool. <!-- whats-new: gallery=host-styles docs=docs-styling.html label="Changes style order" -->
+  
+  Pass `styles` to `defineToolHost` and the runtime adopts
   your sheets into every tool's shadow root, after its own. Any rule of yours outside a CSS layer wins,
   whatever its specificity. `setHostStyles()` swaps them on every tool without a reload. The class names
   and attributes you can rely on are listed in STYLING.md, with four worked examples.
   ([#157](https://github.com/eknowledger/toolbench/issues/157))
-
+  
   - Every result part now carries `data-kind`, and every table cell `data-label` with its column's name.
   - Contract version 5: a tool can name any part or field with `role`, rendered as `data-role`, and mark a
     field or cell `tone: "muted"`.
@@ -176,19 +227,22 @@
     into a tool's shadow root, its unlayered rules now win over the runtime's even where they are less
     specific.
 
-- [#165](https://github.com/eknowledger/toolbench/pull/165) [`024405a`](https://github.com/eknowledger/toolbench/commit/024405a4eb68e03bffa8928377f1fe294d98b89d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: link to one part of a result.** Give a part an `id` and call `host.reveal(id)`: the runtime
+- [#165](https://github.com/eknowledger/toolbench/pull/165) [`024405a`](https://github.com/eknowledger/toolbench/commit/024405a4eb68e03bffa8928377f1fe294d98b89d) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Link to one part.** `host.reveal(id)` opens, scrolls to and focuses one part of a result. <!-- whats-new: gallery=reveal docs=docs-ref-host.html#properties-and-methods -->
+  
+  Give a part an `id` and call `host.reveal(id)`: the runtime
   opens a closed card, shows the part if `parts` or `more` hid it, scrolls to it and moves focus there.
   It resolves `false` for an id the result does not have.
   ([#147](https://github.com/eknowledger/toolbench/issues/147))
-
+  
   - The `id` is rendered as `data-part`, and fixtures fail if a result uses one id twice.
 
 ### Patch Changes
 
-- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a stylesheet you adopt into a tool's shadow root no longer turns the runtime's styles off.**
+- [#164](https://github.com/eknowledger/toolbench/pull/164) [`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Adopted stylesheets.** A stylesheet you adopt into a tool no longer turns the runtime's styles off. <!-- whats-new: docs=docs-styling.html#the-guarantee-your-rules-win -->
+  
   The runtime's sheet now always comes first and yours is kept after it, whichever was adopted first, so
   your rules win at equal specificity. ([#157](https://github.com/eknowledger/toolbench/issues/157))
-
+  
   - A chart's sheet now goes in behind the runtime's and ahead of yours, rather than after yours.
 
 - Updated dependencies [[`feb84cb`](https://github.com/eknowledger/toolbench/commit/feb84cb14be46a8cc9905a17e44d09f185c8fdab), [`024405a`](https://github.com/eknowledger/toolbench/commit/024405a4eb68e03bffa8928377f1fe294d98b89d)]:
@@ -198,118 +252,178 @@
 
 ### Minor Changes
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: `--tb-accent-text` and `--tb-accent-ink`, so a bright accent can fill the Run button while its label and the tool's links stay readable.** ([#106](https://github.com/eknowledger/toolbench/issues/106))
+- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Answer first, or no controls.** Put the result above the form, or let your page own the controls. <!-- whats-new: gallery=answer-first docs=docs.html#the-answer-first-or-the-pages-own-controls shot=answer-first -->
+  
+  ([#103](https://github.com/eknowledger/toolbench/issues/103))
+  
+  - `layout="answer-first"` puts the result above the form, for a tool used as a page's opening figure.
+  - `controls="none"` draws the result alone, and the page drives it with `values` and `run()`, so controls a page builds itself are no longer duplicated inside the tool.
+  
+  Neither changes a card.
 
-  - `--tb-accent-text` colours accent text: links, the card's "Try it" hint, a hovered sample, annotation labels. Defaults to `--tb-accent`.
-  - `--tb-accent-ink` colours text on an accent fill: the Run button's label, a marked byte. Defaults to `--tb-bg`.
-
-  Fills and focus outlines keep `--tb-accent`. Nothing changes unless you set the new tokens.
-
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: bands.** ([#119](https://github.com/eknowledger/toolbench/issues/119)) `shape: "band"` with a `lower` edge fills the range between two edges, a p5 to p95 spread around a median say, beneath every other series. The readout reads it as "29 to 35 ms", and the data table shows both edges.
-
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: box plots.** ([#122](https://github.com/eknowledger/toolbench/issues/122)) `shape: "box"` with a `boxes` summary per x draws whiskers, the quartile box, the median and outliers, grouped like bars. The tool computes the summary, so the whiskers mean what the tool says; the readout and the data table list all five numbers.
-
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: bubble charts.** ([#127](https://github.com/eknowledger/toolbench/issues/127)) `sizes` on a points series draws a third measure as each bubble's area, scaled across the whole chart, with a key of reference sizes, the size in the readout and a size column in the data table.
-
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: named categories on a chart's x axis.** ([#113](https://github.com/eknowledger/toolbench/issues/113))
-
-  `x: ["Mesh", "MCU", "SFU"]` draws one evenly spaced slot per name, in the order given, labelled with the text. When the labels would collide, every second or third is shown; all of them are in the data table and the readout.
-
-  - **Fixed:** a bar chart's axis always starts at zero, so a bar's length is its value.
-  - **Fixed:** bars are capped in thickness, so a chart of a few categories draws bars rather than slabs.
-
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: exploded pie and donut slices.** ([#126](https://github.com/eknowledger/toolbench/issues/126)) `explode: true` on a slice pulls it out a little along its middle, to point at the one part the text is about. Its share is unchanged.
-
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: heatmaps.** ([#121](https://github.com/eknowledger/toolbench/issues/121)) A `heatmap` output draws a value over two dimensions as coloured cells, sequential (one hue) or diverging (two hues around a midpoint), with a key, hatched cells where there is no value, and a readout the arrow keys move through. Its code is fetched only by pages that draw one; theme the colours with `--tb-heat-lo`, `--tb-heat-hi`, `--tb-heat-neg`, `--tb-heat-mid` and `--tb-heat-pos`.
-
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: horizontal bars.** ([#116](https://github.com/eknowledger/toolbench/issues/116))
-
-  `orientation: "horizontal"` draws one row per category with its bars growing rightward, so long names sit beside their bars. Grouping, stacking, thresholds (as vertical rules), the readout and the data table all work the same way; the chart grows taller with its rows.
-
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: log scales.** ([#118](https://github.com/eknowledger/toolbench/issues/118)) `yScale: "log"` and `xScale: "log"` draw an axis in powers of ten (0.1, 1, 10, 100, 1k), for values spanning orders of magnitude. Values a log axis cannot show (zero, negatives) are left out with a note in the data table, and bars are not drawn on a log y axis.
-
-- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: chart markers, for data over separate items.** ([#111](https://github.com/eknowledger/toolbench/issues/111))
-
-  - `markers: true` on a `line` or `area` series draws a marker at every point; `shape: "points"` draws the points with no line between them.
-  - Each series gets its own marker shape as well as its colour, so series with equal values stay distinguishable, and the legend keys each one by its marker.
-
-  Contract version 4. A tool uses these with `"sdk": 4`; existing tools are unaffected.
-
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: mirrored horizontal bars, for pyramids and back-to-back comparisons.** ([#125](https://github.com/eknowledger/toolbench/issues/125)) `mirror: true` on a horizontal chart draws negative values to the left and labels every number, on the axis, in the readout and in the table, as its magnitude.
-
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: pie and donut charts.** ([#123](https://github.com/eknowledger/toolbench/issues/123)) A `pie` output draws parts of a whole in the order given, from 12 o'clock clockwise, every slice labelled with its share. More than six parts fold into "Other", a negative or zero total draws a message instead, and `donut: true` shows the total in the centre. Its code is fetched only by pages that draw one.
-
-- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: radar charts.** ([#128](https://github.com/eknowledger/toolbench/issues/128)) A `radar` output draws a profile across several measures, one spoke each from 12 o'clock, on a shared scale from zero or each axis's own maximum, with round-valued rings, markers on every vertex and a readout that steps spoke by spoke.
-
-- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: charts read out their values on hover and from the keyboard.** ([#112](https://github.com/eknowledger/toolbench/issues/112))
-
+- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Chart readouts.** Hover or use the arrow keys to read every series' value at a point. <!-- whats-new: gallery=chart-lines docs=docs-ref-results.html#readout -->
+  
+  ([#112](https://github.com/eknowledger/toolbench/issues/112))
+  
   - Pointing at a chart snaps to the nearest x, draws a crosshair and shows a card of every series' value there. Tab to a chart and the arrow keys step through it, with each card read out to screen readers.
   - A tool can say what a point means: `readout.titles` for a heading per x, `series.notes` for the text of one value, `readout.mode` and `readout.crosshair` to shape or turn it off.
   - Whole numbers now print without decimals in charts and their data tables: frame 6, not 6.00.
 
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: scatter plots.** ([#120](https://github.com/eknowledger/toolbench/issues/120)) A series can carry its own `x` values, so measurements that share no x positions plot together. The readout snaps to the nearest point, with both crosshair lines, and the keyboard steps through the points left to right; the data table lists one row per point.
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Heatmaps.** A value over two dimensions, drawn as coloured cells with a key. <!-- whats-new: gallery=chart-heatmap docs=docs-ref-results.html#heatmap shot=heatmap -->
+  
+  ([#121](https://github.com/eknowledger/toolbench/issues/121)) A `heatmap` output draws a value over two dimensions as coloured cells, sequential (one hue) or diverging (two hues around a midpoint), with a key, hatched cells where there is no value, and a readout the arrow keys move through. Its code is fetched only by pages that draw one; theme the colours with `--tb-heat-lo`, `--tb-heat-hi`, `--tb-heat-neg`, `--tb-heat-mid` and `--tb-heat-pos`.
 
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: stacked bars.** ([#115](https://github.com/eknowledger/toolbench/issues/115))
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Pie and donut charts.** Parts of a whole, every slice labelled with its share. <!-- whats-new: gallery=chart-pie docs=docs-ref-results.html#pie -->
+  
+  ([#123](https://github.com/eknowledger/toolbench/issues/123)) A `pie` output draws parts of a whole in the order given, from 12 o'clock clockwise, every slice labelled with its share. More than six parts fold into "Other", a negative or zero total draws a message instead, and `donut: true` shows the total in the centre. Its code is fetched only by pages that draw one.
 
+- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Slider.** A number input can have a slider beside its box. <!-- whats-new: gallery=slider docs=docs-ref-inputs.html#number -->
+  
+  ([#102](https://github.com/eknowledger/toolbench/issues/102))
+  
+  `"control": "slider"` on a number input draws a range control beside its number box, so a reader can sweep a value and watch the answer follow (with `autoRun`). The box stays editable for exact values, and the slider honours `min`, `max` and `step`.
+  
+  Contract version 4. A tool uses it with `"sdk": 4`; a runtime that predates it shows the number box alone.
+
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Accent text tokens.** A bright accent can fill the Run button while its label stays readable. <!-- whats-new: gallery=theming docs=docs-ref-tokens.html#tokens -->
+  
+  ([#106](https://github.com/eknowledger/toolbench/issues/106))
+  
+  - `--tb-accent-text` colours accent text: links, the card's "Try it" hint, a hovered sample, annotation labels. Defaults to `--tb-accent`.
+  - `--tb-accent-ink` colours text on an accent fill: the Run button's label, a marked byte. Defaults to `--tb-bg`.
+  
+  Fills and focus outlines keep `--tb-accent`. Nothing changes unless you set the new tokens.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Bands.** Fill the range between two edges, such as p5 to p95 around a median. <!-- whats-new: gallery=chart-band docs=docs-ref-results.html#series-1 -->
+  
+  ([#119](https://github.com/eknowledger/toolbench/issues/119)) `shape: "band"` with a `lower` edge fills the range between two edges, a p5 to p95 spread around a median say, beneath every other series. The readout reads it as "29 to 35 ms", and the data table shows both edges.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Box plots.** Whiskers, quartiles, the median and outliers, from a summary the tool computes. <!-- whats-new: gallery=chart-box docs=docs-ref-results.html#series-1 -->
+  
+  ([#122](https://github.com/eknowledger/toolbench/issues/122)) `shape: "box"` with a `boxes` summary per x draws whiskers, the quartile box, the median and outliers, grouped like bars. The tool computes the summary, so the whiskers mean what the tool says; the readout and the data table list all five numbers.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Bubble charts.** A third measure, drawn as each point's area. <!-- whats-new: gallery=chart-bubble docs=docs-ref-results.html#series-1 -->
+  
+  ([#127](https://github.com/eknowledger/toolbench/issues/127)) `sizes` on a points series draws a third measure as each bubble's area, scaled across the whole chart, with a key of reference sizes, the size in the readout and a size column in the data table.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Named categories.** A chart's x axis can be a list of names. <!-- whats-new: gallery=chart-stacked docs=docs-ref-results.html#chart -->
+  
+  ([#113](https://github.com/eknowledger/toolbench/issues/113))
+  
+  `x: ["Mesh", "MCU", "SFU"]` draws one evenly spaced slot per name, in the order given, labelled with the text. When the labels would collide, every second or third is shown; all of them are in the data table and the readout.
+  
+  - **Fixed:** a bar chart's axis always starts at zero, so a bar's length is its value.
+  - **Fixed:** bars are capped in thickness, so a chart of a few categories draws bars rather than slabs.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Exploded slices.** Pull one pie or donut slice out to point at it. <!-- whats-new: gallery=chart-donut docs=docs-ref-results.html#pie-1 -->
+  
+  ([#126](https://github.com/eknowledger/toolbench/issues/126)) `explode: true` on a slice pulls it out a little along its middle, to point at the one part the text is about. Its share is unchanged.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Horizontal bars.** One row per category, so long names sit beside their bars. <!-- whats-new: gallery=chart-horizontal docs=docs-ref-results.html#chart -->
+  
+  ([#116](https://github.com/eknowledger/toolbench/issues/116))
+  
+  `orientation: "horizontal"` draws one row per category with its bars growing rightward, so long names sit beside their bars. Grouping, stacking, thresholds (as vertical rules), the readout and the data table all work the same way; the chart grows taller with its rows.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Log scales.** An axis in powers of ten, for values spanning orders of magnitude. <!-- whats-new: gallery=chart-log docs=docs-ref-results.html#chart -->
+  
+  ([#118](https://github.com/eknowledger/toolbench/issues/118)) `yScale: "log"` and `xScale: "log"` draw an axis in powers of ten (0.1, 1, 10, 100, 1k), for values spanning orders of magnitude. Values a log axis cannot show (zero, negatives) are left out with a note in the data table, and bars are not drawn on a log y axis.
+
+- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Chart markers.** Each series gets its own marker shape as well as its colour. <!-- whats-new: gallery=chart-lines docs=docs-ref-results.html#series-1 -->
+  
+  ([#111](https://github.com/eknowledger/toolbench/issues/111))
+  
+  - `markers: true` on a `line` or `area` series draws a marker at every point; `shape: "points"` draws the points with no line between them.
+  - Each series gets its own marker shape as well as its colour, so series with equal values stay distinguishable, and the legend keys each one by its marker.
+  
+  Contract version 4. A tool uses these with `"sdk": 4`; existing tools are unaffected.
+
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Mirrored bars.** Back-to-back horizontal bars, for pyramids and comparisons. <!-- whats-new: gallery=chart-pyramid docs=docs-ref-results.html#chart -->
+  
+  ([#125](https://github.com/eknowledger/toolbench/issues/125)) `mirror: true` on a horizontal chart draws negative values to the left and labels every number, on the axis, in the readout and in the table, as its magnitude.
+
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Radar charts.** A profile across several measures, one spoke each. <!-- whats-new: gallery=chart-radar docs=docs-ref-results.html#radar -->
+  
+  ([#128](https://github.com/eknowledger/toolbench/issues/128)) A `radar` output draws a profile across several measures, one spoke each from 12 o'clock, on a shared scale from zero or each axis's own maximum, with round-valued rings, markers on every vertex and a readout that steps spoke by spoke.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Scatter plots.** Each series can carry its own x values. <!-- whats-new: gallery=chart-scatter docs=docs-ref-results.html#series-1 -->
+  
+  ([#120](https://github.com/eknowledger/toolbench/issues/120)) A series can carry its own `x` values, so measurements that share no x positions plot together. The readout snaps to the nearest point, with both crosshair lines, and the keyboard steps through the points left to right; the data table lists one row per point.
+
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Stacked bars.** Bar series with the same `stack` id are drawn as one bar of parts. <!-- whats-new: gallery=chart-stacked docs=docs-ref-results.html#series-1 -->
+  
+  ([#115](https://github.com/eknowledger/toolbench/issues/115))
+  
   Bar series with the same `stack` id are drawn as one bar of parts at each x, so a reader sees each part and the total: a delay budget stage by stage, traffic by protocol. Negative values stack below zero, plain bar series sit beside the stack, and the data table adds a total per stack.
 
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: step lines.** ([#117](https://github.com/eknowledger/toolbench/issues/117)) `shape: "step"` draws a value that holds until it changes, a buffer depth or a configured rate, as flat runs joined by straight risers instead of slopes.
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Step lines.** A value that holds until it changes, drawn as flat runs. <!-- whats-new: gallery=chart-step docs=docs-ref-results.html#series-1 -->
+  
+  ([#117](https://github.com/eknowledger/toolbench/issues/117)) `shape: "step"` draws a value that holds until it changes, a buffer depth or a configured rate, as flat runs joined by straight risers instead of slopes.
 
-- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: threshold lines on a chart.** ([#114](https://github.com/eknowledger/toolbench/issues/114))
-
+- [#134](https://github.com/eknowledger/toolbench/pull/134) [`ccce533`](https://github.com/eknowledger/toolbench/commit/ccce53334fd5444e5c83f60cd76086ed4e7d7afa) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Threshold lines.** A labelled, dashed rule across the plot at a limit. <!-- whats-new: gallery=chart-thresholds docs=docs-ref-results.html#chart -->
+  
+  ([#114](https://github.com/eknowledger/toolbench/issues/114))
+  
   `thresholds: [{ y: 150, label: "150 ms budget", tone: "warn" }]` draws a labelled, dashed rule across the plot at that value. The scale widens to include it, and it stays out of the legend, the data table and the readout, because it is a limit rather than a measurement.
 
-- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: treemaps.** ([#129](https://github.com/eknowledger/toolbench/issues/129)) A `treemap` output draws a hierarchy of sizes as nested rectangles, squarified so they compare, groups in their own hue, labels where they fit and every node in the readout and the data table.
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Treemaps.** A hierarchy of sizes, drawn as nested rectangles. <!-- whats-new: gallery=chart-treemap docs=docs-ref-results.html#treemap -->
+  
+  ([#129](https://github.com/eknowledger/toolbench/issues/129)) A `treemap` output draws a hierarchy of sizes as nested rectangles, squarified so they compare, groups in their own hue, labels where they fit and every node in the readout and the data table.
 
-- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Venn diagrams for two or three sets.** ([#130](https://github.com/eknowledger/toolbench/issues/130)) Two sets are drawn with exact areas; three are placed as closely as circles allow, with every region labelled by its count and the caption saying the areas are approximate. More sets, or numbers that cannot be true, draw a message.
+- [#136](https://github.com/eknowledger/toolbench/pull/136) [`b74570a`](https://github.com/eknowledger/toolbench/commit/b74570a82998544a917e24fd82d785d9ee605a91) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Venn diagrams.** Two or three sets, every region labelled with its count. <!-- whats-new: gallery=chart-venn-three docs=docs-ref-results.html#venn -->
+  
+  ([#130](https://github.com/eknowledger/toolbench/issues/130)) Two sets are drawn with exact areas; three are placed as closely as circles allow, with every region labelled by its count and the caption saying the areas are approximate. More sets, or numbers that cannot be true, draw a message.
 
-- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: lead with the answer, or let the page own the controls.** ([#103](https://github.com/eknowledger/toolbench/issues/103))
-
-  - `layout="answer-first"` puts the result above the form, for a tool used as a page's opening figure.
-  - `controls="none"` draws the result alone, and the page drives it with `values` and `run()`, so controls a page builds itself are no longer duplicated inside the tool.
-
-  Neither changes a card.
-
-- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: link a chart to its tables.** ([#124](https://github.com/eknowledger/toolbench/issues/124))
-
+- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Linked tables.** Pointing at a chart lights the matching table rows, and the other way round. <!-- whats-new: gallery=chart-linked docs=docs-ref-results.html#readout -->
+  
+  ([#124](https://github.com/eknowledger/toolbench/issues/124))
+  
   - `readout.highlightTable: true` highlights the chart's own data-table row as the reader points along the chart.
   - A `table` part with `link: { chart, keys }` is linked to the chart with that `id`: pointing at the chart lights the matching rows, and pointing at a row moves the chart's readout there.
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: the Run area stops getting in the reader's way.** ([#99](https://github.com/eknowledger/toolbench/issues/99), [#101](https://github.com/eknowledger/toolbench/issues/101), [#104](https://github.com/eknowledger/toolbench/issues/104))
-
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Run area.** No "press Run" line, no scroll on click, and an `autoRun` tool shows its answer at once. <!-- whats-new: gallery=autorun docs=docs-ref-manifest.html#manifest-attributes label="Changes a default" -->
+  
+  ([#99](https://github.com/eknowledger/toolbench/issues/99), [#101](https://github.com/eknowledger/toolbench/issues/101), [#104](https://github.com/eknowledger/toolbench/issues/104))
+  
   - No "press Run" line above the Run button. "inputs changed", sample and error messages are unchanged.
   - Clicking Run with a mouse no longer scrolls the page to the result. A keyboard press still moves focus there, and the result now wears the theme's focus ring rather than the browser's.
   - An `autoRun` tool has no Run button, and shows its default answer as soon as it opens.
-
+  
   ⚠️ Heads-up: an `autoRun` tool now runs once on arrival (on activation, for a card). If a page relied on it staying empty until the reader typed, it will not.
-
-- [#132](https://github.com/eknowledger/toolbench/pull/132) [`d09bca0`](https://github.com/eknowledger/toolbench/commit/d09bca0a311821f7126861dbe60f0a618732fea5) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: a slider for number inputs.** ([#102](https://github.com/eknowledger/toolbench/issues/102))
-
-  `"control": "slider"` on a number input draws a range control beside its number box, so a reader can sweep a value and watch the answer follow (with `autoRun`). The box stays editable for exact values, and the slider honours `min`, `max` and `step`.
-
-  Contract version 4. A tool uses it with `"sdk": 4`; a runtime that predates it shows the number box alone.
 
 ### Patch Changes
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a card's blurb and seeded answer reach screen readers, and the card passes the label, nesting and target-size checks.** ([#98](https://github.com/eknowledger/toolbench/issues/98), [#105](https://github.com/eknowledger/toolbench/issues/105))
-
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Accessible cards.** A card's blurb and seeded answer reach screen readers. <!-- whats-new: gallery=card-mode docs=docs.html#display-modes -->
+  
+  ([#98](https://github.com/eknowledger/toolbench/issues/98), [#105](https://github.com/eknowledger/toolbench/issues/105))
+  
   A closed card is now ordinary content with one button, its "Try it" hint, instead of a button wrapping everything. Clicking anywhere on the card still opens it, except on a control inside it such as a chart's "Show the data as a table", which now works in a card. A host test that clicked `button.tb-facade` should click the card or `button.tb-facade-hint` instead.
 
-- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a second y axis shows its title, and an area chart fills from zero.** `yLabelRight` was accepted but never drawn, and an area's fill started at the lowest value instead of at zero, which overstated every difference.
+- [#135](https://github.com/eknowledger/toolbench/pull/135) [`b6b171c`](https://github.com/eknowledger/toolbench/commit/b6b171c249bcd5faf720f102b68c002f7222aa10) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Second axis and area fill.** A second y axis shows its title, and an area fills from zero. <!-- whats-new: gallery=chart-combo docs=docs-ref-results.html#chart -->
+  
+  `yLabelRight` was accepted but never drawn, and an area's fill started at the lowest value instead of at zero, which overstated every difference.
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a closed card no longer downloads the chart renderer, and a failed download no longer breaks the card.** ([#97](https://github.com/eknowledger/toolbench/issues/97))
-
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Closed cards skip chart code.** A closed card downloads the chart renderer only when it needs it. <!-- whats-new: gallery=card-mode docs=docs.html#size-and-cost -->
+  
+  ([#97](https://github.com/eknowledger/toolbench/issues/97))
+  
   - A card fetches the chart code only if its seed contains a chart, or when it is opened. Pages of closed, unseeded chart cards save the 2 KB request.
   - If the chart code cannot be fetched (an offline reload, a cache purge mid-deploy, a strict CSP), cards still paint and open, and show everything except the chart with a line saying it could not be loaded, instead of a bundler error.
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: expanding a card's truncated result no longer resizes the chart already on screen.** ([#100](https://github.com/eknowledger/toolbench/issues/100))
-
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Expanding a result.** Showing more of a card's result no longer resizes its chart. <!-- whats-new: gallery=parts docs=docs.html#letting-the-reader-open-the-rest -->
+  
+  ([#100](https://github.com/eknowledger/toolbench/issues/100))
+  
   "Show 1 more result" reveals the rest underneath; the chart above it keeps its card size. A host that set `--tb-chart-card-max: none` to avoid the jump can remove it.
 
-- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: a tool page that draws no chart no longer downloads the chart styles.** The chart rules moved from the runtime's stylesheet into the chart chunk, which adopts them when the first chart is drawn: 1.4 KB less for every page without a chart.
+- [#133](https://github.com/eknowledger/toolbench/pull/133) [`618c06d`](https://github.com/eknowledger/toolbench/commit/618c06d1167f3da47c765e8b0f116445a3d416fe) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Chart styles with charts.** A page with no chart no longer downloads the chart styles. <!-- whats-new: docs=docs.html#size-and-cost -->
+  
+  The chart rules moved from the runtime's stylesheet into the chart chunk, which adopts them when the first chart is drawn: 1.4 KB less for every page without a chart.
 
-- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: charts read correctly over whole-number x values.** ([#111](https://github.com/eknowledger/toolbench/issues/111))
-
+- [#131](https://github.com/eknowledger/toolbench/pull/131) [`926a15d`](https://github.com/eknowledger/toolbench/commit/926a15d2b8be7007b293eb5fcb5ffd180cc0f121) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Whole-number axes.** Ticks land on round values, and bars sit on their labels. <!-- whats-new: gallery=chart-histogram docs=docs-ref-results.html#chart -->
+  
+  ([#111](https://github.com/eknowledger/toolbench/issues/111))
+  
   - Axis ticks land on round values (0, 100, 200 rather than 0, 118, 235), and an axis of whole numbers never shows a fraction such as frame 4.8.
   - A bar chart's x labels sit on its bars, and two or more bar series are drawn side by side instead of on top of each other.
   - Bars grow from zero, so negative values point down and a series of zeros draws nothing, instead of a row of solid bars under an axis from -1 to 1.
@@ -322,8 +436,10 @@
 
 ### Minor Changes
 
-- [#94](https://github.com/eknowledger/toolbench/pull/94) [`9480da7`](https://github.com/eknowledger/toolbench/commit/9480da7c1ae5bd65bd14a7b372c2657e3d5d24de) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: expand a long result in place.** `parts` now caps a grouped result in any mode, not just on a card, and `more="expand"` turns the "+2 more results" notice into a button that reveals the rest without leaving the page. Expanding never re-runs the tool. ([#79](https://github.com/eknowledger/toolbench/issues/79))
-
+- [#94](https://github.com/eknowledger/toolbench/pull/94) [`9480da7`](https://github.com/eknowledger/toolbench/commit/9480da7c1ae5bd65bd14a7b372c2657e3d5d24de) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Expand in place.** `more="expand"` reveals the rest of a long result without leaving the page. <!-- whats-new: gallery=parts docs=docs.html#letting-the-reader-open-the-rest -->
+  
+  `parts` now caps a grouped result in any mode, not just on a card, and `more="expand"` turns the "+2 more results" notice into a button that reveals the rest without leaving the page. Expanding never re-runs the tool. ([#79](https://github.com/eknowledger/toolbench/issues/79))
+  
   ```html
   <tool-host
     tool="percentiles"
@@ -332,48 +448,66 @@
     more="expand"
   ></tool-host>
   ```
-
+  
   `more` defaults to `link`, so nothing changes unless you opt in.
 
-- [#63](https://github.com/eknowledger/toolbench/pull/63) [`08febf0`](https://github.com/eknowledger/toolbench/commit/08febf06db3c312115bca2c6ac9c1e2d9441c7ff) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: paint `code` results with your own highlighter.** Pass `highlight` to `defineToolHost` and it is called with `(source, lang)` for every `code` result. ([#9](https://github.com/eknowledger/toolbench/issues/9))
-
+- [#63](https://github.com/eknowledger/toolbench/pull/63) [`08febf0`](https://github.com/eknowledger/toolbench/commit/08febf06db3c312115bca2c6ac9c1e2d9441c7ff) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: Your own highlighter.** Pass `highlight` and every code result is painted with it. <!-- whats-new: gallery=code-result docs=docs-ref-host.html#options -->
+  
+  Pass `highlight` to `defineToolHost` and it is called with `(source, lang)` for every `code` result. ([#9](https://github.com/eknowledger/toolbench/issues/9))
+  
   It must return a DOM `Node`, not a string, so the runtime never assigns `innerHTML`. Omit it and you still get readable preformatted text, and no highlighter is bundled.
 
-- [#61](https://github.com/eknowledger/toolbench/pull/61) [`f0cfb36`](https://github.com/eknowledger/toolbench/commit/f0cfb36044b52a168073c22ad9577b6dd5aadf00) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: fill in a tool's form from your page.** `<tool-host>` gains a `values` setter and a `run()` method, so "try this example" buttons live in your own markup instead of inside every tool. ([#38](https://github.com/eknowledger/toolbench/issues/38))
-
+- [#61](https://github.com/eknowledger/toolbench/pull/61) [`f0cfb36`](https://github.com/eknowledger/toolbench/commit/f0cfb36044b52a168073c22ad9577b6dd5aadf00) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: Fill a tool from your page.** Set `values` and call `run()` from buttons in your own markup. <!-- whats-new: docs=docs-ref-host.html#properties-and-methods -->
+  
+  `<tool-host>` gains a `values` setter and a `run()` method, so "try this example" buttons live in your own markup instead of inside every tool. ([#38](https://github.com/eknowledger/toolbench/issues/38))
+  
   - `values` accepts a partial set and validates it the way typing does; it does not run the tool.
   - `run()` runs it. It leaves focus alone by default; `run({ focus: true })` moves focus to the result.
   - The matching `values` getter reads back what is in the form, for building a shareable URL.
 
-- [#54](https://github.com/eknowledger/toolbench/pull/54) [`68d037a`](https://github.com/eknowledger/toolbench/commit/68d037ae544827966766707031689bfdbb32e1fd) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: retire a tool without breaking its URL.** `status: "retired"` or `"deprecated"` in a manifest is now honoured. ([#16](https://github.com/eknowledger/toolbench/issues/16))
-
+- [#54](https://github.com/eknowledger/toolbench/pull/54) [`68d037a`](https://github.com/eknowledger/toolbench/commit/68d037ae544827966766707031689bfdbb32e1fd) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **New: Retired tools.** A retired or deprecated tool keeps its URL and says so. <!-- whats-new: gallery=lifecycle docs=docs-authoring.html#3b-retiring-a-tool label="May refuse a tool" -->
+  
+  `status: "retired"` or `"deprecated"` in a manifest is now honoured. ([#16](https://github.com/eknowledger/toolbench/issues/16))
+  
   - **Retired** does not run. The page explains, and renders `links` as the way onward, so a bookmark is neither a 404 nor a silent run.
   - **Deprecated** still runs, with a marker you can style via `data-status` on `<tool-host>` and the `--tb-mark-*` tokens. It is not offered as a live card.
-
+  
   ⚠️ **Heads-up:** a manifest combining `card: "live"` with a `status` of `deprecated` or `retired` is now refused at load. That pairing says two contradictory things, so this can only catch a mistake, but it is a rule an existing manifest could trip.
 
-- [#59](https://github.com/eknowledger/toolbench/pull/59) [`1b526d2`](https://github.com/eknowledger/toolbench/commit/1b526d2d34ecd20a5008bb869be5b2ba83720d94) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Better errors for broken `samples`.** Two samples that fill the same values are now refused even when their labels differ, and duplicate-label and duplicate-id errors name both colliding entries instead of only one. ([#41](https://github.com/eknowledger/toolbench/issues/41))
-
+- [#59](https://github.com/eknowledger/toolbench/pull/59) [`1b526d2`](https://github.com/eknowledger/toolbench/commit/1b526d2d34ecd20a5008bb869be5b2ba83720d94) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: Clearer sample errors.** Two samples that fill the same values are refused, and errors name both entries. <!-- whats-new: docs=docs-authoring.html#what-validation-will-hold-you-to label="May refuse a tool" -->
+  
+  Two samples that fill the same values are now refused even when their labels differ, and duplicate-label and duplicate-id errors name both colliding entries instead of only one. ([#41](https://github.com/eknowledger/toolbench/issues/41))
+  
   ⚠️ **Heads-up:** a manifest with two identical samples loaded before and now fails at load.
 
-- [#85](https://github.com/eknowledger/toolbench/pull/85) [`fdd87df`](https://github.com/eknowledger/toolbench/commit/fdd87df85a9789c9e300f2df1205ac89cb65f408) Thanks [@eknowledger](https://github.com/eknowledger)! - **Smaller download for pages without charts.** The `series` chart renderer is now its own chunk, worth about 1.4 KB gzipped off the main runtime. ([#12](https://github.com/eknowledger/toolbench/issues/12))
-
+- [#85](https://github.com/eknowledger/toolbench/pull/85) [`fdd87df`](https://github.com/eknowledger/toolbench/commit/fdd87df85a9789c9e300f2df1205ac89cb65f408) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Smaller without charts.** The chart renderer is its own chunk, about 1.4 KB gzipped off the runtime. <!-- whats-new: docs=docs.html#size-and-cost -->
+  
+  The `series` chart renderer is now its own chunk, worth about 1.4 KB gzipped off the main runtime. ([#12](https://github.com/eknowledger/toolbench/issues/12))
+  
   A page whose tool declares `series` in `kinds` fetches it before the first result, so nothing changes for you. A page with no chart tool never downloads it.
 
 ### Patch Changes
 
-- [#95](https://github.com/eknowledger/toolbench/pull/95) [`8cfeec4`](https://github.com/eknowledger/toolbench/commit/8cfeec4d684e62fb020784c5aff533c80fed773d) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: bar charts drew their first bar across the y axis.** The last bar hung off the right edge for the same reason. Bars now sit inside the plot, each filling its own share of the width. Line and area charts are unchanged.
+- [#95](https://github.com/eknowledger/toolbench/pull/95) [`8cfeec4`](https://github.com/eknowledger/toolbench/commit/8cfeec4d684e62fb020784c5aff533c80fed773d) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Bar chart edges.** The first and last bars sit inside the plot. <!-- whats-new: gallery=chart-histogram docs=docs-ref-results.html#chart -->
+  
+  The last bar hung off the right edge for the same reason. Bars now sit inside the plot, each filling its own share of the width. Line and area charts are unchanged.
 
-- [#65](https://github.com/eknowledger/toolbench/pull/65) [`2e93266`](https://github.com/eknowledger/toolbench/commit/2e932660a52d305d6af8781cba49132dfc878f06) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: two accessibility defects on cards.** ([#64](https://github.com/eknowledger/toolbench/issues/64))
-
+- [#65](https://github.com/eknowledger/toolbench/pull/65) [`2e93266`](https://github.com/eknowledger/toolbench/commit/2e932660a52d305d6af8781cba49132dfc878f06) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: Card accessibility.** A card's name includes its visible hint, and its title link is at least 24px tall. <!-- whats-new: gallery=card-mode docs=docs.html#display-modes -->
+  
+  ([#64](https://github.com/eknowledger/toolbench/issues/64))
+  
   - A closed card's accessible name now includes its visible "Try it" / "Open this tool" hint, so speech input matching what is on screen works (WCAG 2.5.3).
   - The title link's hit target is at least 24px tall rather than the height of the text (WCAG 2.5.8).
 
-- [#92](https://github.com/eknowledger/toolbench/pull/92) [`7ebf2da`](https://github.com/eknowledger/toolbench/commit/7ebf2daa88a0d55f463fe605b523f5e273882e9d) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: changing an attribute no longer wipes the result.** Setting `parts` or `mode` after a run used to empty the output. On a card with a seed it was worse: it silently reverted to the seeded default while the reader's own inputs stayed in the form. ([#79](https://github.com/eknowledger/toolbench/issues/79))
-
+- [#92](https://github.com/eknowledger/toolbench/pull/92) [`7ebf2da`](https://github.com/eknowledger/toolbench/commit/7ebf2daa88a0d55f463fe605b523f5e273882e9d) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Attribute changes keep the result.** Changing `parts` or `mode` after a run no longer empties the output. <!-- whats-new: gallery=parts docs=docs-ref-host.html#element-attributes -->
+  
+  Setting `parts` or `mode` after a run used to empty the output. On a card with a seed it was worse: it silently reverted to the seeded default while the reader's own inputs stayed in the form. ([#79](https://github.com/eknowledger/toolbench/issues/79))
+  
   A repaint now redraws whatever was on screen, including an error or a partial result. The seed is only used for a tool that has not produced anything yet.
 
-- [#55](https://github.com/eknowledger/toolbench/pull/55) [`8631f93`](https://github.com/eknowledger/toolbench/commit/8631f938338410e21b03beead95765f0a30d8144) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: the "inputs changed" cue on Run no longer looks like keyboard focus.** It was a ring, which is the visual language of `:focus-visible`; it is now a darker fill. ([#43](https://github.com/eknowledger/toolbench/issues/43))
+- [#55](https://github.com/eknowledger/toolbench/pull/55) [`8631f93`](https://github.com/eknowledger/toolbench/commit/8631f938338410e21b03beead95765f0a30d8144) Thanks [@dyk1454683243-sudo](https://github.com/dyk1454683243-sudo)! - **Fixed: Run cue.** The "inputs changed" cue on Run no longer looks like keyboard focus.
+  
+  It was a ring, which is the visual language of `:focus-visible`; it is now a darker fill. ([#43](https://github.com/eknowledger/toolbench/issues/43))
 
 - Updated dependencies [[`2e93266`](https://github.com/eknowledger/toolbench/commit/2e932660a52d305d6af8781cba49132dfc878f06), [`08febf0`](https://github.com/eknowledger/toolbench/commit/08febf06db3c312115bca2c6ac9c1e2d9441c7ff), [`f0cfb36`](https://github.com/eknowledger/toolbench/commit/f0cfb36044b52a168073c22ad9577b6dd5aadf00), [`68d037a`](https://github.com/eknowledger/toolbench/commit/68d037ae544827966766707031689bfdbb32e1fd), [`8631f93`](https://github.com/eknowledger/toolbench/commit/8631f938338410e21b03beead95765f0a30d8144), [`1b526d2`](https://github.com/eknowledger/toolbench/commit/1b526d2d34ecd20a5008bb869be5b2ba83720d94), [`fdd87df`](https://github.com/eknowledger/toolbench/commit/fdd87df85a9789c9e300f2df1205ac89cb65f408)]:
   - @toolbench/sdk@0.6.0
@@ -382,39 +516,43 @@
 
 ### Minor Changes
 
-- [#51](https://github.com/eknowledger/toolbench/pull/51) [`65dd2b0`](https://github.com/eknowledger/toolbench/commit/65dd2b0fcdcfdcd81651e48a73441e669e4eafcd) Thanks [@eknowledger](https://github.com/eknowledger)! - A card can show every primary input, and more than one result part
-
+- [#51](https://github.com/eknowledger/toolbench/pull/51) [`65dd2b0`](https://github.com/eknowledger/toolbench/commit/65dd2b0fcdcfdcd81651e48a73441e669e4eafcd) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: More on a card.** A card shows every primary input and, with `parts`, more than one result part. <!-- whats-new: gallery=parts docs=docs.html#display-modes -->
+  
   Three changes, all of them about a card that had to say too little.
-
+  
   **Every `primary` input, not the first.** The runtime used `find` where it meant `filter`, so a manifest
   marking two inputs primary got one and nothing said why. A question that needs two numbers cannot be asked
   with one: a queue card offering an arrival rate without a service time sizes nothing. `validate.ts` no
   longer caps the count either, which is a loosening rather than a change, so every manifest that validated
   before still validates and no tool has to change.
-
+  
   **A new `parts` attribute on `<tool-host>`.** A compact card rendered exactly one part of a grouped result.
   One is too few for a tool whose answer is a number _and_ a curve, where the number alone hides how steep
   the curve is and the curve alone is a set of unnamed lines. `parts="2"` gives the card room for both, and
   whatever does not fit is still counted rather than hidden. Default 1, so existing cards render exactly as
   before.
-
+  
   An attribute rather than a manifest key, deliberately: how much room a card has is a property of the page
   it sits on, not of the tool, and the same tool is a one-part card in a sidebar and a two-part card leading
   a section.
-
-  **A card's chart is drawn smaller, not shorter.** Compact mode halved the chart's viewBox height, which took
+  
+  **Fixed: Charts on a card.** A card's chart is drawn smaller, not squashed. <!-- whats-new: gallery=card-mode docs=docs-ref-tokens.html#tokens -->
+  
+  Compact mode halved the chart's viewBox height, which took
   the plot area from 238 units to 88 and compressed a curve falling from 74% to nothing into an unreadable
   band, and dropped the axis titles, the annotation label and the legend with it. None of that was needed: the
   geometry is a viewBox scaled to the available width, so a chart on a narrow card is already smaller than one
   on a page with its aspect ratio intact. The chart is now identical everywhere, and compact changes only the
   rendered size, capped at `--tb-chart-card-max` (52rem). Labels stay legible below that width via a container
   query, since text inside a viewBox otherwise shrinks with it.
-
-  **A result summary is announced, not displayed.** "6 fields, chart, 2 series, table, 5 rows" rendered above
+  
+  **Changed: Result summary.** The one-line summary of a result is announced to screen readers, not shown. <!-- whats-new: gallery=page-mode -->
+  
+  "6 fields, chart, 2 series, table, 5 rows" rendered above
   the result as a line that reads like debug output, describing something already on screen. It is what a
   screen reader needs and what a sighted reader does not, so it moves to a visually hidden live region. The
   visible line keeps what a reader can act on: prompts, a sample's name, and errors.
-
+  
   No contract version change. Nothing here adds or alters a manifest key, and the one rule that changed was
   removed rather than added.
 
@@ -427,19 +565,21 @@
 
 ### Minor Changes
 
-- [#46](https://github.com/eknowledger/toolbench/pull/46) [`dc13784`](https://github.com/eknowledger/toolbench/commit/dc13784af5759a5c651f98d06ba142c36f2889a2) Thanks [@eknowledger](https://github.com/eknowledger)! - Contract version 3 adds the optional `samples` manifest key: labelled example inputs a tool ships with, so a reader who does not know what to type has somewhere to start.
-
+- [#46](https://github.com/eknowledger/toolbench/pull/46) [`dc13784`](https://github.com/eknowledger/toolbench/commit/dc13784af5759a5c651f98d06ba142c36f2889a2) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Samples.** A tool can ship labelled example inputs, drawn as buttons under the form. <!-- whats-new: gallery=samples docs=docs-authoring.html#4b-sample-inputs -->
+  
+  Contract version 3 adds the optional `samples` manifest key: labelled example inputs a tool ships with, so a reader who does not know what to type has somewhere to start.
+  
   ```jsonc
   "samples": [
     { "label": "Definitions disagree", "input": { "values": "3 4 4 5 6 7 9 14 40 260", "method": "linear" } },
     { "label": "Not a number", "input": { "values": "12, 14, 15, 18ms, 21, 24, 31, 44" } }
   ]
   ```
-
+  
   The runtime draws them as a row of buttons under the form, in `page` and `embed` mode. Clicking one fills the form, which is an input change like any other: the result goes stale and waits for Run, or re-runs if the tool set `autoRun`. Each `input` is keyed by input id and may be partial, so a sample changes the one thing it is about and leaves the rest as the reader left it. A card draws no row, because it has room for one input and a Run button.
-
+  
   `validateManifest` checks every sample against the inputs it fills: an unknown input id, a value of the wrong type, a number outside `min`/`max`, a string over `maxLength`, a `select` value that is not an option, a sample that fills nothing, an empty `samples` array and two samples sharing a label are all refused, naming the field. `checkToolDirectory` additionally runs every declared sample, so an example that crashes the tool fails the build with its label in the message; an `error` result is a pass, since a malformed example is one of the most useful a tool can ship.
-
+  
   Existing tools are unaffected and need no change. Both halves of the `2 → 3` migration are the identity function, and no existing tool's fixtures were edited, which is what makes this a minor bump rather than a major one.
 
 ### Patch Changes
@@ -458,8 +598,10 @@
 
 ### Minor Changes
 
-- [#30](https://github.com/eknowledger/toolbench/pull/30) [`d5135ad`](https://github.com/eknowledger/toolbench/commit/d5135ad8ca2c96f41d16a46f99b6a1c23b3bee3a) Thanks [@eknowledger](https://github.com/eknowledger)! - Contract version 2 adds the `bytes` output kind, for wire formats and hex dumps: offsets, hex, a printable gutter, and named highlight ranges that can start mid-row and wrap. A `table` could approximate this but gets alignment and spanning wrong, and has nowhere to put a range that crosses rows.
-
+- [#30](https://github.com/eknowledger/toolbench/pull/30) [`d5135ad`](https://github.com/eknowledger/toolbench/commit/d5135ad8ca2c96f41d16a46f99b6a1c23b3bee3a) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Bytes results.** A hex dump with offsets, a printable gutter and named ranges. <!-- whats-new: gallery=tool-utf8-bytes docs=docs-ref-results.html#bytes -->
+  
+  Contract version 2 adds the `bytes` output kind, for wire formats and hex dumps: offsets, hex, a printable gutter, and named highlight ranges that can start mid-row and wrap. A `table` could approximate this but gets alignment and spanning wrong, and has nowhere to put a range that crosses rows.
+  
   Tools declaring `"sdk": 1` are unaffected and need no change. Raising the contract version is a minor bump, never a major one, because contract changes are additive by policy.
 
 ### Patch Changes
@@ -471,7 +613,9 @@
 
 ### Patch Changes
 
-- [#26](https://github.com/eknowledger/toolbench/pull/26) [`aeb5c50`](https://github.com/eknowledger/toolbench/commit/aeb5c5011948798210d5f059aa66e7a9364aff40) Thanks [@eknowledger](https://github.com/eknowledger)! - Published source maps now contain their sources. Previously the maps referenced `../src/*.ts`, which `files: ["dist"]` never shipped, so anyone stepping into either package in a debugger got a map pointing at nothing. Sources are embedded with `inlineSources`, so the maps are self-contained.
+- [#26](https://github.com/eknowledger/toolbench/pull/26) [`aeb5c50`](https://github.com/eknowledger/toolbench/commit/aeb5c5011948798210d5f059aa66e7a9364aff40) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Source maps.** Published source maps now contain their sources. <!-- whats-new: docs=docs-architecture.html#114-artifacts -->
+  
+  Published source maps now contain their sources. Previously the maps referenced `../src/*.ts`, which `files: ["dist"]` never shipped, so anyone stepping into either package in a debugger got a map pointing at nothing. Sources are embedded with `inlineSources`, so the maps are self-contained.
 
 - Updated dependencies [[`aeb5c50`](https://github.com/eknowledger/toolbench/commit/aeb5c5011948798210d5f059aa66e7a9364aff40)]:
   - @toolbench/sdk@0.1.1

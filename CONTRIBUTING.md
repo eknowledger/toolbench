@@ -34,6 +34,7 @@ execute in a plain `node --test`. That floor is worth it.
 | `pnpm test:bench` | Before a PR. Browser tests, against the **built** bundle. `PLAYWRIGHT_BROWSER=firefox` or `webkit` for the other engines |
 | `pnpm coverage` | When you want the uncovered list. Node suite only, no threshold |
 | `pnpm changeset` | In the same PR as any change a consumer would notice |
+| `pnpm site:shots` | After a changeset names a new `shot`. Screenshots for the What's new page, see below |
 
 `pnpm bench` is not optional politeness. Most of the visual defects in this codebase were found by
 looking at the page, not by reasoning about the code, and the
@@ -46,21 +47,42 @@ release and the changelog, where it is read by somebody deciding whether to upgr
 the code and do not want the reasoning. The first release notes here were essays, several hundred words
 each, explaining *why* a change was made, and nobody could scan them for what shipped.
 
-So: **lead with a bold one-line summary that says what a consumer can now do, or what stopped being
-broken.** Then, only if needed, two or three bullets of detail. Link the issue.
+So: **lead with a bold name and one short sentence that says what a consumer can now do, or what stopped
+being broken.** Then, only if needed, a paragraph or two or three bullets of detail. Link the issue.
 
 ```markdown
 ---
 "@toolbench/runtime": minor
 ---
 
-**New: expand a long result in place.** `more="expand"` turns the "+2 more results" notice into a
-button that reveals the rest without leaving the page. ([#79](https://github.com/…/issues/79))
+**New: Expand in place.** `more="expand"` reveals the rest of a long result without leaving the page. ([#79](https://github.com/…/issues/79)) <!-- whats-new: gallery=parts docs=docs.html#letting-the-reader-open-the-rest -->
 
-`more` defaults to `link`, so nothing changes unless you opt in.
+The "+2 more results" notice becomes a button. `more` defaults to `link`, so nothing changes unless you
+opt in.
 ```
 
-* Prefix with **New:** or **Fixed:** so the intent is plain. Changesets groups by version bump, and
+That first paragraph is also the release's line on the site's
+[What's new](https://eknowledger.github.io/toolbench/whats-new.html) page, which the site build generates
+from the two `CHANGELOG.md` files, so a release needs no other step. The page shows only that paragraph.
+The convention, which `pnpm check` holds every pending changeset to:
+
+* It starts with `**New: Name.**`, `**Fixed: Name.**` or `**Changed: Name.**`. The name is what the page
+  lists, in bold, so make it a short noun phrase: "Reset button", "Readable chart labels".
+* Then **one** sentence, under 120 characters. More than one sentence fails the check; the rest goes in
+  the paragraphs below.
+* Then, optionally, an HTML comment, which GitHub does not show:
+  `<!-- whats-new: gallery=<card-id> docs=<page.html#anchor> shot=<name> label="On by default" -->`.
+  `gallery` is the "Try it" link (an `id` in `gallery.html`), `docs` the "Docs" link, `shot` a screenshot
+  of that gallery card, and `label` a small tag for anything that changes a default or can refuse a tool.
+  The site test checks that every link lands.
+* A changeset that ships two things can start a later paragraph the same way, and it is a second line.
+  Entries in one release with the same kind and name are one line, which is how an entry both packages
+  carry, or one change written as three changesets, appears once.
+* A new `shot` needs its picture: `pnpm site:shots` builds the site, photographs each named gallery card
+  in light and dark, and writes `site/public/whats-new/<name>-light.jpg` and `-dark.jpg` to commit. The
+  site build fails, naming that command, while one is missing.
+
+* **New:**, **Fixed:** or **Changed:** makes the intent plain. Changesets groups by version bump, and
   "Minor Changes" is not the same sentence as "here is a new feature".
 * Say what a reader can do differently. `values` and `run()` are the names of things; "fill in a tool's
   form from your page" is what they are for.

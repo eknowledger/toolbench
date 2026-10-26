@@ -175,6 +175,82 @@ describe("llms.txt and reference.json", () => {
 	});
 });
 
+describe("the What's new page", () => {
+	const page = html.get("whats-new.html") ?? "";
+	const sections = page.split('<section class="wn-release"').slice(1);
+	const items = [...page.matchAll(/<li><strong>([^<]*):<\/strong>/g)].map((m) => m[1] ?? "");
+	/** The links in each item's link row, as [text, href]. */
+	const links = [...page.matchAll(/<span class="wn-links">([\s\S]*?)<\/span><\/li>/g)].flatMap((m) =>
+		[...(m[1] ?? "").matchAll(/<a href="([^"]+)"[^>]*>(Try it|Docs|Screenshot)</g)].map((a) => [a[2] ?? "", (a[1] ?? "").replace(/&amp;/g, "&"), a[0]] as const),
+	);
+
+	it("lists every version in both CHANGELOG.md files, newest first, once each", () => {
+		// Read here with a plain pattern, not through the page's own parser, so a version it skipped shows.
+		const versions = new Set(["packages/runtime/CHANGELOG.md", "packages/sdk/CHANGELOG.md"].flatMap((f) => [...readFileSync(join(ROOT, f), "utf8").matchAll(/^## (\d+\.\d+\.\d+)$/gm)].map((m) => m[1] ?? "")));
+		const byNumber = (v: string) => v.split(".").map((n) => n.padStart(4, "0")).join(".");
+		const expected = [...versions].sort((a, b) => byNumber(b).localeCompare(byNumber(a)));
+		const listed = [...page.matchAll(/<h2 id="v[\d-]+"><span class="wn-ver">([^<]+)<\/span>/g)].map((m) => m[1]);
+		assert.ok(expected.length >= 15, `found only ${expected.length} versions in the changelogs`);
+		assert.deepEqual(listed, expected);
+		const sidebar = [...page.matchAll(/<span class="wn-toc-ver">([^<]+)<\/span>/g)].map((m) => m[1]);
+		assert.deepEqual(sidebar, expected, "the Releases sidebar lists a different set");
+	});
+
+	it("dates every release, and counts in the sidebar what each section holds", () => {
+		for (const s of sections) {
+			const version = /class="wn-ver">([^<]+)</.exec(s)?.[1] ?? "";
+			assert.match(s, /<time datetime="\d{4}-\d{2}-\d{2}">/, `${version} has no date`);
+			const groups = [...s.matchAll(/<h3 class="wn-group wn-(\w+)">\w+ \((\d+)\)<\/h3>/g)].map((m) => [m[1], Number(m[2])] as const);
+			assert.ok(groups.length > 0, `${version} has no items`);
+			const shown = (s.match(/<li><strong>/g) ?? []).length;
+			assert.equal(shown, groups.reduce((n, [, c]) => n + c, 0), `${version}: the headings' counts do not add up to its items`);
+			const meta = new RegExp(`wn-toc-ver">${version.replace(/\./g, "\\.")}</span> <span class="wn-toc-meta">[^·]*· ([^<]+)<`).exec(page)?.[1];
+			assert.equal(meta, groups.map(([k, c]) => `${c} ${k}`).join(", "), `${version}'s sidebar counts`);
+		}
+	});
+
+	it("has no item without a name", () => {
+		const article = page.slice(page.indexOf('<article class="prose wn">'), page.indexOf("</article>"));
+		const lis = (article.match(/<li\b/g) ?? []).length;
+		assert.ok(items.length > 50, `found ${items.length} items`);
+		assert.equal(items.length, lis, "an item does not start with its bold name");
+		assert.deepEqual(items.filter((n) => n.trim() === ""), []);
+	});
+
+	it("resolves every Try it, Docs and Screenshot link to what it names", () => {
+		const galleryIds = ids(html.get("gallery.html") ?? "");
+		const broken: string[] = [];
+		for (const [text, href, tag] of links) {
+			const [path = "", hash = ""] = href.replace(/^\.\//, "").split("#");
+			if (text === "Try it" && (path !== "gallery.html" || !galleryIds.has(hash))) broken.push(`${text} ${href}`);
+			if (text === "Docs" && (!/^docs.*\.html$/.test(path) || !html.has(path) || (hash && !ids(html.get(path) ?? "").has(hash)))) broken.push(`${text} ${href}`);
+			if (text === "Screenshot") {
+				const dark = /data-shot-dark="([^"]+)"/.exec(tag)?.[1] ?? "";
+				for (const f of [path, dark.replace(/^\.\//, "")]) if (!/\.jpg$/.test(f) || !existsSync(join(DIST, f))) broken.push(`${text} ${f}`);
+			}
+		}
+		assert.ok(links.filter(([t]) => t === "Screenshot").length >= 8, "fewer screenshots than the page is meant to have");
+		assert.deepEqual(broken, []);
+	});
+
+	it("is linked from the top bar, marked there, and from the docs sidebar under Project", () => {
+		assert.match(page, /<a data-nav aria-current="page" href="\.\/whats-new\.html">What's new<\/a>/);
+		assert.match(html.get("docs.html") ?? "", /<a data-nav href="\.\/whats-new\.html">What's new<\/a>/);
+		const project = /<h2>Project<\/h2><ul>([\s\S]*?)<\/ul>/.exec(html.get("docs.html") ?? "")?.[1] ?? "";
+		assert.match(project, /href="\.\/whats-new\.html">What's new</);
+		assert.match(page, /<h2>Project<\/h2><ul>[\s\S]*?href="\.\/whats-new\.html" aria-current="page">What's new</);
+	});
+
+	it("is announced on the landing page with the latest release's first new things", () => {
+		const latest = /class="wn-ver">([^<]+)</.exec(sections[0] ?? "")?.[1] ?? "";
+		const firstThree = (sections[0] ?? "").split('<h3 class="wn-group wn-fixed"')[0]?.match(/<li><strong>([^<]*):/g)?.slice(0, 3).map((m) => m.slice(12, -1).toLowerCase()) ?? [];
+		const line = /<p class="hero-new">([\s\S]*?)<\/p>/.exec(html.get("index.html") ?? "")?.[1] ?? "";
+		assert.ok(line.includes(`New in ${latest}`), line);
+		assert.ok(line.includes(`href="./whats-new.html#v${latest.replace(/\./g, "-")}"`), line);
+		assert.equal(/<span>([^<]*)\.<\/span>/.exec(line)?.[1]?.toLowerCase(), firstThree.join(", "));
+	});
+});
+
 describe("figures on the landing page", () => {
 	// The page's own words: code samples and drawings removed, since a manifest quoting a tool's own
 	// "version": "1.0.0" or an SVG path's coordinates are not figures the page claims.
@@ -232,6 +308,7 @@ const TYPES: Record<string, string> = {
 	".woff2": "font/woff2",
 	".json": "application/json",
 	".txt": "text/plain",
+	".jpg": "image/jpeg",
 };
 
 describe("the site in a browser", () => {
@@ -459,7 +536,7 @@ describe("the site in a browser", () => {
 	for (const width of [1440, 390]) {
 		it(`no docs page overflows its column at ${width}px`, async () => {
 			const page = await browser.newPage({ viewport: { width, height: 900 } });
-			const docs = pages.filter((f) => /^docs.*\.html$/.test(f));
+			const docs = pages.filter((f) => /^(?:docs.*|whats-new)\.html$/.test(f));
 			assert.ok(docs.length >= 5, `found ${docs.length} docs pages`);
 			for (const name of docs) {
 				await page.goto(`${origin}${name}`);
@@ -491,6 +568,42 @@ describe("the site in a browser", () => {
 		await page.evaluate((hash) => document.getElementById(hash?.slice(1) ?? "")?.scrollIntoView(), target);
 		await page.waitForTimeout(300);
 		assert.equal(await page.locator(".docs-toc a[aria-current]").getAttribute("href"), target);
+		await page.close();
+	});
+
+	it("What's new opens a screenshot in a dialog, and gives focus back when it closes", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		const requests: string[] = [];
+		page.on("request", (r) => requests.push(new URL(r.url()).pathname));
+		await page.goto(`${origin}whats-new.html`, { waitUntil: "networkidle" });
+		assert.deepEqual(requests.filter((p) => p.endsWith(".jpg")), [], "a screenshot loaded before anyone asked for it");
+		const link = page.locator("a[data-shot-dark]").first();
+		const name = await link.getAttribute("data-shot-name");
+		await link.focus();
+		await page.keyboard.press("Enter");
+		const dialog = page.locator("dialog.wn-shot");
+		await dialog.waitFor({ state: "visible" });
+		assert.equal(await dialog.evaluate((d) => (d as HTMLDialogElement).open && d.matches(":modal")), true);
+		assert.equal(await page.locator("#wn-shot-title").textContent(), `${name}, in the gallery`);
+		await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>("dialog.wn-shot img")].some((i) => i.complete && i.naturalWidth > 0 && i.offsetWidth > 0));
+		assert.match((await page.locator("dialog.wn-shot img:visible").getAttribute("alt")) ?? "", /^Screenshot: /);
+		await page.keyboard.press("Escape");
+		await dialog.waitFor({ state: "hidden" });
+		assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-shot-name")), name, "focus did not return to the link");
+		await page.close();
+	});
+
+	it("What's new folds a long group behind 'and N more', which opens from the keyboard", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}whats-new.html`);
+		const more = page.locator("details.wn-more").first();
+		const hidden = await more.locator("li").count();
+		assert.ok(hidden > 0);
+		assert.equal(await more.locator("summary").textContent(), `and ${hidden} more`);
+		assert.equal(await more.locator("li").first().isVisible(), false);
+		await more.locator("summary").focus();
+		await page.keyboard.press("Enter");
+		assert.equal(await more.locator("li").first().isVisible(), true);
 		await page.close();
 	});
 
