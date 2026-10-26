@@ -31,6 +31,14 @@ export interface Field {
 	 * without counting rows. The runtime gives it no meaning. Contract version 5.
 	 */
 	role?: string;
+	/**
+	 * Set the value, and its note, in the monospace face, for an address, a hex string or a header the
+	 * reader compares character by character. `false` for a sentence or a plain number with a unit, which
+	 * read like terminal output in it. Rendered as `.tb-mono` on the `<dd>`, the class a table cell uses.
+	 * Contract version 8.
+	 * @default true
+	 */
+	mono?: boolean;
 }
 
 export type Tone = "normal" | "warn" | "bad" | "good";
@@ -744,6 +752,15 @@ interface InputBase {
 	 * prose, and a runtime cannot know which is which, so the tool says.
 	 */
 	dir?: "ltr" | "auto";
+	/**
+	 * Whether a host may put this input's value in a link it builds from `host.values`, and read it back
+	 * from one. `false` for a credential or pasted private material: a URL ends up in browser history,
+	 * server logs, chat previews and referrer headers. A privacy hint for hosts, not access control: the
+	 * runtime builds no links and does not enforce it, and `host.values` still writes the input. Contract
+	 * version 8.
+	 * @default true
+	 */
+	share?: boolean;
 }
 
 export type InputSpec =

@@ -720,6 +720,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | Every `links[].href` resolves to `http:`, `https:` or `mailto:`, with no spaces or control characters | `links.ts`, used by `validate.ts` and `element.ts` | A manifest link runs script in the host page |
 | `lang` appears only on a textarea, as one word | `validate.ts` | A key that promises colour on an input nothing paints |
 | A `grammar` sits beside a `lang` on a textarea, has only its four keys, every list capped, and no patterns | `validate.ts`, and a tokeniser in `paint.ts` that runs no regular expression | A tool ships a pattern that backtracks for seconds on a pasted line and freezes the page it is embedded in |
+| An input's `share` is `true` or `false` | `validate.ts` | A host following the docs keeps an input out of a link only on `share === false`, so `"no"` would put a password in a URL |
 | Every declared sample runs without throwing | `tools/cases.test.ts` | The first thing a reader clicks is the first thing to crash |
 | Only a `pure` tool with no assets may be `card: "live"` | `validate.ts` | A landing page card could read files or call the network |
 | Only a `live` tool may be `card: "live"` | `validate.ts`, `element.ts` | A compact slot would present a tool on the way out, or already gone, as current |
@@ -906,14 +907,14 @@ Eight layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 167 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 177 |
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 121 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 25 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
 | `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 33 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 238 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 239 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -1013,12 +1014,12 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 26.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, and 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk) |
+| Runtime plus the bench's own wiring | 26.4 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, and 24 bytes with `share` on an input |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
 | Share action | 1.4 KB | Its own chunk, fetched with a tool's code when the tool draws the share button: the button, its styles, the default link writer and the clipboard. 1,436 bytes |
-| Worker entry | 4.9 KB | Only on pages with a worker-mode tool, and only after activation |
+| Worker entry | 5.0 KB | Only on pages with a worker-mode tool, and only after activation |
 | Graph kind, base chunk | 18.6 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Eleven chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one, and a graph past 100 nodes also fetches the worker's copy of the layout. Each has its own line in `size-check.mjs` |
 | `percentiles` chunk | 1.3 KB | |
 | `queue-explorer` chunk | 1.2 KB | |
@@ -1280,6 +1281,7 @@ declaration, so browsers without that function get the light palette rather than
 | `OUTPUT_KINDS`, `INPUT_TYPES`, `CAPABILITIES` | constants |
 | `validateManifest`, `ManifestError`, `describeSdkVersion` | validation |
 | `isSafeLinkHref` | whether a link target may be offered to a reader |
+| `shareableInputs` | the ids of the inputs a link may carry: every one without `share: false`. The runtime's share button and its reading of a link use it, so there is one rule |
 | `checkManifestFeatures`, `outputFeatureProblem` | the declared `sdk` against what a manifest uses and a result returns. `upgradeManifest` already calls the first |
 | `upgradeManifest`, `upgradeOutput`, `canLoad`, `MIGRATIONS`, `Migration`, `VersionError` | versioning |
 | `runCases`, `assertCases`, `compare`, `testCtx`, `CaseResult`, `RunCasesOptions` | fixtures |

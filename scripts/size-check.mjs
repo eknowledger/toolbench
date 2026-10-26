@@ -218,8 +218,12 @@ const BUDGETS = [
 	 * Raised from 5_500 to 6_000 by the wide-output fixture (#194): 5,141 to 5,544 measured, its manifest's nine
 	 * cases. The option labels are long on purpose: one of them is what showed WebKit counting a select's text
 	 * as overflow of the tool. Bench-only.
+	 *
+	 * Raised from 6_000 to 7_500 by contract v8's fixtures, in the commit that crossed it: 6,012 measured with
+	 * field-faces (#209) on top of 0.13.0's share-private, and input-help and narrow-table still to come in the
+	 * same release. Bench-only.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 6_000, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_500, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
@@ -440,6 +444,8 @@ const BUDGETS = [
 	{ label: "bench fixture: grammar-input", pattern: /^tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Every kind the runtime draws itself, wider than a phone (#194), for the scroll-never-clip test. 1,058 measured.
 	{ label: "bench fixture: wide-output", pattern: /^tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	// Fields in both faces (#209) on screen for the browser tests and the gallery. 231 measured.
+	{ label: "bench fixture: field-faces", pattern: /^tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -474,6 +480,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	{ label: "worker copy: bench fixture field-faces", pattern: /^worker-tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;

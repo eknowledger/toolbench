@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v7-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-25.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-26.4%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -219,8 +219,8 @@ tools/reverse/
 ```
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
-concrete: the current contract is 6, and declaring 1 opts out of everything added since (`bytes` in v2,
-`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets and highlighted textareas in v6). Using one of those means declaring its version: a manifest that uses a feature newer than its `sdk` is refused, with the field and the `sdk` to declare. See [docs/versioning.md](docs/versioning.md).
+concrete: the current contract is 8, and declaring 1 opts out of everything added since (`bytes` in v2,
+`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets and highlighted textareas in v6, graphs and textarea grammars in v7, `mono` on a field and `share` on an input in v8). Using one of those means declaring its version: a manifest that uses a feature newer than its `sdk` is refused, with the field and the `sdk` to declare. See [docs/versioning.md](docs/versioning.md).
 
 **2. Register it.** Once per site:
 
@@ -609,7 +609,8 @@ The page's own parameters stay, and any parameter of this tool's already in the 
 The tool's id in each name is what lets several tools share one address; the same tool twice on one page
 reads the same parameters. A tool opening on a page with such parameters starts with those values, and
 they count as its starting values, so Reset goes back to them. An input marked `share: false` is never
-written or read. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
+written or read; a host building its own links gets the same rule from `shareableInputs(manifest)` in
+`@toolbench/sdk`, which is the one the button uses. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
 refuses, the link is shown, selected, to copy by hand. The element then dispatches `tool-share` with
 `{ url, values }`.
 
@@ -779,9 +780,9 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 26.3 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 26.4 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
-| Worker entry, only for pages with a worker-mode tool | 4.9 KB |
+| Worker entry, only for pages with a worker-mode tool | 5.0 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |

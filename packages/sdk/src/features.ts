@@ -40,6 +40,7 @@ export const LATER = {
 	"inputs.control": 4,
 	"inputs.lang": 6,
 	"inputs.grammar": 7,
+	"inputs.share": 8,
 	"options.sets": 6,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,
@@ -59,6 +60,7 @@ export const OUTPUT_SINCE: Since = {
 	"part role": 5,
 	"part id": 5,
 	"field role": 5,
+	"field mono": 8,
 	"field tone muted": 5,
 	"cell tone muted": 5,
 	"table link": 4,
@@ -153,6 +155,7 @@ export function outputFeatureProblem(output: Output, declared: number): string |
 			if (!isObject(field)) return;
 			if (field.role !== undefined) use("field role", `${at}.fields[${i}].role`);
 			if (field.tone === "muted") use("field tone muted", `${at}.fields[${i}].tone`);
+			if (field.mono !== undefined) use("field mono", `${at}.fields[${i}].mono`);
 		});
 		if (part.kind === "table") {
 			if (part.link !== undefined) use("table link", `${at}.link`);

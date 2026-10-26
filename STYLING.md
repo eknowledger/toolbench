@@ -94,8 +94,8 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 | Kind | Root | Inside it |
 |---|---|---|
 | `group` | `.tb-group` | One root per part |
-| `fields` | `.tb-out-fields` | `.tb-fields` (a `<dl>`, for grouped and ungrouped fields alike), `.tb-field-group` with an `<h4>` for a group, `.tb-field` (with `<dt>` and `<dd>`), `.tb-value`, `.tb-note` |
-| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>`, then `.tb-copy-bar` |
+| `fields` | `.tb-out-fields` | `.tb-fields` (a `<dl>`, for grouped and ungrouped fields alike), `.tb-field-group` with an `<h4>` for a group, `.tb-field` (with `<dt>` and `<dd>`), `.tb-value`, `.tb-note`. The `<dd>` carries `.tb-mono` unless the field says `mono: false` |
+| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>`, then `.tb-copy-bar`. A cell carries `.tb-mono` when it or its column says `mono`, and a header when its column does |
 | `text` | `.tb-out-text` | A `<p>`, or a `<pre class="tb-mono">` |
 | `code` | `.tb-out-code` | `<pre><code class="language-…">`, then `.tb-copy-bar` |
 | `bytes` | `.tb-out-bytes` | `.tb-bytes-grid`, `.tb-bytes-row`, `.tb-bytes-offset`, `.tb-bytes-hex`, `.tb-bytes-ascii`, `.tb-byte`, `.tb-bytes-legend`, `.tb-bytes-caption` |
@@ -200,6 +200,11 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 `role` is the tool's to set: `{ kind: "fields", role: "stats", fields }` names a part, and
 `{ label, value, role: "verdict" }` names one field. The runtime attaches no meaning to it, so a host
 that styles nothing sees no difference.
+
+`.tb-mono` is the one class for "this value is a token", on a field's `<dd>` and on a table cell alike, so
+one rule reaches both: `.tb-mono { font-family: var(--tb-mono); }` is the runtime's, and a host that wants
+its tokens in another face changes `--tb-mono` or writes its own `.tb-mono` rule. A field is mono unless
+it says `mono: false` (contract version 8); a table cell is mono only when it or its column says so.
 
 ## Examples
 

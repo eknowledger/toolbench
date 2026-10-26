@@ -442,6 +442,33 @@ describe("validateManifest: lang on a textarea", () => {
 	});
 });
 
+// Keeping an input out of a host's links (#211): a hint on any input type, and only a boolean.
+describe("validateManifest: share on an input", () => {
+	const inputs = [
+		{ id: "user", type: "text", label: "User", default: "" },
+		{ id: "body", type: "textarea", label: "Body", default: "" },
+		{ id: "n", type: "number", label: "Count", default: 1, min: 0, max: 10 },
+		{ id: "mode", type: "select", label: "Mode", default: "a", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] },
+		{ id: "on", type: "toggle", label: "On", default: false },
+	];
+
+	it("accepts share: false and share: true on every input type, and leaves it absent when absent", () => {
+		for (const share of [false, true]) {
+			const m = validateManifest({ ...good(), inputs: inputs.map((i) => ({ ...i, share })) });
+			assert.deepEqual(m.inputs.map((i) => i.share), [share, share, share, share, share]);
+		}
+		const plain = validateManifest({ ...good(), inputs });
+		assert.deepEqual(plain.inputs.map((i) => i.share), [undefined, undefined, undefined, undefined, undefined], "no default is written in");
+	});
+	it("refuses a share that is not a boolean, which a host would read as true", () => {
+		failsWith((m) => { m.inputs = [{ ...inputs[0], share: "no" }]; }, "inputs[0].share", "must be true or false");
+		failsWith((m) => { m.inputs = [{ ...inputs[0], share: 0 }]; }, "inputs[0].share", "must be true or false");
+	});
+	it("refuses share at the top level of the manifest, and says where it belongs", () => {
+		failsWith((m) => { m.share = false; }, "share", "belongs in an entry of `inputs`");
+	});
+});
+
 describe("validateManifest: link targets", () => {
 	const withHref = (href: string) => (m: Record<string, unknown>) => {
 		m.links = [{ label: "More", href }];

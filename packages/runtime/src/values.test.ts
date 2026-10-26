@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { InputSpec, InputValues } from "@toolbench/sdk";
-import { applyPartialValues, coerce, shareableInputs } from "./values.ts";
+import { shareableInputs } from "@toolbench/sdk";
+import { applyPartialValues, coerce } from "./values.ts";
 
 const numberSpec = {
 	id: "arrivals",

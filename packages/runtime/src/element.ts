@@ -33,14 +33,14 @@
  *    "go now", and is wrong anyway for anything slow.
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
-import { isSafeLinkHref } from "@toolbench/sdk";
+import { isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
-import { applyPartialValues, coerce, shareableInputs } from "./values.ts";
+import { applyPartialValues, coerce } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
 
