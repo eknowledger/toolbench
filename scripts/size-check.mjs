@@ -224,8 +224,17 @@ const BUDGETS = [
 	 * measured, 141 bytes: the #rrggbb check and its message, the lowercasing, the hex box's attributes on the
 	 * text input's branch, and handing the box to the controls chunk for its swatch. 29_000 would have left the
 	 * build 79 over.
+	 *
+	 * Raised from 29_500 to 30_500 by the multiselect (#204), in the commit that crossed it: 29,384 to 30,469
+	 * measured, 1,085 bytes. 443 of it is validation, because `validateManifest` ships here: the type, its
+	 * min and max against each other and the options, a list checked option by option in a default, a sample,
+	 * a preset and a case, a message naming the field for each, and the minimum in `inputProblem`. 149 is the
+	 * CSS for the message now shown under any input an error names, its mark, the count line and the
+	 * toggle's accent. The rest is the element: the group it registers, the visible message, reading a link's
+	 * repeated keys, fetching the choices chunk, and a native multiple select for when that fetch fails. The
+	 * checkboxes, chips and their rules are the choices chunk, below. 29_500 would have left the build 969 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 30_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -262,8 +271,12 @@ const BUDGETS = [
 	 * Raised from 6_000 to 7_500 by contract v8's fixtures, in the commit that crossed it: 6,012 measured with
 	 * field-faces (#209) on top of 0.13.0's share-private, and input-help and narrow-table still to come in the
 	 * same release. Bench-only.
+	 *
+	 * Raised from 7_500 to 8_500 by contract v9's fixtures, in the commit that crossed it: 7,456 to 7,939
+	 * measured with the multiselect fixture (#204), its fourteen regions, and the rows fixture still to come.
+	 * Bench-only.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_500, deployOnly: true },
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 8_500, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
@@ -279,7 +292,11 @@ const BUDGETS = [
 	 * Raised from 6_000 to 7_000 by input-help's markup description (#217), 6,044 measured, with its details
 	 * still to come (#215). Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 7_000, deployOnly: true },
+	/*
+	 * Raised from 7_000 to 8_000 by contract v9's list fixtures (#204), in the commit that crossed it: 6,727 to
+	 * 7,164 measured with the multiselect fixture, and the rows fixture still to come. Bench-only.
+	 */
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 8_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -371,6 +388,9 @@ const BUDGETS = [
 	 * fallback, and the words for each outcome. Fetched with a tool's code when the tool draws the button, so
 	 * a page of cards, or one with sharing turned off, pays nothing. Reader cost: every reader of a page or
 	 * embed tool downloads it. 1,436 measured.
+	 *
+	 * 1,724 with list inputs (#204): a list written as repeats of its key, and a link past 2,000 characters
+	 * leaving out its largest lists and the note saying which. Inside the budget.
 	 */
 	{ label: "share action", pattern: /^share-[^/]+\.js$/, budget: 2_000 },
 	/*
@@ -385,6 +405,11 @@ const BUDGETS = [
 	 * the field. 1_500 would have left it 295 over.
 	 */
 	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 2_000 },
+	/*
+	 * A multiselect's checkboxes and chips (#204), the count line beside them and their rules. Fetched with
+	 * the tool's code only by a tool with a multiselect. Reader cost: that reader downloads it. 1,383 measured.
+	 */
+	{ label: "multiselect choices", pattern: /^choices-[^/]+\.js$/, budget: 1_750 },
 	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
@@ -516,6 +541,7 @@ const BUDGETS = [
 	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// The newer input types (#203) on screen for the browser tests and the gallery. 267 measured.
 	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "bench fixture: multiselect", pattern: /^tool-multiselect-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -554,6 +580,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture input-help", pattern: /^worker-tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture narrow-table", pattern: /^worker-tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture native-inputs", pattern: /^worker-tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture multiselect", pattern: /^worker-tool-multiselect-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;
@@ -643,9 +670,12 @@ for (const file of unclaimed) {
  *
  * Raised to 36_000 by the secret input (#203): 35,299 to 35,600 measured, the same refusals and link rule as
  * boot's line above. 35_500 would have been 100 bytes over.
+ *
+ * Raised to 37_000 by the multiselect (#204), in the commit that crossed it: 35,611 to 36,659 measured,
+ * the same validation, element and CSS as boot's line above. 36_000 would have been 659 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 36_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 37_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

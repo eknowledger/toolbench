@@ -25,6 +25,12 @@ const GOOD_MANIFEST = {
 	kinds: ["fields", "error"],
 };
 const GOOD_CASES = [{ name: "a case", input: {}, expect: { kind: "fields", fields: [] } }];
+/** A list input, whose values in a case are held to the form's rules (#204). */
+const LIST_MANIFEST = {
+	...GOOD_MANIFEST,
+	sdk: 9,
+	inputs: [{ id: "types", type: "multiselect", label: "Types", default: ["A"], min: 1, options: [{ value: "A", label: "A" }, { value: "MX", label: "MX" }] }],
+};
 
 /**
  * A tool module, for the checks that have to actually run one. Written to disk and imported, because
@@ -139,6 +145,11 @@ describe("readToolDirectory rejects", () => {
 			() => fixture("ok", GOOD_MANIFEST, [{ name: "named", input: {}, expect: { kind: "fields", role: "verdict", fields: [] } }]),
 			/case "named" expects output\.role: part role is from contract version 5, but the tool declares "sdk": 1\. Declare "sdk": 5\./,
 		],
+		[
+			"a case giving a list input a value the form could never hold (#204)",
+			() => fixture("ok", LIST_MANIFEST, [{ name: "c", input: { types: ["SOA"] }, expect: { kind: "fields", fields: [] } }]),
+			/ok: case "c": input\.types\[0\]: "SOA" is not one of the options/,
+		],
 		["cases.json that is not JSON at all", () => {
 			const parent = fixture("ok", GOOD_MANIFEST);
 			writeFileSync(join(parent, "ok", "cases.json"), "{ not json");
@@ -171,6 +182,16 @@ describe("readToolDirectory accepts", () => {
 		assert.equal(tool.manifest.runtime.thread, "main", "and defaults are filled in by validation");
 		assert.ok(tool.entry.endsWith(join("ok", "index.ts")), `entry should be an absolute path: ${tool.entry}`);
 		assert.equal(tool.cases.length, 1);
+	});
+
+	/*
+	 * Only a list is checked: a single value in a case has always been passed exactly as given, so a tool can
+	 * test its own guard against an out-of-range number, and a v8 tool's cases must still pass unedited.
+	 */
+	it("a case giving a list input a list the form can hold, and a single value outside its range", () => {
+		const manifest = { ...LIST_MANIFEST, inputs: [...LIST_MANIFEST.inputs, { id: "n", type: "number", label: "N", default: 1, min: 0, max: 9 }] };
+		const parent = fixture("ok", manifest, [{ name: "c", input: { types: ["A", "MX"], n: 99 }, expect: { kind: "fields", fields: [] } }]);
+		assert.equal(readToolDirectory(parent).length, 1);
 	});
 });
 

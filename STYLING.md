@@ -80,6 +80,8 @@ same order, so the cascade is the same.
 | `.tb-nowrap` | A date inside an error message (#203), kept on one line |
 | `.tb-color-row`, `.tb-swatch` | A colour input (#203): the row holding the native swatch, `input[type="color"]`, and the hex box, which is the `.tb-input` |
 | `.tb-secret-row`, `.tb-eye` | A secret input (#203): the row holding the password field and the eye button, which carries `aria-pressed="true"` while the value shows |
+| `.tb-checks`, `.tb-check`, `.tb-chips`, `.tb-chip`, `.tb-count` | A multiselect (#204): the group of checkboxes, each option's `<label>` with its checkbox inside, or the group of chips, each a `<button>` with `aria-pressed`; and the count line under it. An option that cannot be chosen at `max` carries `aria-disabled="true"`, on the checkbox or the chip. The group carries `aria-invalid` when an error names the input. Its row is a `<fieldset>` and its `.tb-label` a `<legend>` |
+| `.tb-field-msg` | The message under an input an error names (#204), the field's name first. While no error names the input the same element is the unseen `.tb-sr` slot |
 | `.tb-details`, its `summary`, `.tb-details-body` | An input's `details` (contract version 8): a `<details>` after the description, closed until the reader opens it. The body takes the same markup classes as `.tb-desc` |
 | `.tb-desc p`, `.tb-desc ul`, `.tb-desc li`, `.tb-desc code`, `.tb-desc strong`, `.tb-desc [data-tone]` | A description's markup. `.tb-desc` is a `<p>`, or a `<div>` when the description has more than one block. `data-tone` is `good`, `warn`, `bad`, `muted` or `accent` |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
@@ -192,7 +194,7 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | `data-kind` | Every part's root | The part's kind |
 | `data-role` | A part's root, a `.tb-field`, or a `.tb-field-row` | Whatever `role` the tool set on the part, field or input. Absent when it set none |
 | `data-input` | `.tb-field-row` | The input's `id` |
-| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle`, `date`, `color`, `secret` |
+| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle`, `date`, `color`, `secret`, `multiselect` |
 | `data-part` | A part's root | Whatever `id` the tool set, unique in the result. Absent when it set none. `host.reveal(id)` goes to it |
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |

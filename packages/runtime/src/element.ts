@@ -41,7 +41,7 @@ import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
 import { help } from "./markup.ts";
-import { applyPartialValues, coerce } from "./values.ts";
+import { applyPartialValues, coerce, fromQuery } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
 
@@ -243,6 +243,8 @@ let sharer: typeof import("./share.ts") | undefined;
 let shareLoad: Promise<void> | undefined;
 /** The newer inputs' controls (#203), once a tool that has one has activated. */
 let controls: typeof import("./controls.ts") | undefined;
+/** A multiselect's checkboxes and chips (#204), once a tool that has one has activated. */
+let picker: typeof import("./choices.ts") | undefined;
 const loadShare = () => (shareLoad ??= import("./share.ts").then((module) => void (sharer = module)));
 
 /** Defines the element. Call once, with the source your host provides. */
@@ -388,7 +390,8 @@ export class ToolHost extends HTMLElement {
 	 * shadow root.
 	 */
 	get values(): InputValues {
-		return this.#manifest ? { ...this.#values } : { ...this.#queued };
+		// A deep copy, since a list is an array a host could otherwise edit in place behind the form (#204).
+		return structuredClone(this.#manifest ? this.#values : this.#queued);
 	}
 
 	/**
@@ -536,10 +539,9 @@ export class ToolHost extends HTMLElement {
 	 */
 	#fromLink(manifest: Manifest): InputValues {
 		const scheme = config?.share;
-		let found: InputValues | undefined = {};
+		let found: InputValues | undefined;
 		try {
-			if (typeof scheme === "object") found = scheme.read(manifest.id);
-			else for (const [key, value] of new URLSearchParams(location.search)) if (key.startsWith(`${manifest.id}.`)) found[key.slice(manifest.id.length + 1)] = value;
+			found = typeof scheme === "object" ? scheme.read(manifest.id) : fromQuery(manifest.id, manifest.inputs ?? [], new URLSearchParams(location.search));
 		} catch {
 			// A host reader that throws leaves the tool on its own values: a broken link is not a broken page.
 			found = undefined;
@@ -751,11 +753,17 @@ export class ToolHost extends HTMLElement {
 				!controls && this.#manifest?.inputs.some((input) => input.type === "color" || input.type === "secret" || (input.type === "select" && input.control === "segmented"))
 					? import("./controls.ts").then((module) => void (controls = module), () => undefined)
 					: undefined;
+			// A multiselect's choices (#204). A failed fetch leaves a native multiple select.
+			const lists =
+				!picker && this.#manifest?.inputs.some((input) => input.type === "multiselect")
+					? import("./choices.ts").then((module) => void (picker = module), () => undefined)
+					: undefined;
 			this.#loaded = await this.#resolve(cfg);
 			await chart;
 			await paint;
 			await share;
 			await native;
+			await lists;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -868,7 +876,7 @@ export class ToolHost extends HTMLElement {
 			}
 			const output =
 				refused ??
-				(await runner.run(loaded, this.#values, {
+				(await runner.run(loaded, this.values, {
 					onProgress: (fraction, partial) => {
 						this.#setProgress(fraction);
 						if (partial && resets === this.#resets) this.#draw(partial);
@@ -887,7 +895,11 @@ export class ToolHost extends HTMLElement {
 			 */
 			if (output.kind === "error") this.#say(summarise(output, this.mode === "card"));
 			else this.#announce(summarise(output, this.mode === "card"));
-			this.#markInvalid(output.kind === "error" ? output.input : undefined);
+			if (output.kind === "error") {
+				// The field's name first, unless the message already starts with it, as the runtime's own refusals do.
+				const label = this.#manifest?.inputs.find((spec) => spec.id === output.input)?.label ?? "";
+				this.#markInvalid(output.input, output.message.startsWith(label) ? output.message : `${label}: ${output.message}`);
+			} else this.#markInvalid(undefined);
 			if (options.focusResult) this.#els.output?.focus();
 			settled(output.kind !== "error", output.kind === "error" ? output.message : undefined);
 		} catch (error) {
@@ -1324,10 +1336,13 @@ export class ToolHost extends HTMLElement {
 		const describedBy: string[] = [];
 		// A segmented select is a group of radios (#203): a fieldset captioned by its legend, not one labelled
 		// control. Without the controls chunk it is the dropdown, which is what an older runtime draws.
-		const segmented = spec.type === "select" && spec.control === "segmented" && controls !== undefined;
+		// A multiselect's choices are a group in the same way (#204); without their chunk, a multiple select.
+		const segmented = (spec.type === "select" && spec.control === "segmented" && controls !== undefined) || (spec.type === "multiselect" && picker !== undefined);
 		const label = el(segmented ? "legend" : "label", { class: "tb-label", for: segmented ? undefined : id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
 		const row = el(segmented ? "fieldset" : "div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
+		// "3 selected, at most 4" under a list (#204): described by, so the bounds are heard with the group.
+		const count = spec.type === "multiselect" ? el("p", { class: "tb-count", id: `${id}-count` }) : null;
 		const desc = spec.description ? help(spec.description, { class: "tb-desc", id: `${id}-desc` }) : null;
 		/*
 		 * The rest of the help (#215), behind a native disclosure: keyboard, state and announcement are the
@@ -1338,6 +1353,7 @@ export class ToolHost extends HTMLElement {
 			? el("details", { class: "tb-details" }, el("summary", {}, "More", el("span", { class: "tb-sr" }, ` about ${spec.label}`)), help(spec.details, { class: "tb-details-body" }))
 			: null;
 		if (desc) describedBy.push(`${id}-desc`);
+		if (count) describedBy.push(count.id);
 		const errorId = `${id}-err`;
 
 		let control: HTMLElement;
@@ -1405,6 +1421,31 @@ export class ToolHost extends HTMLElement {
 					this.#edited(spec.id);
 				});
 				control = box;
+				break;
+			}
+			case "multiselect": {
+				const choose = (next: string[]) => {
+					this.#values[spec.id] = next;
+					this.#edited(spec.id);
+				};
+				const chosen = () => this.#values[spec.id] as string[];
+				if (picker && count) {
+					// The group is the registered control, as a segmented select's is: description, aria-invalid, Enter to run.
+					control = el("div", { id, role: "group", "aria-labelledby": `${id}-label` });
+					this.#painters.set(spec.id, picker.choices(control, spec, count, chosen, choose));
+					break;
+				}
+				// Without the chunk: the browser's own list, which still chooses several and says how many are allowed.
+				const list = el("select", { class: "tb-select", id, multiple: true, size: Math.min(spec.options.length, 6) });
+				for (const option of spec.options) list.append(el("option", { value: option.value }, option.label));
+				const show = () => {
+					for (const option of list.options) option.selected = chosen().includes(option.value);
+					if (count) count.textContent = `${chosen().length} selected`;
+				};
+				list.addEventListener("change", () => choose(coerce(spec, [...list.selectedOptions].map((o) => o.value)) as string[]));
+				show();
+				this.#painters.set(spec.id, show);
+				control = list;
 				break;
 			}
 			case "number": {
@@ -1526,7 +1567,8 @@ export class ToolHost extends HTMLElement {
 			if (desc) row.append(desc);
 			if (more) row.append(more);
 		}
-		// The per-input error slot: empty until a result names this input.
+		if (count) row.append(count);
+		// The per-input error slot: unseen and empty until an error names this input, then the visible message (#204).
 		row.append(el("p", { class: "tb-sr", id: errorId }));
 		return row;
 	}
@@ -1624,7 +1666,8 @@ export class ToolHost extends HTMLElement {
 			if (spec.type !== "select" || changed.includes(spec.id)) continue;
 			const presets = spec.options.filter((o) => o.sets && changed.some((key) => key in (o.sets as InputValues)));
 			if (presets.length === 0) continue;
-			const matches = (o: SelectOption) => o.sets !== undefined && Object.entries(o.sets).every(([key, value]) => this.#values[key] === value);
+			// By value, since a preset may write a list (#204), and two equal lists are never the same array.
+			const matches = (o: SelectOption) => o.sets !== undefined && Object.entries(o.sets).every(([key, value]) => JSON.stringify(this.#values[key]) === JSON.stringify(value));
 			const current = spec.options.find((o) => o.value === this.#values[spec.id]);
 			if (current && (matches(current) || (!current.sets && !spec.options.some(matches)))) continue;
 			const next = spec.options.find(matches) ?? spec.options.find((o) => !o.sets);
@@ -1709,13 +1752,20 @@ export class ToolHost extends HTMLElement {
 		}
 	}
 
-	#markInvalid(inputId: string | undefined): void {
+	/**
+	 * Mark the input an error names, and show `line` under it, the field's name first (#204). It was a slot only
+	 * a screen reader reached, which left a sighted reader of a long form matching a message at the bottom to
+	 * a field near the top. The same text is the control's description, so both hear one sentence.
+	 */
+	#markInvalid(inputId: string | undefined, line = ""): void {
 		for (const [id, control] of this.#controls) {
 			const invalid = id === inputId;
 			control.toggleAttribute("aria-invalid", invalid);
 			if (invalid) control.setAttribute("aria-invalid", "true");
 			const slot = this.#root.getElementById(`in-${id}-err`);
-			if (slot) slot.textContent = invalid ? (this.#els.status?.textContent ?? "") : "";
+			if (!slot) continue;
+			slot.textContent = invalid ? line : "";
+			slot.className = invalid ? "tb-field-msg" : "tb-sr";
 		}
 	}
 

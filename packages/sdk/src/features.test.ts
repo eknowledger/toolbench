@@ -35,8 +35,8 @@ const INPUT_SINCE: Since = {
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 /* The values of `control`, which arrived after the key: each value is a control the runtime has to know. */
-const CONTROL_SINCE: Since = { slider: 4, segmented: 9 };
-const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1, date: 9, color: 9, secret: 9 };
+const CONTROL_SINCE: Since = { slider: 4, segmented: 9, checkboxes: 9, chips: 9 };
+const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1, date: 9, color: 9, secret: 9, multiselect: 9 };
 const CAPABILITY_SINCE: Since = { pure: 1 };
 const KIND_SINCE: Since = {
 	fields: 1, text: 1, code: 1, table: 1, series: 1, group: 1, error: 1,
@@ -94,7 +94,7 @@ describe("the version each feature arrived in (#170)", () => {
 		assert.deepEqual(Object.keys(CAPABILITY_SINCE).sort(), [...CAPABILITIES].sort());
 		assert.deepEqual(Object.keys(KIND_SINCE).sort(), [...OUTPUT_KINDS].sort());
 		assert.ok("sets" in OPTION_SINCE, "the preset key on a select option");
-		assert.deepEqual(Object.keys(CONTROL_SINCE).sort(), ["segmented", "slider"], "every value of control the validator accepts");
+		assert.deepEqual(Object.keys(CONTROL_SINCE).sort(), ["checkboxes", "chips", "segmented", "slider"], "every value of control the validator accepts");
 	});
 
 	it("ships exactly the rows after version 1, and nothing else, in the runtime's table", () => {
@@ -190,6 +190,14 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 
 	it("refuses a date input under sdk 8, quoting the type", () => {
 		refuses({ ...v1(8), inputs: [{ id: "day", type: "date", label: "Day", default: "2026-10-25" }] }, "inputs[0].type", [/"date" is from contract version 9/, /Declare "sdk": 9\./]);
+	});
+
+	// A v8 runtime does not know the type at all, and would refuse it as an unknown type rather than explain.
+	it("refuses a multiselect under sdk 8, and its control values with it", () => {
+		const types = { id: "types", type: "multiselect", label: "Types", default: [], options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] };
+		refuses({ ...v1(8), inputs: [types] }, "inputs[0].type", [/"multiselect" is from contract version 9/, /declares "sdk": 8/, /Declare "sdk": 9\./]);
+		refuses({ ...v1(8), inputs: [{ ...types, type: "select", default: "a", control: "chips" }] }, "inputs[0].control", [/"chips" is from contract version 9/]);
+		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(9), inputs: [{ ...types, control: "checkboxes" }] }));
 	});
 
 	it("refuses role on an input under sdk 7, though role on a part is from 5", () => {

@@ -6,7 +6,7 @@
  * open with a link's values before anything awaits; drawing the button, writing a link and the clipboard
  * are here.
  */
-import type { InputValues, Manifest } from "@toolbench/sdk";
+import type { InputSpec, InputValue, InputValues, Manifest } from "@toolbench/sdk";
 import { el, svg } from "./dom.ts";
 import type { ToolHostConfig } from "./element.ts";
 import { adoptStyles } from "./styles.ts";
@@ -39,11 +39,44 @@ const STYLES = /* css */ `
  * in the address is dropped first: otherwise a value that has since become private, or an input since
  * removed, would ride along in the copy.
  */
-export function linkFor(id: string, values: InputValues): string {
-	const url = new URL(location.href);
-	for (const key of [...url.searchParams.keys()]) if (key.startsWith(`${id}.`)) url.searchParams.delete(key);
-	for (const [key, value] of Object.entries(values)) url.searchParams.set(`${id}.${key}`, String(value));
+export function linkFor(id: string, values: InputValues, inputs: readonly InputSpec[], href = location.href): string {
+	const url = new URL(href);
+	const query = url.searchParams;
+	for (const key of [...query.keys()]) if (key.startsWith(`${id}.`)) query.delete(key);
+	for (const spec of inputs) {
+		const value = values[spec.id];
+		const key = `${id}.${spec.id}`;
+		if (value === undefined) continue;
+		// A list is its key once per item, and none is the bare key: left out, it would read back as the default (#204).
+		if (Array.isArray(value)) {
+			if (value.length === 0) query.set(key, "");
+			for (const item of value) query.append(key, item);
+		} else query.set(key, String(value));
+	}
 	return url.href;
+}
+
+/** Longer than this, a link is cut by old proxies and chat previews, and opens on the wrong values. */
+const LONGEST = 2000;
+
+/**
+ * A link that fits in `LONGEST` characters (#204): while `write` makes it longer, the list input adding most
+ * to it is left out, and `left` names what was, for the note. A single value is never left out: one that
+ * long is the reader's to share, and dropping it would silently change the tool's answer more than a list.
+ */
+export function fitLink(write: (values: InputValues) => string, values: InputValues, inputs: readonly InputSpec[]): { url: string; values: InputValues; left: string[] } {
+	const kept = { ...values };
+	const left: string[] = [];
+	let url = write(kept);
+	// Largest first, measured as each list's own share of a link, so the fewest are left out.
+	const lists = inputs.filter((spec) => Array.isArray(kept[spec.id])).map((spec) => ({ spec, size: write({ [spec.id]: kept[spec.id] as InputValue }).length })).sort((a, b) => b.size - a.size);
+	for (const { spec } of lists) {
+		if (url.length <= LONGEST) break;
+		delete kept[spec.id];
+		left.push(spec.label);
+		url = write(kept);
+	}
+	return { url, values: kept, left };
 }
 
 /** The icon: two half-links and the bar between them, on a 24 unit grid; and the check mark once copied. */
@@ -75,8 +108,9 @@ export function shareBar(host: HTMLElement, manifest: Manifest, values: () => In
 			// The same rule the reader uses, so what is written is exactly what may be read back.
 			const shared: InputValues = {};
 			const now = values();
-			for (const id of shareableInputs(manifest)) shared[id] = now[id] as string | number | boolean;
-			return { values: shared, url: typeof scheme === "object" ? scheme.url(manifest.id, shared) : linkFor(manifest.id, shared) };
+			for (const id of shareableInputs(manifest)) shared[id] = now[id] as InputValue;
+			// A host's own scheme is held to the same length, since its links travel the same way.
+			return fitLink((v) => (typeof scheme === "object" ? scheme.url(manifest.id, v) : linkFor(manifest.id, v, manifest.inputs)), shared, manifest.inputs);
 		},
 		(message, url, shared) => {
 			// Emptied, then written a frame later, so a second share in a row is announced again.
@@ -99,27 +133,30 @@ export function shareBar(host: HTMLElement, manifest: Manifest, values: () => In
  * A refused or missing clipboard puts the link itself in the note, selected, so the reader can copy it with
  * the keyboard. That note stays: the link it shows is still the one to copy.
  */
-function wireShare(button: HTMLButtonElement, note: HTMLElement, link: () => { url: string; values: InputValues }, done: (message: string, url: string, values: InputValues) => void): void {
+function wireShare(button: HTMLButtonElement, note: HTMLElement, link: () => { url: string; values: InputValues; left: string[] }, done: (message: string, url: string, values: InputValues) => void): void {
 	adoptStyles(button, "share", () => STYLES);
 	const path = button.querySelector("path");
 	const idle = path?.getAttribute("d") ?? "";
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	button.addEventListener("click", () => {
-		const { url, values } = link();
+		const { url, values, left } = link();
+		// Said, not just done: a link that opens without the reader's hosts would otherwise look like a broken one.
+		const copied = left.length > 0 ? `Link copied, without ${left.length > 1 ? `${left.slice(0, -1).join(", ")} and ${left.at(-1)}` : left[0]}: too long for a link` : "Link copied";
 		const settle = (ok: boolean) => {
 			clearTimeout(timer);
 			button.toggleAttribute("data-copied", ok);
 			path?.setAttribute("d", ok ? CHECK : idle);
-			note.textContent = ok ? "Link copied" : url;
+			note.textContent = ok ? copied : url;
 			if (ok) {
 				// About two seconds, then back to the link: "copied" would otherwise outlast whatever the reader copies next.
+				// Six when something was left out, which is a sentence to read rather than a word to glance at.
 				timer = setTimeout(() => {
 					button.removeAttribute("data-copied");
 					path?.setAttribute("d", idle);
 					note.textContent = "";
-				}, 2000);
+				}, left.length > 0 ? 6000 : 2000);
 			} else getSelection()?.selectAllChildren(note);
-			done(ok ? "Link copied" : "Copy failed. The link is selected, so you can copy it yourself", url, values);
+			done(ok ? copied : "Copy failed. The link is selected, so you can copy it yourself", url, values);
 		};
 		const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
 		if (!clipboard?.writeText) settle(false);

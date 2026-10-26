@@ -147,6 +147,8 @@ export function inputProblem(spec: InputSpec, value: unknown): string | undefine
 	if (spec.type === "secret" && String(value).length < (spec.minLength ?? 0)) return `${spec.label} must be at least ${spec.minLength} characters, got ${String(value).length}.`;
 	// What a reader types is lowercased and trimmed first, so only a value that is not six hex digits gets here.
 	if (spec.type === "color" && !/^#[0-9a-f]{6}$/.test(String(value))) return `${spec.label} must be a #rrggbb colour, got ${JSON.stringify(value)}.`;
+	// A reader can untick the last box (#204); the form holds the rest of a list's rules itself.
+	if (spec.type === "multiselect" && Array.isArray(value) && value.length < (spec.min ?? 0)) return `${spec.label}: pick at least ${spec.min === 1 ? "one" : spec.min}.`;
 	return undefined;
 }
 
@@ -169,9 +171,9 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
 	if (o.mode !== undefined && type !== "date") fail(`${path}.mode`, `only a date input has a mode; on a ${type} input it would be ignored`);
 	if (o.minLength !== undefined && type !== "secret") fail(`${path}.minLength`, `only a secret checks a minimum length; on a ${type} input it would be ignored`);
-	// The control each type can ask for: a number's slider (v4), a select's segments (v9). On any other type it is ignored, as it always was.
-	const control = type === "number" ? "slider" : type === "select" ? "segmented" : undefined;
-	if (control && o.control !== undefined && o.control !== control) fail(`${path}.control`, `control must be "${control}" when present, got ${JSON.stringify(o.control)}`);
+	// The controls each type can ask for: a number's slider (v4), a select's segments (v9), a multiselect's checkboxes or chips (v9). On any other type it is ignored, as it always was.
+	const controls = type === "number" ? ["slider"] : type === "select" ? ["segmented"] : type === "multiselect" ? ["checkboxes", "chips"] : undefined;
+	if (controls && o.control !== undefined && !controls.includes(o.control as string)) fail(`${path}.control`, `control must be ${controls.map((c) => `"${c}"`).join(" or ")} when present, got ${JSON.stringify(o.control)}`);
 	if (o.lang !== undefined) {
 		// A one-line input has no room for structure to see, and nothing would paint it.
 		if (type !== "textarea") fail(`${path}.lang`, `only a textarea is highlighted; on a ${type} input it would be ignored`);
@@ -209,17 +211,32 @@ function validateInput(raw: unknown, path: string): InputSpec {
 			}
 			break;
 		}
-		case "select": {
+		case "select":
+		case "multiselect": {
 			const options = arr(o.options, `${path}.options`);
-			if (options.length < 2) fail(`${path}.options`, "a select needs at least two options; with one, use a fixed value");
+			if (options.length < 2) fail(`${path}.options`, `a ${type} needs at least two options; with one, use a fixed value`);
 			const values = options.map((opt, i) => {
 				const oo = obj(opt, `${path}.options[${i}]`);
 				str(oo, "label", `${path}.options[${i}].`);
+				// Several presets chosen at once would each fill the same inputs, and no one of them could win.
+				if (type === "multiselect" && oo.sets !== undefined) fail(`${path}.options[${i}].sets`, "is a preset, and a multiselect chooses several at once; put presets on a select");
 				return str(oo, "value", `${path}.options[${i}].`);
 			});
 			if (new Set(values).size !== values.length) fail(`${path}.options`, "option values must be unique");
-
-			if (typeof o.default !== "string" || !values.includes(o.default)) {
+			if (type === "multiselect") {
+				// As a number's min and max are its guard, these bound the list `run` gets, and a link's length.
+				const count = (key: "min" | "max", fallback: number): number => {
+					const n = o[key] ?? fallback;
+					if (!Number.isInteger(n) || (n as number) < 0) fail(`${path}.${key}`, "must be a whole number of choices, 0 or more");
+					return n as number;
+				};
+				const min = count("min", 0);
+				const max = count("max", values.length);
+				if (max < 1) fail(`${path}.max`, "must be at least 1: with none allowed, the input asks for nothing");
+				if (max > values.length) fail(`${path}.max`, `max (${max}) is more than the ${values.length} options`);
+				if (min > max) fail(`${path}.min`, `min (${min}) is above max (${max})`);
+				checkPicks(o.default, values, min, max, `${path}.default`);
+			} else if (typeof o.default !== "string" || !values.includes(o.default)) {
 				fail(`${path}.default`, `must be one of the option values: ${values.join(", ")}`);
 			}
 			break;
@@ -255,6 +272,21 @@ function validateInput(raw: unknown, path: string): InputSpec {
 		}
 	}
 	return raw as InputSpec;
+}
+
+/**
+ * A multiselect's list, wherever an author writes one: its default, a sample, a preset, a case. Each an
+ * option, each once, and between `min` and `max` of them, because the form could hold nothing else.
+ */
+function checkPicks(value: unknown, values: readonly string[], min: number, max: number, where: string): void {
+	if (!Array.isArray(value)) fail(where, "must be a list of option values, [] for none");
+	value.forEach((v, i) => {
+		if (typeof v !== "string" || !values.includes(v)) fail(`${where}[${i}]`, `${JSON.stringify(v)} is not one of the options: ${values.join(", ")}`);
+		const first = value.indexOf(v);
+		if (first < i) fail(`${where}[${i}]`, `is already chosen at ${where}[${first}]`);
+	});
+	if (value.length < min) fail(where, `${value.length} chosen, fewer than min (${min})`);
+	if (value.length > max) fail(where, `${value.length} chosen, more than max (${max})`);
 }
 
 /**
@@ -334,6 +366,10 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
 				if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
 				break;
 			}
+			case "multiselect": {
+				checkPicks(value, spec.options.map((option) => option.value), spec.min ?? 0, spec.max ?? spec.options.length, where);
+				break;
+			}
 			case "secret":
 				fail(where, "is a secret, which a manifest may not set: every reader would have it");
 			default: {
@@ -343,6 +379,17 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
 			}
 		}
 	}
+}
+
+/**
+ * A case's values for its list inputs (#204), checked as a sample's are: a list is held to what the form can
+ * hold. A single value is not checked, as it never was, so a case can still test a tool's own guard against
+ * an out-of-range number, and an older tool's cases pass unedited. For the fixture harness, not the runtime.
+ */
+export function checkCaseLists(specs: readonly InputSpec[], input: Record<string, unknown>): void {
+	const byId = new Map(specs.map((spec) => [spec.id, spec]));
+	const lists = Object.fromEntries(Object.entries(input).filter(([key]) => byId.get(key)?.type === "multiselect"));
+	checkPayload(lists, byId, "input", "A case");
 }
 
 /**
@@ -381,7 +428,8 @@ function validatePresets(specs: InputSpec[]): void {
 			if (option.value === spec.default) {
 				for (const [key, value] of Object.entries(sets)) {
 					const target = byId.get(key) as InputSpec & { default: unknown };
-					if (target.default !== value) {
+					// By value: a list written anew in the preset is the same list as the default.
+					if (JSON.stringify(target.default) !== JSON.stringify(value)) {
 						fail(`${path}.${key}`, `is ${JSON.stringify(value)}, but "${key}" defaults to ${JSON.stringify(target.default)}, and the form opens on this option`);
 					}
 				}

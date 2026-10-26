@@ -123,8 +123,8 @@ describe("the Inputs reference", () => {
 	it("shows the validator's own messages", async () => {
 		const page = html.get("docs-ref-inputs.html") ?? "";
 		// One message, checked against the source text, so a page of invented messages would fail.
-		assert.ok(page.includes("a select needs at least two options; with one, use a fixed value"));
-		assert.ok(readFileSync(join(import.meta.dirname, "../packages/sdk/src/validate.ts"), "utf8").includes("a select needs at least two options; with one, use a fixed value"));
+		assert.ok(page.includes("option values must be unique"));
+		assert.ok(readFileSync(join(import.meta.dirname, "../packages/sdk/src/validate.ts"), "utf8").includes("option values must be unique"));
 	});
 });
 
@@ -421,6 +421,20 @@ describe("the site in a browser", () => {
 		await card.locator("[role=tab]", { hasText: "Live" }).click();
 		assert.equal(await host.locator(".tb-textarea").inputValue(), "state kept");
 		assert.ok(await host.locator(".tb-output [data-kind]").count(), "the result was lost");
+		await page.close();
+	});
+
+	// The multiselect card (#204): the fixture's six record types as checkboxes, its fourteen regions as chips.
+	it("the multiselect card draws checkboxes and chips, and refuses Run with none chosen", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#multiselect`);
+		const host = page.locator("#multiselect tool-host");
+		await host.locator(".tb-chip").first().waitFor({ timeout: 10_000 });
+		assert.equal(await host.locator(".tb-checks input[type=checkbox]").count(), 6);
+		assert.equal(await host.locator(".tb-chips .tb-chip").count(), 14);
+		for (const value of ["A", "AAAA", "MX"]) await host.locator(`input[value="${value}"]`).click();
+		await host.locator(".tb-run").click();
+		assert.equal(await host.locator("#in-types-err").textContent(), "Record types: pick at least one.");
 		await page.close();
 	});
 

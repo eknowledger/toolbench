@@ -323,7 +323,7 @@ or that presents a deprecated one as current, is a field that lies.
 
 ## 4. Inputs
 
-Eight types. Each generates a labelled control with its description wired to `aria-describedby`.
+Nine types. Each generates a labelled control with its description wired to `aria-describedby`.
 
 ```jsonc
 { "id": "text",  "type": "text",     "label": "Pattern", "default": "^a.*z$", "maxLength": 200 }
@@ -335,6 +335,8 @@ Eight types. Each generates a labelled control with its description wired to `ar
 { "id": "day",   "type": "date",     "label": "Day",     "default": "2026-10-25", "min": "2020-01-01" }
 { "id": "tint",  "type": "color",    "label": "Tint",    "default": "#1f5aa8" }
 { "id": "key",   "type": "secret",   "label": "API key", "minLength": 16 }
+{ "id": "types", "type": "multiselect", "label": "Record types", "default": ["A", "MX"], "min": 1,
+  "options": [{ "value": "A", "label": "A" }, { "value": "MX", "label": "MX" }, { "value": "TXT", "label": "TXT" }] }
 ```
 
 Things the validator will hold you to, and why:
@@ -373,6 +375,17 @@ Things the validator will hold you to, and why:
   is refused. ⚠️ **Do not return the value in a result**, not even as an echo: a result is on screen,
   announced to a screen reader, kept in the seed a host may store, and in the `tool-run` event a page
   listens to. Return what you did with it.
+* **A `multiselect` for several choices from a fixed list** (contract version 9, `"sdk": 9`). `run` gets
+  a `string[]` of the chosen option values, in the options' order, so declare it as
+  `type Input = { types: string[] }`. Up to six options are checkboxes and more are chips, a row of toggle
+  buttons that wraps; `"control": "checkboxes"` or `"chips"` picks one. `min` (default 0) and `max`
+  (default every option) bound the list: at `max` the rest are marked unavailable, with the reason in the
+  count line under the group, and below `min` the reader's Run is refused with "Record types: pick at least
+  one." under the input, so `run` never sees too few. The options follow a select's rules, without `sets`.
+  `default`, a sample and a preset's `sets` give the list as a JSON array of option values, each once and
+  within `min..max`, and so does a case in `cases.json`; anything else is refused naming the item. A shared
+  link writes one parameter per choice, `?dns.types=A&dns.types=MX`, and reading a list with an unknown
+  option, a repeat or more than `max` opens on the whole default instead.
 * **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
   host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
   behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a
@@ -749,6 +762,10 @@ return {
   len: token.length,
 };
 ```
+
+The input named by `input` is marked invalid and the message is shown under it, after the field's name:
+"Measurements: No measurements yet. Paste some numbers." So write the message to follow a name and a colon, and do not
+repeat the field's name in it.
 
 Write the message so it says what is wrong, where, and what would be right. `"nope" is not a number`
 beats `Invalid input`. Never abbreviate an error; a browser test asserts that an error never ends in an
