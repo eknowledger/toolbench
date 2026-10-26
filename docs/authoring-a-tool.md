@@ -604,6 +604,11 @@ instead, for a sentence or a plain number with a unit, which in monospace reads 
 list can hold both: `{ label: "Mapped address", value: "192.0.2.10:54321" }` beside
 `{ label: "Integrity", value: "No integrity attribute present", mono: false }`. Contract version 8.
 
+A table column can say how its text wraps, so the table survives a phone: `wrap: "none"` for a short
+token kept on one line (a hash, a date, a status word, a row's name), `wrap: "prose"` for sentences that
+need a reading width. A cell's own `wrap` overrides its column's. Say nothing and nothing is claimed, as
+before. It is rendered as `data-wrap` on the header and every cell. Contract version 8.
+
 ```ts
 { kind: "table",
   columns: [{ key: "n", label: "Bucket", align: "end" }, { key: "hits", label: "Hits", align: "end", mono: true }],

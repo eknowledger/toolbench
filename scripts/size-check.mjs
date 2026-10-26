@@ -400,8 +400,14 @@ const BUDGETS = [
 	 * The worker's half of laying out a large graph (#152), one message and a dynamic import of the layout,
 	 * spent 123 inside it, 4,827. The layout itself is the "graph worker" chunks above, which a worker-mode tool
 	 * never fetches.
+	 *
+	 * Raised from 5_000 to 5_500 by the narrow-table fixture (#213), in the commit that crossed it: 4,989 to
+	 * 5,021 measured. That is the worker's copy of the bench registry naming one more fixture, as it grew for
+	 * the v8 fixtures before it (4,914 to 4,989): a host's worker entry carries its own
+	 * registry instead, and the runtime's share of this chunk did not move. Squeezing the bench's names to fit
+	 * would measure nothing a reader pays.
 	 */
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_000 },
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_500 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
 	/*
@@ -456,6 +462,8 @@ const BUDGETS = [
 	{ label: "bench fixture: field-faces", pattern: /^tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
 	// A form whose inputs carry names and read the form tokens (#224). 449 measured.
 	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// A six-column table whose columns say how they wrap (#213). 681 measured.
+	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -492,6 +500,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture field-faces", pattern: /^worker-tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture input-help", pattern: /^worker-tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture narrow-table", pattern: /^worker-tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 ];
 
 let files;

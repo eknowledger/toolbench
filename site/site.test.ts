@@ -348,6 +348,30 @@ describe("the site in a browser", () => {
 	});
 
 	/*
+	 * The table-wrap card (#213): at 390px its six columns cannot fit, so the part scrolls, the tokens stay on
+	 * one line and the Note column is at least 20ch wide rather than one word.
+	 */
+	it("the table-wrap card keeps tokens on one line and scrolls at 390px", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#table-wrap`);
+		const host = page.locator("#table-wrap tool-host");
+		await host.locator("tbody tr").first().waitFor({ timeout: 10_000 });
+		const seen = await host.evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			const note = root.querySelector('tbody td[data-wrap="prose"]') as HTMLElement;
+			const ch = Number.parseFloat(getComputedStyle(note).fontSize) * 0.5;
+			return {
+				scrolls: part.scrollWidth > part.clientWidth,
+				nowrap: [...root.querySelectorAll('[data-wrap="none"]')].every((c) => getComputedStyle(c).whiteSpace === "nowrap"),
+				noteWide: note.getBoundingClientRect().width >= 20 * ch,
+			};
+		});
+		assert.deepEqual(seen, { scrolls: true, nowrap: true, noteWide: true });
+		await page.close();
+	});
+
+	/*
 	 * The input-styles card (#224): the gallery's sheet sets --tb-input-border on the row whose role is
 	 * "threshold", so that one control's border is the accent and the textarea's is still the border colour.
 	 */

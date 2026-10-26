@@ -6224,3 +6224,43 @@ describe("names and tokens for one input (contract 8, #224)", () => {
 		await page.close();
 	});
 });
+
+describe("how a table column wraps (contract 8, #213)", () => {
+	/*
+	 * Written from the narrow-table fixture by hand: five columns say "none" and Note says "prose", and with
+	 * the default sort host-2 is the third row, whose Note cell overrides its column with "none".
+	 */
+	it("writes data-wrap on every header and cell of a column that says it, and a cell's own over it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=narrow-table`, { waitUntil: "load" });
+		await page.locator("#host >> tbody tr").first().waitFor({ timeout: 15_000 });
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const wrap = (cells: Iterable<Element>) => [...cells].map((c) => c.getAttribute("data-wrap"));
+			return {
+				head: wrap(root.querySelectorAll("thead th")),
+				rows: [...root.querySelectorAll("tbody tr")].map((tr) => [tr.children[0]?.textContent, ...wrap(tr.children)]),
+			};
+		});
+		assert.deepEqual(seen.head, ["none", "none", "none", "none", "none", "prose"]);
+		const n = ["none", "none", "none", "none", "none"];
+		assert.deepEqual(seen.rows, [
+			["host-4", ...n, "prose"],
+			["host-1", ...n, "prose"],
+			["host-2", ...n, "none"],
+			["host-3", ...n, "prose"],
+			["host-5", ...n, "prose"],
+			["host-6", ...n, "prose"],
+		]);
+		await page.close();
+	});
+
+	it("writes no data-wrap on a table that makes no claim", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/styling.html`, { waitUntil: "load" });
+		await page.locator("#audit >> tbody tr").first().waitFor({ timeout: 15_000 });
+		const count = await page.evaluate(() => document.getElementById("audit")?.shadowRoot?.querySelectorAll("[data-wrap]").length);
+		assert.equal(count, 0);
+		await page.close();
+	});
+});

@@ -191,6 +191,7 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |
 | `data-align` | Table cells and headers | `start`, `end` |
+| `data-wrap` | Table cells and headers | `prose`, `none`: the column's or the cell's `wrap` (contract version 8). Absent when neither says |
 | `data-series` | `.tb-byte`, `.tb-bytes-legend li` | `1` to `6`: the series colour of a range with no tone, in order, round again after six. Absent on a toned range |
 | `data-lang` | `.tb-out-code` | The code's language |
 | `data-tok` | A token a tool's `grammar` painted in a textarea, inside `.tb-paint` | `keyword`, `string`, `comment`, `operator`. Colour only: a rule that changes a token's width moves the caret off the glyph |

@@ -446,6 +446,9 @@ function renderCode(lang: string, source: string, options: RenderOptions): HTMLE
 	return el("div", { class: "tb-out-code", "data-lang": lang }, pre, options.copy === false ? null : copyBar("Copy code", () => source, () => pre));
 }
 
+/** Only the two values (#213): the union is closed to TypeScript alone, and an attribute a host selects on is no place for a tool's free text. */
+const wrapOf = (value: unknown) => (value === "prose" || value === "none" ? value : undefined);
+
 function renderTable(
 	output: Extract<Output, { kind: "table" }>,
 	options: RenderOptions,
@@ -454,7 +457,7 @@ function renderTable(
 		"tr",
 		{},
 		...output.columns.map((column) =>
-			el("th", { scope: "col", "data-align": column.align ?? "start", class: column.mono ? "tb-mono" : "" }, column.label),
+			el("th", { scope: "col", "data-align": column.align ?? "start", "data-wrap": wrapOf(column.wrap), class: column.mono ? "tb-mono" : "" }, column.label),
 		),
 	);
 	const link = output.link;
@@ -477,6 +480,7 @@ function renderTable(
 						 * column, where it would only draw an empty line above the value.
 						 */
 						"data-label": column?.label || undefined,
+						"data-wrap": wrapOf(("wrap" in value ? value.wrap : undefined) ?? column?.wrap),
 						class: mono ? "tb-mono" : "",
 					},
 					value.text,

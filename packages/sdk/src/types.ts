@@ -62,9 +62,17 @@ export interface Column {
 	align?: "start" | "end";
 	/** Monospace, for anything the reader will compare digit by digit. */
 	mono?: boolean;
+	/**
+	 * How the column's text wraps, rendered as `data-wrap` on its header and every cell, so a narrow layout
+	 * knows which columns are sentences: `prose` may wrap and wants a reading width, `none` is a short token
+	 * (a hash, a date, a status word) kept on one line. A cell's own `wrap` overrides it. Absent makes no
+	 * claim, and no attribute is written. Contract version 8.
+	 */
+	wrap?: "prose" | "none";
 }
 
-export type Cell = string | number | { text: string; mono?: boolean; tone?: TextTone };
+/** A cell's `wrap` overrides its column's (contract version 8). */
+export type Cell = string | number | { text: string; mono?: boolean; tone?: TextTone; wrap?: "prose" | "none" };
 
 /** One line, bar or area on a chart. */
 export interface Series {

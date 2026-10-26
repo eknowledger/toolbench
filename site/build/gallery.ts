@@ -371,6 +371,13 @@ export const GROUPS: Group[] = [
 				code: (demo) => [demo, region("site/src/gallery.ts", "reveal")],
 			},
 			{
+				id: "table-wrap",
+				title: "A wide table on a phone",
+				text: "A column says whether it holds prose or a short token with <code>wrap</code>, written as <code>data-wrap</code>, so a narrow layout can keep tokens on one line and give sentences a reading width. Shown at 390px.",
+				demo: `<div class="narrow-demo"><tool-host tool="narrow-table" mode="embed"></tool-host></div>`,
+				code: async () => [await output(`${FIX}/narrow-table`, {}), region("site/src/gallery-host.ts", "wrap-styles")],
+			},
+			{
 				id: "input-styles",
 				title: "Styling one input",
 				text: "Each input's row is named by <code>data-input</code>, <code>data-type</code> and the tool's <code>role</code>, and the controls read four properties of their own. Set one on a row and only that input changes.",
