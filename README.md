@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.9%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-29.1%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -66,7 +66,7 @@ that produces it:
 | Section | What it shows |
 |---|---|
 | [Display modes](https://eknowledger.github.io/toolbench/gallery.html#modes) | A tool on its own page, a card that loads nothing until it is opened, and a tool inside an article |
-| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a segmented select, a date picker, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
+| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a segmented select, a date picker, a colour picker, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
 | [Running and failing](https://eknowledger.github.io/toolbench/gallery.html#running) | Worker mode with a timeout, a tool that spins, throws or rejects its input, and the `deprecated` and `retired` states |
 | [Charts](https://eknowledger.github.io/toolbench/gallery.html#charts) | Every chart kind, each with the result that draws it |
 
@@ -572,6 +572,17 @@ checks the value before `run` and refuses it on the input: "Captured at must be 
 2026-10-25T23:59, got 2026-11-02T09:30." `inputProblem(spec, value)` in `@toolbench/sdk` is that check.
 Contract version 9.
 
+**A colour.** A `color` input is a hex box with the system's colour picker beside it, kept in step:
+
+```jsonc
+{ "id": "accent", "type": "color", "label": "Highlight colour", "default": "#1f5aa8" }
+```
+
+`run` gets a lowercase `#rrggbb`: no alpha, no shorthand, and a default in any other form is refused.
+The box is the labelled control and is lowercased as it is read; anything that is not six hex digits is
+refused before `run`. The swatch is in the controls chunk, so without it the box still works. Contract
+version 9.
+
 **A textarea can be highlighted.** Give a `textarea` input a `lang`, and a host that passes `highlight`
 to `defineToolHost` paints what the reader types with the same hook `code` results use, so a site keeps
 one highlighter:
@@ -818,7 +829,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 28.9 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 29.1 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |

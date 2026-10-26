@@ -6798,3 +6798,92 @@ describe("a date input (contract 9, #203)", () => {
 		await page.close();
 	});
 });
+
+describe("a colour input (contract 9, #203)", () => {
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="accent"]') as HTMLElement;
+			const swatch = row.querySelector(".tb-swatch") as HTMLInputElement | null;
+			const box = row.querySelector("#in-accent") as HTMLInputElement;
+			const attrs = (e: Element | null) => (e ? Object.fromEntries([...e.attributes].map((a) => [a.name, a.value])) : null);
+			return {
+				children: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				inRow: [...(row.querySelector(".tb-color-row")?.children ?? [])].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				box: attrs(box),
+				swatch: attrs(swatch),
+				boxValue: box.value,
+				swatchValue: swatch?.value,
+				labelFor: row.querySelector("label")?.getAttribute("for"),
+				error: root.querySelector(".tb-error-message")?.textContent ?? "",
+				answer: root.querySelector(".tb-out-fields")?.textContent ?? "",
+			};
+		});
+	const run = async (page: Page) => {
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.getAttribute("data-state") === "idle", null, { timeout: 10_000 });
+	};
+
+	/* Written from the native-inputs manifest by hand: the hex box is the labelled control, the swatch beside it a shortcut. */
+	it("draws a native swatch beside a hex box, the box the labelled control", async () => {
+		const page = await openNative();
+		const seen = await read(page);
+		assert.deepEqual(seen.children, ["label.tb-label", "div.tb-color-row", "p.tb-desc", "p.tb-sr"]);
+		assert.deepEqual(seen.inRow, ["input.tb-swatch", "input.tb-input"]);
+		assert.equal(seen.labelFor, "in-accent");
+		assert.deepEqual(seen.box, {
+			class: "tb-input",
+			id: "in-accent",
+			type: "text",
+			spellcheck: "false",
+			autocapitalize: "off",
+			autocomplete: "off",
+			dir: "ltr",
+			maxlength: "7",
+			"aria-describedby": "in-accent-desc in-accent-err",
+		});
+		assert.deepEqual(seen.swatch, { class: "tb-swatch", type: "color", "aria-label": "Highlight colour picker" });
+		assert.deepEqual([seen.boxValue, seen.swatchValue], ["#1f5aa8", "#1f5aa8"]);
+		await page.close();
+	});
+
+	it("keeps the two in step both ways, and run gets lowercase #rrggbb", async () => {
+		const page = await openNative();
+		await page.locator("#host >> #in-accent").fill("#AA0011");
+		assert.equal((await read(page)).swatchValue, "#aa0011", "a whole colour typed moves the swatch");
+		await page.locator("#host >> #in-accent").fill("#12");
+		assert.equal((await read(page)).swatchValue, "#aa0011", "half a colour leaves it where it was");
+		await page.evaluate(() => {
+			const swatch = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-swatch") as HTMLInputElement;
+			swatch.value = "#00ff7f";
+			swatch.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		assert.equal((await read(page)).boxValue, "#00ff7f", "a pick writes the box");
+		await run(page);
+		assert.match((await read(page)).answer, /accent"#00ff7f"/);
+		await page.close();
+	});
+
+	it("refuses a box that is not a colour before run, in the mockup's words", async () => {
+		const page = await openNative();
+		await page.locator("#host >> #in-accent").fill("#1f5ag8");
+		await run(page);
+		const seen = await read(page);
+		assert.equal(seen.error, 'Highlight colour must be a #rrggbb colour, got "#1f5ag8".');
+		assert.equal(seen.box?.["aria-invalid"], "true");
+		assert.equal(seen.answer, "");
+		await page.close();
+	});
+
+	it("takes a colour from a link and from a host, moving the swatch", async () => {
+		const page = await openNative("&native-inputs.accent=%23AA0011");
+		const linked = await read(page);
+		assert.deepEqual([linked.boxValue, linked.swatchValue], ["#aa0011", "#aa0011"]);
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { accent: "#336699" };
+		});
+		const hosted = await read(page);
+		assert.deepEqual([hosted.boxValue, hosted.swatchValue], ["#336699", "#336699"]);
+		await page.close();
+	});
+});

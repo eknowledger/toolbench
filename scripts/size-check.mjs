@@ -219,8 +219,13 @@ const BUDGETS = [
 	 * because a native picker lets a reader type past max and hands over nothing mid-entry. The rest is the
 	 * picker's attributes on the text input's branch, the loop in run, and keeping a date in an error message
 	 * on one line. 28_500 would have left the build 438 over.
+	 *
+	 * Raised from 29_000 to 29_500 by the colour input (#203), in the commit that crossed it: 28,938 to 29,079
+	 * measured, 141 bytes: the #rrggbb check and its message, the lowercasing, the hex box's attributes on the
+	 * text input's branch, and handing the box to the controls chunk for its swatch. 29_000 would have left the
+	 * build 79 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -372,7 +377,8 @@ const BUDGETS = [
 	 * The newer inputs' controls (#203): a segmented select's radios, the measurement that stacks them, and their
 	 * rules. Fetched with a tool's code only by a tool that has one, so every other page pays nothing. Reader
 	 * cost: that reader downloads it. 1,104 measured, 73 of it tracking the keyboard for the ring WebKit
-	 * does not draw on a radio.
+	 * does not draw on a radio, and 1,360 with a colour's swatch, kept in step with its hex box,
+	 * and its rules.
 	 */
 	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 1_500 },
 	/*
@@ -504,7 +510,7 @@ const BUDGETS = [
 	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// A six-column table whose columns say how they wrap (#213). 681 measured.
 	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
-	// The newer input types (#203) on screen for the browser tests and the gallery. 227 measured.
+	// The newer input types (#203) on screen for the browser tests and the gallery. 241 measured.
 	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.

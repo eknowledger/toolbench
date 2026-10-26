@@ -24,6 +24,8 @@ export function coerce(spec: InputSpec, value: string | number | boolean): strin
 		// As written, in range or not: the check before `run` names what arrived rather than a substitute.
 		case "date":
 			return String(value);
+		case "color":
+			return String(value).trim().toLowerCase();
 		default: {
 			const text = String(value);
 			return spec.maxLength !== undefined ? text.slice(0, spec.maxLength) : text;

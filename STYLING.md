@@ -78,6 +78,7 @@ same order, so the cascade is the same.
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
 | `.tb-seg`, `.tb-seg-opt` | A segmented select (#203): the radio group, and each option's `<label>` with its radio inside. `.tb-seg` carries `data-stack` while the options are stacked radios, and `aria-invalid` when a result names the input. Its row is a `<fieldset>` and its `.tb-label` a `<legend>` |
 | `.tb-nowrap` | A date inside an error message (#203), kept on one line |
+| `.tb-color-row`, `.tb-swatch` | A colour input (#203): the row holding the native swatch, `input[type="color"]`, and the hex box, which is the `.tb-input` |
 | `.tb-details`, its `summary`, `.tb-details-body` | An input's `details` (contract version 8): a `<details>` after the description, closed until the reader opens it. The body takes the same markup classes as `.tb-desc` |
 | `.tb-desc p`, `.tb-desc ul`, `.tb-desc li`, `.tb-desc code`, `.tb-desc strong`, `.tb-desc [data-tone]` | A description's markup. `.tb-desc` is a `<p>`, or a `<div>` when the description has more than one block. `data-tone` is `good`, `warn`, `bad`, `muted` or `accent` |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
@@ -190,7 +191,7 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | `data-kind` | Every part's root | The part's kind |
 | `data-role` | A part's root, a `.tb-field`, or a `.tb-field-row` | Whatever `role` the tool set on the part, field or input. Absent when it set none |
 | `data-input` | `.tb-field-row` | The input's `id` |
-| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle`, `date` |
+| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle`, `date`, `color` |
 | `data-part` | A part's root | Whatever `id` the tool set, unique in the result. Absent when it set none. `host.reveal(id)` goes to it |
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |

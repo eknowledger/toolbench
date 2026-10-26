@@ -131,7 +131,7 @@ const isDate = (mode: DateMode, v: unknown): v is string =>
  * the reader sees, naming the input by its label; `undefined` when nothing is. The runtime refuses a value
  * this finds before calling `run`, showing it as an error on that input, so `run` can trust the format and
  * the range. A native date control lets a reader type a day outside `min..max`, and empties itself while a
- * date is half typed. Validation applies it to samples and presets too. Contract version 9.
+ * date is half typed; a colour's hex box takes any seven characters. Validation applies it to samples and presets too. Contract version 9.
  */
 export function inputProblem(spec: InputSpec, value: unknown): string | undefined {
 	if (spec.type === "date") {
@@ -142,6 +142,8 @@ export function inputProblem(spec: InputSpec, value: unknown): string | undefine
 		if (spec.min && value < spec.min) return `${spec.label} must be on or after ${spec.min}, got ${value}.`;
 		if (spec.max && value > spec.max) return `${spec.label} must be on or before ${spec.max}, got ${value}.`;
 	}
+	// What a reader types is lowercased and trimmed first, so only a value that is not six hex digits gets here.
+	if (spec.type === "color" && !/^#[0-9a-f]{6}$/.test(String(value))) return `${spec.label} must be a #rrggbb colour, got ${JSON.stringify(value)}.`;
 	return undefined;
 }
 
@@ -222,11 +224,14 @@ function validateInput(raw: unknown, path: string): InputSpec {
 			if (typeof o.default !== "boolean") fail(`${path}.default`, "a toggle input needs a boolean default");
 			break;
 		}
-		case "date": {
-			const mode = o.mode === undefined ? "date" : oneOf(o.mode, ["date", "time", "datetime"] as const, `${path}.mode`);
-			for (const key of ["min", "default", "max"]) {
-				if ((key === "default" || o[key] !== undefined) && !isDate(mode, o[key])) {
-					fail(`${path}.${key}`, `must be written ${DATE_FORMATS[mode]} in mode "${mode}", got ${JSON.stringify(o[key])}`);
+		case "date":
+		case "color": {
+			if (type === "date") {
+				const mode = o.mode === undefined ? "date" : oneOf(o.mode, ["date", "time", "datetime"] as const, `${path}.mode`);
+				for (const key of ["min", "default", "max"]) {
+					if ((key === "default" || o[key] !== undefined) && !isDate(mode, o[key])) {
+						fail(`${path}.${key}`, `must be written ${DATE_FORMATS[mode]} in mode "${mode}", got ${JSON.stringify(o[key])}`);
+					}
 				}
 			}
 			// Held to what a reader is held to, so the form never opens refusing its own default.

@@ -655,6 +655,24 @@ describe("validateManifest: a date input (contract 9, #203)", () => {
 	});
 });
 
+describe("validateManifest: a colour input (contract 9, #203)", () => {
+	const accent = (value: unknown) => (m: Record<string, unknown>) => { m.inputs = [{ id: "accent", type: "color", label: "Highlight colour", default: value }]; };
+	it("accepts a lowercase #rrggbb default", () => {
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ id: "accent", type: "color", label: "Highlight colour", default: "#1f5aa8" }] }));
+	});
+	it("refuses any other default: uppercase, shorthand, alpha, a name", () => {
+		failsWith(accent("#1F5AA8"), "inputs[0].default", 'Highlight colour must be a #rrggbb colour, got "#1F5AA8"');
+		failsWith(accent("#15a"), "inputs[0].default", "#rrggbb");
+		failsWith(accent("#1f5aa8ff"), "inputs[0].default", "#rrggbb");
+		failsWith(accent("blue"), "inputs[0].default", '"blue"');
+		failsWith(accent(undefined), "inputs[0].default", "got undefined");
+	});
+	it("holds a sample to the same form", () => {
+		const m = { ...good(), inputs: [{ id: "accent", type: "color", label: "Highlight colour", default: "#1f5aa8" }], samples: [{ label: "Red", input: { accent: "#f00" } }] };
+		assert.throws(() => validateManifest(m), /samples\[0\]\.input\.accent: Highlight colour must be a #rrggbb colour, got "#f00"\./);
+	});
+});
+
 /*
  * The messages a reader sees when the runtime refuses a value before `run` (#203), written from the mockup by
  * hand: the label, what was wrong, and what arrived.
@@ -668,6 +686,11 @@ describe("inputProblem", () => {
 		assert.equal(inputProblem(at, "2026-10-25 14:30"), 'Captured at must be a date and time as YYYY-MM-DDTHH:MM, got "2026-10-25 14:30".');
 		assert.equal(inputProblem({ id: "d", type: "date", label: "Day", default: "2024-02-29" }, "2025-02-29"), 'Day must be a date as YYYY-MM-DD, got "2025-02-29".');
 		assert.equal(inputProblem({ id: "t", type: "date", label: "Start", mode: "time", default: "09:00" }, ""), "Start needs a time, as HH:MM.");
+	});
+	it("says a colour is not six hex digits, in the mockup's words", () => {
+		const accent = { id: "accent", type: "color", label: "Highlight colour", default: "#1f5aa8" } as const;
+		assert.equal(inputProblem(accent, "#1f5ag8"), 'Highlight colour must be a #rrggbb colour, got "#1f5ag8".');
+		assert.equal(inputProblem(accent, "#1f5aa8"), undefined);
 	});
 	it("finds nothing in a good value, or in an input the form already holds to its rules", () => {
 		assert.equal(inputProblem(at, "2026-10-25T23:59"), undefined);

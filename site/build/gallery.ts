@@ -198,7 +198,7 @@ export const GROUPS: Group[] = [
 	{
 		id: "inputs",
 		title: "Inputs",
-		text: "The form is built from the manifest: six input types, each with a real label, a description and keyboard behaviour.",
+		text: "The form is built from the manifest: seven input types, each with a real label, a description and keyboard behaviour.",
 		features: [
 			{
 				id: "samples",
@@ -231,9 +231,9 @@ export const GROUPS: Group[] = [
 			{
 				id: "native-inputs",
 				title: "Native controls",
-				text: "<code>\"control\": \"segmented\"</code> on a select draws its options as one row of native radios, the chosen one filled. When a label would not fit, the row becomes stacked radios. A <code>date</code> input is the browser's own picker, and a value out of range is refused before the tool runs.",
+				text: "<code>\"control\": \"segmented\"</code> on a select draws its options as one row of native radios, the chosen one filled. When a label would not fit, the row becomes stacked radios. A <code>date</code> input is the browser's own picker, and a value out of range is refused before the tool runs. A <code>color</code> is a hex box beside the system's picker.",
 				demo: `<tool-host tool="native-inputs" mode="embed"></tool-host>`,
-				code: () => [input(`${FIX}/native-inputs`, "order"), input(`${FIX}/native-inputs`, "captured")],
+				code: () => [input(`${FIX}/native-inputs`, "order"), input(`${FIX}/native-inputs`, "captured"), input(`${FIX}/native-inputs`, "accent")],
 			},
 			{
 				id: "highlighted-input",

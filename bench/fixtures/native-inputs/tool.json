@@ -2,7 +2,7 @@
 	"sdk": 9,
 	"id": "native-inputs",
 	"name": "Native inputs",
-	"blurb": "The browser's own controls behind the newer input types: a select drawn as segments, and a date and time.",
+	"blurb": "The browser's own controls behind the newer input types: a select drawn as segments, a date and time, and a colour.",
 	"version": "1.0.0",
 	"capabilities": ["pure"],
 	"runtime": { "entry": "index.ts", "thread": "main" },
@@ -32,6 +32,13 @@
 			"default": "2026-10-25T14:30",
 			"min": "2020-01-01T00:00",
 			"max": "2026-10-25T23:59"
+		},
+		{
+			"id": "accent",
+			"type": "color",
+			"label": "Highlight colour",
+			"description": "Six hex digits, as `#rrggbb`. The swatch opens the system picker.",
+			"default": "#1f5aa8"
 		}
 	]
 }

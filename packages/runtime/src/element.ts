@@ -748,7 +748,7 @@ export class ToolHost extends HTMLElement {
 			const share = this.#shares ? loadShare().catch(() => undefined) : undefined;
 			// The newer inputs' controls (#203). A failed fetch leaves each the plain control the runtime draws itself.
 			const native =
-				!controls && this.#manifest?.inputs.some((input) => input.type === "select" && input.control === "segmented")
+				!controls && this.#manifest?.inputs.some((input) => input.type === "color" || (input.type === "select" && input.control === "segmented"))
 					? import("./controls.ts").then((module) => void (controls = module), () => undefined)
 					: undefined;
 			this.#loaded = await this.#resolve(cfg);
@@ -1464,14 +1464,27 @@ export class ToolHost extends HTMLElement {
 					"input",
 					spec.type === "date"
 						? { class: "tb-input", id, type: spec.mode === "datetime" ? "datetime-local" : (spec.mode ?? "date"), min: spec.min, max: spec.max, dir: "ltr" }
-						: { class: "tb-input", id, type: "text", spellcheck: "false", autocapitalize: "off", autocomplete: "off", dir: spec.dir ?? "auto", maxlength: spec.maxLength },
+						: { class: "tb-input", id, type: "text", spellcheck: "false", autocapitalize: "off", autocomplete: "off", dir: spec.type === "color" ? "ltr" : (spec.dir ?? "auto"), maxlength: spec.type === "color" ? 7 : spec.maxLength },
 				);
 				input.value = String(this.#values[spec.id] ?? spec.default);
 				input.addEventListener("input", () => {
-					this.#values[spec.id] = input.value;
+					// A colour is lowercased and trimmed, so `run` gets #rrggbb however it was typed.
+					this.#values[spec.id] = coerce(spec, input.value);
 					this.#edited(spec.id);
 				});
 				control = input;
+				/*
+				 * A colour's hex box is the labelled control, and the native swatch beside it a shortcut to the system
+				 * picker (#203), from the controls chunk. Without it the box alone still takes a colour.
+				 */
+				if (spec.type === "color" && controls) {
+					const swatch = controls.swatch(input, spec.label, () => String(this.#values[spec.id]), (value) => {
+						this.#values[spec.id] = value;
+						this.#edited(spec.id);
+					});
+					placed = swatch.row;
+					this.#painters.set(spec.id, swatch.sync);
+				}
 				break;
 			}
 		}

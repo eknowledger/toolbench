@@ -83,6 +83,13 @@ describe("coerce", () => {
 		assert.equal(coerce(day, 20270101), "20270101");
 	});
 
+	// run gets lowercase #rrggbb whatever case was typed or linked; anything else is kept, to be named before run.
+	it("lowercases and trims a colour, and keeps one that is not a colour as written", () => {
+		const accent = { id: "accent", type: "color", label: "Accent", default: "#1f5aa8" } as const satisfies InputSpec;
+		assert.equal(coerce(accent, " #AA0011 "), "#aa0011");
+		assert.equal(coerce(accent, "teal"), "teal");
+	});
+
 	it("truncates text to maxLength, the same limit the maxlength attribute enforces on typing", () => {
 		assert.equal(coerce(textSpec, "abcdefghij"), "abcdefgh");
 		assert.equal(coerce(unboundedText, "abcdefghij"), "abcdefghij");
