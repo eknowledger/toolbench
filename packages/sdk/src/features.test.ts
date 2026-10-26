@@ -195,4 +195,19 @@ describe("a result using a feature newer than its tool's sdk is reported (#170)"
 		assert.match(String(outputFeatureProblem(chart({}, { x: ["a", "b"] }), 3)), /chart\.x: chart x text/);
 		assert.equal(outputFeatureProblem(chart({ shape: "bar" }), 1), undefined, "the shapes of version 1 are fine at 1");
 	});
+
+	/*
+	 * Either value, not only `false`. `true` draws the same on a v7 runtime, but the key is what a tool
+	 * declares it needs, and a rule that let one value of a key through under an older sdk would be a
+	 * second rule for an author to remember.
+	 */
+	it("sees mono on a field, at version 8, inside a group", () => {
+		const faces: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "Address", value: "192.0.2.10", mono: true }, { label: "Integrity", value: "none present", mono: false }] }] };
+		assert.equal(
+			outputFeatureProblem(faces, 7),
+			'output.parts[0].fields[0].mono: field mono is from contract version 8, but the tool declares "sdk": 7. Declare "sdk": 8.',
+		);
+		assert.equal(outputFeatureProblem(faces, 8), undefined);
+		assert.equal(outputFeatureProblem({ kind: "fields", fields: [{ label: "Address", value: "192.0.2.10" }] }, 7), undefined, "a field with no mono is a v1 field");
+	});
 });

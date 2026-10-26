@@ -258,7 +258,9 @@ export const STYLES = /* css */ `
 .tb-fields, .tb-field-group dl { margin: 0; display: grid; gap: 0.375rem; }
 .tb-field { display: grid; grid-template-columns: minmax(6rem, 34%) 1fr; gap: 0.75rem; align-items: baseline; }
 .tb-field dt { color: var(--tb-muted); font-size: 0.82rem; }
-.tb-field dd { margin: 0; font-family: var(--tb-mono); font-size: 0.85rem; word-break: break-word; }
+/* The face comes from .tb-mono, which the dd carries unless the field says mono: false (#209). The size
+   stays here and outranks .tb-mono's 0.82rem, so an address and a sentence in one list share a size. */
+.tb-field dd { margin: 0; font-size: 0.85rem; word-break: break-word; }
 .tb-field[data-tone="bad"] dd .tb-value { color: var(--tb-bad); }
 .tb-field[data-tone="warn"] dd .tb-value { color: var(--tb-warn); }
 .tb-field[data-tone="good"] dd .tb-value { color: var(--tb-good); }

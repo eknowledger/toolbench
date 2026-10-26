@@ -6100,3 +6100,57 @@ describe("chart labels keep their size at any width (#210)", () => {
 		assert.ok(widths.length > 30 && widths.every((w) => w <= 520.5), `every picture at most 520px: ${widths.map(Math.round).join(", ")}`);
 	});
 });
+
+describe("a field's face (contract 8, #209)", () => {
+	/*
+	 * Written from the field-faces fixture by hand: Mapped address says mono: true, Integrity and Round trip
+	 * say mono: false, and Transaction says nothing, which must draw as every field drew before `mono`.
+	 */
+	it("sets .tb-mono on the dd unless the field says mono: false, in one size either way", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=field-faces`, { waitUntil: "load" });
+		// The fixture runs as it opens (autoRun), so there is no Run button to press.
+		await page.locator("#host >> .tb-field").first().waitFor({ timeout: 15_000 });
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const frame = getComputedStyle(root.querySelector(".tb") as Element);
+			const face = (node: Element) => getComputedStyle(node).fontFamily;
+			return {
+				mono: frame.getPropertyValue("--tb-mono"),
+				text: frame.getPropertyValue("--tb-font"),
+				fields: [...root.querySelectorAll(".tb-field")].map((field) => {
+					const dd = field.querySelector("dd") as Element;
+					const note = dd.querySelector(".tb-note");
+					return {
+						label: field.querySelector("dt")?.textContent,
+						classes: dd.className,
+						value: face(dd.querySelector(".tb-value") as Element),
+						note: note ? face(note) : null,
+						size: getComputedStyle(dd).fontSize,
+					};
+				}),
+			};
+		});
+		assert.deepEqual(
+			seen.fields.map((f) => [f.label, f.classes]),
+			[
+				["Mapped address", "tb-mono"],
+				["Integrity", ""],
+				["Round trip", ""],
+				["Transaction", "tb-mono"],
+			],
+		);
+		const [address, integrity, trip, transaction] = seen.fields;
+		// A custom property reads back as written and a computed font-family as the browser serialises it:
+		// WebKit drops the quotes around "SF Mono" that Chromium keeps, so quotes and spaces are not compared.
+		const same = (s: string) => s.replace(/[\s'"]+/g, "");
+		assert.equal(same(address!.value), same(seen.mono), "mono: true is the monospace face");
+		assert.equal(same(transaction!.value), same(seen.mono), "and so is a field that says nothing");
+		assert.equal(same(integrity!.value), same(seen.text), "mono: false is the text face");
+		assert.equal(same(trip!.note ?? ""), same(seen.text), "and its note follows it");
+		// 0.85rem at a 16px root: the dd's own size, which .tb-mono's 0.82rem (13.12px) must not override.
+		// Firefox rounds it to a sixty-fourth, 13.5938px, so within a hundredth of a pixel.
+		for (const f of seen.fields) assert.ok(Math.abs(Number.parseFloat(f.size) - 13.6) < 0.01, `${f.label} is ${f.size}`);
+		await page.close();
+	});
+});

@@ -115,7 +115,7 @@ flowchart LR
 A manifest and every result are walked up the same chain of migrations to the current shape before
 anything validates or draws them, and a manifest newer than the runtime is refused.
 
-The chain holds six steps today, `1 → 2` to `6 → 7`, and all twelve of their halves are the identity
+The chain holds seven steps today, `1 → 2` to `7 → 8`, and all fourteen of their halves are the identity
 function.
 
 It was built before anything needed it, and tested against synthetic versions, which is why the first
@@ -264,10 +264,11 @@ See [authoring-a-tool.md §3b](authoring-a-tool.md#3b-retiring-a-tool).
 | 5 | 0.8.0 | Names for host stylesheets: an optional `role` on any output part and on any field, rendered as `data-role` (see [STYLING.md](../STYLING.md)). An optional `id` on any part, rendered as `data-part`, which `host.reveal(id)` opens, scrolls to and focuses; fixtures refuse an id used twice in one result. The `muted` tone on fields and table cells, for the routine majority of a dense table. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 | 6 | 0.9.0 | Presets and highlighted inputs. An optional `sets` on a select option, the values choosing that option writes into other inputs, validated like a sample's `input`. The select follows the form afterwards, showing the preset the values match or the first option with no `sets`. An optional `lang` on a textarea, which the host's `highlight` hook paints behind the real textarea; textarea only. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 | 7 | 0.10.0 | Graphs: the `graph` output kind (#152), nodes and edges the runtime lays out and draws. Layered, tree, radial, force and manual layouts in four directions; orthogonal, spline, straight and polyline routing; twelve shapes, record nodes with per-row ports, and crow's-foot and UML markers; nested groups that a reader can close, swimlanes, a highlighted path, and a tool's own `limits`. Structural rules (unique ids, edges and ports that exist, groups without cycles, a group in one lane) are checked by the fixture runner as well as the runtime, through the SDK's `graphProblem`. An optional `grammar` beside a textarea's `lang` (#163): keywords, a comment prefix, operators and string delimiters the runtime tokenises in the paint chunk with no regular expression, capped by validation, with no pattern key; a host hook that paints the `lang` still wins. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
+| 8 | Unreleased | Faces and form hints. An optional `mono` on a field (#209), `false` to set its value and note in the text face rather than monospace, rendered as `.tb-mono` on the `<dd>` like a table cell; a field with no `mono` is drawn as before. Both migration halves are the identity function, and no existing tool's fixtures were edited. |
 
 Planned, in likely order. Nothing here is committed, and each would follow §5:
 
 | Version | Adds | Why it is not in the contract yet |
 |---|---|---|
-| 8 or later | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
-| 8 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |
+| 9 or later | A `file` input and an `assets` capability | Reading a file means a tool is no longer purely a function of declared inputs. That interacts with seeding, with fixtures, and with whether a tool may be a live card, and each of those needs deciding rather than guessing |
+| 9 or later | A `net` capability with an injected `ctx.fetch` | The runtime would have to own the timeout, the abort and the failure rendering. A tool calling `fetch` itself would break cancellation and make fixtures meaningless |
