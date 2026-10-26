@@ -32,14 +32,24 @@ const PORT = 4173;
 const BASE = `http://localhost:${PORT}`;
 
 /**
- * Three frames. A chart is first drawn at a guessed width, before it is on the page, and replaced by one laid
- * out at its measured width in the next rendering step, before anything is painted (#210). The redrawn figure
- * is observed from the frame after, which may lay it out once more if its page's scrollbar moved. A test that
- * finds an earlier drawing and acts on it is acting on an element about to be detached: in CI a key pressed
- * on one stepped a readout that the next drawing then started again from its first value.
+ * Until every chart on the page is the drawing a reader keeps. A chart is first drawn at a guessed width,
+ * before it is on the page, and replaced by one laid out at its measured width; the runtime marks that one
+ * `data-fitted` once a measurement finds nothing left to change (#236). Waiting a count of frames instead was
+ * enough on a laptop and not on a loaded CI runner, where WebKit then pointed at a drawing about to be
+ * replaced and read the readout of the wrong point. Charts with no box, a closed card's hidden preview, never
+ * measure, so they are not waited on.
  */
 const settled = (page: Page) =>
-	page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
+	page.waitForFunction(
+		() => {
+			const figures = [...document.querySelectorAll("tool-host")]
+				.flatMap((h) => [...(h.shadowRoot?.querySelectorAll<HTMLElement>("figure.tb-out-chart") ?? [])])
+				.filter((f) => f.getClientRects().length > 0);
+			return figures.length > 0 && figures.every((f) => f.hasAttribute("data-fitted"));
+		},
+		null,
+		{ timeout: 15_000 },
+	);
 
 const ENGINES = { chromium, firefox, webkit } as const;
 type EngineName = keyof typeof ENGINES;
@@ -2564,6 +2574,7 @@ describe("charts over whole-number x values (#111)", () => {
 		// (q3 - median) / (q3 - q1) = (18 - 12) / (18 - 8) = 0.6 of the box, measured from its top.
 		assert.ok(Math.abs((read.mobile.median - read.mobile.top) / read.mobile.height - 0.6) < 0.02, JSON.stringify(read.mobile));
 		assert.equal(read.heads, 1 + 2 * 5, "the x, then low, q1, median, q3 and high for each series");
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		await page.keyboard.press("End");
 		const row = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout li")?.textContent);
@@ -2616,6 +2627,7 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.equal(read.rows, 13, "one table row per point, since the series share no x");
 		assert.deepEqual(read.first, ["Quiet room", "200", "18"]);
 		// From the keyboard the points go left to right: the first is (200, 18), the second (250, 26).
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		await page.keyboard.press("ArrowRight");
 		const card = await page.evaluate(() => {
@@ -2645,6 +2657,7 @@ describe("charts over whole-number x values (#111)", () => {
 		assert.equal(read.bands, 2, "second 7 has no data, so the band is two pieces");
 		assert.ok(read.bandFirst, "the band is drawn beneath the median line");
 		assert.deepEqual(read.heads, ["Second", "Median (ms)", "p5 to p95, low (ms)", "p5 to p95, high (ms)"]);
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		const rows = await page.evaluate(() => [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-readout li") ?? [])].map((li) => li.textContent));
 		// Second 1: median 31, spread 4, so 29 to 35.
@@ -2726,6 +2739,7 @@ describe("charts over whole-number x values (#111)", () => {
 		const row2 = read.bars.filter((b) => b.i === 2).reduce((sum, b) => sum + b.w, 0);
 		assert.ok(Math.abs(row2 / total - 195 / 90) < 0.02, "rows are as long as their totals, 195 against 90");
 
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		await page.keyboard.press("ArrowDown");
 		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
@@ -2883,6 +2897,7 @@ describe("the chart readout (#112)", () => {
 		});
 	/** Point at frame n: its x position in the plot, from the axis geometry rather than a guess. */
 	async function pointAt(page: import("playwright").Page, frame: number) {
+		await settled(page);
 		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
 		assert.ok(box);
 		// Frames 1 to 20 span the x axis edge to edge, and the chart is laid out at its measured width (#210), so
@@ -2911,6 +2926,7 @@ describe("the chart readout (#112)", () => {
 
 	it("steps through the values from the keyboard, and reads each one out", async () => {
 		const page = await chartCase("markers");
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		assert.equal((await card(page)).title, "Frame 1", "focus shows the first value");
 		await page.keyboard.press("ArrowRight");
@@ -2948,6 +2964,7 @@ describe("the chart readout (#112)", () => {
 				};
 			});
 		// Frames 4 to 9 span the plot edge to edge; frame 6 is the third of six.
+		await settled(page);
 		const box = await page.locator("#host >> .tb-plot svg").boundingBox();
 		assert.ok(box);
 		await page.mouse.move(box.x + ((56 + (2 / 5) * (620 - 56)) / 640) * box.width, box.y + box.height * 0.4);
@@ -3020,6 +3037,7 @@ describe("heatmaps (#121)", () => {
 
 	it("reads out the cell under the keyboard, and moves through the grid both ways", async () => {
 		const { page } = await heatmapCase("heatmap-diverging");
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		await page.keyboard.press("ArrowDown");
 		await page.keyboard.press("ArrowRight");
@@ -3170,6 +3188,7 @@ describe("radar, treemap and Venn (#128, #129, #130)", () => {
 		const largest = Math.max(...areas);
 		// Media is the largest group: 38 + 52 + 30 + 22 + 14 = 156 of 401.
 		assert.ok(Math.abs(largest / read.whole - 156 / 401) < 0.01, `Media, the largest group, is ${(largest / read.whole).toFixed(3)} of the area`);
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		const title = await page.evaluate(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-readout-title")?.textContent);
 		assert.match(title ?? "", / \/ /, `the readout names the path: ${title}`);
@@ -3240,6 +3259,7 @@ describe("radar, treemap and Venn (#128, #129, #130)", () => {
 		assert.equal(read.satelliteShapes, 0, "a broken shape is not filled");
 		assert.equal(read.satelliteDots, 4, "four of five values present");
 		assert.deepEqual(read.rings, ["2", "4", "6", "8", "10"]);
+		await settled(page);
 		await page.locator("#host >> .tb-plot").focus();
 		const rows = await page.evaluate(() => [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-readout li") ?? [])].map((li) => li.textContent));
 		assert.deepEqual(rows, ["9Fibre", "6Mobile", "2Satellite"]);
@@ -4093,7 +4113,6 @@ describe("layout and page-owned controls (#103)", () => {
 			host.values = { values: "1 2 3 4 100" };
 			await host.run();
 		});
-		await settled(page);
 		await page.locator("#host >> .tb-out-fields").first().waitFor({ timeout: 10_000 });
 		// Writing values again does not dim the answer or claim it is stale: the page owns that.
 		await page.evaluate(() => {
@@ -5305,7 +5324,6 @@ describe("graphs (#152)", () => {
 			host.values = { case: "injected" };
 			await host.run();
 		});
-		await settled(page);
 		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
 		await page.waitForTimeout(500);
 		const read = await page.evaluate(() => {
@@ -5375,7 +5393,6 @@ describe("graphs (#152)", () => {
 			host.values = { deps: "solo" };
 			await host.run();
 		});
-		await settled(page);
 		await page.locator("#host >> .tb-graph-plot").waitFor({ timeout: 15_000 });
 		const rows = await page.evaluate(() => [...document.querySelector("#host")!.shadowRoot!.querySelectorAll(".tb-graph-data tbody tr")].map((tr) => [...tr.children].map((c) => c.textContent)));
 		assert.deepEqual(rows, [["solo", "no edges"]]);
@@ -5714,7 +5731,10 @@ describe("a result wider than its tool scrolls inside it, and is never clipped (
 					}
 				}
 				// Drawn, not degraded: a seeded graph used to fall back to a status line here when its layout asked for a chunk (#201).
-				const drawn = (h: Host) => h.shadowRoot?.querySelector("[data-kind]");
+				// And every chart in it the measured drawing (#236), since the first one is 640 wide whatever the frame.
+				const drawn = (h: Host) =>
+					h.shadowRoot?.querySelector("[data-kind]") &&
+					[...h.shadowRoot.querySelectorAll("figure.tb-out-chart")].filter((f) => f.getClientRects().length > 0).every((f) => f.hasAttribute("data-fitted"));
 				const deadline = Date.now() + 15_000;
 				while (!hosts.every(drawn)) {
 					if (Date.now() > deadline) throw new Error(`never drew: ${hosts.filter((h) => !drawn(h)).map((h) => h.dataset.case)}`);
@@ -6009,9 +6029,13 @@ describe("chart labels keep their size at any width (#210)", () => {
 					host.values = { case: cases[i] as string };
 					await host.run();
 				}
-				// Two frames and a pause, so a chart laid out again at its measured width has been.
-				await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-				await new Promise((r) => setTimeout(r, 100));
+				// Every chart the drawing a reader keeps (#236): laid out at its measured width, and marked so.
+				const fitted = () =>
+					hosts.every((h) => [...(h.shadowRoot?.querySelectorAll("figure.tb-out-chart") ?? [])].every((f) => f.hasAttribute("data-fitted")));
+				for (const deadline = Date.now() + 15_000; !fitted(); ) {
+					if (Date.now() > deadline) throw new Error("a chart was never fitted to its width");
+					await new Promise((r) => setTimeout(r, 20));
+				}
 				const out: string[] = [];
 				const widths: number[] = [];
 				for (const host of hosts) {
