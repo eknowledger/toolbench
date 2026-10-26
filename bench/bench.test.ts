@@ -6696,7 +6696,15 @@ describe("a date input (contract 9, #203)", () => {
 				input: Object.fromEntries([...input.attributes].map((a) => [a.name, a.value])),
 				value: input.value,
 				scheme: getComputedStyle(input).colorScheme,
-				font: getComputedStyle(input).fontFamily === getComputedStyle(root.querySelector(".tb") as Element).getPropertyValue("--tb-mono").trim(),
+				// Against a probe set to the token, since engines serialise a font list differently from the property's text.
+				font: (() => {
+					const probe = document.createElement("span");
+					probe.style.fontFamily = "var(--tb-mono)";
+					root.querySelector(".tb")?.append(probe);
+					const mono = getComputedStyle(probe).fontFamily;
+					probe.remove();
+					return getComputedStyle(input).fontFamily === mono;
+				})(),
 				error: root.querySelector(".tb-error-message")?.textContent ?? "",
 				slot: root.querySelector("#in-captured-err")?.textContent,
 				answer: root.querySelector(".tb-out-fields")?.textContent ?? "",
