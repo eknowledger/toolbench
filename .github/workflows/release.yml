@@ -157,6 +157,25 @@ jobs:
           # 2FA for writes, and a passkey cannot answer npm's CLI one-time-password prompt.
           NPM_CONFIG_PROVENANCE: "true"
 
+      - name: Short release notes
+        # changesets/action has just made one GitHub release per package tag, @toolbench/runtime@V and
+        # @toolbench/sdk@V, each with that package's CHANGELOG.md section in full as its body. Both get the
+        # same short notes instead: the What's new page's lines from both changelogs, merged, and links to
+        # the page and the changelogs for the detail. Kept apart from publishing on purpose: if this fails,
+        # npm, the tags and the releases are already right, and `node scripts/release-notes.mjs <version>
+        # --apply` from a signed-in machine finishes the job. The convention the parser needs was already
+        # checked by `pnpm test` above, before anything was published.
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+        run: |
+          # The fixed group publishes one version for both packages, so this is normally one version.
+          versions=$(node -e 'for (const v of new Set(JSON.parse(process.env.PACKAGES).map((p) => p.version))) console.log(v)')
+          for v in $versions; do
+            node scripts/release-notes.mjs "$v" --apply
+          done
+
       - name: Say what happened
         if: always()
         env:

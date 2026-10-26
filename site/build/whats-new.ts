@@ -27,7 +27,7 @@ export const CHANGELOGS = ["packages/runtime/CHANGELOG.md", "packages/sdk/CHANGE
 export const SHOTS_DIR = "site/public/whats-new";
 const KINDS = { New: "new", Changed: "changed", Fixed: "fixed" } as const;
 type Kind = (typeof KINDS)[keyof typeof KINDS];
-const GROUPS: { kind: Kind; title: string }[] = [
+export const GROUPS: { kind: Kind; title: string }[] = [
 	{ kind: "new", title: "New" },
 	{ kind: "changed", title: "Changed" },
 	{ kind: "fixed", title: "Fixed" },
@@ -171,7 +171,7 @@ function releaseDates(): Map<string, string> {
 	return dates;
 }
 
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
 	const pa = a.split(".").map(Number);
 	const pb = b.split(".").map(Number);
 	for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pb[i] ?? 0) - (pa[i] ?? 0);
@@ -180,9 +180,11 @@ function compareVersions(a: string, b: string): number {
 
 let cached: Release[] | null = null;
 
-/** Every release in either changelog, newest first, the two packages merged. */
-export function releases(): Release[] {
-	if (cached) return cached;
+/**
+ * Both changelogs' items per version, merged, with no git and no dates: what the page and the GitHub
+ * release notes (scripts/release-notes.mjs) both list.
+ */
+export function mergedItems(): Map<string, Item[]> {
 	const merged = new Map<string, Item[]>();
 	for (const file of CHANGELOGS) {
 		for (const [version, items] of parseChangelog(readFileSync(join(ROOT, file), "utf8"), file)) {
@@ -192,6 +194,13 @@ export function releases(): Release[] {
 			merged.set(version, list);
 		}
 	}
+	return merged;
+}
+
+/** Every release in either changelog, newest first, the two packages merged. */
+export function releases(): Release[] {
+	if (cached) return cached;
+	const merged = mergedItems();
 	const dates = releaseDates();
 	cached = [...merged]
 		.map(([version, items]) => ({ version, date: dates.get(version) ?? null, items }))
@@ -244,7 +253,7 @@ export function counts(r: Release): string {
 }
 
 /** The sentence after the name reads as its continuation: "Reset button: puts a tool's inputs back". */
-function continuation(line: string): string {
+export function continuation(line: string): string {
 	// Only an ordinary capitalised word: "ToolHostAttributes" or "ER" keeps its capitals.
 	const word = /^\S+/.exec(line)?.[0] ?? "";
 	return /^[A-Z][a-z]*[,.]?$/.test(word) ? line[0]?.toLowerCase() + line.slice(1) : line;

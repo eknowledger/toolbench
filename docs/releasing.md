@@ -10,6 +10,7 @@ How versions are decided, how a release happens, and the one-time setup it needs
 4. [The road to 1.0](#4-the-road-to-10)
 5. [How a release runs](#5-how-a-release-runs)
 5b. [A release that lands as a stack](#5b-a-release-that-lands-as-a-stack)
+5c. [The GitHub release notes](#5c-the-github-release-notes)
 6. [One-time setup](#6-one-time-setup)
 7. [What gets published](#7-what-gets-published)
 8. [Publishing by hand](#8-publishing-by-hand)
@@ -119,6 +120,9 @@ typecheck, test, build, then `changeset publish`
         │
         ▼
 npm + git tag + GitHub release
+        │
+        ▼
+both releases' bodies rewritten to the short notes   (scripts/release-notes.mjs, see 5c)
 ```
 
 Two gates, and they check different things. **Gate 1** is the version numbers and the changelog: a diff
@@ -242,6 +246,47 @@ That was the case for #173 in 0.9.0. If either fails, fall back to a normal `git
 
 If a stacked pull request has already been closed, it is recoverable: push the deleted branch back to its last
 commit, reopen the pull request, retarget it to `main`, and delete the branch again.
+
+## 5c. The GitHub release notes
+
+changesets/action makes one GitHub release per package tag, `@toolbench/runtime@V` and
+`@toolbench/sdk@V`, and writes each body from that package's `CHANGELOG.md` section: every entry in full,
+which is right for the changelog and too long for a reader scanning a release for what shipped.
+
+So the `publish` job's next step rewrites **both** bodies to one short set of notes, built by
+`scripts/release-notes.mjs` from both changelogs merged, with the same parser as the site's What's new
+page (`parseChangelog` in `site/build/whats-new.ts`). The page and the release cannot disagree, and a
+release needs no step beyond its changesets, which follow the convention in
+[CONTRIBUTING.md](../CONTRIBUTING.md#writing-a-changeset).
+
+The format, one line per item, grouped:
+
+```markdown
+### New (5)
+
+- **Reset button**: puts a tool's inputs back where they started.
+- **Share a link**: a link icon copies the page address with the tool's inputs in it. _On by default_
+
+### Fixed (3)
+
+- **Readable chart labels**: chart labels are the same size on a phone as on a wide screen.
+
+[What's new in 0.13.0](https://eknowledger.github.io/toolbench/whats-new.html#v0-13-0) · Full changelog: [runtime](…/packages/runtime/CHANGELOG.md#0130), [sdk](…/packages/sdk/CHANGELOG.md#0130)
+```
+
+No detail block: the page and the changelog carry the detail, and the last line links to both.
+
+```sh
+node scripts/release-notes.mjs 0.13.0            # print one version's notes
+node scripts/release-notes.mjs --all --print     # print every version's, newest first
+node scripts/release-notes.mjs 0.13.0 --apply    # rewrite that version's two releases with gh
+node scripts/release-notes.mjs --all --apply     # rewrite every past release, once
+```
+
+`--apply` needs `gh` signed in with write access, and skips a tag that has no release. The step in
+`release.yml` runs after publishing and apart from it, so if it fails, npm, the tags and the releases are
+already right: run `--apply` for that version by hand. `scripts/release-notes.test.ts` checks 0.13.0 and
+0.10.0 against notes written by hand from the page.
 
 ## 6. One-time setup
 
