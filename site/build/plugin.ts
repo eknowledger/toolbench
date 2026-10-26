@@ -100,7 +100,7 @@ export const DOCS: Doc[] = [
 		file: "packages/runtime/src/element.ts",
 		page: "docs-ref-host.html",
 		title: "Host API",
-		summary: "defineToolHost, the element's attributes, properties and methods, and tool sources.",
+		summary: "defineToolHost, the element's attributes, properties, methods and events, and tool sources.",
 		group: "Reference",
 		generate: hostReference,
 	},
