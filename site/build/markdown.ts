@@ -18,6 +18,11 @@ export type Rendered = { html: string; title: string; headings: Heading[] };
 export type RenderOptions = {
 	/** Rewrite a link target: repository-relative markdown to a site page, anything else to GitHub. */
 	linkFor?: (href: string) => string;
+	/**
+	 * Keep no raw HTML at all: every `<` is text. For a line whose author is not writing a docs page (a What's
+	 * new item), where the docs' small tag allowlist is a way in rather than a convenience.
+	 */
+	noRawTags?: boolean;
 	/** Drop a hand-written "Contents" list: the site draws its own navigation from the headings. */
 	dropContents?: boolean;
 	/** A ```mermaid block, drawn. Without this a diagram renders as its source. */
@@ -39,7 +44,7 @@ export function slugify(text: string): string {
 		.replace(/\s/g, "-");
 }
 
-function inline(text: string, opts: RenderOptions): string {
+export function inline(text: string, opts: RenderOptions = {}): string {
 	// Code spans first, set aside so nothing inside them is treated as markup.
 	const codes: string[] = [];
 	let s = text.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks, code: string) => {
@@ -48,7 +53,7 @@ function inline(text: string, opts: RenderOptions): string {
 	});
 	// Inline HTML the docs use, kept; everything else escaped.
 	const tags: string[] = [];
-	s = s.replace(/<\/?(?:kbd|br|sup|sub|em|strong|code|details|summary|b|i)\b[^>]*>/g, (tag) => {
+	if (!opts.noRawTags) s = s.replace(/<\/?(?:kbd|br|sup|sub|em|strong|code|details|summary|b|i)\b[^>]*>/g, (tag) => {
 		tags.push(tag);
 		return `\u0001${tags.length - 1}\u0001`;
 	});

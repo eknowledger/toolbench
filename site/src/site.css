@@ -99,6 +99,11 @@ main { display: block; }
 @media (min-width: 900px) { .hero-sub { white-space: nowrap; } }
 .lede { margin: 0 0 1.5rem; font-size: 1.1875rem; color: var(--muted); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+/* The latest release in one line, under the pitch: what changed, and the way to the rest. */
+.hero-new { margin: -0.75rem 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; color: var(--muted); font-size: 0.9375rem; }
+.hero-new-tag { font-weight: 700; color: var(--ink); }
+.hero-new-tag::before { content: ""; display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.45rem; border-radius: 50%; background: var(--amber); vertical-align: 0.05em; }
+.hero-new a { color: var(--ink); font-weight: 700; text-decoration-color: var(--amber-text); }
 .button {
   display: inline-flex; align-items: center; gap: 0.5rem; min-height: 46px; padding: 0 1.15rem;
   border-radius: 10px; border: 1px solid var(--line); background: var(--panel);

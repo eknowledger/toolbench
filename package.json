@@ -16,6 +16,7 @@
     "site": "pnpm --filter @toolbench/site dev",
     "site:build": "pnpm --filter @toolbench/site build",
     "site:diagrams": "node site/build/draw-diagrams.ts",
+    "site:shots": "node site/build/shots.ts",
     "check": "pnpm typecheck && pnpm test",
     "coverage": "node scripts/coverage.mjs",
     "test:bench": "node --test bench/*.test.ts",
