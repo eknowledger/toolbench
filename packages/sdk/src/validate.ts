@@ -128,6 +128,9 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	// An empty disclosure would offer the reader "More" and open on nothing.
 	if (o.details !== undefined && (typeof o.details !== "string" || o.details === "")) fail(`${path}.details`, "must be a non-empty string");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
+	// The control each type can ask for: a number's slider (v4), a select's segments (v9). On any other type it is ignored, as it always was.
+	const control = type === "number" ? "slider" : type === "select" ? "segmented" : undefined;
+	if (control && o.control !== undefined && o.control !== control) fail(`${path}.control`, `control must be "${control}" when present, got ${JSON.stringify(o.control)}`);
 	if (o.lang !== undefined) {
 		// A one-line input has no room for structure to see, and nothing would paint it.
 		if (type !== "textarea") fail(`${path}.lang`, `only a textarea is highlighted; on a ${type} input it would be ignored`);
@@ -163,9 +166,6 @@ function validateInput(raw: unknown, path: string): InputSpec {
 			if (o.default < o.min || o.default > o.max) {
 				fail(`${path}.default`, `default ${o.default} is outside min..max (${o.min}..${o.max})`);
 			}
-			if (o.control !== undefined && o.control !== "slider") {
-				fail(`${path}.control`, `control must be "slider" when present, got ${JSON.stringify(o.control)}`);
-			}
 			break;
 		}
 		case "select": {
@@ -177,6 +177,7 @@ function validateInput(raw: unknown, path: string): InputSpec {
 				return str(oo, "value", `${path}.options[${i}].`);
 			});
 			if (new Set(values).size !== values.length) fail(`${path}.options`, "option values must be unique");
+
 			if (typeof o.default !== "string" || !values.includes(o.default)) {
 				fail(`${path}.default`, `must be one of the option values: ${values.join(", ")}`);
 			}

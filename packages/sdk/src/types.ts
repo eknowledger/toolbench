@@ -850,6 +850,16 @@ export type InputSpec =
 			default: string;
 			/** Two or more choices, with unique values. */
 			options: SelectOption[];
+			/**
+			 * `segmented` draws the options as a row of segments instead of a dropdown, for two to five short
+			 * choices a reader should see at once. They are native radio buttons in a fieldset, so the arrow keys,
+			 * the single tab stop and the announcement are the browser's, and the chosen one is a solid accent
+			 * fill. When a segment would not fit its label, measured as the form resizes, the row becomes stacked
+			 * radios. A hint, not a type: `run` still receives an option value, presets work as they do on a
+			 * dropdown, and a runtime that does not know it draws the dropdown. Contract version 9.
+			 * @default the dropdown
+			 */
+			control?: "segmented";
 	  })
 	| (InputBase & {
 			type: "toggle";

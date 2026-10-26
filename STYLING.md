@@ -76,6 +76,7 @@ same order, so the cascade is the same.
 | `.tb-body` | Form, actions, status and output |
 | `.tb-facade`, `.tb-facade-hint` | A closed card, and its "Try it" control |
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
+| `.tb-seg`, `.tb-seg-opt` | A segmented select (#203): the radio group, and each option's `<label>` with its radio inside. `.tb-seg` carries `data-stack` while the options are stacked radios, and `aria-invalid` when a result names the input. Its row is a `<fieldset>` and its `.tb-label` a `<legend>` |
 | `.tb-details`, its `summary`, `.tb-details-body` | An input's `details` (contract version 8): a `<details>` after the description, closed until the reader opens it. The body takes the same markup classes as `.tb-desc` |
 | `.tb-desc p`, `.tb-desc ul`, `.tb-desc li`, `.tb-desc code`, `.tb-desc strong`, `.tb-desc [data-tone]` | A description's markup. `.tb-desc` is a `<p>`, or a `<div>` when the description has more than one block. `data-tone` is `good`, `warn`, `bad`, `muted` or `accent` |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |

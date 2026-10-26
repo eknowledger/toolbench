@@ -202,8 +202,16 @@ const BUDGETS = [
 	 * descriptions are drawn with the form: one pattern for the inline spans, a line loop for paragraphs and
 	 * lists, and a tree built with `el`, never HTML. Written as a character loop it was 86 more. The rest is the
 	 * CSS for paragraphs, lists, code, bold and the five tones. 27_500 would have left the build 152 over.
+	 *
+	 * Raised from 28_000 to 28_500 by the segmented select (#203), in the commit that crossed it: 27,977 to
+	 * 28,297 measured, 320 bytes. 219 of it is the element: the fieldset and legend, the group it registers as
+	 * the control, the radio its Reset focuses, and fetching the controls chunk with the tool's code, which the
+	 * date, colour and secret inputs reuse. The other 101 is contract v9 in the SDK: its changelog line, the
+	 * one `control` rule for a number and a select, the version rows, and the red border an invalid dropdown
+	 * lacked. The segments, their measurement and their rules are the controls chunk, below, not here: in boot
+	 * they measured 762 together. 28_000 would have left the build 297 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -352,6 +360,12 @@ const BUDGETS = [
 	 */
 	{ label: "share action", pattern: /^share-[^/]+\.js$/, budget: 2_000 },
 	/*
+	 * The newer inputs' controls (#203): a segmented select's radios, the measurement that stacks them, and their
+	 * rules. Fetched with a tool's code only by a tool that has one, so every other page pays nothing. Reader
+	 * cost: that reader downloads it. 1,031 measured.
+	 */
+	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 1_500 },
+	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
 	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
@@ -480,6 +494,8 @@ const BUDGETS = [
 	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// A six-column table whose columns say how they wrap (#213). 681 measured.
 	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// The newer input types (#203) on screen for the browser tests and the gallery. 210 measured.
+	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -517,6 +533,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture field-faces", pattern: /^worker-tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture input-help", pattern: /^worker-tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture narrow-table", pattern: /^worker-tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture native-inputs", pattern: /^worker-tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;

@@ -32,6 +32,8 @@ const INPUT_SINCE: Since = {
 	details: 8,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
+/* The values of `control`, which arrived after the key: each value is a control the runtime has to know. */
+const CONTROL_SINCE: Since = { slider: 4, segmented: 9 };
 const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1 };
 const CAPABILITY_SINCE: Since = { pure: 1 };
 const KIND_SINCE: Since = {
@@ -45,6 +47,7 @@ const SCOPES: [string, Since][] = [
 	["runtime.", RUNTIME_SINCE],
 	["inputs.", INPUT_SINCE],
 	["options.", OPTION_SINCE],
+	["control.", CONTROL_SINCE],
 	["type.", INPUT_TYPE_SINCE],
 	["capabilities.", CAPABILITY_SINCE],
 	["kinds.", KIND_SINCE],
@@ -89,6 +92,7 @@ describe("the version each feature arrived in (#170)", () => {
 		assert.deepEqual(Object.keys(CAPABILITY_SINCE).sort(), [...CAPABILITIES].sort());
 		assert.deepEqual(Object.keys(KIND_SINCE).sort(), [...OUTPUT_KINDS].sort());
 		assert.ok("sets" in OPTION_SINCE, "the preset key on a select option");
+		assert.deepEqual(Object.keys(CONTROL_SINCE).sort(), ["segmented", "slider"], "every value of control the validator accepts");
 	});
 
 	it("ships exactly the rows after version 1, and nothing else, in the runtime's table", () => {
@@ -162,6 +166,15 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 			const m = { ...v1(7), inputs: [{ id: "password", type: "text", label: "Password", default: "", share }] };
 			refuses(m, "inputs[0].share", [/from contract version 8/, /declares "sdk": 7/, /Declare "sdk": 8\./]);
 		}
+	});
+
+	// The key is from 4, so only the value can say the tool needs 9; a v8 runtime would draw a dropdown.
+	it("refuses a segmented select under sdk 8, though control itself is from 4", () => {
+		const order = { id: "order", type: "select", label: "Order", default: "a", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }], control: "segmented" };
+		refuses({ ...v1(8), inputs: [order] }, "inputs[0].control", [/"segmented" is from contract version 9/, /declares "sdk": 8/, /Declare "sdk": 9\./]);
+		refuses({ ...v1(3), inputs: [order] }, "inputs[0].control", [/is from contract version 4/, /Declare "sdk": 9\./]);
+		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(9), inputs: [order] }));
+		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(4), inputs: [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9, control: "slider" }] }));
 	});
 
 	it("refuses role on an input under sdk 7, though role on a part is from 5", () => {

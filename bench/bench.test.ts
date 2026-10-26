@@ -6535,3 +6535,147 @@ describe("details on an input, behind a disclosure (#215)", () => {
 		await page.close();
 	});
 });
+
+/** Opens the native-inputs fixture (#203) at a width, waiting for its form. */
+async function openNative(query = "", width = 1280): Promise<Page> {
+	const page = await browser.newPage({ viewport: { width, height: 1000 } });
+	await page.goto(`${BASE}/tool.html?id=native-inputs${query}`, { waitUntil: "load" });
+	await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+	return page;
+}
+
+/** A token resolved to a colour the way a control inside the shadow root resolves it. */
+const probeColour = (page: Page, value: string) =>
+	page.evaluate((value) => {
+		const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+		const span = document.createElement("span");
+		span.style.color = value;
+		root.querySelector(".tb")?.append(span);
+		const out = getComputedStyle(span).color;
+		span.remove();
+		return out;
+	}, value);
+
+describe("a segmented select (contract 9, #203)", () => {
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="order"]') as HTMLElement;
+			const seg = row.querySelector(".tb-seg") as HTMLElement;
+			const opts = [...seg.querySelectorAll<HTMLElement>("label.tb-seg-opt")];
+			const active = root.activeElement as HTMLInputElement | null;
+			return {
+				row: `${row.tagName.toLowerCase()}.${row.className}`,
+				children: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				legend: row.querySelector("legend")?.textContent,
+				seg: Object.fromEntries([...seg.attributes].map((a) => [a.name, a.value])),
+				options: opts.map((o) => {
+					const radio = o.querySelector("input") as HTMLInputElement;
+					return [o.textContent, radio.type, radio.name, radio.value, radio.checked];
+				}),
+				fills: opts.map((o) => getComputedStyle(o).backgroundColor),
+				inks: opts.map((o) => getComputedStyle(o).color),
+				stacked: seg.hasAttribute("data-stack"),
+				radioOpacity: getComputedStyle(seg.querySelector("input") as Element).opacity,
+				checked: (seg.querySelector("input:checked") as HTMLInputElement | null)?.value,
+				focused: active?.type === "radio" ? active.value : active?.className,
+				border: getComputedStyle(seg).borderTopColor,
+				ring: [getComputedStyle(seg).outlineStyle, ...opts.map((o) => getComputedStyle(o).outlineStyle)],
+				error: root.querySelector("#in-order-err")?.textContent,
+				answer: root.querySelector(".tb-out-fields")?.textContent ?? "",
+			};
+		});
+
+	/*
+	 * Written from the native-inputs manifest by hand: three options, "little" the default, the legend the
+	 * group's name and the description its description, as a dropdown's label and description are.
+	 */
+	it("draws native radios in a fieldset, the legend naming them and the chosen one filled with the accent", async () => {
+		const page = await openNative();
+		const seen = await read(page);
+		assert.equal(seen.row, "fieldset.tb-field-row");
+		assert.deepEqual(seen.children, ["legend.tb-label", "div.tb-seg", "p.tb-desc", "p.tb-sr"]);
+		assert.equal(seen.legend, "Byte order");
+		assert.deepEqual(seen.seg, { class: "tb-seg", id: "in-order", role: "radiogroup", "aria-labelledby": "in-order-label", "aria-describedby": "in-order-desc in-order-err" });
+		assert.deepEqual(seen.options, [
+			["Little-endian (x86)", "radio", "in-order", "little", true],
+			["Big-endian (network)", "radio", "in-order", "big", false],
+			["Detect from header", "radio", "in-order", "auto", false],
+		]);
+		const accent = await probeColour(page, "var(--tb-accent)");
+		assert.equal(seen.fills[0], accent, "the chosen segment is a solid accent fill");
+		assert.equal(seen.inks[0], await probeColour(page, "var(--tb-accent-ink)"));
+		assert.notEqual(seen.fills[1], accent);
+		assert.equal(seen.stacked, false, "three short labels fit at 1280");
+		assert.equal(seen.radioOpacity, "0", "the radio itself is under its segment");
+		await page.close();
+	});
+
+	it("is one tab stop whose arrow keys choose, and Enter runs with the choice", async () => {
+		const page = await openNative();
+		await page.locator('#host >> input[value="little"]').focus();
+		await page.keyboard.press("ArrowRight");
+		let seen = await read(page);
+		assert.deepEqual(seen.ring, ["solid", "none", "none", "none"], "one ring, on the group, not one per segment");
+		assert.equal(seen.checked, "big");
+		assert.equal(seen.focused, "big");
+		assert.equal(seen.fills[1], await probeColour(page, "var(--tb-accent)"), "the fill follows the choice");
+		await tabForward(page);
+		seen = await read(page);
+		assert.equal(seen.focused, "tb-run", "Tab leaves the group rather than visiting each segment");
+		await page.locator('#host >> input[value="big"]').focus();
+		await page.keyboard.press("Enter");
+		await page.waitForFunction(() => /"big"/.test(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-fields")?.textContent ?? ""), null, { timeout: 10_000 });
+		await page.close();
+	});
+
+	it("stacks into radios when a segment would not fit, and goes back when it fits again", async () => {
+		const page = await openNative("", 390);
+		let seen = await read(page);
+		assert.equal(seen.stacked, true, "Big-endian (network) does not fit a third of a phone");
+		assert.equal(seen.radioOpacity, "1", "stacked, the radios show");
+		await page.setViewportSize({ width: 1280, height: 1000 });
+		await page.waitForFunction(() => !document.querySelector("#host")?.shadowRoot?.querySelector(".tb-seg")?.hasAttribute("data-stack"), null, { timeout: 5_000 });
+		seen = await read(page);
+		assert.equal(seen.radioOpacity, "0");
+		await page.close();
+	});
+
+	it("is marked invalid when the tool names it, with the message in its description", async () => {
+		const page = await openNative();
+		await page.locator("#host >> text=Detect from header").click();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-error").waitFor({ timeout: 10_000 });
+		const seen = await read(page);
+		assert.equal(seen.seg["aria-invalid"], "true");
+		assert.equal(seen.border, await probeColour(page, "var(--tb-bad)"));
+		assert.match(seen.error ?? "", /no header to read/);
+		await page.close();
+	});
+
+	it("follows a host's values and a link, which choose an option the way a click does", async () => {
+		const page = await openNative();
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { order: "big" };
+		});
+		assert.equal((await read(page)).checked, "big");
+		await page.close();
+		const linked = await openNative("&native-inputs.order=auto");
+		assert.equal((await read(linked)).checked, "auto");
+		await linked.close();
+	});
+
+	// The mockup's invalid select had the default border: the rule named .tb-input and .tb-textarea only.
+	it("gives a dropdown marked invalid the same red border as a text box", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=presets`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-select").waitFor({ timeout: 15_000 });
+		const border = await page.evaluate(() => {
+			const select = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-select") as HTMLElement;
+			select.setAttribute("aria-invalid", "true");
+			return getComputedStyle(select).borderTopColor;
+		});
+		assert.equal(border, await probeColour(page, "var(--tb-bad)"));
+		await page.close();
+	});
+});

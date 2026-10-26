@@ -337,3 +337,37 @@ describe("the 7 -> 8 step", () => {
 		assert.deepEqual({ ...upgraded, sdk: 7 }, v7);
 	});
 });
+
+/*
+ * 8 -> 9 (#203): `control: "segmented"` on a select. A v8 select has no control and is a dropdown, which is
+ * what an absent control still means, so both halves are the identity. The v8 manifest is written by hand as
+ * a v8 author would have written it: a select with presets, an input with share, role and details.
+ */
+describe("the 8 -> 9 step", () => {
+	const v8 = {
+		sdk: 8,
+		id: "v8-inputs",
+		name: "A v8 tool",
+		reset: false,
+		inputs: [
+			{ id: "stack", type: "select", label: "Library", default: "a", options: [{ value: "a", label: "A", sets: { token: "" } }, { value: "custom", label: "Custom" }] },
+			{ id: "token", type: "text", label: "Token", default: "", share: false, role: "credential", details: "Never sent anywhere." },
+		],
+		kinds: ["fields", "error"],
+	};
+	const step = MIGRATIONS.find((m) => m.from === 8);
+
+	it("exists, and both halves are the identity", () => {
+		assert.ok(step, "a step from 8");
+		assert.deepEqual(step.manifest(v8), v8);
+		const output: Output = { kind: "table", columns: [{ label: "Instance", rowHeader: true, wrap: "none" }], rows: [["host-4"]] };
+		assert.deepEqual(step.output(output), output);
+		assert.deepEqual(upgradeOutput(output, 8), output);
+	});
+
+	it("carries a v8 manifest forward with nothing changed but sdk", () => {
+		const upgraded = upgradeManifest(v8);
+		assert.equal(upgraded.sdk, SDK_VERSION);
+		assert.deepEqual({ ...upgraded, sdk: 8 }, v8);
+	});
+});

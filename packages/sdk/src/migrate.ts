@@ -136,6 +136,17 @@ export const MIGRATIONS: readonly Migration[] = [
 		manifest: (m) => m,
 		output: (o) => o,
 	},
+	{
+		from: 8,
+		/*
+		 * 8 -> 9 added `control: "segmented"` on a select (#203).
+		 *
+		 * Identity on both halves. A v8 select has no `control` and is a dropdown, and an absent `control` still
+		 * means exactly that. Nothing an older tool wrote changes meaning, and no output changed at all.
+		 */
+		manifest: (m) => m,
+		output: (o) => o,
+	},
 ];
 
 export class VersionError extends Error {

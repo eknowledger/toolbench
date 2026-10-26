@@ -229,6 +229,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/slider`, "rtt"), keys(`${FIX}/slider`, "autoRun")],
 			},
 			{
+				id: "native-inputs",
+				title: "Native controls",
+				text: "<code>\"control\": \"segmented\"</code> on a select draws its options as one row of native radios, the chosen one filled. When a label would not fit, the row becomes stacked radios.",
+				demo: `<tool-host tool="native-inputs" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/native-inputs`, "order")],
+			},
+			{
 				id: "highlighted-input",
 				title: "A highlighted textarea",
 				text: "A textarea with a <code>lang</code> is painted by the host's highlighter, the same hook that paints code results. Caret, selection and undo stay the browser's own.",

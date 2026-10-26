@@ -345,6 +345,12 @@ Things the validator will hold you to, and why:
   A native range control appears beside the number box, which stays editable for exact values. It uses
   `min`, `max` and `step`, so a slider can never produce a value the manifest calls invalid. Pair it with
   `autoRun` when the tool is instant, or the answer will not follow the thumb.
+* **`"control": "segmented"` on a select of two to five short choices** (contract version 9, `"sdk": 9`).
+  The options become one row of segments, the chosen one filled with the accent, which a reader sees all
+  at once instead of opening a dropdown. They are native radios in a fieldset whose legend is the label,
+  so a reader tabs in once and the arrow keys choose. When a segment would cut its label, measured as the
+  tool resizes, the row becomes stacked radios, so long labels still read. `run` gets the option value and
+  presets behave as on a dropdown. Any other `control` on a select is refused.
 * **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
   host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
   behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a

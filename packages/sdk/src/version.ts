@@ -4,10 +4,10 @@
  * Every tool declares `sdk: <n>` in its manifest, and the runtime supports every version it has
  * ever shipped. Raising this number is a deliberate act with a checklist — see docs/versioning.md.
  */
-export const SDK_VERSION = 8;
+export const SDK_VERSION = 9;
 
 /** Every contract version this SDK can read. Never shrinks. */
-export const SUPPORTED_SDK_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const SUPPORTED_SDK_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /**
  * What each contract version added. Kept as data so the runtime can explain itself: when a tool
@@ -22,4 +22,5 @@ export const SDK_CHANGELOG: Record<number, string> = {
 	6: "presets and highlighted inputs: an optional sets on a select option, the values choosing it writes into other inputs, with the select following the form afterwards; and an optional lang on a textarea, painted through the host's highlight hook.",
 	7: "graphs: the graph output kind, nodes and edges the runtime lays out and draws, with groups, swimlanes, records and crow's-foot ends, every edge also listed in a table; and an optional grammar on a textarea with lang, the tool's own keywords, comment prefix, operators and string delimiters, with no patterns.",
 	8: "mono on a field, false for the text face; share on an input, false to keep it out of links; role on an input, as data-role on its row; wrap on a table column or cell, prose or none; rowHeader on a column, its cells as row headers; details on an input, behind a disclosure; reset: false to hide the Reset control.",
+	9: "native controls: control: \"segmented\" on a select, its options as radio segments.",
 };

@@ -188,7 +188,7 @@ export const STYLES = /* css */ `
   outline: 2px solid var(--tb-accent);
   outline-offset: 2px;
 }
-.tb-input[aria-invalid="true"], .tb-textarea[aria-invalid="true"] { border-color: var(--tb-bad); }
+.tb-input[aria-invalid="true"], .tb-textarea[aria-invalid="true"], .tb-select[aria-invalid="true"] { border-color: var(--tb-bad); }
 .tb-toggle-row { display: flex; align-items: center; gap: 0.5rem; }
 /* A slider takes the width and the number box keeps its own, so the value always shows beside the track. */
 .tb-slider-row { display: flex; align-items: center; gap: 0.75rem; }
