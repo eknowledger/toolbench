@@ -597,9 +597,12 @@ for (const file of unclaimed) {
  *
  * Raised to 34_000 by markup in an input's description (#217): 33,073 to 33,693 measured, the same parser
  * and CSS as boot's line above. 33_500 would have been 193 bytes over.
+ *
+ * Raised to 34_500 by the What's new page (#248): main measured 33,987 and this build 34,250, for the
+ * "New in" line on the landing page and the What's new link in every page's header.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_500 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
