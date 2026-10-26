@@ -386,6 +386,10 @@ Things the validator will hold you to, and why:
   left open included, so a description with none of it renders exactly as before. A tone colours words that
   already say the thing: "{bad|refused}", not a red word standing for refusal. On a runtime older than
   this, the characters show as written.
+* **`"reset": false`** at the top level of the manifest (contract version 8) hides the Reset control,
+  which puts every input back to the values the tool opened with (#208), exactly as `reset="none"` on the
+  element does. For a tool with one input, where retyping it is the reset. Any value other than a boolean
+  is refused.
 * **`details` for the rest of the help** (contract version 8). Keep `description` to the one-line hint and
   put every case, format and reason in `details`: it is drawn under the hint behind a closed "More" that the
   reader opens, it takes the same markup, and it is not part of what a screen reader announces on focus,

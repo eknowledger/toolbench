@@ -37,6 +37,7 @@ export const LATER = {
 	// No prototype, so a manifest key named `constructor` finds nothing here rather than Object's.
 	__proto__: null,
 	samples: 3,
+	reset: 8,
 	"inputs.control": 4,
 	"inputs.lang": 6,
 	"inputs.grammar": 7,

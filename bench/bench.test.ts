@@ -1510,6 +1510,19 @@ describe("a Reset control (#208)", () => {
 		await page.close();
 	});
 
+	/*
+	 * The tool's own opt-out (contract 8): narrow-table's manifest says "reset": false, its one input is a
+	 * toggle, and after the reader flips it there is still no Reset, exactly as with reset="none".
+	 */
+	it("is not drawn for a tool whose manifest says reset: false, even once the values have changed", async () => {
+		const page = await open("tool.html?id=narrow-table");
+		assert.equal((await state(page)).reset, "absent");
+		await page.locator("#host >> .tb-checkbox").click();
+		assert.equal((await state(page)).values.sort, false, "the input did change");
+		assert.equal((await state(page)).reset, "absent", "the manifest opted out");
+		await page.close();
+	});
+
 	it("redraws an autoRun tool's default answer, since that is what first load showed", async () => {
 		const page = await open("tool.html?id=histogram");
 		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });

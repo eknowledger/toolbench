@@ -18,6 +18,7 @@ const TOP_LEVEL_SINCE: Since = {
 	sdk: 1, id: 1, name: 1, blurb: 1, version: 1, capabilities: 1, inputs: 1, kinds: 1, runtime: 1, status: 1, card: 1,
 	cardFields: 1, autoRun: 1, timeoutMs: 1, help: 1, tags: 1, links: 1,
 	samples: 3,
+	reset: 8,
 };
 const RUNTIME_SINCE: Since = { entry: 1, thread: 1 };
 const INPUT_SINCE: Since = {
@@ -113,8 +114,8 @@ describe("the version each feature arrived in (#170)", () => {
 	 */
 	it("dates each manifest feature where the version history puts it", () => {
 		assert.deepEqual(
-			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar, share: INPUT_SINCE.share, role: INPUT_SINCE.role, details: INPUT_SINCE.details },
-			{ samples: 3, control: 4, lang: 6, sets: 6, grammar: 7, share: 8, role: 8, details: 8 },
+			{ reset: TOP_LEVEL_SINCE.reset, samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar, share: INPUT_SINCE.share, role: INPUT_SINCE.role, details: INPUT_SINCE.details },
+			{ reset: 8, samples: 3, control: 4, lang: 6, sets: 6, grammar: 7, share: 8, role: 8, details: 8 },
 		);
 		assert.deepEqual(
 			Object.fromEntries(Object.entries(KIND_SINCE).filter(([, v]) => v > 1)),

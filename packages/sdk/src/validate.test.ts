@@ -442,6 +442,21 @@ describe("validateManifest: lang on a textarea", () => {
 	});
 });
 
+// The opt-out from the runtime's Reset control (#208).
+describe("validateManifest: reset", () => {
+	it("accepts reset: false and reset: true, and leaves it absent when absent", () => {
+		assert.equal(validateManifest({ ...good(), reset: false }).reset, false);
+		assert.equal(validateManifest({ ...good(), reset: true }).reset, true);
+		assert.equal(validateManifest(good()).reset, undefined, "no default is written in");
+	});
+	it("refuses a reset that is not a boolean, which a host would read as true", () => {
+		failsWith((m) => { m.reset = "no"; }, "reset", "must be a boolean");
+	});
+	it("refuses reset on an input, and says where it belongs", () => {
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 2, reset: false }]; }, "inputs[0].reset", "the top level of the manifest");
+	});
+});
+
 // The rest of an input's help, behind a disclosure (#215).
 describe("validateManifest: details on an input", () => {
 	const name = { id: "name", type: "text", label: "Name", default: "" };

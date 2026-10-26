@@ -1170,8 +1170,9 @@ export class ToolHost extends HTMLElement {
 		 * Always built when allowed, and hidden rather than left out, for the undo reason in `#showReset`. Its
 		 * accessible name starts with the visible word, so a speech-input user saying "Reset" still matches.
 		 */
+		// The tool's own opt-out (#208) is the host's `reset="none"` said in the manifest: no button at all.
 		const reset =
-			this.reset === "none"
+			this.reset === "none" || manifest.reset === false
 				? undefined
 				: el("button", { class: "tb-reset", type: "button", "aria-label": "Reset inputs to their starting values", hidden: JSON.stringify(this.#values) === this.#start }, "Reset");
 		reset?.addEventListener("click", () => this.#doReset());
