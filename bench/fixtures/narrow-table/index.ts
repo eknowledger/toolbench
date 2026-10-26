@@ -2,7 +2,8 @@
  * A six-column table for a narrow tool (#213, contract version 8), for the gallery and the browser tests.
  *
  * Five columns of short tokens say `wrap: "none"` and the Note column says `wrap: "prose"`; one Note cell,
- * an incident id, overrides its column with `wrap: "none"`. The values are illustrative.
+ * an incident id, overrides its column with `wrap: "none"`. Instance is the row header (#214). The values
+ * are illustrative.
  */
 import type { Cell, Output, Tool } from "@toolbench/sdk";
 
@@ -25,7 +26,7 @@ export default {
 			kind: "table",
 			caption: sort ? "Six instances, slowest p99 first" : "Six instances",
 			columns: [
-				{ label: "Instance", wrap: "none" },
+				{ label: "Instance", wrap: "none", rowHeader: true },
 				{ label: "Requests", align: "end", mono: true, wrap: "none" },
 				{ label: "p50 ms", align: "end", mono: true, wrap: "none" },
 				{ label: "p99 ms", align: "end", mono: true, wrap: "none" },

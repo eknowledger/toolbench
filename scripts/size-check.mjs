@@ -189,8 +189,15 @@ const BUDGETS = [
 	 * 26,428 to 26,569 measured, 141 bytes, the bench registry naming the input-help fixture among them. The rest
 	 * is the four form tokens and the rules reading them, the three attributes on each row, and the role check
 	 * with its row in the version table. 26_500 would have left the build 69 over.
+	 *
+	 * Raised from 27_000 to 27_500 by row headers and the narrow table (#214), in the commit that crossed it:
+	 * 26,646 to 27,018 measured, 372 bytes. Nearly all of it is CSS: the edge shadows that say a table
+	 * scrolls, four gradients over a property matching the frame; the narrow layout for a table with
+	 * data-wrap; and the sticky row header and caption. The rest renders the th and its heading's attribute.
+	 * Loading those rules only when such a table renders would save about 260 here, at the price of the table
+	 * shifting when they arrive, which was judged not worth it. 27_000 would have left the build 18 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_000 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -575,9 +582,12 @@ for (const file of unclaimed) {
  * Raised to 33_000 by the share button (#227), in the commit that spent it: 31,985 to 32,527 measured, 542
  * bytes: the runtime's reading of a link and placing of the button, as in boot, and the landing page's own
  * tools now fetching the share chunk with their code. 32_000 would have been 527 over.
+ *
+ * Raised to 33_500 by row headers and the narrow table (#214): 32,720 to 33,073 measured, the same CSS as
+ * boot's line above, which every consumer pays too. 33_000 would have been 73 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_500 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

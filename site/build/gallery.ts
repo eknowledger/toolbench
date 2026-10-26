@@ -373,9 +373,9 @@ export const GROUPS: Group[] = [
 			{
 				id: "table-wrap",
 				title: "A wide table on a phone",
-				text: "A column says whether it holds prose or a short token with <code>wrap</code>, written as <code>data-wrap</code>, so a narrow layout can keep tokens on one line and give sentences a reading width. Shown at 390px.",
+				text: "A column says whether it holds prose or a short token with <code>wrap</code>, and <code>rowHeader</code> makes one column each row's name. On a narrow tool the table keeps its columns and scrolls: tokens stay on one line, sentences get a reading width, the row's name stays in view, and a shadow shows there is more. Shown at 390px.",
 				demo: `<div class="narrow-demo"><tool-host tool="narrow-table" mode="embed"></tool-host></div>`,
-				code: async () => [await output(`${FIX}/narrow-table`, {}), region("site/src/gallery-host.ts", "wrap-styles")],
+				code: async () => [await output(`${FIX}/narrow-table`, {})],
 			},
 			{
 				id: "input-styles",

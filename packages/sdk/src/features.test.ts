@@ -226,6 +226,12 @@ describe("a result using a feature newer than its tool's sdk is reported (#170)"
 		assert.equal(outputFeatureProblem(table, 8), undefined);
 	});
 
+	it("sees rowHeader on a column, at version 8", () => {
+		const table: Output = { kind: "table", columns: [{ label: "Instance", rowHeader: true }, { label: "p99" }], rows: [["host-4", "1450"]] };
+		assert.match(String(outputFeatureProblem(table, 7)), /^output\.columns\[0\]\.rowHeader: column rowHeader is from contract version 8/);
+		assert.equal(outputFeatureProblem(table, 8), undefined);
+	});
+
 	it("sees mono on a field, at version 8, inside a group", () => {
 		const faces: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "Address", value: "192.0.2.10", mono: true }, { label: "Integrity", value: "none present", mono: false }] }] };
 		assert.equal(
