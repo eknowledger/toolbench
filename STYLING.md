@@ -126,8 +126,10 @@ Below 480px a chart takes a narrow layout: fewer gridlines, each horizontal bar'
 its bars, a pie's key under the pie, and a Venn diagram's set names in a key under the picture.
 
 ⚠️ A chart's first drawing, made before it is on the page, is at a guessed width of 640 pixels. It is
-replaced by one at the measured width before anything is painted, so a script that keeps a reference to the
-figure returned by `render` holds the replaced one. Find it again by `data-kind` or `data-part` instead.
+replaced by one at the measured width, usually before anything is painted, so a script that keeps a reference
+to the figure returned by `render` holds the replaced one. Find it again by `data-kind` or `data-part`
+instead. A script that points at a chart or measures one should wait for `data-fitted` on the figure: it
+marks the drawing at the measured width, the one that stays. Counting frames is not enough on a busy machine.
 
 ### Inside a graph
 
@@ -193,6 +195,7 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | `data-state` | `.tb-output` | `running`, `idle` |
 | `data-stale` | `.tb-output` | Present when the inputs have changed since the result was drawn |
 | `data-status` | `tool-host` itself | `deprecated`, `retired`. Absent for a live tool |
+| `data-fitted` | `.tb-out-chart` | Present once the chart is laid out at its measured width and nothing is left to change. Absent on the first drawing, and on a new drawing after a resize until it is measured. See [Chart text and width](#chart-text-and-width) |
 
 `role` is the tool's to set: `{ kind: "fields", role: "stats", fields }` names a part, and
 `{ label, value, role: "verdict" }` names one field. The runtime attaches no meaning to it, so a host

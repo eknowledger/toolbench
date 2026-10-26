@@ -277,7 +277,8 @@ const BUDGETS = [
 	 *
 	 * #210 added `fitted`, which lays every chart kind out again at its measured width, the label helpers,
 	 * and measuring the faces' ascent, descent and character width, since constants in em overlapped labels
-	 * on Linux: 1,733 to 2,785 with the comments stripped (#230), inside the budget.
+	 * on Linux: 1,733 to 2,785 with the comments stripped (#230), inside the budget. Marking the measured
+	 * drawing `data-fitted` (#236): 2,803.
 	 */
 	{ label: "chart common", pattern: /^plot-common-[^/]+\.js$/, budget: 3_500 },
 	/*

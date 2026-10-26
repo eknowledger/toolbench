@@ -258,12 +258,22 @@ export function fitted(draw: (fit: Fit) => HTMLElement): HTMLElement {
 		if (width <= 0) return;
 		const m = metrics(plot, font);
 		const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
-		if (width === at.width && font === at.font && narrow === at.narrow && same(m.ascent, at.ascent) && same(m.descent, at.descent) && same(m.char, at.char)) return;
+		/*
+		 * Measured and found to need nothing: this drawing is the one a reader keeps, so it says so (#236). A
+		 * script that points at a chart, or measures one, waits for `data-fitted` rather than counting frames:
+		 * three frames were not enough on a loaded CI runner, and a test then pressed keys on a drawing that
+		 * was about to be replaced.
+		 */
+		if (width === at.width && font === at.font && narrow === at.narrow && same(m.ascent, at.ascent) && same(m.descent, at.descent) && same(m.char, at.char)) {
+			figure.setAttribute("data-fitted", "");
+			return;
+		}
 		at = { width, font, narrow, ...m };
 		char = at.char;
 		const next = draw(at);
 		const drawn = new Set(next.getAttributeNames());
-		for (const name of figure.getAttributeNames()) if (!own.has(name)) next.setAttribute(name, figure.getAttribute(name) ?? "");
+		// Not `data-fitted`: the new drawing has not been measured yet.
+		for (const name of figure.getAttributeNames()) if (!own.has(name) && name !== "data-fitted") next.setAttribute(name, figure.getAttribute(name) ?? "");
 		own = drawn;
 		const open = figure.querySelector("details.tb-chart-data")?.hasAttribute("open");
 		if (open) next.querySelector("details.tb-chart-data")?.setAttribute("open", "");
