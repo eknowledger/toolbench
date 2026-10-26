@@ -1,0 +1,58 @@
+{
+  "sdk": 9,
+  "id": "rate-limits",
+  "name": "Which rate limit applies",
+  "blurb": "Matches each request against an ordered list of path limits, the first match winning, for the methods you choose.",
+  "version": "1.0.0",
+  "capabilities": ["pure"],
+  "runtime": { "entry": "index.ts", "thread": "main" },
+  "kinds": ["table", "error"],
+  "inputs": [
+    {
+      "id": "limits",
+      "type": "rows",
+      "label": "Limits",
+      "description": "A path prefix and its limit. The first matching path wins, so order matters.",
+      "minRows": 1,
+      "maxRows": 8,
+      "columns": [
+        { "id": "path", "type": "text", "label": "Path", "maxLength": 100, "dir": "ltr" },
+        { "id": "limit", "type": "number", "label": "Limit", "min": 1, "max": 10000, "step": 1, "unit": "req/s" }
+      ],
+      "default": [
+        { "path": "/api/login", "limit": 5 },
+        { "path": "/api", "limit": 500 }
+      ]
+    },
+    {
+      "id": "methods",
+      "type": "multiselect",
+      "label": "Limited methods",
+      "description": "Requests with any other method are not limited.",
+      "min": 1,
+      "default": ["POST", "PUT", "PATCH", "DELETE"],
+      "options": [
+        { "value": "GET", "label": "GET" },
+        { "value": "POST", "label": "POST" },
+        { "value": "PUT", "label": "PUT" },
+        { "value": "PATCH", "label": "PATCH" },
+        { "value": "DELETE", "label": "DELETE" },
+        { "value": "HEAD", "label": "HEAD" }
+      ]
+    },
+    {
+      "id": "requests",
+      "type": "textarea",
+      "label": "Requests",
+      "description": "One per line: a method and a path.",
+      "dir": "ltr",
+      "rows": 5,
+      "maxLength": 5000,
+      "default": "POST /api/login\nPOST /api/orders\nGET /api/orders/7\nDELETE /api/orders/7\nPOST /health"
+    }
+  ],
+  "samples": [
+    { "label": "Reads limited too", "input": { "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"] } },
+    { "label": "A rule that never matches", "input": { "limits": [{ "path": "/api", "limit": 500 }, { "path": "/api/login", "limit": 5 }] } }
+  ]
+}

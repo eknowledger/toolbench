@@ -816,3 +816,73 @@ describe("validateManifest: a multiselect (contract 9, #204)", () => {
 		failsWith((m) => { m.inputs = [preset(["A"]), types()]; }, "inputs[0].options[0].sets.types", String.raw`defaults to \["A","AAAA"\]`);
 	});
 });
+
+describe("validateManifest: rows (contract 9, #204)", () => {
+	const limits = (extra: Record<string, unknown> = {}) => ({
+		id: "limits",
+		type: "rows",
+		label: "Limits",
+		maxRows: 8,
+		columns: [
+			{ id: "path", type: "text", label: "Path", maxLength: 20 },
+			{ id: "limit", type: "number", label: "Limit", min: 1, max: 10000, unit: "req/s" },
+		],
+		default: [{ path: "/api", limit: 500 }],
+		...extra,
+	});
+	const withLimits = (extra: Record<string, unknown> = {}, rest: Record<string, unknown> = {}) => (m: Record<string, unknown>) => {
+		m.inputs = [limits(extra)];
+		Object.assign(m, rest);
+	};
+	const column = (extra: Record<string, unknown>) => withLimits({ columns: [{ id: "c", type: "text", label: "C", ...extra }], default: [] });
+
+	it("accepts columns of the four single-value types, maxRows, minRows and a default list of rows", () => {
+		const columns = [
+			{ id: "host", type: "text", label: "Host" },
+			{ id: "port", type: "number", label: "Port", min: 1, max: 65535, step: 1 },
+			{ id: "scheme", type: "select", label: "Scheme", options: [{ value: "https", label: "HTTPS" }, { value: "http", label: "HTTP" }] },
+			{ id: "on", type: "toggle", label: "On" },
+		];
+		const m = validateManifest({ ...good(), inputs: [limits({ columns, minRows: 1, default: [{ host: "a", port: 443, scheme: "https", on: true }] })] });
+		assert.ok(m.inputs[0]?.type === "rows");
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [limits({ default: [] })] }), "no rows is a default when minRows is 0");
+	});
+
+	it("needs maxRows, a whole number from 1 to 50, and minRows within it", () => {
+		failsWith(withLimits({ maxRows: undefined }), "inputs[0].maxRows", "must declare maxRows");
+		failsWith(withLimits({ maxRows: 51 }), "inputs[0].maxRows", "1 to 50");
+		failsWith(withLimits({ maxRows: 2.5 }), "inputs[0].maxRows", "1 to 50");
+		failsWith(withLimits({ minRows: 9 }), "inputs[0].minRows", String.raw`0 to maxRows \(8\)`);
+	});
+
+	it("takes one to four columns with unique ids", () => {
+		failsWith(withLimits({ columns: [], default: [] }), "inputs[0].columns", "1 to 4 columns, got 0");
+		const five = ["a", "b", "c", "d", "e"].map((id) => ({ id, type: "text", label: id }));
+		failsWith(withLimits({ columns: five, default: [] }), "inputs[0].columns", "1 to 4 columns, got 5");
+		failsWith(withLimits({ columns: [{ id: "a", type: "text", label: "A" }, { id: "a", type: "toggle", label: "B" }], default: [] }), "inputs[0].columns[1].id", String.raw`already used by inputs\[0\].columns\[0\]`);
+	});
+
+	it("holds a column to its type's rules, refuses a type that is not a single value, and keys an input has", () => {
+		failsWith(column({ type: "textarea" }), "inputs[0].columns[0].type", 'must be one of "text", "number", "select", "toggle"');
+		failsWith(column({ type: "number" }), "inputs[0].columns[0].min/max", "must declare min and max");
+		failsWith(column({ type: "select", options: [{ value: "a", label: "A" }] }), "inputs[0].columns[0].options", "at least two options");
+		failsWith(column({ type: "select", options: [{ value: "a", label: "A", sets: { value: 1 } }, { value: "b", label: "B" }] }), "inputs[0].columns[0].options[0].sets", "preset");
+		failsWith(column({ default: "x" }), "inputs[0].columns[0].default", "the rows input's default");
+		failsWith(column({ description: "x" }), "inputs[0].columns[0].description", "not part of a column");
+	});
+
+	it("checks every row of the default as the form would hold it", () => {
+		failsWith(withLimits({ default: { path: "/api", limit: 5 } }), "inputs[0].default", "list of rows");
+		failsWith(withLimits({ default: [{ path: "/api" }] }), "inputs[0].default[0]", 'has no "limit"');
+		failsWith(withLimits({ default: [{ path: "/api", limit: 5, burst: 2 }] }), "inputs[0].default[0].burst", "names no column");
+		failsWith(withLimits({ default: [{ path: "/api", limit: 20000 }] }), "inputs[0].default[0].limit", String.raw`outside "limit"'s min..max \(1..10000\)`);
+		failsWith(withLimits({ default: [{ path: "/a-path-longer-than-twenty", limit: 5 }] }), "inputs[0].default[0].path", "maxLength of 20");
+		failsWith(withLimits({ minRows: 2 }), "inputs[0].default", String.raw`1 row, fewer than minRows \(2\)`);
+		failsWith(withLimits({ maxRows: 1, default: [{ path: "/a", limit: 1 }, { path: "/b", limit: 2 }] }), "inputs[0].default", String.raw`2 rows, more than maxRows \(1\)`);
+	});
+
+	it("checks a sample's rows as it checks the default", () => {
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [limits()], samples: [{ label: "Two", input: { limits: [{ path: "/a", limit: 1 }, { path: "/b", limit: 2 }] } }] }));
+		failsWith(withLimits({}, { samples: [{ label: "Bad", input: { limits: [{ path: "/a", limit: "many" }] } }] }), "samples[0].input.limits[0].limit", "finite number");
+	});
+});

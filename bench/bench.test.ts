@@ -7239,3 +7239,253 @@ describe("a toggle in the accent colour (#204)", () => {
 		await page.close();
 	});
 });
+
+/*
+ * A rows input (#204), on the bench's `rows` fixture: one column of host names, at least one row and at most
+ * eight, opening on example.com, api.example.com and status.example.net; and on the rate-limits tool, two
+ * columns, for the narrow layout. Every expectation is written from those manifests by hand.
+ */
+describe("a rows input (contract 9, #204)", () => {
+	const HOSTS = ["example.com", "api.example.com", "status.example.net"];
+	async function open(query = "", width = 1280, id = "rows"): Promise<Page> {
+		const page = await browser.newPage({ viewport: { width, height: 1000 } });
+		await page.addInitScript(() => {
+			const w = window as unknown as { copied: string[] };
+			w.copied = [];
+			const stub = { writeText: (text: string) => (w.copied.push(text), Promise.resolve()) };
+			Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => stub });
+		});
+		await page.goto(`${BASE}/tool.html?id=${id}${query}`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		return page;
+	}
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const attrs = (e: Element | null) => Object.fromEntries([...(e?.attributes ?? [])].map((a) => [a.name, a.value]));
+			const row = root.querySelector('[data-input="hosts"]') as HTMLElement;
+			const box = root.querySelector("#in-hosts") as HTMLElement;
+			const lis = [...box.querySelectorAll("li.tb-row")];
+			const active = root.activeElement as HTMLElement | null;
+			return {
+				row: `${row.tagName.toLowerCase()}.${row.className}`,
+				children: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				box: attrs(box),
+				inside: [...box.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}${(c as HTMLElement).hidden ? "[hidden]" : ""}`),
+				foot: [...(box.querySelector(".tb-rows-foot")?.children ?? [])].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				rows: lis.map((li) => [li.querySelector(".tb-handle")?.getAttribute("aria-label"), (li.querySelector("input") as HTMLInputElement).value, li.querySelector("input")?.getAttribute("aria-label"), li.querySelector(".tb-remove")?.getAttribute("aria-label")]),
+				moving: lis.map((li) => li.hasAttribute("data-moving")),
+				add: attrs(box.querySelector(".tb-add")),
+				count: root.querySelector("#in-hosts-count")?.textContent,
+				empty: (box.querySelector(".tb-rows-empty") as HTMLElement).hidden ? null : box.querySelector(".tb-rows-empty")?.textContent,
+				error: [root.querySelector("#in-hosts-err")?.className, root.querySelector("#in-hosts-err")?.textContent],
+				rowError: lis.map((li) => li.querySelector(".tb-row-msg")?.textContent ?? null),
+				invalid: lis.map((li) => [li.querySelector("input")?.getAttribute("aria-invalid"), li.querySelector("input")?.getAttribute("aria-describedby")]),
+				announced: root.querySelector(".tb-announce")?.textContent ?? "",
+				focused: active ? `${active.className}|${active.getAttribute("aria-label") ?? active.textContent}` : "",
+				values: ((document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values.hosts as { host: string }[]).map((r) => r.host),
+				answer: [...root.querySelectorAll(".tb-out-table tbody tr")].map((tr) => tr.querySelector("td, th")?.textContent),
+			};
+		});
+	// The unseen region is written a frame after it is emptied, so a test waits for the sentence.
+	const heard = (page: Page, sentence: string) =>
+		page.waitForFunction((s) => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent === s, sentence, { timeout: 5_000 });
+	const handle = (page: Page, n: number) => page.locator(`#host >> li.tb-row >> nth=${n - 1}`).locator(".tb-handle");
+
+	it("draws a row per host in a list, named by its legend, each with a handle, a labelled cell and a remove button", async () => {
+		const page = await open();
+		const seen = await read(page);
+		assert.equal(seen.row, "fieldset.tb-field-row");
+		assert.deepEqual(seen.children, ["legend.tb-label", "div.tb-rows-box", "p.tb-desc", "p.tb-sr"]);
+		assert.deepEqual(seen.box, { class: "tb-rows-box", id: "in-hosts", role: "group", "aria-labelledby": "in-hosts-label", "aria-describedby": "in-hosts-desc in-hosts-count in-hosts-err" });
+		assert.deepEqual(seen.inside, ["ol.tb-rows", "p.tb-rows-empty[hidden]", "div.tb-rows-foot"], "one column has no header row");
+		assert.deepEqual(seen.foot, ["button.tb-add", "p.tb-count"]);
+		assert.deepEqual(seen.rows, HOSTS.map((h, i) => [`Move row ${i + 1}, ${h}`, h, `Host, row ${i + 1} of 3`, `Remove row ${i + 1}, ${h}`]));
+		assert.equal(seen.count, "3 of at most 8, at least 1");
+		assert.deepEqual(seen.add, { type: "button", class: "tb-add" });
+		await page.close();
+	});
+
+	it("adds a row, focuses its cell, says so, and hands run the rows in order", async () => {
+		const page = await open();
+		await page.locator("#host >> .tb-add").click();
+		await heard(page, "Row 4 added, 4 of 8.");
+		let seen = await read(page);
+		assert.equal(seen.focused, "tb-input|Host, row 4 of 4");
+		await page.keyboard.type("new.example");
+		seen = await read(page);
+		assert.deepEqual(seen.values, [...HOSTS, "new.example"]);
+		assert.equal(seen.rows[3]?.[0], "Move row 4, new.example", "the handle is named by what was typed");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-table").waitFor({ timeout: 10_000 });
+		assert.deepEqual((await read(page)).answer, [...HOSTS, "new.example"]);
+		await page.close();
+	});
+
+	it("moves a row with the arrow keys on its handle, keeping focus on it and saying where it went", async () => {
+		const page = await open();
+		await handle(page, 3).focus();
+		await page.keyboard.press("ArrowUp");
+		await heard(page, "Moved status.example.net to row 2 of 3.");
+		let seen = await read(page);
+		assert.deepEqual(seen.values, ["example.com", "status.example.net", "api.example.com"]);
+		assert.equal(seen.focused, "tb-icon tb-handle|Move row 2, status.example.net");
+		assert.deepEqual(seen.moving, [false, true, false], "the moved row is lifted while its handle has focus");
+		await page.keyboard.press("Home");
+		assert.deepEqual((await read(page)).values, ["status.example.net", "example.com", "api.example.com"]);
+		await page.keyboard.press("End");
+		seen = await read(page);
+		assert.deepEqual(seen.values, ["example.com", "api.example.com", "status.example.net"]);
+		assert.equal(seen.focused, "tb-icon tb-handle|Move row 3, status.example.net");
+		await page.keyboard.press("Tab");
+		assert.deepEqual((await read(page)).moving, [false, false, false], "and set down when focus leaves it");
+		await page.close();
+	});
+
+	it("moves a row with Alt and an arrow from its cell, and focus stays in the cell", async () => {
+		const page = await open();
+		await page.locator("#host >> li.tb-row >> nth=0").locator("input").focus();
+		await page.keyboard.press("Alt+ArrowDown");
+		const seen = await read(page);
+		assert.deepEqual(seen.values, ["api.example.com", "example.com", "status.example.net"]);
+		assert.equal(seen.focused, "tb-input|Host, row 2 of 3");
+		await page.close();
+	});
+
+	it("moves a row by dragging its handle", async () => {
+		const page = await open();
+		const from = await handle(page, 1).boundingBox();
+		const to = await page.locator("#host >> li.tb-row >> nth=2").boundingBox();
+		assert.ok(from && to);
+		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(from.x + from.width / 2, to.y + to.height - 2, { steps: 8 });
+		await page.mouse.up();
+		assert.deepEqual((await read(page)).values, ["api.example.com", "status.example.net", "example.com"]);
+		await page.close();
+	});
+
+	it("after a removal puts focus on the row that took its place, else the one before, else Add", async () => {
+		const page = await open();
+		await page.locator("#host >> li.tb-row >> nth=1").locator(".tb-remove").click();
+		await heard(page, "Row 2 removed, 2 of 8.");
+		let seen = await read(page);
+		assert.deepEqual(seen.values, ["example.com", "status.example.net"]);
+		assert.equal(seen.focused, "tb-icon tb-remove|Remove row 2, status.example.net");
+		await page.keyboard.press("Enter");
+		seen = await read(page);
+		assert.deepEqual(seen.values, ["example.com"], "Enter presses the button, it does not run the tool");
+		assert.equal(seen.focused, "tb-icon tb-remove|Remove row 1, example.com", "the last row gone, the one before");
+		await page.keyboard.press("Space");
+		seen = await read(page);
+		assert.equal(seen.focused, "tb-add|Add row");
+		assert.equal(seen.empty, "No rows yet.");
+		assert.deepEqual(seen.inside, ["ol.tb-rows[hidden]", "p.tb-rows-empty", "div.tb-rows-foot"]);
+		await page.close();
+	});
+
+	it("at maxRows keeps Add in the tab order, unavailable, with the reason beside it", async () => {
+		const page = await open();
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { hosts: Array.from({ length: 8 }, (_, i) => ({ host: `h${i}.example` })) };
+		});
+		let seen = await read(page);
+		assert.deepEqual(seen.add, { type: "button", class: "tb-add", "aria-disabled": "true", "aria-describedby": "in-hosts-count" });
+		assert.equal(seen.count, "8 of 8, the most this tool allows. Remove one to add another.");
+		// Forced: Playwright will not click a control marked aria-disabled, and a reader can.
+		await page.locator("#host >> .tb-add").click({ force: true });
+		assert.equal((await read(page)).values.length, 8, "a click added no ninth row");
+		// From the keyboard, where the tab order matters. A click focuses no button in macOS WebKit, so it is not the test of focus.
+		await page.locator("#host >> .tb-add").focus();
+		await page.keyboard.press("Enter");
+		seen = await read(page);
+		assert.equal(seen.values.length, 8, "nor did Enter");
+		assert.equal(seen.focused, "tb-add|Add row");
+		await page.close();
+	});
+
+	it("refuses Run below minRows with a visible message, and does not call the tool", async () => {
+		const page = await open();
+		for (let i = 0; i < 3; i++) await page.locator("#host >> li.tb-row >> nth=0").locator(".tb-remove").click();
+		await page.locator("#host >> .tb-run").click();
+		const seen = await read(page);
+		assert.deepEqual(seen.error, ["tb-field-msg", "Hosts: add at least one row."]);
+		assert.deepEqual(seen.answer, []);
+		await page.close();
+	});
+
+	it("shows a tool's error under the row it names, naming the field and the row, and marks that row's cell", async () => {
+		const page = await open();
+		await page.locator('#host >> .tb-sample:text-is("A space in one")').click();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-error").waitFor({ timeout: 10_000 });
+		const seen = await read(page);
+		assert.deepEqual(seen.rowError, [null, "Hosts, row 2: a host name cannot contain a space."]);
+		assert.deepEqual(seen.invalid, [[null, null], ["true", "in-hosts-row-err"]]);
+		assert.deepEqual(seen.error, ["tb-sr", "Hosts, row 2: a host name cannot contain a space."], "the group hears it too, unseen");
+		const colour = await page.locator("#host >> .tb-row-msg").evaluate((e) => getComputedStyle(e).color);
+		assert.equal(colour, await probeColour(page, "var(--tb-bad)"));
+		await page.close();
+	});
+
+	it("writes a link as one key per column, zipped by position, and reads it back", async () => {
+		const page = await open();
+		await page.locator('#host >> [part~="share"]').click();
+		const copied = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
+		assert.deepEqual(copied, [`${BASE}/tool.html?id=rows&rows.hosts.host=example.com&rows.hosts.host=api.example.com&rows.hosts.host=status.example.net`]);
+		await page.close();
+		const linked = await open("&rows.hosts.host=a.example&rows.hosts.host=b.example");
+		assert.deepEqual((await read(linked)).values, ["a.example", "b.example"]);
+		await linked.close();
+		const tooMany = await open(Array.from({ length: 9 }, (_, i) => `&rows.hosts.host=h${i}.example`).join(""));
+		assert.deepEqual((await read(tooMany)).values, HOSTS, "more than maxRows opens on the default");
+		await tooMany.close();
+	});
+
+	it("leaves a list out of a link past 2,000 characters, and says which", async () => {
+		const page = await open();
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { hosts: Array.from({ length: 8 }, () => ({ host: "a".repeat(253) })) };
+		});
+		await page.locator('#host >> [part~="share"]').click();
+		const copied = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
+		assert.deepEqual(copied, [`${BASE}/tool.html?id=rows`]);
+		assert.equal(await page.locator("#host >> .tb-share-note").textContent(), "Link copied, without Hosts: too long for a link");
+		await page.close();
+	});
+
+	it("stacks two columns' cells in a narrow tool, each labelled, and keeps them side by side when wide", async () => {
+		const cellTops = (page: Page) =>
+			page.evaluate(() => {
+				const li = document.querySelector("#host")?.shadowRoot?.querySelector('[data-input="limits"] li.tb-row') as HTMLElement;
+				return {
+					tops: [...li.querySelectorAll(".tb-cell")].map((c) => Math.round(c.getBoundingClientRect().top)),
+					labels: [...li.querySelectorAll(".tb-cell")].map((c) => getComputedStyle(c, "::before").content),
+				};
+			});
+		const wide = await open("", 1280, "rate-limits");
+		let seen = await cellTops(wide);
+		assert.equal(seen.tops[0], seen.tops[1], "side by side at 1280");
+		assert.deepEqual(seen.labels, ["none", "none"], "the header row names them instead");
+		await wide.close();
+		const narrow = await open("", 390, "rate-limits");
+		seen = await cellTops(narrow);
+		assert.ok((seen.tops[1] ?? 0) > (seen.tops[0] ?? 0), `stacked at 390: ${seen.tops}`);
+		assert.deepEqual(seen.labels, ['"Path"', '"Limit"']);
+		await narrow.close();
+	});
+
+	it("fetches the list's chunk with the tool's code, and a tool without a rows input does not", async () => {
+		const chunks = async (id: string) => {
+			const page = await browser.newPage();
+			const seen: string[] = [];
+			page.on("request", (r) => seen.push(new URL(r.url()).pathname));
+			await page.goto(`${BASE}/tool.html?id=${id}`, { waitUntil: "load" });
+			await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+			await page.close();
+			return seen.filter((p) => /\/rows-[^/]+\.js$/.test(p)).length;
+		};
+		assert.equal(await chunks("rows"), 1);
+		assert.equal(await chunks("multiselect"), 0);
+	});
+});

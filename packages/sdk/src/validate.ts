@@ -147,8 +147,9 @@ export function inputProblem(spec: InputSpec, value: unknown): string | undefine
 	if (spec.type === "secret" && String(value).length < (spec.minLength ?? 0)) return `${spec.label} must be at least ${spec.minLength} characters, got ${String(value).length}.`;
 	// What a reader types is lowercased and trimmed first, so only a value that is not six hex digits gets here.
 	if (spec.type === "color" && !/^#[0-9a-f]{6}$/.test(String(value))) return `${spec.label} must be a #rrggbb colour, got ${JSON.stringify(value)}.`;
-	// A reader can untick the last box (#204); the form holds the rest of a list's rules itself.
+	// A reader can untick the last box or remove the last row (#204); the form holds the rest of a list's rules itself.
 	if (spec.type === "multiselect" && Array.isArray(value) && value.length < (spec.min ?? 0)) return `${spec.label}: pick at least ${spec.min === 1 ? "one" : spec.min}.`;
+	if (spec.type === "rows" && Array.isArray(value) && value.length < (spec.minRows ?? 0)) return `${spec.label}: add at least ${spec.minRows === 1 ? "one row" : `${spec.minRows} rows`}.`;
 	return undefined;
 }
 
@@ -270,8 +271,68 @@ function validateInput(raw: unknown, path: string): InputSpec {
 			if (problem) fail(`${path}.default`, problem);
 			break;
 		}
+		case "rows": {
+			const columns = arr(o.columns, `${path}.columns`);
+			// Four is what a row holds at a phone's width before a cell is too narrow to read.
+			if (columns.length < 1 || columns.length > 4) fail(`${path}.columns`, `takes 1 to 4 columns, got ${columns.length}`);
+			columns.forEach((column, i) => validateColumn(column, `${path}.columns[${i}]`));
+			const ids = columns.map((column) => (column as { id: string }).id);
+			const repeated = firstRepeat(ids);
+			if (repeated) fail(`${path}.columns[${repeated.index}].id`, `"${ids[repeated.index]}" is already used by ${path}.columns[${repeated.previous}]`);
+			if (o.maxRows === undefined) fail(`${path}.maxRows`, "a rows input must declare maxRows: it is the guard against a runaway list and a runaway link");
+			if (!Number.isInteger(o.maxRows) || (o.maxRows as number) < 1 || (o.maxRows as number) > 50) fail(`${path}.maxRows`, "must be a whole number from 1 to 50");
+			if (o.minRows !== undefined && (!Number.isInteger(o.minRows) || (o.minRows as number) < 0 || (o.minRows as number) > (o.maxRows as number))) {
+				fail(`${path}.minRows`, `must be a whole number from 0 to maxRows (${o.maxRows})`);
+			}
+			checkRows(o.default, o as unknown as RowsSpec, `${path}.default`, "The default");
+			break;
+		}
 	}
 	return raw as InputSpec;
+}
+
+type RowsSpec = Extract<InputSpec, { type: "rows" }>;
+
+/** What a column of a rows input takes: a single-value input's keys, without its default and its help (#204). */
+const COLUMN_KEYS = ["id", "label", "type", "unit", "dir", "maxLength", "min", "max", "step", "options"];
+
+/**
+ * A column, held to the rules of an input of its type by validating it as one, with the value a new row's
+ * cell starts at standing in for the default it does not have. So a number column needs `min` and `max` for
+ * the same reason a number input does, and says so in the same words.
+ */
+function validateColumn(raw: unknown, path: string): void {
+	const o = obj(raw, path);
+	for (const key of Object.keys(o)) {
+		if (!COLUMN_KEYS.includes(key)) fail(`${path}.${key}`, key === "default" ? "belongs in the rows input's default, which gives every row a value" : `is not part of a column, which takes ${COLUMN_KEYS.join(", ")}`);
+	}
+	const type = oneOf(o.type, ["text", "number", "select", "toggle"] as const, `${path}.type`);
+	const options = type === "select" ? arr(o.options, `${path}.options`) : [];
+	// A cell choosing a preset would rewrite the form from inside one row.
+	options.forEach((option, i) => Object(option).sets !== undefined && fail(`${path}.options[${i}].sets`, "is a preset, and a cell cannot fill the form"));
+	const zero = type === "number" ? (typeof o.min === "number" && typeof o.max === "number" ? Math.min(o.max, Math.max(o.min, 0)) : 0) : type === "select" ? Object(options[0]).value : type === "toggle" ? false : "";
+	validateInput({ ...o, default: zero }, path);
+}
+
+/**
+ * A rows input's list, wherever an author writes one: its default, a sample, a preset, a case. Every row has
+ * a value for every column and nothing else, each held to its column as a sample's value is to its input,
+ * and the count is within `minRows..maxRows`.
+ */
+function checkRows(value: unknown, spec: RowsSpec, where: string, what: string): void {
+	if (!Array.isArray(value)) fail(where, "must be a list of rows, one object per row keyed by column id, [] for none");
+	const byId = new Map(spec.columns.map((column) => [column.id, column as unknown as InputSpec]));
+	value.forEach((row, i) => {
+		const at = `${where}[${i}]`;
+		const cells = obj(row, at);
+		for (const key of Object.keys(cells)) if (!byId.has(key)) fail(`${at}.${key}`, `names no column of this input. Its columns are: ${[...byId.keys()].join(", ")}`);
+		for (const key of byId.keys()) if (!(key in cells)) fail(at, `has no "${key}": every row needs a value for every column`);
+		checkPayload(cells, byId, at, what);
+	});
+	const n = value.length;
+	const min = spec.minRows ?? 0;
+	if (n < min) fail(where, `${n} row${n === 1 ? "" : "s"}, fewer than minRows (${min})`);
+	if (n > spec.maxRows) fail(where, `${n} rows, more than maxRows (${spec.maxRows})`);
 }
 
 /**
@@ -370,6 +431,10 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
 				checkPicks(value, spec.options.map((option) => option.value), spec.min ?? 0, spec.max ?? spec.options.length, where);
 				break;
 			}
+			case "rows": {
+				checkRows(value, spec, where, what);
+				break;
+			}
 			case "secret":
 				fail(where, "is a secret, which a manifest may not set: every reader would have it");
 			default: {
@@ -388,7 +453,7 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
  */
 export function checkCaseLists(specs: readonly InputSpec[], input: Record<string, unknown>): void {
 	const byId = new Map(specs.map((spec) => [spec.id, spec]));
-	const lists = Object.fromEntries(Object.entries(input).filter(([key]) => byId.get(key)?.type === "multiselect"));
+	const lists = Object.fromEntries(Object.entries(input).filter(([key]) => ["multiselect", "rows"].includes(byId.get(key)?.type ?? "")));
 	checkPayload(lists, byId, "input", "A case");
 }
 
@@ -510,7 +575,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples", "reset"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details", "mode", "minLength"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details", "mode", "minLength", "columns", "minRows", "maxRows"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

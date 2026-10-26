@@ -32,7 +32,7 @@
  *  - there is always a Run button. Debounce-on-typing alone leaves a keyboard user no way to say
  *    "go now", and is wrong anyway for anything slow.
  */
-import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
+import type { InputSpec, InputValues, Manifest, Output, Row, Sample, SelectOption } from "@toolbench/sdk";
 import { defaultInputs, inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
@@ -245,6 +245,8 @@ let shareLoad: Promise<void> | undefined;
 let controls: typeof import("./controls.ts") | undefined;
 /** A multiselect's checkboxes and chips (#204), once a tool that has one has activated. */
 let picker: typeof import("./choices.ts") | undefined;
+/** A rows input's list (#204), once a tool that has one has activated. */
+let lister: typeof import("./rows.ts") | undefined;
 const loadShare = () => (shareLoad ??= import("./share.ts").then((module) => void (sharer = module)));
 
 /** Defines the element. Call once, with the source your host provides. */
@@ -336,6 +338,8 @@ export class ToolHost extends HTMLElement {
 	#sliders = new Map<string, HTMLInputElement>();
 	/** Repaint for each painted textarea (#153), for values written without a keystroke. */
 	#painters = new Map<string, () => void>();
+	/** Shows an error's line under one row of a rows input (#204), or clears it. */
+	#marks = new Map<string, (row: number | undefined, line: string) => void>();
 	#els: {
 		output?: HTMLElement;
 		status?: HTMLElement;
@@ -754,6 +758,11 @@ export class ToolHost extends HTMLElement {
 					? import("./controls.ts").then((module) => void (controls = module), () => undefined)
 					: undefined;
 			// A multiselect's choices (#204). A failed fetch leaves a native multiple select.
+			// A rows input's list (#204), the largest of the input controls, so only for a tool with one.
+			const listed =
+				!lister && this.#manifest?.inputs.some((input) => input.type === "rows")
+					? import("./rows.ts").then((module) => void (lister = module), () => undefined)
+					: undefined;
 			const lists =
 				!picker && this.#manifest?.inputs.some((input) => input.type === "multiselect")
 					? import("./choices.ts").then((module) => void (picker = module), () => undefined)
@@ -764,6 +773,7 @@ export class ToolHost extends HTMLElement {
 			await share;
 			await native;
 			await lists;
+			await listed;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -896,9 +906,11 @@ export class ToolHost extends HTMLElement {
 			if (output.kind === "error") this.#say(summarise(output, this.mode === "card"));
 			else this.#announce(summarise(output, this.mode === "card"));
 			if (output.kind === "error") {
-				// The field's name first, unless the message already starts with it, as the runtime's own refusals do.
+				// The field's name first, unless the message already starts with it, as the runtime's own refusals do;
+				// and the row a tool names in a rows input (#204), its index from 0 and its words from 1.
 				const label = this.#manifest?.inputs.find((spec) => spec.id === output.input)?.label ?? "";
-				this.#markInvalid(output.input, output.message.startsWith(label) ? output.message : `${label}: ${output.message}`);
+				const name = output.row !== undefined ? `${label}, row ${output.row + 1}` : label;
+				this.#markInvalid(output.input, output.message.startsWith(label) ? output.message : `${name}: ${output.message}`, output.row);
 			} else this.#markInvalid(undefined);
 			if (options.focusResult) this.#els.output?.focus();
 			settled(output.kind !== "error", output.kind === "error" ? output.message : undefined);
@@ -1127,6 +1139,7 @@ export class ToolHost extends HTMLElement {
 		this.#controls.clear();
 		this.#sliders.clear();
 		this.#painters.clear();
+		this.#marks.clear();
 		for (const spec of inputs) form.append(this.#control(spec));
 
 		const run = el("button", { class: "tb-run", type: "button" }, "Run");
@@ -1337,12 +1350,12 @@ export class ToolHost extends HTMLElement {
 		// A segmented select is a group of radios (#203): a fieldset captioned by its legend, not one labelled
 		// control. Without the controls chunk it is the dropdown, which is what an older runtime draws.
 		// A multiselect's choices are a group in the same way (#204); without their chunk, a multiple select.
-		const segmented = (spec.type === "select" && spec.control === "segmented" && controls !== undefined) || (spec.type === "multiselect" && picker !== undefined);
+		const segmented = (spec.type === "select" && spec.control === "segmented" && controls !== undefined) || (spec.type === "multiselect" && picker !== undefined) || (spec.type === "rows" && lister !== undefined);
 		const label = el(segmented ? "legend" : "label", { class: "tb-label", for: segmented ? undefined : id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
 		const row = el(segmented ? "fieldset" : "div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
 		// "3 selected, at most 4" under a list (#204): described by, so the bounds are heard with the group.
-		const count = spec.type === "multiselect" ? el("p", { class: "tb-count", id: `${id}-count` }) : null;
+		const count = spec.type === "multiselect" || spec.type === "rows" ? el("p", { class: "tb-count", id: `${id}-count` }) : null;
 		const desc = spec.description ? help(spec.description, { class: "tb-desc", id: `${id}-desc` }) : null;
 		/*
 		 * The rest of the help (#215), behind a native disclosure: keyboard, state and announcement are the
@@ -1446,6 +1459,27 @@ export class ToolHost extends HTMLElement {
 				show();
 				this.#painters.set(spec.id, show);
 				control = list;
+				break;
+			}
+			case "rows": {
+				if (lister && count) {
+					control = el("div", { id, role: "group", "aria-labelledby": `${id}-label` });
+					const view = lister.rows(control, spec, id, count, () => this.#values[spec.id] as Row[], (next) => {
+						this.#values[spec.id] = next;
+						this.#edited(spec.id);
+					}, (message) => {
+						// Emptied, then written a frame later, so the same sentence twice is announced twice.
+						const region = this.#els.announce;
+						if (!region) return;
+						region.textContent = "";
+						setTimeout(() => (region.textContent = message), 50);
+					});
+					this.#painters.set(spec.id, view.sync);
+					this.#marks.set(spec.id, view.mark);
+					break;
+				}
+				// Without the chunk there is no list to edit, and saying so beats a form that silently runs on the default.
+				control = el("p", { class: "tb-desc", id }, "This list could not be loaded, so the tool runs with its starting rows. Reload the page to edit them.");
 				break;
 			}
 			case "number": {
@@ -1567,7 +1601,8 @@ export class ToolHost extends HTMLElement {
 			if (desc) row.append(desc);
 			if (more) row.append(more);
 		}
-		if (count) row.append(count);
+		// A rows input keeps its count beside Add, inside the list.
+		if (count && !count.parentNode) row.append(count);
 		// The per-input error slot: unseen and empty until an error names this input, then the visible message (#204).
 		row.append(el("p", { class: "tb-sr", id: errorId }));
 		return row;
@@ -1757,7 +1792,7 @@ export class ToolHost extends HTMLElement {
 	 * a screen reader reached, which left a sighted reader of a long form matching a message at the bottom to
 	 * a field near the top. The same text is the control's description, so both hear one sentence.
 	 */
-	#markInvalid(inputId: string | undefined, line = ""): void {
+	#markInvalid(inputId: string | undefined, line = "", rowAt?: number): void {
 		for (const [id, control] of this.#controls) {
 			const invalid = id === inputId;
 			control.toggleAttribute("aria-invalid", invalid);
@@ -1765,7 +1800,10 @@ export class ToolHost extends HTMLElement {
 			const slot = this.#root.getElementById(`in-${id}-err`);
 			if (!slot) continue;
 			slot.textContent = invalid ? line : "";
-			slot.className = invalid ? "tb-field-msg" : "tb-sr";
+			// Under the row it names, for a rows input; the group still hears it, from the unseen slot.
+			const mark = this.#marks.get(id);
+			mark?.(invalid ? rowAt : undefined, line);
+			slot.className = invalid && !(mark && rowAt !== undefined) ? "tb-field-msg" : "tb-sr";
 		}
 	}
 

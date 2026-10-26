@@ -234,7 +234,18 @@ const BUDGETS = [
 	 * repeated keys, fetching the choices chunk, and a native multiple select for when that fetch fails. The
 	 * checkboxes, chips and their rules are the choices chunk, below. 29_500 would have left the build 969 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 30_500 },
+	/*
+	 * Raised from 30_500 to 32_500 by rows (#204), in the commit that crossed it: 30,469 to 32,338 measured,
+	 * 1,869 bytes, measured in three parts. 540 is the rate-limits tool's manifest, which `registry.ts` inlines
+	 * here as it does every tool's. 672 is validation: the type, its columns validated as inputs of their own
+	 * type, maxRows and minRows, every row of a default, a sample, a preset and a case checked cell by cell,
+	 * and the minimum in `inputProblem`. The other 657 is the element and its values: a row brought to its
+	 * columns for a host's write or a link, a link's columns zipped back into rows, an error's row in the line
+	 * under the input, and fetching the rows chunk. The list itself, its keyboard moves, the drag, the focus
+	 * after a removal and the narrow layout are the rows chunk, below, fetched only by a tool with a rows
+	 * input: 3,314 measured. 30_500 would have left the build 1,838 over.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 32_500 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -274,7 +285,7 @@ const BUDGETS = [
 	 *
 	 * Raised from 7_500 to 8_500 by contract v9's fixtures, in the commit that crossed it: 7,456 to 7,939
 	 * measured with the multiselect fixture (#204), its fourteen regions, and the rows fixture still to come.
-	 * Bench-only.
+	 * Bench-only. 8,229 with the rows fixture.
 	 */
 	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 8_500, deployOnly: true },
 	/*
@@ -294,7 +305,8 @@ const BUDGETS = [
 	 */
 	/*
 	 * Raised from 7_000 to 8_000 by contract v9's list fixtures (#204), in the commit that crossed it: 6,727 to
-	 * 7,164 measured with the multiselect fixture, and the rows fixture still to come. Bench-only.
+	 * 7,164 measured with the multiselect fixture, and the rows fixture still to come. Bench-only. 7,414 with
+	 * the rows fixture.
 	 */
 	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 8_000, deployOnly: true },
 	/*
@@ -411,6 +423,14 @@ const BUDGETS = [
 	 */
 	{ label: "multiselect choices", pattern: /^choices-[^/]+\.js$/, budget: 1_750 },
 	/*
+	 * A rows input's list (#204): its rows and cells, Add and remove, the arrow keys and Alt on a handle or a
+	 * cell, the drag, the focus after a removal, the announcements, the error under a row, and the narrow
+	 * layout's rules. Fetched with the tool's code only by a tool with a rows input. Built into boot it would
+	 * have cost every page this much for a list most tools never draw. Reader cost: that reader downloads it.
+	 * 3,314 measured.
+	 */
+	{ label: "rows list", pattern: /^rows-[^/]+\.js$/, budget: 3_750 },
+	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
 	 * The base lays out and draws a layered graph with orthogonal edges and the basic shapes, which is most
@@ -481,8 +501,12 @@ const BUDGETS = [
 	 * the v8 fixtures before it (4,914 to 4,989): a host's worker entry carries its own
 	 * registry instead, and the runtime's share of this chunk did not move. Squeezing the bench's names to fit
 	 * would measure nothing a reader pays.
+	 *
+	 * Raised from 5_500 to 6_000 by rows (#204), in the commit that crossed it: 5,082 to 5,644 measured, the
+	 * worker's registry inlining the rate-limits manifest as the boot chunk's does, and the rows fixture named
+	 * in it. 5_500 would have left the build 144 over.
 	 */
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_500 },
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 6_000 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
 	/*
@@ -501,6 +525,8 @@ const BUDGETS = [
 	{ label: "tool: histogram", pattern: /^tool-histogram-[^/]+\.js$/, budget: 1_500 },
 	// The graph kind's example (#152): parsing, rounds, the longest chain and the cycle. 1,209 measured.
 	{ label: "tool: build-order", pattern: /^tool-build-order-[^/]+\.js$/, budget: 1_500 },
+	// The array inputs' example (#204): checking the rules' order, and matching each request.
+	{ label: "tool: rate-limits", pattern: /^tool-rate-limits-[^/]+\.js$/, budget: 1_000 },
 	/*
 	 * ⚠️ The two bench FIXTURES, measured but deployOnly, and labelled so nobody mistakes them for shipped
 	 * tools. `json-code` arrived counted as reader cost, which would have put a chunk only the bench
@@ -542,9 +568,11 @@ const BUDGETS = [
 	// The newer input types (#203) on screen for the browser tests and the gallery. 267 measured.
 	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench fixture: multiselect", pattern: /^tool-multiselect-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "bench fixture: rows", pattern: /^tool-rows-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
-	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
+	// Raised from 7_000 to 7_500 by rows (#204): 6,616 to 7,187 measured, the page's registry naming the new tool. Bench-only.
+	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_500, deployOnly: true },
 	{ label: "bench page: charts", pattern: /^charts-[^/]+\.js$/, budget: 3_500, deployOnly: true },
 	// The graph gallery (#152). 1,089 measured.
 	{ label: "bench page: graphs", pattern: /^graphs-[^/]+\.js$/, budget: 1_500, deployOnly: true },
@@ -573,6 +601,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture share-private", pattern: /^worker-tool-share-private-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture highlighted-input", pattern: /^worker-tool-highlighted-input-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: build-order", pattern: /^worker-tool-build-order-[^/]+\.js$/, budget: 1_500, deployOnly: true },
+	{ label: "worker copy: rate-limits", pattern: /^worker-tool-rate-limits-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture graph-families", pattern: /^worker-tool-graph-families-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
@@ -581,6 +610,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture narrow-table", pattern: /^worker-tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture native-inputs", pattern: /^worker-tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "worker copy: bench fixture multiselect", pattern: /^worker-tool-multiselect-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture rows", pattern: /^worker-tool-rows-[^/]+\.js$/, budget: 500, deployOnly: true },
 ];
 
 let files;
@@ -673,9 +703,13 @@ for (const file of unclaimed) {
  *
  * Raised to 37_000 by the multiselect (#204), in the commit that crossed it: 35,611 to 36,659 measured,
  * the same validation, element and CSS as boot's line above. 36_000 would have been 659 bytes over.
+ *
+ * Raised to 39_000 by rows (#204), in the commit that crossed it: 36,659 to 38,448 measured, the same
+ * validation, element and values as boot's line above, and the landing page's registry inlining the
+ * rate-limits manifest. 37_000 would have been 1,448 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 37_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 39_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

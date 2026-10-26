@@ -1,0 +1,84 @@
+[
+  {
+    "name": "the defaults: the login limit before the general one, reads not limited, a path no rule covers",
+    "input": {
+      "limits": [{ "path": "/api/login", "limit": 5 }, { "path": "/api", "limit": 500 }],
+      "methods": ["POST", "PUT", "PATCH", "DELETE"],
+      "requests": "POST /api/login\nPOST /api/orders\nGET /api/orders/7\nDELETE /api/orders/7\nPOST /health"
+    },
+    "expect": {
+      "kind": "table",
+      "caption": "The limit each request meets, first match winning",
+      "columns": [{ "label": "Request" }, { "label": "Rule" }, { "label": "Limit (req/s)", "align": "end" }],
+      "rows": [
+        ["POST /api/login", "row 1, /api/login", 5],
+        ["POST /api/orders", "row 2, /api", 500],
+        ["GET /api/orders/7", "GET is not limited", "none"],
+        ["DELETE /api/orders/7", "row 2, /api", 500],
+        ["POST /health", "no rule matches", "none"]
+      ]
+    }
+  },
+  {
+    "name": "only GET limited: the general rule takes it, and POST passes unlimited",
+    "input": {
+      "limits": [{ "path": "/api/login", "limit": 5 }, { "path": "/api", "limit": 500 }],
+      "methods": ["GET"],
+      "requests": "GET /api/x\npost /api"
+    },
+    "expect": {
+      "kind": "table",
+      "caption": "The limit each request meets, first match winning",
+      "columns": [{ "label": "Request" }, { "label": "Rule" }, { "label": "Limit (req/s)", "align": "end" }],
+      "rows": [
+        ["GET /api/x", "row 2, /api", 500],
+        ["POST /api", "POST is not limited", "none"]
+      ]
+    }
+  },
+  {
+    "name": "a narrower path after a wider one never matches, and the error names its row, from 0",
+    "input": {
+      "limits": [{ "path": "/api", "limit": 500 }, { "path": "/api/login", "limit": 5 }],
+      "methods": ["POST"],
+      "requests": "POST /api/login"
+    },
+    "expect": { "kind": "error", "message": "\"/api/login\" never matches: row 1, \"/api\", matches it first. Move it above.", "input": "limits", "row": 1 }
+  },
+  {
+    "name": "a path twice is refused at its second row",
+    "input": {
+      "limits": [{ "path": "/api", "limit": 5 }, { "path": "/api", "limit": 500 }],
+      "methods": ["POST"],
+      "requests": "POST /api"
+    },
+    "expect": { "kind": "error", "message": "Path \"/api\" is already in row 1.", "input": "limits", "row": 1 }
+  },
+  {
+    "name": "a path without its leading slash, in the first row",
+    "input": {
+      "limits": [{ "path": "api", "limit": 5 }],
+      "methods": ["POST"],
+      "requests": "POST /api"
+    },
+    "expect": { "kind": "error", "message": "\"api\" must start with \"/\".", "input": "limits", "row": 0 }
+  },
+  {
+    "name": "a request line with no path is refused where it starts",
+    "input": {
+      "limits": [{ "path": "/api", "limit": 5 }],
+      "methods": ["POST"],
+      "requests": "POST /api\nGET"
+    },
+    "expect": { "kind": "error", "message": "\"GET\" is not a method and a path, such as \"GET /api/orders\".", "input": "requests", "at": 10, "len": 3 }
+  },
+  {
+    "name": "no requests at all",
+    "input": {
+      "limits": [{ "path": "/api", "limit": 5 }],
+      "methods": ["POST"],
+      "requests": "\n"
+    },
+    "expect": { "kind": "error", "message": "No requests yet. Add one per line, a method and a path.", "input": "requests" }
+  }
+]

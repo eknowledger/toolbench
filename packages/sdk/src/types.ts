@@ -720,6 +720,11 @@ type OutputBody =
 			at?: number;
 			/** How far the problem runs from `at`, shown as a range after the message. */
 			len?: number;
+			/**
+			 * For a `rows` input, the index of the row at fault, 0 for the first: the message is shown under that
+			 * row, named "Limits, row 2: ...", and its cells are marked invalid. Contract version 9.
+			 */
+			row?: number;
 	  };
 
 export type OutputKind = Output["kind"];
@@ -934,7 +939,72 @@ export type InputSpec =
 			 * @default checkboxes up to 6 options, chips above
 			 */
 			control?: "checkboxes" | "chips";
+	  })
+	| (InputBase & {
+			/**
+			 * A list of rows the reader adds, removes and reorders (#204): hosts, or paths and their limits. `run`
+			 * receives a `Row[]`, one object per row keyed by column id, even for one column, so a list of hosts is
+			 * `rows.map((r) => r.host)`. Number cells arrive clamped, and never fewer rows than `minRows`: a reader
+			 * below it is told so when they press Run, and the tool is not called. Contract version 9.
+			 */
+			type: "rows";
+			/** One to four columns, each a text, number, select or toggle with that type's keys and no `default`. */
+			columns: RowColumn[];
+			/**
+			 * The most rows a reader may add, at most 50. Required, as a number's `max` is: the guard against a
+			 * runaway list, and a runaway link. At it, Add stays focusable with the reason beside it.
+			 */
+			maxRows: number;
+			/**
+			 * The fewest rows Run accepts.
+			 * @default 0
+			 */
+			minRows?: number;
+			/** The rows the form opens with, each with a value for every column. `[]` for none. */
+			default: Row[];
 	  });
+
+/**
+ * One column of a `rows` input: the keys of a single-value input of its type, without `default`,
+ * `description` and the rest, which belong to the rows input. A new row's cell is empty text, the number
+ * nearest 0 within `min..max`, the first option, or off. Contract version 9.
+ */
+export type RowColumn =
+	| (RowColumnBase & {
+			type: "text";
+			/** The most characters a cell accepts. */
+			maxLength?: number;
+	  })
+	| (RowColumnBase & {
+			type: "number";
+			/** The lowest value. Required, as on a number input. */
+			min: number;
+			/** The highest value, above `min`. */
+			max: number;
+			/** The increment for the arrow keys. Any value when omitted. */
+			step?: number;
+	  })
+	| (RowColumnBase & {
+			type: "select";
+			/** Two or more choices, with unique values and no `sets`. */
+			options: SelectOption[];
+	  })
+	| (RowColumnBase & { type: "toggle" });
+
+/** What every column of a `rows` input has. */
+export interface RowColumnBase {
+	/** The key of this column's value in each row `run` receives. Unique within the input. */
+	id: string;
+	/** The column's heading, and the start of each cell's accessible name: "Path, row 2 of 3". */
+	label: string;
+	/** Shown after each cell: "req/s". */
+	unit?: string;
+	/** Force text direction, as on an input. */
+	dir?: "ltr" | "auto";
+}
+
+/** One row of a `rows` input's value: a cell per column, keyed by column id. Contract version 9. */
+export type Row = Record<string, string | number | boolean>;
 
 /**
  * A textarea language a tool defines itself (#163), tokenised by the runtime and painted behind the real
@@ -977,14 +1047,14 @@ export interface SelectOption {
 
 export type InputType = InputSpec["type"];
 
-export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color", "secret", "multiselect"];
+export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color", "secret", "multiselect", "rows"];
 
 /**
- * One input's value: a string, a number or a boolean for the single-value types, and a `string[]` for
- * a multiselect (contract version 9). Widened, never narrowed, so a tool's own `type Input = { ... }` of
+ * One input's value: a string, a number or a boolean for the single-value types, a `string[]` for a
+ * multiselect and a `Row[]` for rows (contract version 9). Widened, never narrowed, so a tool's own `type Input = { ... }` of
  * single values still satisfies `InputValues`.
  */
-export type InputValue = string | number | boolean | string[];
+export type InputValue = string | number | boolean | string[] | Row[];
 
 /** The shape a tool's `run` receives: one entry per declared input, keyed by id. */
 export type InputValues = Record<string, InputValue>;

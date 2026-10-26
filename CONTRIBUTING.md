@@ -159,8 +159,9 @@ each cover something the others do not: `percentiles` is a main-thread group of 
 `queue-explorer` is a worker with progress and a timeout, `utf8-bytes` is the `bytes` kind,
 `regex-explainer` is the `text` kind, and a worker whose timeout is the point rather than an
 afterthought, `histogram` is a bare `series` with no group around it, the `bar` shape, and no
-primary input for a card to fall back on, and `build-order` is the `graph` kind, a graph the runtime lays out
-beside the fields that explain it.
+primary input for a card to fall back on, `build-order` is the `graph` kind, a graph the runtime lays out
+beside the fields that explain it, and `rate-limits` is the list inputs, an ordered `rows` input whose order
+is the answer and a `multiselect`.
 
 Start with `pnpm new-tool <id>`, then replace the starter function. The scaffold exists so the first
 two minutes are not copying boilerplate. It does not change what a tool in this repository has to cover.

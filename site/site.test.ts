@@ -438,6 +438,20 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	// The rows card (#204): the fixture's three hosts, and the arrow keys on a handle moving one.
+	it("the rows card draws a row per host and moves one with the arrow keys", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#rows`);
+		const host = page.locator("#rows tool-host");
+		await host.locator("li.tb-row").first().waitFor({ timeout: 10_000 });
+		const hosts = () => host.evaluate((el) => [...(el.shadowRoot?.querySelectorAll<HTMLInputElement>("li.tb-row input") ?? [])].map((i) => i.value));
+		assert.deepEqual(await hosts(), ["example.com", "api.example.com", "status.example.net"]);
+		await host.locator("li.tb-row >> nth=2").locator(".tb-handle").focus();
+		await page.keyboard.press("ArrowUp");
+		assert.deepEqual(await hosts(), ["example.com", "status.example.net", "api.example.com"]);
+		await page.close();
+	});
+
 	// The input-details card (#215): the p99 target's details are closed, then open on a click.
 	it("the input-details card opens the details on a click", async () => {
 		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

@@ -96,4 +96,12 @@ describe("compare — subset, and its guard rails", () => {
 		const testCase: Case = { ...base, match: "subset", why: "message wording may gain detail", expect: { kind: "error", message: "at least 12 bytes", input: "hex" } };
 		assert.equal(compare(actual, testCase), undefined);
 	});
+
+	// The row is where the reader is sent, so a subset match that ignored it would pass an error under the wrong row (#204).
+	it("holds a subset error to the row it names", () => {
+		const actual: Output = { kind: "error", message: '"/api" is already in row 1.', input: "limits", row: 2 };
+		const testCase: Case = { ...base, match: "subset", why: "wording may gain detail", expect: { kind: "error", message: "already in row 1", input: "limits", row: 1 } };
+		assert.equal(compare(actual, testCase), "output.row: expected 1, got 2");
+		assert.equal(compare({ ...actual, row: 1 }, testCase), undefined);
+	});
 });
