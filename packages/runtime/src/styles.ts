@@ -63,6 +63,11 @@ export const STYLES = /* css */ `
      light page, which is 3.18:1 on #d97706; a bright accent wants dark text instead, black being 9.78:1
      on #f59e0b. Defaults to the surface, so nothing changes unless a host sets it. */
   --tb-accent-ink: var(--tb-bg);
+  /* The form's colours (#224), so one input can be recoloured through its row. Today's values by default. */
+  --tb-input-bg: var(--tb-surface);
+  --tb-input-border: var(--tb-border);
+  --tb-input-fg: var(--tb-fg);
+  --tb-desc-fg: var(--tb-faint);
 
   /* Series colours. A chart uses six, then they repeat: a chart needing seven is a chart needing a
      rethink. A graph's categories can name all eight, because seven teams in a dependency graph are not. */
@@ -135,14 +140,42 @@ export const STYLES = /* css */ `
 .tb-field-row { display: grid; gap: 0.25rem; }
 .tb-label { font-size: 0.82rem; font-weight: 600; color: var(--tb-muted); }
 .tb-unit { font-weight: 400; color: var(--tb-faint); }
-.tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
+.tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-desc-fg); }
+/* Help text with markup (#217). Its blocks keep the one-line hint's tight rhythm rather than a page's. */
+:is(div.tb-desc, .tb-details-body) > * { margin: 0; }
+:is(div.tb-desc, .tb-details-body) > * + * { margin-top: 0.35rem; }
+:is(.tb-desc, .tb-details-body) ul { padding-inline-start: 1.1rem; }
+:is(.tb-desc, .tb-details-body) li + li { margin-top: 0.15rem; }
+:is(.tb-desc, .tb-details-body) code { font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
+:is(.tb-desc, .tb-details-body) strong { font-weight: 650; color: var(--tb-muted); }
+/* A tone colours words the text already says, so colour is never the only carrier (WCAG 1.4.1), and the
+   weight sets them apart for a reader who cannot tell the colours apart. Muted keeps the normal weight:
+   in bold, a grey read as emphasis, the opposite of receding. */
+:is(.tb-desc, .tb-details-body) [data-tone] { font-weight: 600; }
+:is(.tb-desc, .tb-details-body) [data-tone="good"] { color: var(--tb-good); }
+:is(.tb-desc, .tb-details-body) [data-tone="warn"] { color: var(--tb-warn); }
+:is(.tb-desc, .tb-details-body) [data-tone="bad"] { color: var(--tb-bad); }
+:is(.tb-desc, .tb-details-body) [data-tone="accent"] { color: var(--tb-accent-text); }
+:is(.tb-desc, .tb-details-body) [data-tone="muted"] { color: var(--tb-faint); font-weight: inherit; }
+/* An input's details (#215): a quiet disclosure under the hint, its marker drawn like .tb-disclose's. The
+   summary is 24px tall for WCAG 2.5.8; the body is set off by a rule, not a box, so it reads as the hint's
+   continuation. */
+.tb-details { font-size: 0.78rem; color: var(--tb-desc-fg); }
+.tb-details > summary { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 24px; cursor: pointer; color: var(--tb-muted); list-style: none; border-radius: 6px; padding-inline-end: 0.25rem; }
+.tb-details > summary::-webkit-details-marker { display: none; }
+.tb-details > summary::before { content: ""; border-left: 4px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 120ms ease; }
+.tb-details[open] > summary::before { transform: rotate(90deg); }
+.tb-details > summary:hover { color: var(--tb-fg); }
+.tb-details > summary:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+.tb-details-body { margin: 0.25rem 0 0.15rem; padding: 0.375rem 0 0.375rem 0.625rem; border-inline-start: 2px solid var(--tb-border); }
+@media (prefers-reduced-motion: reduce) { .tb-details > summary::before { transition: none; } }
 .tb-input, .tb-textarea, .tb-select {
   width: 100%;
   font: inherit;
   font-size: 0.9rem;
-  color: var(--tb-fg);
-  background: var(--tb-surface);
-  border: 1px solid var(--tb-border);
+  color: var(--tb-input-fg);
+  background: var(--tb-input-bg);
+  border: 1px solid var(--tb-input-border);
   border-radius: 8px;
   padding: 0.4375rem 0.5625rem;
 }
@@ -321,7 +354,9 @@ export const STYLES = /* css */ `
 .tb-copy:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-copy-note { font-size: 0.78rem; color: var(--tb-muted); }
 
-.tb-out-table { overflow-x: auto; }
+/* Edge shadows while more scrolls (#214): local covers hide each at its end. Covers match the frame. */
+.tb-out-table{overflow-x:auto;--tb-scroll-bg:var(--tb-bg);--s:color-mix(in oklab,var(--tb-fg) 28%,transparent);background:linear-gradient(90deg,var(--tb-scroll-bg) 40%,#0000) left/1.5rem 100% no-repeat local,linear-gradient(270deg,var(--tb-scroll-bg) 40%,#0000) right/1.5rem 100% no-repeat local,radial-gradient(farthest-side at 0,var(--s),#0000) left/.875rem 100% no-repeat,radial-gradient(farthest-side at 100%,var(--s),#0000) right/.875rem 100% no-repeat}
+:host([mode="embed"]) .tb-out-table{--tb-scroll-bg:var(--tb-surface)}
 .tb-out-table table, .tb-chart-data table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
 .tb-out-table caption, .tb-chart-data caption { text-align: start; color: var(--tb-faint); font-size: 0.78rem; padding-bottom: 0.375rem; }
 .tb-out-table th, .tb-out-table td, .tb-chart-data th, .tb-chart-data td {
@@ -329,14 +364,26 @@ export const STYLES = /* css */ `
 }
 .tb-out-table th { color: var(--tb-muted); font-size: 0.78rem; font-weight: 600; }
 .tb-out-table td[data-align="end"], .tb-out-table th[data-align="end"] { text-align: end; }
-.tb-out-table td[data-tone="bad"] { color: var(--tb-bad); }
+/* A row header (#214) is the row's name. Before the tones, which reach it at equal specificity. */
+.tb-out-table th[scope=row]{color:var(--tb-fg);font-size:inherit}
+.tb-out-table th[scope=row][data-align=end]{text-align:end}
+.tb-out-table tr > [data-tone="bad"] { color: var(--tb-bad); }
 /* A row a chart's readout is on (#124), in a table linked to it: a wash and a rule, never colour alone. */
 .tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
 .tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
-.tb-out-table td[data-tone="warn"] { color: var(--tb-warn); }
+.tb-out-table tr > [data-tone="warn"] { color: var(--tb-warn); }
 /* good matched a field value and was unstyled on a cell (#156); muted lets the routine cells recede. */
-.tb-out-table td[data-tone="good"] { color: var(--tb-good); }
-.tb-out-table td[data-tone="muted"] { color: var(--tb-faint); }
+.tb-out-table tr > [data-tone="good"] { color: var(--tb-good); }
+.tb-out-table tr > [data-tone="muted"] { color: var(--tb-faint); }
+/* The narrow layout (#213, #214), only where data-wrap says which cells are prose. width, not only a floor,
+   or prose ran on one line. :where so the linked-row wash still reaches a sticky row header. */
+@container (max-width:34rem){
+.tb-out-table table:has([data-wrap]){width:max-content;min-width:100%}
+.tb-out-table table:has([data-wrap]) thead th,.tb-out-table [data-wrap=none]{white-space:nowrap}
+.tb-out-table [data-wrap=prose]{min-width:20ch;width:26ch}
+.tb-out-table table:has([data-wrap]) caption{position:sticky;inset-inline-start:0;max-width:calc(100cqi - 2rem)}
+.tb-out-table :where(tbody th[scope=row],thead th[data-row-header]){position:sticky;inset-inline-start:0;z-index:1;background:var(--tb-scroll-bg);box-shadow:inset -1px 0 0 var(--tb-border)}
+}
 
 .tb-out-error {
   display: flex; gap: 0.5rem; align-items: baseline;

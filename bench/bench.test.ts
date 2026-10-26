@@ -1510,6 +1510,19 @@ describe("a Reset control (#208)", () => {
 		await page.close();
 	});
 
+	/*
+	 * The tool's own opt-out (contract 8): narrow-table's manifest says "reset": false, its one input is a
+	 * toggle, and after the reader flips it there is still no Reset, exactly as with reset="none".
+	 */
+	it("is not drawn for a tool whose manifest says reset: false, even once the values have changed", async () => {
+		const page = await open("tool.html?id=narrow-table");
+		assert.equal((await state(page)).reset, "absent");
+		await page.locator("#host >> .tb-checkbox").click();
+		assert.equal((await state(page)).values.sort, false, "the input did change");
+		assert.equal((await state(page)).reset, "absent", "the manifest opted out");
+		await page.close();
+	});
+
 	it("redraws an autoRun tool's default answer, since that is what first load showed", async () => {
 		const page = await open("tool.html?id=histogram");
 		await page.waitForSelector("#host >> .tb-out-chart", { timeout: 10_000 });
@@ -6151,6 +6164,374 @@ describe("a field's face (contract 8, #209)", () => {
 		// 0.85rem at a 16px root: the dd's own size, which .tb-mono's 0.82rem (13.12px) must not override.
 		// Firefox rounds it to a sixty-fourth, 13.5938px, so within a hundredth of a pixel.
 		for (const f of seen.fields) assert.ok(Math.abs(Number.parseFloat(f.size) - 13.6) < 0.01, `${f.label} is ${f.size}`);
+		await page.close();
+	});
+});
+
+describe("names and tokens for one input (contract 8, #224)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written from the input-help manifest by hand. An allowlist: a row carries its class and these three
+	 * names and nothing else, so an attribute added later by accident shows up here.
+	 */
+	it("names every row by id and type, and by role where the input has one", async () => {
+		const page = await open();
+		const rows = await page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-field-row") ?? [])].map((row) =>
+				Object.fromEntries([...row.attributes].map((a) => [a.name, a.value])),
+			),
+		);
+		assert.deepEqual(rows, [
+			{ class: "tb-field-row", "data-input": "values", "data-type": "textarea", "data-role": "data" },
+			{ class: "tb-field-row", "data-input": "unit", "data-type": "select" },
+			{ class: "tb-field-row", "data-input": "slo", "data-type": "number", "data-role": "threshold" },
+			{ class: "tb-field-row", "data-input": "strict", "data-type": "toggle", "data-role": "advanced" },
+		]);
+		await page.close();
+	});
+
+	it("draws the controls and descriptions from the four tokens, which default to today's colours", async () => {
+		const page = await open();
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+				const css = (selector: string, prop: string) => getComputedStyle(root.querySelector(selector) as Element).getPropertyValue(prop);
+				// A probe resolves a token to a colour the same way the control does.
+				const probe = (value: string) => {
+					const span = document.createElement("span");
+					span.style.color = value;
+					root.querySelector(".tb")?.append(span);
+					const out = getComputedStyle(span).color;
+					span.remove();
+					return out;
+				};
+				return {
+					area: [css(".tb-textarea", "background-color"), css(".tb-textarea", "border-top-color"), css(".tb-textarea", "color")],
+					select: [css(".tb-select", "background-color"), css(".tb-input", "background-color")],
+					desc: css(".tb-desc", "color"),
+					today: [probe("var(--tb-surface)"), probe("var(--tb-border)"), probe("var(--tb-fg)"), probe("var(--tb-faint)")],
+				};
+			});
+		const before = await read();
+		const [surface, border, fg, faint] = before.today;
+		assert.deepEqual(before.area, [surface, border, fg], "unset, the textarea is drawn as before");
+		assert.deepEqual(before.select, [surface, surface]);
+		assert.equal(before.desc, faint);
+		await page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement;
+			host.style.setProperty("--tb-input-bg", "rgb(1, 2, 3)");
+			host.style.setProperty("--tb-input-border", "rgb(4, 5, 6)");
+			host.style.setProperty("--tb-input-fg", "rgb(7, 8, 9)");
+			host.style.setProperty("--tb-desc-fg", "rgb(10, 11, 12)");
+		});
+		const after = await read();
+		assert.deepEqual(after.area, ["rgb(1, 2, 3)", "rgb(4, 5, 6)", "rgb(7, 8, 9)"]);
+		assert.deepEqual(after.select, ["rgb(1, 2, 3)", "rgb(1, 2, 3)"]);
+		assert.equal(after.desc, "rgb(10, 11, 12)");
+		await page.close();
+	});
+});
+
+describe("how a table column wraps (contract 8, #213)", () => {
+	/*
+	 * Written from the narrow-table fixture by hand: five columns say "none" and Note says "prose", and with
+	 * the default sort host-2 is the third row, whose Note cell overrides its column with "none".
+	 */
+	it("writes data-wrap on every header and cell of a column that says it, and a cell's own over it", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=narrow-table`, { waitUntil: "load" });
+		await page.locator("#host >> tbody tr").first().waitFor({ timeout: 15_000 });
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const wrap = (cells: Iterable<Element>) => [...cells].map((c) => c.getAttribute("data-wrap"));
+			return {
+				head: wrap(root.querySelectorAll("thead th")),
+				rows: [...root.querySelectorAll("tbody tr")].map((tr) => [tr.children[0]?.textContent, ...wrap(tr.children)]),
+			};
+		});
+		assert.deepEqual(seen.head, ["none", "none", "none", "none", "none", "prose"]);
+		const n = ["none", "none", "none", "none", "none"];
+		assert.deepEqual(seen.rows, [
+			["host-4", ...n, "prose"],
+			["host-1", ...n, "prose"],
+			["host-2", ...n, "none"],
+			["host-3", ...n, "prose"],
+			["host-5", ...n, "prose"],
+			["host-6", ...n, "prose"],
+		]);
+		await page.close();
+	});
+
+	it("writes no data-wrap on a table that makes no claim", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/styling.html`, { waitUntil: "load" });
+		await page.locator("#audit >> tbody tr").first().waitFor({ timeout: 15_000 });
+		const count = await page.evaluate(() => document.getElementById("audit")?.shadowRoot?.querySelectorAll("[data-wrap]").length);
+		assert.equal(count, 0);
+		await page.close();
+	});
+});
+
+describe("a row header and the narrow table (contract 8, #214)", () => {
+	async function open(width: number, id = "narrow-table") {
+		const page = await browser.newPage({ viewport: { width, height: 900 } });
+		await page.goto(`${BASE}/tool.html?id=${id}`, { waitUntil: "load" });
+		// The fixture runs as it opens; percentiles waits for Run, so only its form is there yet.
+		await page.locator(id === "narrow-table" ? "#host >> tbody tr" : "#host >> .tb-run").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written from the narrow-table fixture by hand: Instance says rowHeader, so each row's first cell is a th
+	 * with scope="row", carrying the attributes a td would, and the other five stay td.
+	 */
+	it("renders a rowHeader column's cells as th scope=row, with a td's attributes", async () => {
+		const page = await open(1280);
+		const rows = await page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelectorAll("tbody tr") ?? [])].map((tr) => [...tr.children].map((c) => `${c.tagName.toLowerCase()}${c.getAttribute("scope") ? `[${c.getAttribute("scope")}]` : ""}`)),
+		);
+		for (const row of rows) assert.deepEqual(row, ["th[row]", "td", "td", "td", "td", "td"]);
+		const first = await page.evaluate(() => {
+			const th = document.querySelector("#host")?.shadowRoot?.querySelector('tbody th[scope="row"]') as Element;
+			return Object.fromEntries([...th.attributes].map((a) => [a.name, a.value]));
+		});
+		// An empty class, as every td of a column without mono has.
+		assert.deepEqual(first, { scope: "row", "data-align": "start", "data-tone": "normal", "data-label": "Instance", "data-wrap": "none", class: "" });
+		await page.close();
+	});
+
+	const measure = (page: Page) =>
+		page.evaluate(() => {
+			// The cell's content width in its own font's ch, measured with a 1ch probe rather than assumed.
+			const noteWidthInCh = (cell: HTMLElement) => {
+				const probe = document.createElement("span");
+				probe.style.cssText = "display:inline-block;width:1ch";
+				cell.append(probe);
+				const ch = probe.getBoundingClientRect().width;
+				probe.remove();
+				const style = getComputedStyle(cell);
+				return (cell.getBoundingClientRect().width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)) / ch;
+			};
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			const table = part.querySelector("table") as HTMLElement;
+			const rowHead = root.querySelector('tbody th[scope="row"]') as HTMLElement | null;
+			const note = root.querySelector('tbody td[data-wrap="prose"]') as HTMLElement | null;
+			return {
+				part: part.clientWidth,
+				table: table.getBoundingClientRect().width,
+				scrolls: part.scrollWidth > part.clientWidth,
+				headNowrap: [...root.querySelectorAll("thead th")].every((th) => getComputedStyle(th).whiteSpace === "nowrap"),
+				noneNowrap: [...root.querySelectorAll('[data-wrap="none"]')].every((c) => getComputedStyle(c).whiteSpace === "nowrap"),
+				noteCh: note ? noteWidthInCh(note) : 0,
+				sticky: rowHead ? getComputedStyle(rowHead).position : null,
+				attachment: getComputedStyle(part).backgroundAttachment,
+			};
+		});
+
+	it("at 390px keeps the table at its own width, scrolling, tokens on one line and prose at 20ch", async () => {
+		const page = await open(390);
+		const m = await measure(page);
+		assert.ok(m.scrolls && m.table > m.part, `the table should be wider than its ${m.part}px part, got ${m.table}px`);
+		assert.ok(m.headNowrap, "every heading on one line");
+		assert.ok(m.noneNowrap, "every none cell on one line");
+		assert.ok(m.noteCh >= 20, `the Note column is ${m.noteCh.toFixed(1)}ch, under 20`);
+		// And it wraps: as max-content it ran each sentence on one line, the column 50ch wide.
+		assert.ok(m.noteCh <= 27, `the Note column is ${m.noteCh.toFixed(1)}ch, so its sentences do not wrap`);
+		assert.equal(m.sticky, "sticky");
+		await page.close();
+	});
+
+	it("keeps the row header in view while the rest scrolls", async () => {
+		const page = await open(390);
+		const left = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			part.scrollLeft = 200;
+			const th = root.querySelector('tbody th[scope="row"]') as HTMLElement;
+			const heads = [...root.querySelectorAll("thead th")].map((h) => h.hasAttribute("data-row-header"));
+			const head = root.querySelector("thead th[data-row-header]") as HTMLElement;
+			return { part: part.getBoundingClientRect().left, th: th.getBoundingClientRect().left, head: head.getBoundingClientRect().left, heads, scrolled: part.scrollLeft };
+		});
+		assert.ok(left.scrolled > 0, "the part scrolled");
+		assert.ok(Math.abs(left.th - left.part) < 1, `the row header left the view: ${left.th} against ${left.part}`);
+		assert.deepEqual(left.heads, [true, false, false, false, false, false], "only the row header column's heading is marked");
+		assert.ok(Math.abs(left.head - left.part) < 1, `its heading left the view: ${left.head} against ${left.part}`);
+		await page.close();
+	});
+
+	/*
+	 * The caption scrolled with the table and was cut to its last word, "first", at the left edge. At either
+	 * end of the scroll it must lie inside the part, all of it, wrapping if it has to.
+	 */
+	it("keeps the caption whole and in view at both ends of the scroll", async () => {
+		const page = await open(390);
+		for (const to of [0, 99_999]) {
+			const box = await page.evaluate((to) => {
+				const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+				const part = root.querySelector(".tb-out-table") as HTMLElement;
+				part.scrollLeft = to;
+				const caption = root.querySelector("caption") as HTMLElement;
+				const p = part.getBoundingClientRect();
+				const c = caption.getBoundingClientRect();
+				return { pl: p.left, pr: p.left + part.clientWidth, cl: c.left, cr: c.right, text: caption.textContent, overflow: caption.scrollWidth - caption.clientWidth, scrolled: part.scrollLeft };
+			}, to);
+			assert.equal(box.text, "Six instances, slowest p99 first");
+			assert.ok(box.cl >= box.pl - 1 && box.cr <= box.pr + 1, `scrolled to ${box.scrolled}, the caption runs ${box.cl} to ${box.cr} in a part ${box.pl} to ${box.pr}`);
+			assert.ok(box.overflow <= 0, "and none of its text overflows it");
+		}
+		await page.close();
+	});
+	/*
+	 * A table that declares no wrap keeps today's layout: the narrow rules are scoped to a table with a
+	 * data-wrap, so percentiles at 390px is still exactly its part's width, as it was.
+	 */
+	it("leaves a table with no wrap at its part's width, as before", async () => {
+		const page = await open(390, "percentiles");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-table").waitFor({ timeout: 15_000 });
+		const m = await measure(page);
+		assert.ok(Math.abs(m.table - m.part) < 1, `the table is ${m.table}px in a ${m.part}px part`);
+		await page.close();
+	});
+
+	it("draws the scroll shadows with a local background, so they follow what is left to scroll", async () => {
+		const page = await open(390);
+		const m = await measure(page);
+		assert.equal(m.attachment, "local, local, scroll, scroll");
+		await page.close();
+	});
+});
+
+describe("markup in an input's description (#217)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written by hand from the input-help manifest's two descriptions: the Latencies one uses every block and
+	 * inline form but strong-in-tone, and the p99 target's has no markup, so it must be exactly the <p> and
+	 * the one text node it always was.
+	 */
+	it("builds the markup as elements, and leaves a plain description exactly as it was", async () => {
+		const page = await open();
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const values = root.querySelector('[data-input="values"] .tb-desc') as HTMLElement;
+			const slo = root.querySelector('[data-input="slo"] .tb-desc') as HTMLElement;
+			return {
+				values: values.outerHTML,
+				slo: slo.outerHTML,
+				sloNodes: [...slo.childNodes].map((n) => n.nodeType),
+				describedBy: root.querySelector("#in-values")?.getAttribute("aria-describedby"),
+			};
+		});
+		assert.equal(
+			seen.values,
+			'<div class="tb-desc" id="in-values-desc"><p>Raw latencies, in the unit chosen below.</p><ul><li><strong>Spaces or commas</strong>: <code>41 38 37 1450</code>.</li><li><strong>One per line</strong>: a column pasted from a spreadsheet.</li></ul><p>A negative value is <span data-tone="bad">refused</span>. Zeros are <span data-tone="good">kept</span>, and <span data-tone="muted">blank lines are ignored</span>.</p></div>',
+		);
+		assert.equal(seen.slo, '<p class="tb-desc" id="in-slo-desc">The p99 the service promises.</p>');
+		assert.deepEqual(seen.sloNodes, [3], "one text node");
+		assert.equal(seen.describedBy, "in-values-desc in-values-err", "the description is still what the control is described by");
+		await page.close();
+	});
+
+	it("draws a tone in its colour and in a heavier weight, muted at the normal weight, and code in mono", async () => {
+		const page = await open();
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const desc = root.querySelector('[data-input="values"] .tb-desc') as HTMLElement;
+			const css = (selector: string) => getComputedStyle(desc.querySelector(selector) as Element);
+			const probe = (value: string) => {
+				const span = document.createElement("span");
+				span.style.color = value;
+				desc.append(span);
+				const out = getComputedStyle(span).color;
+				span.remove();
+				return out;
+			};
+			const frame = getComputedStyle(root.querySelector(".tb") as Element);
+			return {
+				bad: [css('[data-tone="bad"]').color, css('[data-tone="bad"]').fontWeight],
+				good: [css('[data-tone="good"]').color, css('[data-tone="good"]').fontWeight],
+				muted: [css('[data-tone="muted"]').color, css('[data-tone="muted"]').fontWeight],
+				plain: getComputedStyle(desc).fontWeight,
+				// WebKit serialises a family without the quotes Chromium keeps, so neither is compared.
+				code: css("code").fontFamily.replace(/[\s'"]+/g, ""),
+				mono: frame.getPropertyValue("--tb-mono").replace(/[\s'"]+/g, ""),
+				want: [probe("var(--tb-bad)"), probe("var(--tb-good)"), probe("var(--tb-faint)")],
+			};
+		});
+		assert.deepEqual(seen.bad, [seen.want[0], "600"]);
+		assert.deepEqual(seen.good, [seen.want[1], "600"]);
+		assert.deepEqual(seen.muted, [seen.want[2], seen.plain], "muted recedes: its colour, and the text's own weight");
+		assert.equal(seen.code, seen.mono);
+		await page.close();
+	});
+});
+
+describe("details on an input, behind a disclosure (#215)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="slo"]') as HTMLElement;
+			const details = row.querySelector("details.tb-details") as HTMLDetailsElement | null;
+			const body = details?.querySelector(".tb-details-body") as HTMLElement | null;
+			return {
+				order: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				open: details?.open,
+				summary: details?.querySelector("summary")?.textContent,
+				body: body?.outerHTML,
+				bodyShown: body ? body.checkVisibility() : false,
+				describedBy: root.querySelector("#in-slo")?.getAttribute("aria-describedby"),
+				others: root.querySelectorAll("details").length,
+			};
+		});
+
+	/*
+	 * Written from the input-help manifest by hand: only the p99 target has details. The body is the same
+	 * markup a description takes, and the control is still described by the short hint alone.
+	 */
+	it("draws the details after the description, closed, and out of the control's description", async () => {
+		const page = await open();
+		const seen = await read(page);
+		assert.deepEqual(seen.order, ["label.tb-label", "input.tb-input", "p.tb-desc", "details.tb-details", "p.tb-sr"]);
+		assert.equal(seen.open, false);
+		assert.equal(seen.bodyShown, false, "closed, the body takes no room");
+		assert.equal(seen.summary, "More about p99 target", "the visible More, named for its input");
+		assert.equal(
+			seen.body,
+			'<div class="tb-details-body"><p>Compared with the p99 of what you paste, by nearest rank: the smallest value with at least 99% of them at or below it.</p><ul><li>A p99 equal to the target is a <span data-tone="bad">miss</span> only when the toggle below is on.</li><li>With fewer than 100 values, the p99 is the <span data-tone="warn">largest</span> one.</li></ul><p><span data-tone="muted">A percentile of a few values says little.</span></p></div>',
+		);
+		assert.equal(seen.describedBy, "in-slo-desc in-slo-err", "aria-describedby stays on the short hint");
+		assert.equal(seen.others, 1, "no other input has details");
+		await page.close();
+	});
+
+	it("opens from the keyboard, and closes again", async () => {
+		const page = await open();
+		await page.locator('#host >> [data-input="slo"] summary').focus();
+		await page.keyboard.press("Enter");
+		const opened = await read(page);
+		assert.equal(opened.open, true);
+		assert.equal(opened.bodyShown, true);
+		await page.keyboard.press("Space");
+		assert.equal((await read(page)).open, false);
 		await page.close();
 	});
 });

@@ -76,6 +76,8 @@ same order, so the cascade is the same.
 | `.tb-body` | Form, actions, status and output |
 | `.tb-facade`, `.tb-facade-hint` | A closed card, and its "Try it" control |
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
+| `.tb-details`, its `summary`, `.tb-details-body` | An input's `details` (contract version 8): a `<details>` after the description, closed until the reader opens it. The body takes the same markup classes as `.tb-desc` |
+| `.tb-desc p`, `.tb-desc ul`, `.tb-desc li`, `.tb-desc code`, `.tb-desc strong`, `.tb-desc [data-tone]` | A description's markup. `.tb-desc` is a `<p>`, or a `<div>` when the description has more than one block. `data-tone` is `good`, `warn`, `bad`, `muted` or `accent` |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
 | `.tb-share-bar`, `.tb-share`, `.tb-share-note`, `.tb-share-top` | The share button (#227), the note beside it, and the row that puts it at the end of the title. The button carries `data-copied` while it shows the check mark, and is also `::part(share)` |
 | `.tb-actions`, `.tb-run`, `.tb-reset`, `.tb-progress` | The Run button, the Reset button beside it (carries `hidden` while the inputs are at their starting values), and the progress bar |
@@ -95,7 +97,7 @@ the tool gave a `role` also has `data-role`, with the tool's string unchanged.
 |---|---|---|
 | `group` | `.tb-group` | One root per part |
 | `fields` | `.tb-out-fields` | `.tb-fields` (a `<dl>`, for grouped and ungrouped fields alike), `.tb-field-group` with an `<h4>` for a group, `.tb-field` (with `<dt>` and `<dd>`), `.tb-value`, `.tb-note`. The `<dd>` carries `.tb-mono` unless the field says `mono: false` |
-| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>`, then `.tb-copy-bar`. A cell carries `.tb-mono` when it or its column says `mono`, and a header when its column does |
+| `table` | `.tb-out-table` | A `<table>`, with `<caption>`, `<thead>`, `<tbody>`, then `.tb-copy-bar`. A cell carries `.tb-mono` when it or its column says `mono`, and a header when its column does. A `rowHeader` column's cells are `<th scope="row">` with a cell's attributes, and its heading carries `data-row-header` |
 | `text` | `.tb-out-text` | A `<p>`, or a `<pre class="tb-mono">` |
 | `code` | `.tb-out-code` | `<pre><code class="language-…">`, then `.tb-copy-bar` |
 | `bytes` | `.tb-out-bytes` | `.tb-bytes-grid`, `.tb-bytes-row`, `.tb-bytes-offset`, `.tb-bytes-hex`, `.tb-bytes-ascii`, `.tb-byte`, `.tb-bytes-legend`, `.tb-bytes-caption` |
@@ -184,11 +186,15 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 | Attribute | On | Values |
 |---|---|---|
 | `data-kind` | Every part's root | The part's kind |
-| `data-role` | A part's root, or a `.tb-field` | Whatever `role` the tool set. Absent when it set none |
+| `data-role` | A part's root, a `.tb-field`, or a `.tb-field-row` | Whatever `role` the tool set on the part, field or input. Absent when it set none |
+| `data-input` | `.tb-field-row` | The input's `id` |
+| `data-type` | `.tb-field-row` | The input's `type`: `text`, `textarea`, `number`, `select`, `toggle` |
 | `data-part` | A part's root | Whatever `id` the tool set, unique in the result. Absent when it set none. `host.reveal(id)` goes to it |
 | `data-label` | Every table cell | Its column's label. Absent for a column with an empty label |
 | `data-tone` | `.tb-field`, table cells | `normal`, `good`, `warn`, `bad`, `muted` |
 | `data-align` | Table cells and headers | `start`, `end` |
+| `data-row-header` | The heading of a `rowHeader` column | Present or absent (contract version 8) |
+| `data-wrap` | Table cells and headers | `prose`, `none`: the column's or the cell's `wrap` (contract version 8). Absent when neither says |
 | `data-series` | `.tb-byte`, `.tb-bytes-legend li` | `1` to `6`: the series colour of a range with no tone, in order, round again after six. Absent on a toned range |
 | `data-lang` | `.tb-out-code` | The code's language |
 | `data-tok` | A token a tool's `grammar` painted in a textarea, inside `.tb-paint` | `keyword`, `string`, `comment`, `operator`. Colour only: a rule that changes a token's width moves the caret off the glyph |
@@ -200,6 +206,16 @@ tool-host::part(share):hover { border-color: var(--tb-accent); }
 `role` is the tool's to set: `{ kind: "fields", role: "stats", fields }` names a part, and
 `{ label, value, role: "verdict" }` names one field. The runtime attaches no meaning to it, so a host
 that styles nothing sees no difference.
+
+The form is named the same way (contract version 8 for `role`): each `.tb-field-row` carries `data-input`
+and `data-type`, and `data-role` when the input has a `role`. Its controls read `--tb-input-bg`,
+`--tb-input-border` and `--tb-input-fg`, and its description `--tb-desc-fg`, so a host can recolour one
+input by setting a property on its row rather than restating the runtime's rules:
+
+```css
+.tb-field-row[data-role="threshold"] { --tb-input-border: var(--tb-accent); }
+.tb-field-row[data-input="values"] { --tb-desc-fg: var(--tb-muted); }
+```
 
 `.tb-mono` is the one class for "this value is a token", on a field's `<dd>` and on a table cell alike, so
 one rule reaches both: `.tb-mono { font-family: var(--tb-mono); }` is the runtime's, and a host that wants
@@ -250,6 +266,18 @@ the screen's:
   .tb-out-table td[data-label]::before { content: attr(data-label); display: block; font-size: 0.72rem; color: var(--tb-muted); font-family: var(--tb-font); }
 }
 ```
+
+A table with a `rowHeader` column has `th` cells in its body, so write `:is(td, th[scope="row"])` where this
+says `td`.
+
+**The built-in narrow layout.** A table whose columns say `wrap` (contract version 8) already has one, in
+the runtime's layer, under `@container (max-width: 34rem)`: the table keeps its own width and scrolls
+inside its part, headings and `none` cells stay on one line, a `prose` cell is 26ch wide and at least 20ch,
+and a `rowHeader` column, with its heading, stays in view while the rest scrolls, as does the caption, wrapping to the part's width. A table that says
+nothing about wrapping keeps the layout it had. Wherever a table scrolls, a shadow at an edge says there is
+more that way; it is painted over `--tb-scroll-bg`, set on `.tb-out-table` to the frame's colour, which a
+host that recolours the frame of an embedded tool sets to match. Any of it can be overridden like any
+other runtime rule.
 
 ## What may change
 

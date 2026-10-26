@@ -442,6 +442,49 @@ describe("validateManifest: lang on a textarea", () => {
 	});
 });
 
+// The opt-out from the runtime's Reset control (#208).
+describe("validateManifest: reset", () => {
+	it("accepts reset: false and reset: true, and leaves it absent when absent", () => {
+		assert.equal(validateManifest({ ...good(), reset: false }).reset, false);
+		assert.equal(validateManifest({ ...good(), reset: true }).reset, true);
+		assert.equal(validateManifest(good()).reset, undefined, "no default is written in");
+	});
+	it("refuses a reset that is not a boolean, which a host would read as true", () => {
+		failsWith((m) => { m.reset = "no"; }, "reset", "must be a boolean");
+	});
+	it("refuses reset on an input, and says where it belongs", () => {
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 2, reset: false }]; }, "inputs[0].reset", "the top level of the manifest");
+	});
+});
+
+// The rest of an input's help, behind a disclosure (#215).
+describe("validateManifest: details on an input", () => {
+	const name = { id: "name", type: "text", label: "Name", default: "" };
+
+	it("accepts details on any input, with or without a description", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...name, description: "Short.", details: "- Long\n- Longer" }, { id: "on", type: "toggle", label: "On", default: false, details: "Why." }] });
+		assert.deepEqual(m.inputs.map((i) => i.details), ["- Long\n- Longer", "Why."]);
+	});
+	it("refuses details that are not a non-empty string, which would draw a disclosure with nothing in it", () => {
+		failsWith((m) => { m.inputs = [{ ...name, details: "" }]; }, "inputs[0].details", "non-empty string");
+		failsWith((m) => { m.inputs = [{ ...name, details: ["a"] }]; }, "inputs[0].details", "non-empty string");
+	});
+});
+
+// A name for one input, for host stylesheets (#224), as a result part has.
+describe("validateManifest: role on an input", () => {
+	const name = { id: "name", type: "text", label: "Name", default: "" };
+
+	it("accepts a role on any input, and leaves it as written", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...name, role: "credential" }, { id: "on", type: "toggle", label: "On", default: false, role: "advanced" }] });
+		assert.deepEqual(m.inputs.map((i) => i.role), ["credential", "advanced"]);
+	});
+	it("refuses a role that is not a non-empty string, which no selector could match", () => {
+		failsWith((m) => { m.inputs = [{ ...name, role: "" }]; }, "inputs[0].role", "non-empty string");
+		failsWith((m) => { m.inputs = [{ ...name, role: 3 }]; }, "inputs[0].role", "non-empty string");
+	});
+});
+
 // Keeping an input out of a host's links (#211): a hint on any input type, and only a boolean.
 describe("validateManifest: share on an input", () => {
 	const inputs = [

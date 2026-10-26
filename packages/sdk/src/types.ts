@@ -62,9 +62,25 @@ export interface Column {
 	align?: "start" | "end";
 	/** Monospace, for anything the reader will compare digit by digit. */
 	mono?: boolean;
+	/**
+	 * How the column's text wraps, rendered as `data-wrap` on its header and every cell, so a narrow layout
+	 * knows which columns are sentences: `prose` may wrap and wants a reading width, `none` is a short token
+	 * (a hash, a date, a status word) kept on one line. A cell's own `wrap` overrides it. Absent makes no
+	 * claim, and no attribute is written. Contract version 8.
+	 */
+	wrap?: "prose" | "none";
+	/**
+	 * The column names each row: its cells render as `<th scope="row">` instead of `<td>`, so a screen reader
+	 * announces the row's name with every cell, and on a narrow tool the column stays in view while the rest
+	 * scrolls. Opt-in, because a host selector such as `td:first-child` stops matching those cells.
+	 * Contract version 8.
+	 * @default false
+	 */
+	rowHeader?: boolean;
 }
 
-export type Cell = string | number | { text: string; mono?: boolean; tone?: TextTone };
+/** A cell's `wrap` overrides its column's (contract version 8). */
+export type Cell = string | number | { text: string; mono?: boolean; tone?: TextTone; wrap?: "prose" | "none" };
 
 /** One line, bar or area on a chart. */
 export interface Series {
@@ -735,8 +751,18 @@ interface InputBase {
 	id: string;
 	/** The visible label, which is also the control's accessible name. */
 	label: string;
-	/** The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. */
+	/**
+	 * The hint a form shows and a screen reader reads. Not a placeholder: those vanish on focus. Takes light
+	 * markup: a blank line starts a paragraph, a line starting "- " is a list item, `code`, **strong**, and
+	 * {good|text} for the tones good, warn, bad, muted and accent. Anything else is text.
+	 */
 	description?: string;
+	/**
+	 * The rest of the help, behind a native disclosure under the description: every case a format covers,
+	 * per-vendor rules, the reasons. Takes the same markup as `description`. It is not part of the control's
+	 * accessible description, so a screen reader announces only the short hint on focus. Contract version 8.
+	 */
+	details?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
 	/**
@@ -761,6 +787,12 @@ interface InputBase {
 	 * @default true
 	 */
 	share?: boolean;
+	/**
+	 * A name for this input, rendered as `data-role` on its `.tb-field-row`, so a host stylesheet can style
+	 * "the credential" or "the advanced ones" without naming each id. The runtime gives it no meaning, as
+	 * with a result part's `role`. Contract version 8.
+	 */
+	role?: string;
 }
 
 export type InputSpec =
@@ -959,6 +991,12 @@ export interface Manifest {
 	 * live, a unit converter say. Anything with a worker or a heavy loop should leave it alone.
 	 */
 	autoRun?: boolean;
+	/**
+	 * `false` hides the runtime's Reset control, which puts every input back to the values the tool opened
+	 * with: for a tool with one input, where retyping it is the reset. Contract version 8.
+	 * @default true
+	 */
+	reset?: boolean;
 	/** Worker mode only. A tool that declares this on the main thread is rejected: nothing there can be stopped. */
 	timeoutMs?: number;
 	/** Markdown file, relative to the tool's directory, rendered as the tool's help. */
