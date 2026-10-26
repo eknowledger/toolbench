@@ -372,6 +372,20 @@ Things the validator will hold you to, and why:
   nothing for it. `grammar` without `lang`, or off a textarea, is refused.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
+* **`description` takes light markup**, for help that is a list rather than a run-on paragraph:
+
+  | Write | Renders |
+  |---|---|
+  | A blank line | A new paragraph |
+  | Lines starting with `- ` | A bulleted list |
+  | `` `text` `` | Code |
+  | `**text**` | Bold |
+  | `{good\|text}`, `{warn\|...}`, `{bad\|...}`, `{muted\|...}`, `{accent\|...}` | The text in that tone's colour, bold except for muted |
+
+  It is built as elements, never parsed as HTML, and there are no links. Anything else is text, a marker
+  left open included, so a description with none of it renders exactly as before. A tone colours words that
+  already say the thing: "{bad|refused}", not a red word standing for refusal. On a runtime older than
+  this, the characters show as written.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and
   nothing else, so mark as many as the question genuinely needs and no more: a capacity planner offering a
   rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card

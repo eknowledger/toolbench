@@ -40,6 +40,7 @@ import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./prot
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
+import { help } from "./markup.ts";
 import { applyPartialValues, coerce } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
@@ -1302,7 +1303,7 @@ export class ToolHost extends HTMLElement {
 		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
 		const row = el("div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
-		const desc = spec.description ? el("p", { class: "tb-desc", id: `${id}-desc` }, spec.description) : null;
+		const desc = spec.description ? help(spec.description, { class: "tb-desc", id: `${id}-desc` }) : null;
 		if (desc) describedBy.push(`${id}-desc`);
 		const errorId = `${id}-err`;
 

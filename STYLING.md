@@ -76,6 +76,7 @@ same order, so the cascade is the same.
 | `.tb-body` | Form, actions, status and output |
 | `.tb-facade`, `.tb-facade-hint` | A closed card, and its "Try it" control |
 | `.tb-form`, `.tb-field-row`, `.tb-label`, `.tb-desc`, `.tb-input`, `.tb-textarea`, `.tb-select`, `.tb-checkbox`, `.tb-slider` | The generated form |
+| `.tb-desc p`, `.tb-desc ul`, `.tb-desc li`, `.tb-desc code`, `.tb-desc strong`, `.tb-desc [data-tone]` | A description's markup. `.tb-desc` is a `<p>`, or a `<div>` when the description has more than one block. `data-tone` is `good`, `warn`, `bad`, `muted` or `accent` |
 | `.tb-samples`, `.tb-sample` | The row of sample inputs, and each button |
 | `.tb-share-bar`, `.tb-share`, `.tb-share-note`, `.tb-share-top` | The share button (#227), the note beside it, and the row that puts it at the end of the title. The button carries `data-copied` while it shows the check mark, and is also `::part(share)` |
 | `.tb-actions`, `.tb-run`, `.tb-reset`, `.tb-progress` | The Run button, the Reset button beside it (carries `hidden` while the inputs are at their starting values), and the progress bar |

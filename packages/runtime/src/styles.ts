@@ -141,6 +141,22 @@ export const STYLES = /* css */ `
 .tb-label { font-size: 0.82rem; font-weight: 600; color: var(--tb-muted); }
 .tb-unit { font-weight: 400; color: var(--tb-faint); }
 .tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-desc-fg); }
+/* Help text with markup (#217). Its blocks keep the one-line hint's tight rhythm rather than a page's. */
+div.tb-desc > * { margin: 0; }
+div.tb-desc > * + * { margin-top: 0.35rem; }
+.tb-desc ul { padding-inline-start: 1.1rem; }
+.tb-desc li + li { margin-top: 0.15rem; }
+.tb-desc code { font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
+.tb-desc strong { font-weight: 650; color: var(--tb-muted); }
+/* A tone colours words the text already says, so colour is never the only carrier (WCAG 1.4.1), and the
+   weight sets them apart for a reader who cannot tell the colours apart. Muted keeps the normal weight:
+   in bold, a grey read as emphasis, the opposite of receding. */
+.tb-desc [data-tone] { font-weight: 600; }
+.tb-desc [data-tone="good"] { color: var(--tb-good); }
+.tb-desc [data-tone="warn"] { color: var(--tb-warn); }
+.tb-desc [data-tone="bad"] { color: var(--tb-bad); }
+.tb-desc [data-tone="accent"] { color: var(--tb-accent-text); }
+.tb-desc [data-tone="muted"] { color: var(--tb-faint); font-weight: inherit; }
 .tb-input, .tb-textarea, .tb-select {
   width: 100%;
   font: inherit;

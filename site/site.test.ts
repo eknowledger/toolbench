@@ -347,6 +347,20 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	// The help-markup card (#217): its description is a list and two paragraphs, built as elements.
+	it("the help-markup card draws its description's list and tones", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#help-markup`);
+		const host = page.locator("#help-markup tool-host");
+		await host.locator(".tb-textarea").waitFor({ timeout: 10_000 });
+		const shape = await host.evaluate((el) => {
+			const desc = el.shadowRoot?.querySelector('[data-input="values"] .tb-desc') as Element;
+			return { tag: desc.tagName, kids: [...desc.children].map((c) => c.tagName), tones: [...desc.querySelectorAll("[data-tone]")].map((t) => t.getAttribute("data-tone")) };
+		});
+		assert.deepEqual(shape, { tag: "DIV", kids: ["P", "UL", "P"], tones: ["bad", "good", "muted"] });
+		await page.close();
+	});
+
 	/*
 	 * The table-wrap card (#213, #214): at 390px its six columns cannot fit, so the runtime's own narrow layout
 	 * scrolls the part, keeps the tokens on one line and gives the Note column at least 20ch, not one word.

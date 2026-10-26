@@ -15,7 +15,7 @@
 			"id": "values",
 			"type": "textarea",
 			"label": "Latencies",
-			"description": "Raw latencies, separated by spaces, commas or new lines.",
+			"description": "Raw latencies, in the unit chosen below.\n- **Spaces or commas**: `41 38 37 1450`.\n- **One per line**: a column pasted from a spreadsheet.\n\nA negative value is {bad|refused}. Zeros are {good|kept}, and {muted|blank lines are ignored}.",
 			"default": "41 38 37 39 36 35 44 52 61 1450",
 			"rows": 3,
 			"maxLength": 20000,

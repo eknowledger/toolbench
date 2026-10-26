@@ -6375,7 +6375,6 @@ describe("a row header and the narrow table (contract 8, #214)", () => {
 		}
 		await page.close();
 	});
-
 	/*
 	 * A table that declares no wrap keeps today's layout: the narrow rules are scoped to a table with a
 	 * data-wrap, so percentiles at 390px is still exactly its part's width, as it was.
@@ -6395,4 +6394,75 @@ describe("a row header and the narrow table (contract 8, #214)", () => {
 		assert.equal(m.attachment, "local, local, scroll, scroll");
 		await page.close();
 	});
+});
+
+describe("markup in an input's description (#217)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written by hand from the input-help manifest's two descriptions: the Latencies one uses every block and
+	 * inline form but strong-in-tone, and the p99 target's has no markup, so it must be exactly the <p> and
+	 * the one text node it always was.
+	 */
+	it("builds the markup as elements, and leaves a plain description exactly as it was", async () => {
+		const page = await open();
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const values = root.querySelector('[data-input="values"] .tb-desc') as HTMLElement;
+			const slo = root.querySelector('[data-input="slo"] .tb-desc') as HTMLElement;
+			return {
+				values: values.outerHTML,
+				slo: slo.outerHTML,
+				sloNodes: [...slo.childNodes].map((n) => n.nodeType),
+				describedBy: root.querySelector("#in-values")?.getAttribute("aria-describedby"),
+			};
+		});
+		assert.equal(
+			seen.values,
+			'<div class="tb-desc" id="in-values-desc"><p>Raw latencies, in the unit chosen below.</p><ul><li><strong>Spaces or commas</strong>: <code>41 38 37 1450</code>.</li><li><strong>One per line</strong>: a column pasted from a spreadsheet.</li></ul><p>A negative value is <span data-tone="bad">refused</span>. Zeros are <span data-tone="good">kept</span>, and <span data-tone="muted">blank lines are ignored</span>.</p></div>',
+		);
+		assert.equal(seen.slo, '<p class="tb-desc" id="in-slo-desc">The p99 the service promises.</p>');
+		assert.deepEqual(seen.sloNodes, [3], "one text node");
+		assert.equal(seen.describedBy, "in-values-desc in-values-err", "the description is still what the control is described by");
+		await page.close();
+	});
+
+	it("draws a tone in its colour and in a heavier weight, muted at the normal weight, and code in mono", async () => {
+		const page = await open();
+		const seen = await page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const desc = root.querySelector('[data-input="values"] .tb-desc') as HTMLElement;
+			const css = (selector: string) => getComputedStyle(desc.querySelector(selector) as Element);
+			const probe = (value: string) => {
+				const span = document.createElement("span");
+				span.style.color = value;
+				desc.append(span);
+				const out = getComputedStyle(span).color;
+				span.remove();
+				return out;
+			};
+			const frame = getComputedStyle(root.querySelector(".tb") as Element);
+			return {
+				bad: [css('[data-tone="bad"]').color, css('[data-tone="bad"]').fontWeight],
+				good: [css('[data-tone="good"]').color, css('[data-tone="good"]').fontWeight],
+				muted: [css('[data-tone="muted"]').color, css('[data-tone="muted"]').fontWeight],
+				plain: getComputedStyle(desc).fontWeight,
+				// WebKit serialises a family without the quotes Chromium keeps, so neither is compared.
+				code: css("code").fontFamily.replace(/[\s'"]+/g, ""),
+				mono: frame.getPropertyValue("--tb-mono").replace(/[\s'"]+/g, ""),
+				want: [probe("var(--tb-bad)"), probe("var(--tb-good)"), probe("var(--tb-faint)")],
+			};
+		});
+		assert.deepEqual(seen.bad, [seen.want[0], "600"]);
+		assert.deepEqual(seen.good, [seen.want[1], "600"]);
+		assert.deepEqual(seen.muted, [seen.want[2], seen.plain], "muted recedes: its colour, and the text's own weight");
+		assert.equal(seen.code, seen.mono);
+		await page.close();
+	});
+
 });
