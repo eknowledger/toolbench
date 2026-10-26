@@ -6631,6 +6631,8 @@ describe("a segmented select (contract 9, #203)", () => {
 
 	it("stacks into radios when a segment would not fit, and goes back when it fits again", async () => {
 		const page = await openNative("", 390);
+		// The measurement is a ResizeObserver's, which runs before the first paint but after the form is built.
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-seg")?.hasAttribute("data-stack"), null, { timeout: 5_000 }).catch(() => undefined);
 		let seen = await read(page);
 		assert.equal(seen.stacked, true, "Big-endian (network) does not fit a third of a phone");
 		assert.equal(seen.radioOpacity, "1", "stacked, the radios show");
