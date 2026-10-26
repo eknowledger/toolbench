@@ -131,7 +131,8 @@ const isDate = (mode: DateMode, v: unknown): v is string =>
  * the reader sees, naming the input by its label; `undefined` when nothing is. The runtime refuses a value
  * this finds before calling `run`, showing it as an error on that input, so `run` can trust the format and
  * the range. A native date control lets a reader type a day outside `min..max`, and empties itself while a
- * date is half typed; a colour's hex box takes any seven characters. Validation applies it to samples and presets too. Contract version 9.
+ * date is half typed; a colour's hex box takes any seven characters; a secret has no minimum length in HTML
+ * that holds anything but a form submit. Validation applies it to samples and presets too. Contract version 9.
  */
 export function inputProblem(spec: InputSpec, value: unknown): string | undefined {
 	if (spec.type === "date") {
@@ -142,6 +143,8 @@ export function inputProblem(spec: InputSpec, value: unknown): string | undefine
 		if (spec.min && value < spec.min) return `${spec.label} must be on or after ${spec.min}, got ${value}.`;
 		if (spec.max && value > spec.max) return `${spec.label} must be on or before ${spec.max}, got ${value}.`;
 	}
+	// A length and not the value: the message is on screen and in a host's tool-run event.
+	if (spec.type === "secret" && String(value).length < (spec.minLength ?? 0)) return `${spec.label} must be at least ${spec.minLength} characters, got ${String(value).length}.`;
 	// What a reader types is lowercased and trimmed first, so only a value that is not six hex digits gets here.
 	if (spec.type === "color" && !/^#[0-9a-f]{6}$/.test(String(value))) return `${spec.label} must be a #rrggbb colour, got ${JSON.stringify(value)}.`;
 	return undefined;
@@ -165,6 +168,7 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	if (o.details !== undefined && (typeof o.details !== "string" || o.details === "")) fail(`${path}.details`, "must be a non-empty string");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
 	if (o.mode !== undefined && type !== "date") fail(`${path}.mode`, `only a date input has a mode; on a ${type} input it would be ignored`);
+	if (o.minLength !== undefined && type !== "secret") fail(`${path}.minLength`, `only a secret checks a minimum length; on a ${type} input it would be ignored`);
 	// The control each type can ask for: a number's slider (v4), a select's segments (v9). On any other type it is ignored, as it always was.
 	const control = type === "number" ? "slider" : type === "select" ? "segmented" : undefined;
 	if (control && o.control !== undefined && o.control !== control) fail(`${path}.control`, `control must be "${control}" when present, got ${JSON.stringify(o.control)}`);
@@ -222,6 +226,16 @@ function validateInput(raw: unknown, path: string): InputSpec {
 		}
 		case "toggle": {
 			if (typeof o.default !== "boolean") fail(`${path}.default`, "a toggle input needs a boolean default");
+			break;
+		}
+		case "secret": {
+			// Published with the tool, so every reader would have it; an empty one says nothing a secret needs.
+			if ("default" in o) fail(`${path}.default`, "a secret has no default: a manifest is published, so every reader would have it");
+			for (const key of ["minLength", "maxLength"]) {
+				const n = o[key];
+				if (n !== undefined && !(Number.isInteger(n) && (n as number) > 0)) fail(`${path}.${key}`, `must be a whole number above 0, got ${JSON.stringify(n)}`);
+			}
+			if ((o.minLength as number) > (o.maxLength as number)) fail(`${path}.minLength`, `${o.minLength} is above maxLength ${o.maxLength}`);
 			break;
 		}
 		case "date":
@@ -320,6 +334,8 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
 				if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
 				break;
 			}
+			case "secret":
+				fail(where, "is a secret, which a manifest may not set: every reader would have it");
 			default: {
 				// A sample or a preset is held to what the runtime holds a reader's value to before `run`.
 				const problem = inputProblem(spec, value);
@@ -364,7 +380,7 @@ function validatePresets(specs: InputSpec[]): void {
 			checkPayload(sets, byId, path, "A preset");
 			if (option.value === spec.default) {
 				for (const [key, value] of Object.entries(sets)) {
-					const target = byId.get(key) as InputSpec;
+					const target = byId.get(key) as InputSpec & { default: unknown };
 					if (target.default !== value) {
 						fail(`${path}.${key}`, `is ${JSON.stringify(value)}, but "${key}" defaults to ${JSON.stringify(target.default)}, and the form opens on this option`);
 					}
@@ -446,7 +462,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples", "reset"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details", "mode"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details", "mode", "minLength"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

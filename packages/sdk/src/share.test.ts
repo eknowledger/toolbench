@@ -25,6 +25,12 @@ describe("shareableInputs (#211)", () => {
 		assert.deepEqual(shareableInputs(raw as { inputs: { id: string }[] }), ["b"]);
 	});
 
+	// A secret (#203) is the one type that starts private: it shares only when its manifest says share: true.
+	it("leaves a secret out unless it says share: true", () => {
+		const manifest = { inputs: [{ id: "a", type: "secret" }, { id: "b", type: "secret", share: true }, { id: "c", type: "secret", share: false }, { id: "d", type: "text" }] };
+		assert.deepEqual(shareableInputs(manifest), ["b", "d"]);
+	});
+
 	it("shares nothing when every input says share: false", () => {
 		assert.deepEqual(shareableInputs({ inputs: [{ id: "secret", share: false }] }), []);
 	});

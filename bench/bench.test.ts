@@ -6536,11 +6536,15 @@ describe("details on an input, behind a disclosure (#215)", () => {
 	});
 });
 
-/** Opens the native-inputs fixture (#203) at a width, waiting for its form. */
-async function openNative(query = "", width = 1280): Promise<Page> {
+/**
+ * Opens the native-inputs fixture (#203) at a width, waiting for its form. Its secret opens empty and needs
+ * 16 characters, so unless `token` is false one is typed, and a test about another input can run the tool.
+ */
+async function openNative(query = "", width = 1280, token = true): Promise<Page> {
 	const page = await browser.newPage({ viewport: { width, height: 1000 } });
 	await page.goto(`${BASE}/tool.html?id=native-inputs${query}`, { waitUntil: "load" });
 	await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+	if (token) await page.locator("#host >> #in-token").fill("tb_live_9f2c7a41e08b5d36");
 	return page;
 }
 
@@ -6884,6 +6888,95 @@ describe("a colour input (contract 9, #203)", () => {
 		});
 		const hosted = await read(page);
 		assert.deepEqual([hosted.boxValue, hosted.swatchValue], ["#336699", "#336699"]);
+		await page.close();
+	});
+});
+
+describe("a secret input (contract 9, #203)", () => {
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="token"]') as HTMLElement;
+			const attrs = (e: Element | null) => (e ? Object.fromEntries([...e.attributes].map((a) => [a.name, a.value])) : null);
+			const input = row.querySelector("#in-token") as HTMLInputElement;
+			return {
+				children: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				inRow: [...(row.querySelector(".tb-secret-row")?.children ?? [])].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				input: attrs(input),
+				eye: attrs(row.querySelector(".tb-eye")),
+				value: input.value,
+				focused: (root.activeElement as HTMLElement | null)?.className,
+				error: root.querySelector(".tb-error-message")?.textContent ?? "",
+				answer: root.querySelector(".tb-out-fields")?.textContent ?? "",
+			};
+		});
+	const run = async (page: Page) => {
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.getAttribute("data-state") === "idle", null, { timeout: 10_000 });
+	};
+
+	/* Written from the native-inputs manifest by hand: a password field, empty, with the eye inside its end edge. */
+	it("is an empty password field with an eye button, named for the input", async () => {
+		const page = await openNative("", 1280, false);
+		const seen = await read(page);
+		assert.deepEqual(seen.children, ["label.tb-label", "div.tb-secret-row", "p.tb-desc", "p.tb-sr"]);
+		assert.deepEqual(seen.inRow, ["input.tb-input", "button.tb-eye"]);
+		assert.deepEqual(seen.input, {
+			class: "tb-input",
+			id: "in-token",
+			type: "password",
+			spellcheck: "false",
+			autocapitalize: "off",
+			autocomplete: "off",
+			dir: "ltr",
+			maxlength: "64",
+			"aria-describedby": "in-token-desc in-token-err",
+		});
+		assert.deepEqual(seen.eye, { class: "tb-eye", type: "button", "aria-pressed": "false", "aria-label": "Show API token", "aria-controls": "in-token" });
+		assert.equal(seen.value, "", "a secret has no default");
+		await page.close();
+	});
+
+	it("shows and hides the value from the keyboard, the button saying which", async () => {
+		const page = await openNative();
+		await page.locator("#host >> .tb-eye").focus();
+		await page.keyboard.press("Space");
+		let seen = await read(page);
+		assert.deepEqual([seen.eye?.["aria-pressed"], seen.eye?.["aria-label"], seen.input?.type], ["true", "Hide API token", "text"]);
+		assert.equal(seen.focused, "tb-eye", "focus stays on the button");
+		await page.keyboard.press("Enter");
+		seen = await read(page);
+		assert.deepEqual([seen.eye?.["aria-pressed"], seen.eye?.["aria-label"], seen.input?.type], ["false", "Show API token", "password"]);
+		await page.close();
+	});
+
+	it("refuses one shorter than minLength before run, counting it and never quoting it", async () => {
+		const page = await openNative("", 1280, false);
+		await page.locator("#host >> #in-token").fill("tb_live_9f2");
+		await run(page);
+		const seen = await read(page);
+		assert.equal(seen.error, "API token must be at least 16 characters, got 11.");
+		assert.equal(seen.input?.["aria-invalid"], "true");
+		await page.close();
+	});
+
+	it("reaches run, whose result here gives its length and not the value", async () => {
+		const page = await openNative();
+		await run(page);
+		const seen = await read(page);
+		assert.match(seen.answer, /token24 characters/);
+		assert.doesNotMatch(seen.answer, /tb_live/);
+		await page.close();
+	});
+
+	// share defaults to false on a secret, so a crafted link cannot fill it; a host's own code still can.
+	it("is never read from a link, though a host's values still write it", async () => {
+		const page = await openNative("&native-inputs.token=leaked-from-a-link-0000", 1280, false);
+		assert.equal((await read(page)).value, "");
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { token: "from-the-host-0000" };
+		});
+		assert.equal((await read(page)).value, "from-the-host-0000");
 		await page.close();
 	});
 });

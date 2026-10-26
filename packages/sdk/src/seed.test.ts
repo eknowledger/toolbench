@@ -33,6 +33,12 @@ describe("defaultInputs", () => {
 			on: true,
 		});
 	});
+
+	// A secret has no default to read (#203), so a seed and a sample run see it empty, as the form opens.
+	it("gives a secret an empty string", () => {
+		const token: InputSpec = { id: "token", type: "secret", label: "Token", minLength: 8 };
+		assert.deepEqual(defaultInputs({ manifest: manifestWith([TEXT, token]) }), { text: "hi", token: "" });
+	});
 });
 
 describe("seed", () => {

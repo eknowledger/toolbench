@@ -90,6 +90,11 @@ describe("coerce", () => {
 		assert.equal(coerce(accent, "teal"), "teal");
 	});
 
+	it("cuts a secret at maxLength, as typing would be", () => {
+		const token = { id: "token", type: "secret", label: "Token", maxLength: 4 } as const satisfies InputSpec;
+		assert.equal(coerce(token, "abcdefgh"), "abcd");
+	});
+
 	it("truncates text to maxLength, the same limit the maxlength attribute enforces on typing", () => {
 		assert.equal(coerce(textSpec, "abcdefghij"), "abcdefgh");
 		assert.equal(coerce(unboundedText, "abcdefghij"), "abcdefghij");
