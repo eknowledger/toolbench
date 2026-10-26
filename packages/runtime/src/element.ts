@@ -40,6 +40,7 @@ import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./prot
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
+import { help } from "./markup.ts";
 import { applyPartialValues, coerce } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
@@ -1169,8 +1170,9 @@ export class ToolHost extends HTMLElement {
 		 * Always built when allowed, and hidden rather than left out, for the undo reason in `#showReset`. Its
 		 * accessible name starts with the visible word, so a speech-input user saying "Reset" still matches.
 		 */
+		// The tool's own opt-out (#208) is the host's `reset="none"` said in the manifest: no button at all.
 		const reset =
-			this.reset === "none"
+			this.reset === "none" || manifest.reset === false
 				? undefined
 				: el("button", { class: "tb-reset", type: "button", "aria-label": "Reset inputs to their starting values", hidden: JSON.stringify(this.#values) === this.#start }, "Reset");
 		reset?.addEventListener("click", () => this.#doReset());
@@ -1300,8 +1302,17 @@ export class ToolHost extends HTMLElement {
 		const id = `in-${spec.id}`;
 		const describedBy: string[] = [];
 		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
-		const row = el("div", { class: "tb-field-row" });
-		const desc = spec.description ? el("p", { class: "tb-desc", id: `${id}-desc` }, spec.description) : null;
+		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
+		const row = el("div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
+		const desc = spec.description ? help(spec.description, { class: "tb-desc", id: `${id}-desc` }) : null;
+		/*
+		 * The rest of the help (#215), behind a native disclosure: keyboard, state and announcement are the
+		 * browser's. Not in aria-describedby, so focus reads the short hint, not 600 characters. The hidden
+		 * words name the input, or every input's disclosure would be called just "More".
+		 */
+		const more = spec.details
+			? el("details", { class: "tb-details" }, el("summary", {}, "More", el("span", { class: "tb-sr" }, ` about ${spec.label}`)), help(spec.details, { class: "tb-details-body" }))
+			: null;
 		if (desc) describedBy.push(`${id}-desc`);
 		const errorId = `${id}-err`;
 
@@ -1449,10 +1460,12 @@ export class ToolHost extends HTMLElement {
 		if (spec.type === "toggle") {
 			row.append(el("div", { class: "tb-toggle-row" }, control, label));
 			if (desc) row.append(desc);
+			if (more) row.append(more);
 		} else {
 			const slider = this.#sliders.get(spec.id);
 			row.append(label, slider ? el("div", { class: "tb-slider-row" }, slider, control) : (placed ?? control));
 			if (desc) row.append(desc);
+			if (more) row.append(more);
 		}
 		// The per-input error slot: empty until a result names this input.
 		row.append(el("p", { class: "tb-sr", id: errorId }));

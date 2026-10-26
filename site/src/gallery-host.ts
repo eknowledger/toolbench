@@ -49,3 +49,12 @@ export const perTool = {
 	],
 };
 // #endregion
+
+// #region input-styles
+// One input by role and one by id: a property set on a row reaches only that row's control.
+export const INPUT_STYLES = /* css */ `
+.tb-field-row[data-role="threshold"] { --tb-input-border: var(--tb-accent); --tb-input-bg: var(--tb-accent-bg); }
+.tb-field-row[data-input="values"] { --tb-desc-fg: var(--tb-muted); }
+.tb-field-row[data-role="advanced"] { padding-top: 0.625rem; border-top: 1px dashed var(--tb-border); }
+`;
+// #endregion

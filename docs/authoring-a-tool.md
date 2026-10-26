@@ -372,11 +372,37 @@ Things the validator will hold you to, and why:
   nothing for it. `grammar` without `lang`, or off a textarea, is refused.
 * **`description` is not a placeholder.** Placeholder text vanishes when someone types, which is when
   they most want it.
+* **`description` takes light markup**, for help that is a list rather than a run-on paragraph:
+
+  | Write | Renders |
+  |---|---|
+  | A blank line | A new paragraph |
+  | Lines starting with `- ` | A bulleted list |
+  | `` `text` `` | Code |
+  | `**text**` | Bold |
+  | `{good\|text}`, `{warn\|...}`, `{bad\|...}`, `{muted\|...}`, `{accent\|...}` | The text in that tone's colour, bold except for muted |
+
+  It is built as elements, never parsed as HTML, and there are no links. Anything else is text, a marker
+  left open included, so a description with none of it renders exactly as before. A tone colours words that
+  already say the thing: "{bad|refused}", not a red word standing for refusal. On a runtime older than
+  this, the characters show as written.
+* **`"reset": false`** at the top level of the manifest (contract version 8) hides the Reset control,
+  which puts every input back to the values the tool opened with (#208), exactly as `reset="none"` on the
+  element does. For a tool with one input, where retyping it is the reset. Any value other than a boolean
+  is refused.
+* **`details` for the rest of the help** (contract version 8). Keep `description` to the one-line hint and
+  put every case, format and reason in `details`: it is drawn under the hint behind a closed "More" that the
+  reader opens, it takes the same markup, and it is not part of what a screen reader announces on focus,
+  which stays the hint. A 600-character description was up to 13 lines on a phone and read in full every
+  time the control took focus.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and
   nothing else, so mark as many as the question genuinely needs and no more: a capacity planner offering a
   rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card
   shows the first input. Every input is shown on the full tool either way.
 * **`dir: "ltr"`** on anything that is not prose: bytes, code, patterns, identifiers.
+* **`role` on an input a host may want to style by name** (contract version 8): `"credential"`,
+  `"advanced"`. It is rendered as `data-role` on the input's row, beside `data-input` and `data-type`, and
+  the runtime gives it no meaning. It must be a non-empty string. See [STYLING.md](../STYLING.md).
 * **`"share": false` on an input whose value must never be in a URL** (contract version 8): a password,
   a token, a private key, or a textarea a reader pastes private material into. A host building a link
   from `host.values` leaves it out, and does not read it back from one (`shareableInputs(manifest)` in
@@ -600,6 +626,18 @@ value the reader compares character by character. `mono: false` sets it, and its
 instead, for a sentence or a plain number with a unit, which in monospace reads like terminal output. One
 list can hold both: `{ label: "Mapped address", value: "192.0.2.10:54321" }` beside
 `{ label: "Integrity", value: "No integrity attribute present", mono: false }`. Contract version 8.
+
+A table column can say how its text wraps, so the table survives a phone: `wrap: "none"` for a short
+token kept on one line (a hash, a date, a status word, a row's name), `wrap: "prose"` for sentences that
+need a reading width. A cell's own `wrap` overrides its column's. Say nothing and nothing is claimed, as
+before. It is rendered as `data-wrap` on the header and every cell. Contract version 8.
+
+`rowHeader: true` on a column makes its cells each row's name: they render as `<th scope="row">`, so a
+screen reader announces the name with every cell of the row, and on a narrow tool the column stays in view
+while the rest scrolls. Mark the column that names the row, usually the first. Contract version 8.
+
+With `wrap` on its columns, a table has a narrow layout built in: on a tool narrower than 34rem it keeps
+its columns and scrolls, with the tokens on one line and the prose at a reading width.
 
 ```ts
 { kind: "table",

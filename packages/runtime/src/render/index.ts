@@ -446,6 +446,9 @@ function renderCode(lang: string, source: string, options: RenderOptions): HTMLE
 	return el("div", { class: "tb-out-code", "data-lang": lang }, pre, options.copy === false ? null : copyBar("Copy code", () => source, () => pre));
 }
 
+/** Only the two values (#213): the union is closed to TypeScript alone, and an attribute a host selects on is no place for a tool's free text. */
+const wrapOf = (value: unknown) => (value === "prose" || value === "none" ? value : undefined);
+
 function renderTable(
 	output: Extract<Output, { kind: "table" }>,
 	options: RenderOptions,
@@ -454,7 +457,7 @@ function renderTable(
 		"tr",
 		{},
 		...output.columns.map((column) =>
-			el("th", { scope: "col", "data-align": column.align ?? "start", class: column.mono ? "tb-mono" : "" }, column.label),
+			el("th", { scope: "col", "data-align": column.align ?? "start", "data-wrap": wrapOf(column.wrap), "data-row-header": column.rowHeader || undefined, class: column.mono ? "tb-mono" : "" }, column.label),
 		),
 	);
 	const link = output.link;
@@ -466,9 +469,11 @@ function renderTable(
 				const column = output.columns[i];
 				const value = typeof cell === "object" && cell !== null ? cell : { text: String(cell) };
 				const mono = ("mono" in value ? value.mono : undefined) ?? column?.mono ?? false;
+				// A row header (#214) is announced with every cell of its row; it keeps a td's attributes.
 				return el(
-					"td",
+					column?.rowHeader ? "th" : "td",
 					{
+						scope: column?.rowHeader ? "row" : undefined,
 						"data-align": column?.align ?? (typeof cell === "number" ? "end" : "start"),
 						"data-tone": ("tone" in value ? value.tone : undefined) ?? "normal",
 						/*
@@ -477,6 +482,7 @@ function renderTable(
 						 * column, where it would only draw an empty line above the value.
 						 */
 						"data-label": column?.label || undefined,
+						"data-wrap": wrapOf(("wrap" in value ? value.wrap : undefined) ?? column?.wrap),
 						class: mono ? "tb-mono" : "",
 					},
 					value.text,

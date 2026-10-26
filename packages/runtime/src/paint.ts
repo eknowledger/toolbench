@@ -48,11 +48,11 @@ export const PAINT_MAX = 20_000;
 const CSS = `@layer toolbench{
 .tb-painted{position:relative}
 .tb-painted>.tb-textarea{display:block;position:relative}
-.tb-paint{position:absolute;inset:0;margin:0;overflow:hidden;pointer-events:none;visibility:hidden;font:inherit;font-family:var(--tb-mono);font-size:.82rem;padding:.4375rem .5625rem;border:1px solid transparent;border-radius:8px;color:var(--tb-fg);background:var(--tb-surface);white-space:pre-wrap;overflow-wrap:break-word}
+.tb-paint{position:absolute;inset:0;margin:0;overflow:hidden;pointer-events:none;visibility:hidden;font:inherit;font-family:var(--tb-mono);font-size:.82rem;padding:.4375rem .5625rem;border:1px solid transparent;border-radius:8px;color:var(--tb-input-fg);background:var(--tb-input-bg);white-space:pre-wrap;overflow-wrap:break-word}
 .tb-painted>.tb-textarea,.tb-paint{scrollbar-gutter:stable}
 .tb-painted>.tb-textarea::selection{background:color-mix(in srgb,var(--tb-accent) 30%,transparent)}
 .tb-painted[data-paint]>.tb-paint{visibility:visible}
-.tb-painted[data-paint]>.tb-textarea{color:transparent;background:transparent;caret-color:var(--tb-fg)}
+.tb-painted[data-paint]>.tb-textarea{color:transparent;background:transparent;caret-color:var(--tb-input-fg)}
 .tb-painted[data-paint]>.tb-textarea::selection{color:transparent}
 .tb-paint [data-tok=keyword]{color:var(--tb-s2)}
 .tb-paint [data-tok=string]{color:var(--tb-good)}

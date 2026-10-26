@@ -243,6 +243,20 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/grammar-input`, "machine")],
 			},
 			{
+				id: "help-markup",
+				title: "Help text with structure",
+				text: "A description can carry paragraphs, a list, <code>code</code>, bold and a tone for a word, so help that covers several formats reads as a list. Built as elements, never as HTML, and a description without markup is drawn as before.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "values")],
+			},
+			{
+				id: "input-details",
+				title: "The rest of the help, behind More",
+				text: "An input's <code>details</code> sit under its one-line hint in a native disclosure, closed until the reader opens it. Same markup as a description, and a screen reader on the control hears only the hint.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "slo")],
+			},
+			{
 				id: "autorun",
 				title: "Update as the reader types",
 				text: "<code>\"autoRun\": true</code> runs on every edit. Off by default, and refused for worker tools, because it only suits a tool that is genuinely instant.",
@@ -369,6 +383,20 @@ export const GROUPS: Group[] = [
       <tool-host tool="styled-output" mode="embed" parts="1" more="expand" id="reveal-host"></tool-host>
     </div>`,
 				code: (demo) => [demo, region("site/src/gallery.ts", "reveal")],
+			},
+			{
+				id: "table-wrap",
+				title: "A wide table on a phone",
+				text: "A column says whether it holds prose or a short token with <code>wrap</code>, and <code>rowHeader</code> makes one column each row's name. On a narrow tool the table keeps its columns and scrolls: tokens stay on one line, sentences get a reading width, the row's name stays in view, and a shadow shows there is more. Shown at 390px.",
+				demo: `<div class="narrow-demo"><tool-host tool="narrow-table" mode="embed"></tool-host></div>`,
+				code: async () => [await output(`${FIX}/narrow-table`, {})],
+			},
+			{
+				id: "input-styles",
+				title: "Styling one input",
+				text: "Each input's row is named by <code>data-input</code>, <code>data-type</code> and the tool's <code>role</code>, and the controls read four properties of their own. Set one on a row and only that input changes.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "slo"), region("site/src/gallery-host.ts", "input-styles")],
 			},
 			{
 				id: "share",

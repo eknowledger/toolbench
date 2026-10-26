@@ -424,6 +424,86 @@ describe("the site in a browser", () => {
 		await page.close();
 	});
 
+	// The input-details card (#215): the p99 target's details are closed, then open on a click.
+	it("the input-details card opens the details on a click", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#input-details`);
+		const host = page.locator("#input-details tool-host");
+		await host.locator("summary").waitFor({ timeout: 10_000 });
+		const open = () => host.evaluate((el) => (el.shadowRoot?.querySelector("details") as HTMLDetailsElement).open);
+		assert.equal(await open(), false);
+		await host.locator("summary").click();
+		assert.equal(await open(), true);
+		await page.close();
+	});
+
+	// The help-markup card (#217): its description is a list and two paragraphs, built as elements.
+	it("the help-markup card draws its description's list and tones", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#help-markup`);
+		const host = page.locator("#help-markup tool-host");
+		await host.locator(".tb-textarea").waitFor({ timeout: 10_000 });
+		const shape = await host.evaluate((el) => {
+			const desc = el.shadowRoot?.querySelector('[data-input="values"] .tb-desc') as Element;
+			return { tag: desc.tagName, kids: [...desc.children].map((c) => c.tagName), tones: [...desc.querySelectorAll("[data-tone]")].map((t) => t.getAttribute("data-tone")) };
+		});
+		assert.deepEqual(shape, { tag: "DIV", kids: ["P", "UL", "P"], tones: ["bad", "good", "muted"] });
+		await page.close();
+	});
+
+	/*
+	 * The table-wrap card (#213, #214): at 390px its six columns cannot fit, so the runtime's own narrow layout
+	 * scrolls the part, keeps the tokens on one line and gives the Note column at least 20ch, not one word.
+	 */
+	it("the table-wrap card keeps tokens on one line and scrolls at 390px", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#table-wrap`);
+		const host = page.locator("#table-wrap tool-host");
+		await host.locator("tbody tr").first().waitFor({ timeout: 10_000 });
+		const seen = await host.evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot;
+			const part = root.querySelector(".tb-out-table") as HTMLElement;
+			const note = root.querySelector('tbody td[data-wrap="prose"]') as HTMLElement;
+			// A 1ch probe in the cell's own font, rather than a guess at its width.
+			const probe = document.createElement("span");
+			probe.style.cssText = "display:inline-block;width:1ch";
+			note.append(probe);
+			const ch = probe.getBoundingClientRect().width;
+			probe.remove();
+			return {
+				scrolls: part.scrollWidth > part.clientWidth,
+				nowrap: [...root.querySelectorAll('[data-wrap="none"]')].every((c) => getComputedStyle(c).whiteSpace === "nowrap"),
+				noteWide: note.getBoundingClientRect().width >= 20 * ch,
+			};
+		});
+		assert.deepEqual(seen, { scrolls: true, nowrap: true, noteWide: true });
+		await page.close();
+	});
+
+	/*
+	 * The input-styles card (#224): the gallery's sheet sets --tb-input-border on the row whose role is
+	 * "threshold", so that one control's border is the accent and the textarea's is still the border colour.
+	 */
+	it("the input-styles card recolours one input through its row", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#input-styles`);
+		const host = page.locator("#input-styles tool-host");
+		await host.locator(".tb-textarea").waitFor({ timeout: 10_000 });
+		const seen = await host.evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot;
+			const border = (s: string) => getComputedStyle(root.querySelector(s) as Element).borderTopColor;
+			const probe = document.createElement("span");
+			probe.style.color = "var(--tb-accent)";
+			root.querySelector(".tb")?.append(probe);
+			const accent = getComputedStyle(probe).color;
+			probe.remove();
+			return { slo: border('[data-role="threshold"] .tb-input'), values: border('[data-input="values"] .tb-textarea'), accent };
+		});
+		assert.equal(seen.slo, seen.accent, "the threshold input takes the accent border");
+		assert.notEqual(seen.values, seen.accent, "and no other input does");
+		await page.close();
+	});
+
 	/*
 	 * A graph wider than its card was drawn past the card's right edge and cut off, with no scrollbar, because
 	 * the runtime's frame clips and the graph's container grew to the drawing. Every graph, at a desktop and a

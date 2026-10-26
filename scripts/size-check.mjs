@@ -184,8 +184,26 @@ const BUDGETS = [
 	 * code, and the three attributes; about 43 of it is the bench registry's entries for the `share-private`
 	 * fixture. The button, the link writer, the clipboard and the button's styles are the share chunk, below,
 	 * not here. 26_000 would have left the build 346 over.
+	 *
+	 * Raised from 26_500 to 27_000 by names and colours for one input (#224), in the commit that crossed it:
+	 * 26,428 to 26,569 measured, 141 bytes, the bench registry naming the input-help fixture among them. The rest
+	 * is the four form tokens and the rules reading them, the three attributes on each row, and the role check
+	 * with its row in the version table. 26_500 would have left the build 69 over.
+	 *
+	 * Raised from 27_000 to 27_500 by row headers and the narrow table (#214), in the commit that crossed it:
+	 * 26,646 to 27,018 measured, 372 bytes. Nearly all of it is CSS: the edge shadows that say a table
+	 * scrolls, four gradients over a property matching the frame; the narrow layout for a table with
+	 * data-wrap; and the sticky row header and caption. The rest renders the th and its heading's attribute.
+	 * Loading those rules only when such a table renders would save about 260 here, at the price of the table
+	 * shifting when they arrive, which was judged not worth it. 27_000 would have left the build 18 over.
+	 *
+	 * Raised from 27_500 to 28_000 by markup in an input's description (#217), in the commit that crossed it:
+	 * 27,018 to 27,652 measured, 634 bytes. Most of it is the parser and the builder, here because a form's
+	 * descriptions are drawn with the form: one pattern for the inline spans, a line loop for paragraphs and
+	 * lists, and a tree built with `el`, never HTML. Written as a character loop it was 86 more. The rest is the
+	 * CSS for paragraphs, lists, code, bold and the five tones. 27_500 would have left the build 152 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -232,8 +250,14 @@ const BUDGETS = [
 	 * Raised from 4_500 to 5_000 by the grammar fixture (#163): 4,237 to 4,649 measured. Bench-only.
 	 *
 	 * Raised from 5_000 to 5_500 by the wide-output fixture (#194): 4,649 to 5,013 measured. Bench-only.
+	 *
+	 * Raised from 5_500 to 6_000 by contract v8's fixtures, in the commit that crossed it: 5,753 with
+	 * field-faces (#209) and input-help (#224), four inputs of four types. Bench-only.
+	 *
+	 * Raised from 6_000 to 7_000 by input-help's markup description (#217), 6,044 measured, with its details
+	 * still to come (#215). Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 5_500, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 7_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -392,8 +416,14 @@ const BUDGETS = [
 	 * The worker's half of laying out a large graph (#152), one message and a dynamic import of the layout,
 	 * spent 123 inside it, 4,827. The layout itself is the "graph worker" chunks above, which a worker-mode tool
 	 * never fetches.
+	 *
+	 * Raised from 5_000 to 5_500 by the narrow-table fixture (#213), in the commit that crossed it: 4,989 to
+	 * 5,021 measured. That is the worker's copy of the bench registry naming one more fixture, as it grew for
+	 * the v8 fixtures before it (4,914 to 4,989): a host's worker entry carries its own
+	 * registry instead, and the runtime's share of this chunk did not move. Squeezing the bench's names to fit
+	 * would measure nothing a reader pays.
 	 */
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_000 },
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_500 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
 	/*
@@ -446,6 +476,10 @@ const BUDGETS = [
 	{ label: "bench fixture: wide-output", pattern: /^tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	// Fields in both faces (#209) on screen for the browser tests and the gallery. 231 measured.
 	{ label: "bench fixture: field-faces", pattern: /^tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// A form whose inputs carry names and read the form tokens (#224). 449 measured.
+	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	// A six-column table whose columns say how they wrap (#213). 681 measured.
+	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -481,6 +515,8 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture field-faces", pattern: /^worker-tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture input-help", pattern: /^worker-tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
+	{ label: "worker copy: bench fixture narrow-table", pattern: /^worker-tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 ];
 
 let files;
@@ -555,9 +591,15 @@ for (const file of unclaimed) {
  * Raised to 33_000 by the share button (#227), in the commit that spent it: 31,985 to 32,527 measured, 542
  * bytes: the runtime's reading of a link and placing of the button, as in boot, and the landing page's own
  * tools now fetching the share chunk with their code. 32_000 would have been 527 over.
+ *
+ * Raised to 33_500 by row headers and the narrow table (#214): 32,720 to 33,073 measured, the same CSS as
+ * boot's line above, which every consumer pays too. 33_000 would have been 73 bytes over.
+ *
+ * Raised to 34_000 by markup in an input's description (#217): 33,073 to 33,693 measured, the same parser
+ * and CSS as boot's line above. 33_500 would have been 193 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 33_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

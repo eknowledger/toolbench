@@ -1,0 +1,55 @@
+{
+	"sdk": 8,
+	"id": "input-help",
+	"name": "Latency against an SLO",
+	"blurb": "A form whose inputs carry names for a host stylesheet, one of each input type.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"card": "live",
+	"autoRun": true,
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "values",
+			"type": "textarea",
+			"label": "Latencies",
+			"description": "Raw latencies, in the unit chosen below.\n- **Spaces or commas**: `41 38 37 1450`.\n- **One per line**: a column pasted from a spreadsheet.\n\nA negative value is {bad|refused}. Zeros are {good|kept}, and {muted|blank lines are ignored}.",
+			"default": "41 38 37 39 36 35 44 52 61 1450",
+			"rows": 3,
+			"maxLength": 20000,
+			"dir": "ltr",
+			"role": "data",
+			"primary": true
+		},
+		{
+			"id": "unit",
+			"type": "select",
+			"label": "Unit",
+			"default": "ms",
+			"options": [
+				{ "value": "ms", "label": "Milliseconds" },
+				{ "value": "s", "label": "Seconds" }
+			]
+		},
+		{
+			"id": "slo",
+			"type": "number",
+			"label": "p99 target",
+			"description": "The p99 the service promises.",
+			"details": "Compared with the p99 of what you paste, by nearest rank: the smallest value with at least 99% of them at or below it.\n- A p99 equal to the target is a {bad|miss} only when the toggle below is on.\n- With fewer than 100 values, the p99 is the {warn|largest} one.\n\n{muted|A percentile of a few values says little.}",
+			"default": 300,
+			"min": 1,
+			"max": 60000,
+			"role": "threshold"
+		},
+		{
+			"id": "strict",
+			"type": "toggle",
+			"label": "Count a value at the target as a miss",
+			"default": false,
+			"role": "advanced"
+		}
+	]
+}

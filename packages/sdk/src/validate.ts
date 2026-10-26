@@ -123,6 +123,10 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	if (o.dir !== undefined) oneOf(o.dir, ["ltr", "auto"] as const, `${path}.dir`);
 	// A host's rule is `share !== false`, so "no" or 0 would put the value in a link the author meant to keep it out of.
 	if (o.share !== undefined && typeof o.share !== "boolean") fail(`${path}.share`, "must be true or false");
+	// An empty data-role matches no host selector, so it could only be a mistake.
+	if (o.role !== undefined && (typeof o.role !== "string" || o.role === "")) fail(`${path}.role`, "must be a non-empty string");
+	// An empty disclosure would offer the reader "More" and open on nothing.
+	if (o.details !== undefined && (typeof o.details !== "string" || o.details === "")) fail(`${path}.details`, "must be a non-empty string");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
 	if (o.lang !== undefined) {
 		// A one-line input has no room for structure to see, and nothing would paint it.
@@ -382,9 +386,9 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  * default. So a known key found in the wrong place is refused with the place it belongs. Unknown keys are
  * still ignored: refusing those would narrow the contract and stop manifests that load today from loading.
  */
-export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples"];
+export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples", "reset"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {
@@ -495,6 +499,7 @@ export function validateManifest(raw: unknown): Manifest {
 		fail("cardFields", "must be a positive number of fields");
 	}
 	if (o.autoRun !== undefined && typeof o.autoRun !== "boolean") fail("autoRun", "must be a boolean");
+	if (o.reset !== undefined && typeof o.reset !== "boolean") fail("reset", "must be a boolean");
 
 	// --- timeout ----------------------------------------------------------------------------------
 	if (o.timeoutMs !== undefined) {

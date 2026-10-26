@@ -18,6 +18,7 @@ const TOP_LEVEL_SINCE: Since = {
 	sdk: 1, id: 1, name: 1, blurb: 1, version: 1, capabilities: 1, inputs: 1, kinds: 1, runtime: 1, status: 1, card: 1,
 	cardFields: 1, autoRun: 1, timeoutMs: 1, help: 1, tags: 1, links: 1,
 	samples: 3,
+	reset: 8,
 };
 const RUNTIME_SINCE: Since = { entry: 1, thread: 1 };
 const INPUT_SINCE: Since = {
@@ -27,6 +28,8 @@ const INPUT_SINCE: Since = {
 	lang: 6,
 	grammar: 7,
 	share: 8,
+	role: 8,
+	details: 8,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1 };
@@ -111,8 +114,8 @@ describe("the version each feature arrived in (#170)", () => {
 	 */
 	it("dates each manifest feature where the version history puts it", () => {
 		assert.deepEqual(
-			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar, share: INPUT_SINCE.share },
-			{ samples: 3, control: 4, lang: 6, sets: 6, grammar: 7, share: 8 },
+			{ reset: TOP_LEVEL_SINCE.reset, samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar, share: INPUT_SINCE.share, role: INPUT_SINCE.role, details: INPUT_SINCE.details },
+			{ reset: 8, samples: 3, control: 4, lang: 6, sets: 6, grammar: 7, share: 8, role: 8, details: 8 },
 		);
 		assert.deepEqual(
 			Object.fromEntries(Object.entries(KIND_SINCE).filter(([, v]) => v > 1)),
@@ -159,6 +162,10 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 			const m = { ...v1(7), inputs: [{ id: "password", type: "text", label: "Password", default: "", share }] };
 			refuses(m, "inputs[0].share", [/from contract version 8/, /declares "sdk": 7/, /Declare "sdk": 8\./]);
 		}
+	});
+
+	it("refuses role on an input under sdk 7, though role on a part is from 5", () => {
+		refuses({ ...v1(7), inputs: [{ id: "body", type: "textarea", label: "Body", default: "", role: "data" }] }, "inputs[0].role", [/from contract version 8/, /Declare "sdk": 8\./]);
 	});
 
 	it("refuses a declared kind its sdk cannot express, quoting the kind", () => {
@@ -210,6 +217,23 @@ describe("a result using a feature newer than its tool's sdk is reported (#170)"
 	 * declares it needs, and a rule that let one value of a key through under an older sdk would be a
 	 * second rule for an author to remember.
 	 */
+	it("sees wrap on a column and on a cell, at version 8", () => {
+		const table: Output = { kind: "table", columns: [{ label: "Note", wrap: "prose" }, { label: "Date" }], rows: [["a", { text: "2025-02-27", wrap: "none" }]] };
+		assert.equal(
+			outputFeatureProblem(table, 7),
+			'output.columns[0].wrap: column wrap is from contract version 8, but the tool declares "sdk": 7. Declare "sdk": 8.',
+		);
+		const cellOnly: Output = { kind: "table", columns: [{ label: "Date" }], rows: [[{ text: "2025-02-27", wrap: "none" }]] };
+		assert.match(String(outputFeatureProblem(cellOnly, 7)), /^output\.rows\[0\]\[0\]\.wrap: cell wrap is from contract version 8/);
+		assert.equal(outputFeatureProblem(table, 8), undefined);
+	});
+
+	it("sees rowHeader on a column, at version 8", () => {
+		const table: Output = { kind: "table", columns: [{ label: "Instance", rowHeader: true }, { label: "p99" }], rows: [["host-4", "1450"]] };
+		assert.match(String(outputFeatureProblem(table, 7)), /^output\.columns\[0\]\.rowHeader: column rowHeader is from contract version 8/);
+		assert.equal(outputFeatureProblem(table, 8), undefined);
+	});
+
 	it("sees mono on a field, at version 8, inside a group", () => {
 		const faces: Output = { kind: "group", parts: [{ kind: "fields", fields: [{ label: "Address", value: "192.0.2.10", mono: true }, { label: "Integrity", value: "none present", mono: false }] }] };
 		assert.equal(
