@@ -6761,6 +6761,25 @@ describe("a date input (contract 9, #203)", () => {
 		await page.close();
 	});
 
+	// At 390 the description's code broke after "2026-10-", leaving "25T14:30" alone on the next line.
+	it("moves inline code in a description to the next line whole, rather than breaking it at a hyphen", async () => {
+		const page = await openNative("", 390);
+		// Every width a phone has, since where the line ends depends on it: the gallery's card broke at 390 and the bench's did not.
+		const broken: number[] = [];
+		for (let width = 320; width <= 480; width += 4) {
+			await page.setViewportSize({ width, height: 1000 });
+			const lines = await page.evaluate(() => {
+				const code = [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll("#in-captured-desc code") ?? [])].find((c) => c.textContent === "2026-10-25T14:30") as HTMLElement;
+				const range = document.createRange();
+				range.selectNodeContents(code);
+				return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+			});
+			if (lines > 1) broken.push(width);
+		}
+		assert.deepEqual(broken, [], "widths where the code broke across lines");
+		await page.close();
+	});
+
 	// The mockup's message broke after "2026-" at 390, leaving "10-25T23:59," on the next line.
 	it("keeps each date in the message on one line at 390", async () => {
 		const page = await openNative("", 390);
