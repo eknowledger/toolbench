@@ -93,7 +93,8 @@ function parseItem(paragraph: string, from: string): Item | null {
 	for (const [key, value] of [["gallery", item.gallery], ["shot", item.shot]] as const)
 		if (value !== undefined && !SLUG.test(value)) fail(from, `"${item.name}" has ${key}=${value}; it must be lower-case letters, digits and hyphens`);
 	if (item.docs !== undefined && !DOCS_LINK.test(item.docs)) fail(from, `"${item.name}" has docs=${item.docs}; write a site page, page.html or page.html#anchor`);
-	// Code spans may show markup as text: `<tool-host>` is escaped. Anywhere else, `<` would be a raw tag.
+	// A friendlier error than the renderer's: the line is rendered with noRawTags, so a tag could only ever
+	// show as text, and this says so before it does. The renderer, not this regex, is what keeps tags out.
 	if (/[\u0000-\u001f\u007f]/.test(item.line)) fail(from, `"${item.name}" has a control character in its line`);
 	const prose = item.line.replace(/(`+)[\s\S]*?\1/g, "");
 	if (prose.includes("<")) fail(from, `"${item.name}" has a "<" in its line outside a code span`);
@@ -260,7 +261,7 @@ function itemHtml(item: Item): string {
 	}
 	const flag = item.label ? ` <span class="wn-flag">${escapeHtml(item.label)}</span>` : "";
 	const linkRow = links.length ? ` <span class="wn-links">${links.join(" ")}</span>` : "";
-	return `<li><strong>${escapeHtml(item.name)}:</strong> ${inline(continuation(item.line), { linkFor: safeLink(item.name) })}${flag}${linkRow}</li>`;
+	return `<li><strong>${escapeHtml(item.name)}:</strong> ${inline(continuation(item.line), { linkFor: safeLink(item.name), noRawTags: true })}${flag}${linkRow}</li>`;
 }
 
 function releaseHtml(r: Release): string {

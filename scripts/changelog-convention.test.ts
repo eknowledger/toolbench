@@ -116,3 +116,15 @@ describe("the link check on what is rendered", () => {
 	});
 });
 
+describe("raw HTML in a What's new line", () => {
+	it("renders as text whatever the code-span rules make of it", () => {
+		const render = (line: string) => inline(line, { linkFor: safeLink("Test"), noRawTags: true });
+		for (const line of ["``<b onmouseover=alert(1)>x</b>``", "`a``<img src=x onerror=alert(1)>", "<details open><summary>x</summary></details>", "<strong onclick=alert(1)>x</strong>"]) {
+			const html = render(line);
+			// Only the renderer's own tags, and none of them carrying an attribute but an href.
+			assert.ok(!/<(?!\/?(?:code|strong|em|a)\b)[a-z]/i.test(html), `${line} rendered a raw tag: ${html}`);
+			assert.ok(![...html.matchAll(/<[a-z]+\s([^>]*)>/gi)].some((m) => !/^href="[^"]*"$/.test(m[1] ?? "")), `${line} rendered an attribute: ${html}`);
+		}
+	});
+});
+
