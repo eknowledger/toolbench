@@ -30,11 +30,12 @@ const INPUT_SINCE: Since = {
 	share: 8,
 	role: 8,
 	details: 8,
+	mode: 9,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 /* The values of `control`, which arrived after the key: each value is a control the runtime has to know. */
 const CONTROL_SINCE: Since = { slider: 4, segmented: 9 };
-const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1 };
+const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1, date: 9 };
 const CAPABILITY_SINCE: Since = { pure: 1 };
 const KIND_SINCE: Since = {
 	fields: 1, text: 1, code: 1, table: 1, series: 1, group: 1, error: 1,
@@ -175,6 +176,10 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 		refuses({ ...v1(3), inputs: [order] }, "inputs[0].control", [/is from contract version 4/, /Declare "sdk": 9\./]);
 		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(9), inputs: [order] }));
 		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(4), inputs: [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9, control: "slider" }] }));
+	});
+
+	it("refuses a date input under sdk 8, quoting the type", () => {
+		refuses({ ...v1(8), inputs: [{ id: "day", type: "date", label: "Day", default: "2026-10-25" }] }, "inputs[0].type", [/"date" is from contract version 9/, /Declare "sdk": 9\./]);
 	});
 
 	it("refuses role on an input under sdk 7, though role on a part is from 5", () => {

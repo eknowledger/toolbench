@@ -2,7 +2,7 @@
 	"sdk": 9,
 	"id": "native-inputs",
 	"name": "Native inputs",
-	"blurb": "The browser's own controls behind the newer input types: a select drawn as segments.",
+	"blurb": "The browser's own controls behind the newer input types: a select drawn as segments, and a date and time.",
 	"version": "1.0.0",
 	"capabilities": ["pure"],
 	"runtime": { "entry": "index.ts", "thread": "main" },
@@ -21,6 +21,17 @@
 				{ "value": "big", "label": "Big-endian (network)" },
 				{ "value": "auto", "label": "Detect from header" }
 			]
+		},
+		{
+			"id": "captured",
+			"type": "date",
+			"mode": "datetime",
+			"label": "Captured at",
+			"unit": "local time",
+			"description": "When the trace was taken, between **2020-01-01** and **2026-10-25**. Arrives as `2026-10-25T14:30`.",
+			"default": "2026-10-25T14:30",
+			"min": "2020-01-01T00:00",
+			"max": "2026-10-25T23:59"
 		}
 	]
 }

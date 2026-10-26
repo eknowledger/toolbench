@@ -323,7 +323,7 @@ or that presents a deprecated one as current, is a field that lies.
 
 ## 4. Inputs
 
-Five types. Each generates a labelled control with its description wired to `aria-describedby`.
+Six types. Each generates a labelled control with its description wired to `aria-describedby`.
 
 ```jsonc
 { "id": "text",  "type": "text",     "label": "Pattern", "default": "^a.*z$", "maxLength": 200 }
@@ -332,6 +332,7 @@ Five types. Each generates a labelled control with its description wired to `ari
 { "id": "mode",  "type": "select",   "label": "Mode",    "default": "fast",
   "options": [{ "value": "fast", "label": "Fast" }, { "value": "exact", "label": "Exact" }] }
 { "id": "trace", "type": "toggle",   "label": "Show trace", "default": false }
+{ "id": "day",   "type": "date",     "label": "Day",     "default": "2026-10-25", "min": "2020-01-01" }
 ```
 
 Things the validator will hold you to, and why:
@@ -351,6 +352,13 @@ Things the validator will hold you to, and why:
   so a reader tabs in once and the arrow keys choose. When a segment would cut its label, measured as the
   tool resizes, the row becomes stacked radios, so long labels still read. `run` gets the option value and
   presets behave as on a dropdown. Any other `control` on a select is refused.
+* **A `date` input for a day, a time of day, or both** (contract version 9). `mode` is `date`, the
+  default, `time` or `datetime`, and `run` gets `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`, local, with no
+  time zone: convert in `run` if you need one. `min`, `default` and `max` are written in the same format,
+  each must parse, a day must exist, and `min` ≤ `default` ≤ `max`. The control is the browser's own
+  picker, which lets a reader type a day past `max` and hands over an empty string while a date is half
+  typed, so the runtime checks the value first and refuses it on the input, naming it by its label, before
+  `run` is called. Samples and presets are held to the same check. `mode` on any other input is refused.
 * **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
   host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
   behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a

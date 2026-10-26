@@ -76,6 +76,13 @@ describe("coerce", () => {
 		assert.equal(coerce(toggleSpec, 0), false);
 	});
 
+	// Kept as written, out of range or not, so the check before run can name what arrived (#203).
+	it("keeps a date as the string it arrived as", () => {
+		const day = { id: "day", type: "date", label: "Day", default: "2026-10-25", max: "2026-12-31" } as const satisfies InputSpec;
+		assert.equal(coerce(day, "2027-01-01"), "2027-01-01");
+		assert.equal(coerce(day, 20270101), "20270101");
+	});
+
 	it("truncates text to maxLength, the same limit the maxlength attribute enforces on typing", () => {
 		assert.equal(coerce(textSpec, "abcdefghij"), "abcdefgh");
 		assert.equal(coerce(unboundedText, "abcdefghij"), "abcdefghij");

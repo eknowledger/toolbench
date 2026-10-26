@@ -182,7 +182,8 @@ export const STYLES = /* css */ `
 /* WebKit counts a select's clipped option text as overflow of .tb, which can then be scrolled (#194). */
 .tb-select { contain: paint; }
 .tb-textarea { font-family: var(--tb-mono); font-size: 0.82rem; resize: vertical; min-height: 4.5rem; }
-.tb-input[type="number"] { font-family: var(--tb-mono); }
+/* A number, a date or time (#203): values a reader compares digit by digit. */
+.tb-input:not([type="text"]) { font-family: var(--tb-mono); }
 /* The output takes focus after a keyboard Run. Without it here it wore the browser's own blue ring (#99). */
 .tb-input:focus-visible, .tb-textarea:focus-visible, .tb-select:focus-visible, .tb-run:focus-visible, .tb-reset:focus-visible, .tb-share:focus-visible, .tb-facade-hint:focus-visible, .tb-sample:focus-visible, .tb-output:focus-visible {
   outline: 2px solid var(--tb-accent);
@@ -400,6 +401,7 @@ export const STYLES = /* css */ `
   font-size: 0.72rem; font-weight: 700; line-height: 1.05rem; text-align: center;
 }
 .tb-error-message { min-width: 0; overflow-wrap: anywhere; }
+.tb-nowrap { white-space: nowrap; }
 .tb-at { color: var(--tb-faint); font-family: var(--tb-mono); font-size: 0.78rem; }
 
 .tb-unknown {

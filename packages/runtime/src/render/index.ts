@@ -643,7 +643,8 @@ function renderError(output: Extract<Output, { kind: "error" }>): HTMLElement {
 		"div",
 		{ class: "tb-out-error", role: "alert", "data-input": output.input ?? "" },
 		el("span", { class: "tb-error-icon", "aria-hidden": "true" }, "!"),
-		el("span", { class: "tb-error-message" }, output.message),
+		// A date in a message is kept on one line: at 390 "2026-10-25T23:59" broke after "2026-" (#203).
+		el("span", { class: "tb-error-message" }, ...output.message.split(/(\d{4}-\d\d-\d\d(?:T\d\d:\d\d)?)/).map((part, i) => (i % 2 ? el("span", { class: "tb-nowrap" }, part) : part))),
 		at,
 	);
 }

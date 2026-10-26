@@ -6624,7 +6624,7 @@ describe("a segmented select (contract 9, #203)", () => {
 		assert.equal(seen.fills[1], await probeColour(page, "var(--tb-accent)"), "the fill follows the choice");
 		await tabForward(page);
 		seen = await read(page);
-		assert.equal(seen.focused, "tb-run", "Tab leaves the group rather than visiting each segment");
+		assert.ok(!seen.focused || !["little", "big", "auto"].includes(seen.focused), `Tab leaves the group rather than visiting each segment, got ${seen.focused}`);
 		await page.locator('#host >> input[value="big"]').focus();
 		await page.keyboard.press("Enter");
 		await page.waitForFunction(() => /"big"/.test(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-out-fields")?.textContent ?? ""), null, { timeout: 10_000 });
@@ -6680,6 +6680,113 @@ describe("a segmented select (contract 9, #203)", () => {
 			return getComputedStyle(select).borderTopColor;
 		});
 		assert.equal(border, await probeColour(page, "var(--tb-bad)"));
+		await page.close();
+	});
+});
+
+describe("a date input (contract 9, #203)", () => {
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const row = root.querySelector('[data-input="captured"]') as HTMLElement;
+			const input = row.querySelector("input") as HTMLInputElement;
+			return {
+				children: [...row.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`),
+				label: row.querySelector("label")?.textContent,
+				input: Object.fromEntries([...input.attributes].map((a) => [a.name, a.value])),
+				value: input.value,
+				scheme: getComputedStyle(input).colorScheme,
+				font: getComputedStyle(input).fontFamily === getComputedStyle(root.querySelector(".tb") as Element).getPropertyValue("--tb-mono").trim(),
+				error: root.querySelector(".tb-error-message")?.textContent ?? "",
+				slot: root.querySelector("#in-captured-err")?.textContent,
+				answer: root.querySelector(".tb-out-fields")?.textContent ?? "",
+			};
+		});
+	const run = async (page: Page) => {
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-output")?.getAttribute("data-state") === "idle", null, { timeout: 10_000 });
+	};
+
+	/* Written from the native-inputs manifest by hand: datetime is the browser's datetime-local, bounded as declared. */
+	it("is the browser's own picker, labelled, bounded and described as the manifest says", async () => {
+		const page = await openNative();
+		const seen = await read(page);
+		assert.deepEqual(seen.children, ["label.tb-label", "input.tb-input", "p.tb-desc", "p.tb-sr"]);
+		assert.equal(seen.label, "Captured at (local time)");
+		assert.deepEqual(seen.input, {
+			class: "tb-input",
+			id: "in-captured",
+			type: "datetime-local",
+			min: "2020-01-01T00:00",
+			max: "2026-10-25T23:59",
+			dir: "ltr",
+			"aria-describedby": "in-captured-desc in-captured-err",
+		});
+		assert.equal(seen.value, "2026-10-25T14:30");
+		assert.equal(seen.font, true, "set in the monospace face, as a number is");
+		await run(page);
+		assert.match((await read(page)).answer, /captured"2026-10-25T14:30"/, "run gets the value as written");
+		await page.close();
+	});
+
+	it("refuses a value after max before run, on the input, in the mockup's words", async () => {
+		const page = await openNative();
+		await page.locator("#host >> #in-captured").fill("2026-11-02T09:30");
+		await run(page);
+		const seen = await read(page);
+		assert.equal(seen.error, "Captured at must be on or before 2026-10-25T23:59, got 2026-11-02T09:30.");
+		assert.equal(seen.input["aria-invalid"], "true");
+		assert.match(seen.slot ?? "", /on or before 2026-10-25T23:59/, "the control's description carries the message");
+		assert.equal(seen.answer, "", "the tool was not called");
+		await page.close();
+	});
+
+	it("names a date half typed, which the browser hands over as empty", async () => {
+		const page = await openNative();
+		await page.locator("#host >> #in-captured").fill("");
+		await run(page);
+		assert.equal((await read(page)).error, "Captured at needs a date and time, as YYYY-MM-DDTHH:MM.");
+		await page.close();
+	});
+
+	// The mockup's message broke after "2026-" at 390, leaving "10-25T23:59," on the next line.
+	it("keeps each date in the message on one line at 390", async () => {
+		const page = await openNative("", 390);
+		await page.locator("#host >> #in-captured").fill("2026-11-02T09:30");
+		await run(page);
+		const lines = await page.evaluate(() => {
+			const message = document.querySelector("#host")?.shadowRoot?.querySelector(".tb-error-message") as HTMLElement;
+			const text = message;
+			const tops = (from: string) => {
+				const node = [...text.querySelectorAll("*"), text].flatMap((e) => [...e.childNodes]).find((n) => n.nodeType === 3 && n.textContent?.includes(from)) as Text;
+				const range = document.createRange();
+				const at = (node.textContent ?? "").indexOf(from);
+				range.setStart(node, at);
+				range.setEnd(node, at + from.length);
+				return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+			};
+			return { before: tops("2026-10-25T23:59"), got: tops("2026-11-02T09:30") };
+		});
+		assert.deepEqual([lines.before, lines.got], [1, 1], "each date on one line");
+		await page.close();
+	});
+
+	it("follows the page's colour scheme, so the picker is dark on a dark page", async () => {
+		const page = await browser.newPage();
+		await page.addInitScript(() => localStorage.setItem("toolbench-bench-theme", "dark"));
+		await page.goto(`${BASE}/tool.html?id=native-inputs`, { waitUntil: "load" });
+		await page.locator("#host >> #in-captured").waitFor({ timeout: 15_000 });
+		assert.equal((await read(page)).scheme, "dark");
+		await page.close();
+	});
+
+	it("takes a date from a host and from a link, as the string it is", async () => {
+		const page = await openNative("&native-inputs.captured=2021-03-04T05%3A06");
+		assert.equal((await read(page)).value, "2021-03-04T05:06");
+		await page.evaluate(() => {
+			(document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values = { captured: "2022-01-02T03:04" };
+		});
+		assert.equal((await read(page)).value, "2022-01-02T03:04");
 		await page.close();
 	});
 });

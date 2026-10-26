@@ -173,6 +173,9 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A number's default is within `min..max`", change: (m) => (input(m, 0).default = 90) },
 	{ rule: "`control` on a number is `\"slider\"`", change: (m) => (input(m, 0).control = "knob") },
 	{ rule: "`control` on a select is `\"segmented\"`", change: (m) => (input(m, 1).control = "slider") },
+	{ rule: "A date's `min`, `default` and `max` parse in its `mode`", change: (m) => (m.inputs = [{ id: "day", type: "date", label: "Day", default: "25/10/2026" }]) },
+	{ rule: "A date's default is within `min..max`", change: (m) => (m.inputs = [{ id: "day", type: "date", label: "Day", default: "2019-12-31", min: "2020-01-01" }]) },
+	{ rule: "`mode` only on a date", change: (m) => (input(m, 2).mode = "date") },
 	{ rule: "A select has two or more options", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }]) },
 	{ rule: "Option values are unique", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }, { value: "fast", label: "Also fast" }]) },
 	{ rule: "A select's default is one of its options", change: (m) => (input(m, 1).default = "slow") },
@@ -190,6 +193,7 @@ const EXAMPLES: Record<string, { from: string; id: string; gallery?: string }> =
 	number: { from: "bench/fixtures/slider", id: "rtt", gallery: "slider" },
 	select: { from: "bench/fixtures/presets", id: "stack", gallery: "presets" },
 	toggle: { from: "bench/fixtures/styled-output", id: "" },
+	date: { from: "bench/fixtures/native-inputs", id: "captured", gallery: "native-inputs" },
 };
 
 const SUMMARY: Record<string, string> = {
@@ -198,6 +202,7 @@ const SUMMARY: Record<string, string> = {
 	number: "A bounded quantity: a rate, a count, a size",
 	select: "A choice from a short fixed list, as a dropdown or a row of segments, or a preset that fills other inputs",
 	toggle: "On or off",
+	date: "A day, a time of day, or both, in the browser's own picker",
 };
 /** The type of the value `run` gets for an input of this kind. */
 const RECEIVES: Record<string, string> = {
@@ -206,6 +211,7 @@ const RECEIVES: Record<string, string> = {
 	number: "number, clamped to `min..max`",
 	select: "string, one of the option values",
 	toggle: "boolean",
+	date: "string, `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`, within `min..max`",
 };
 
 /**
