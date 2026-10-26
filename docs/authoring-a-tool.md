@@ -386,6 +386,11 @@ Things the validator will hold you to, and why:
   left open included, so a description with none of it renders exactly as before. A tone colours words that
   already say the thing: "{bad|refused}", not a red word standing for refusal. On a runtime older than
   this, the characters show as written.
+* **`details` for the rest of the help** (contract version 8). Keep `description` to the one-line hint and
+  put every case, format and reason in `details`: it is drawn under the hint behind a closed "More" that the
+  reader opens, it takes the same markup, and it is not part of what a screen reader announces on focus,
+  which stays the hint. A 600-character description was up to 13 lines on a phone and read in full every
+  time the control took focus.
 * **Mark the inputs a card cannot do without as `primary`.** A compact card shows every primary input and
   nothing else, so mark as many as the question genuinely needs and no more: a capacity planner offering a
   rate without a duration is not a smaller version of itself, it is a broken one. Mark none and a card

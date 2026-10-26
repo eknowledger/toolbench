@@ -42,6 +42,7 @@ export const LATER = {
 	"inputs.grammar": 7,
 	"inputs.share": 8,
 	"inputs.role": 8,
+	"inputs.details": 8,
 	"options.sets": 6,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,

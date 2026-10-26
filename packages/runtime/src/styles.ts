@@ -142,21 +142,33 @@ export const STYLES = /* css */ `
 .tb-unit { font-weight: 400; color: var(--tb-faint); }
 .tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-desc-fg); }
 /* Help text with markup (#217). Its blocks keep the one-line hint's tight rhythm rather than a page's. */
-div.tb-desc > * { margin: 0; }
-div.tb-desc > * + * { margin-top: 0.35rem; }
-.tb-desc ul { padding-inline-start: 1.1rem; }
-.tb-desc li + li { margin-top: 0.15rem; }
-.tb-desc code { font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
-.tb-desc strong { font-weight: 650; color: var(--tb-muted); }
+:is(div.tb-desc, .tb-details-body) > * { margin: 0; }
+:is(div.tb-desc, .tb-details-body) > * + * { margin-top: 0.35rem; }
+:is(.tb-desc, .tb-details-body) ul { padding-inline-start: 1.1rem; }
+:is(.tb-desc, .tb-details-body) li + li { margin-top: 0.15rem; }
+:is(.tb-desc, .tb-details-body) code { font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
+:is(.tb-desc, .tb-details-body) strong { font-weight: 650; color: var(--tb-muted); }
 /* A tone colours words the text already says, so colour is never the only carrier (WCAG 1.4.1), and the
    weight sets them apart for a reader who cannot tell the colours apart. Muted keeps the normal weight:
    in bold, a grey read as emphasis, the opposite of receding. */
-.tb-desc [data-tone] { font-weight: 600; }
-.tb-desc [data-tone="good"] { color: var(--tb-good); }
-.tb-desc [data-tone="warn"] { color: var(--tb-warn); }
-.tb-desc [data-tone="bad"] { color: var(--tb-bad); }
-.tb-desc [data-tone="accent"] { color: var(--tb-accent-text); }
-.tb-desc [data-tone="muted"] { color: var(--tb-faint); font-weight: inherit; }
+:is(.tb-desc, .tb-details-body) [data-tone] { font-weight: 600; }
+:is(.tb-desc, .tb-details-body) [data-tone="good"] { color: var(--tb-good); }
+:is(.tb-desc, .tb-details-body) [data-tone="warn"] { color: var(--tb-warn); }
+:is(.tb-desc, .tb-details-body) [data-tone="bad"] { color: var(--tb-bad); }
+:is(.tb-desc, .tb-details-body) [data-tone="accent"] { color: var(--tb-accent-text); }
+:is(.tb-desc, .tb-details-body) [data-tone="muted"] { color: var(--tb-faint); font-weight: inherit; }
+/* An input's details (#215): a quiet disclosure under the hint, its marker drawn like .tb-disclose's. The
+   summary is 24px tall for WCAG 2.5.8; the body is set off by a rule, not a box, so it reads as the hint's
+   continuation. */
+.tb-details { font-size: 0.78rem; color: var(--tb-desc-fg); }
+.tb-details > summary { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 24px; cursor: pointer; color: var(--tb-muted); list-style: none; border-radius: 6px; padding-inline-end: 0.25rem; }
+.tb-details > summary::-webkit-details-marker { display: none; }
+.tb-details > summary::before { content: ""; border-left: 4px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 120ms ease; }
+.tb-details[open] > summary::before { transform: rotate(90deg); }
+.tb-details > summary:hover { color: var(--tb-fg); }
+.tb-details > summary:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+.tb-details-body { margin: 0.25rem 0 0.15rem; padding: 0.375rem 0 0.375rem 0.625rem; border-inline-start: 2px solid var(--tb-border); }
+@media (prefers-reduced-motion: reduce) { .tb-details > summary::before { transition: none; } }
 .tb-input, .tb-textarea, .tb-select {
   width: 100%;
   font: inherit;

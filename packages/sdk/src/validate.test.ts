@@ -442,6 +442,20 @@ describe("validateManifest: lang on a textarea", () => {
 	});
 });
 
+// The rest of an input's help, behind a disclosure (#215).
+describe("validateManifest: details on an input", () => {
+	const name = { id: "name", type: "text", label: "Name", default: "" };
+
+	it("accepts details on any input, with or without a description", () => {
+		const m = validateManifest({ ...good(), inputs: [{ ...name, description: "Short.", details: "- Long\n- Longer" }, { id: "on", type: "toggle", label: "On", default: false, details: "Why." }] });
+		assert.deepEqual(m.inputs.map((i) => i.details), ["- Long\n- Longer", "Why."]);
+	});
+	it("refuses details that are not a non-empty string, which would draw a disclosure with nothing in it", () => {
+		failsWith((m) => { m.inputs = [{ ...name, details: "" }]; }, "inputs[0].details", "non-empty string");
+		failsWith((m) => { m.inputs = [{ ...name, details: ["a"] }]; }, "inputs[0].details", "non-empty string");
+	});
+});
+
 // A name for one input, for host stylesheets (#224), as a result part has.
 describe("validateManifest: role on an input", () => {
 	const name = { id: "name", type: "text", label: "Name", default: "" };

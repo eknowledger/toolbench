@@ -250,6 +250,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/input-help`, "values")],
 			},
 			{
+				id: "input-details",
+				title: "The rest of the help, behind More",
+				text: "An input's <code>details</code> sit under its one-line hint in a native disclosure, closed until the reader opens it. Same markup as a description, and a screen reader on the control hears only the hint.",
+				demo: `<tool-host tool="input-help" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/input-help`, "slo")],
+			},
+			{
 				id: "autorun",
 				title: "Update as the reader types",
 				text: "<code>\"autoRun\": true</code> runs on every edit. Off by default, and refused for worker tools, because it only suits a tool that is genuinely instant.",

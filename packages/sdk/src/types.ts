@@ -757,6 +757,12 @@ interface InputBase {
 	 * {good|text} for the tones good, warn, bad, muted and accent. Anything else is text.
 	 */
 	description?: string;
+	/**
+	 * The rest of the help, behind a native disclosure under the description: every case a format covers,
+	 * per-vendor rules, the reasons. Takes the same markup as `description`. It is not part of the control's
+	 * accessible description, so a screen reader announces only the short hint on focus. Contract version 8.
+	 */
+	details?: string;
 	/** Shown after the control: "ms", "req/s", "bytes". A number without one is a riddle. */
 	unit?: string;
 	/**
