@@ -1,5 +1,56 @@
 # @toolbench/sdk
 
+## 0.14.0
+
+### Minor Changes
+
+- [#238](https://github.com/eknowledger/toolbench/pull/238) [`7d54382`](https://github.com/eknowledger/toolbench/commit/7d54382e2d9d640d2ee4d5fab64467168652393a) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Text face on a field.** `mono: false` sets a field's value in the text face instead of monospace. <!-- whats-new: docs=docs-ref-results.html#field -->
+  
+  For a sentence or a plain number beside an address in the same list, the value and its note are drawn in the text face. Otherwise the field's `<dd>` carries `.tb-mono`, the same class a table cell uses. ([#209](https://github.com/eknowledger/toolbench/issues/209))
+  
+  - Contract version 8. A field with no `mono` is drawn exactly as before.
+
+- [#244](https://github.com/eknowledger/toolbench/pull/244) [`f2e7ab1`](https://github.com/eknowledger/toolbench/commit/f2e7ab1c13a7556b699760fd431a8330f40364a2) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: More help behind a disclosure.** `details` on an input puts the rest of its help behind a "More", closed until opened. <!-- whats-new: gallery=input-details docs=docs-ref-inputs.html#common-attributes -->
+  
+  `details` on an input puts the rest of its help in a native disclosure under the one-line `description`, closed until the reader opens it. It takes the same markup as a description. ([#215](https://github.com/eknowledger/toolbench/issues/215))
+  
+  - A screen reader on the control still hears only the description.
+  - Contract version 8.
+
+- [#240](https://github.com/eknowledger/toolbench/pull/240) [`e3cfb54`](https://github.com/eknowledger/toolbench/commit/e3cfb54524ad5fa4f0b2cf46441b91ae2b140e12) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Style one input at a time.** Each input row names its input, its type and its role, and four new properties recolour it. <!-- whats-new: gallery=input-styles docs=docs-ref-tokens.html#tokens -->
+  
+  Each input's `.tb-field-row` now carries `data-input` (its id), `data-type`, and `data-role` when the manifest gives the input a `role`. The form reads four new properties, `--tb-input-bg`, `--tb-input-border`, `--tb-input-fg` and `--tb-desc-fg`, so setting one on a row recolours only that input. ([#224](https://github.com/eknowledger/toolbench/issues/224))
+  
+  - `role` on an input is contract version 8. The attributes and properties need no contract change.
+  - The properties default to today's colours, so nothing changes unless you set them.
+
+- [#239](https://github.com/eknowledger/toolbench/pull/239) [`bcd9612`](https://github.com/eknowledger/toolbench/commit/bcd9612a8e1511b1b67e1c4082eda9f8aa2042f9) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Inputs kept out of links.** `"share": false` on an input tells a host's links to leave it out. <!-- whats-new: docs=docs-ref-inputs.html#common-attributes -->
+  
+  A host building a shareable link from `host.values` leaves that input out and does not read it back, for a password or pasted private material. ([#211](https://github.com/eknowledger/toolbench/issues/211))
+  
+  - Contract version 8. Without `share`, an input is shareable, as before.
+  - A hint for hosts, not access control: the runtime builds no links and enforces nothing. `shareableInputs(manifest)` in `@toolbench/sdk` lists the inputs a link may carry.
+
+- [#245](https://github.com/eknowledger/toolbench/pull/245) [`97c0af5`](https://github.com/eknowledger/toolbench/commit/97c0af524c1cd91cda7cc759c16581965af08ad0) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Reset off for a tool.** `"reset": false` in a manifest leaves the Reset button out. <!-- whats-new: gallery=reset docs=docs-ref-manifest.html#manifest-attributes -->
+  
+  `"reset": false` at the top level of a manifest leaves Reset out, as `reset="none"` on the element does, for a tool with one input where it adds nothing. ([#208](https://github.com/eknowledger/toolbench/issues/208))
+  
+  - Contract version 8.
+
+- [#242](https://github.com/eknowledger/toolbench/pull/242) [`f4fddb8`](https://github.com/eknowledger/toolbench/commit/f4fddb8bbe818f0b902a597f4d9da351c0cebf42) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Tables that work on a phone.** A table keeps its columns and scrolls on a narrow screen, with the row name kept in view. <!-- whats-new: gallery=table-wrap docs=docs-ref-results.html#column label="Changes a default" -->
+  
+  `rowHeader: true` on a table column renders its cells as `<th scope="row">`, so a screen reader names the row with every cell. A table whose columns say `wrap` now has a narrow layout built in: under 34rem it keeps its columns and scrolls, tokens on one line, prose at a reading width, the row header in view. ([#214](https://github.com/eknowledger/toolbench/issues/214))
+  
+  - Any table that scrolls shows a shadow at the edge with more to see. A table that fits looks as before.
+  - Contract version 8. A table with no `wrap` and no `rowHeader` keeps its layout.
+  - ⚠️ Heads-up: the cells of a `rowHeader` column are no longer `td`, so a host selector such as `td:first-child` stops matching them. It is opt-in per column.
+
+- [#241](https://github.com/eknowledger/toolbench/pull/241) [`02cc7e3`](https://github.com/eknowledger/toolbench/commit/02cc7e367ceac3b5d188deda373d5450aa9489c6) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Column wrapping.** A table column can say whether it holds sentences or short tokens. <!-- whats-new: gallery=table-wrap docs=docs-ref-results.html#column -->
+  
+  `wrap: "prose"` or `wrap: "none"` on a column, or on one cell, is written as `data-wrap` on the header and cells, so a narrow layout can keep short tokens on one line and give sentences a reading width. ([#213](https://github.com/eknowledger/toolbench/issues/213))
+  
+  - Contract version 8. A column with no `wrap` renders exactly as before.
+
 ## 0.13.0
 
 No changes in this release.
