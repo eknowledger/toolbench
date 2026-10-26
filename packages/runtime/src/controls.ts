@@ -27,7 +27,7 @@ legend.tb-label { padding: 0; margin-bottom: 0.25rem; }
 .tb-seg-opt:has(:checked) { background: var(--tb-accent); color: var(--tb-accent-ink); font-weight: 600; }
 /* One ring, round the group as round any other control. Round the filled segment it was clipped by the
    group and doubled the fill's edge, and the radio's own was the browser's blue (#99). */
-.tb-seg:has(:focus-visible) { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+.tb-seg:has(:focus-visible), .tb-seg[data-keys]:has(:focus) { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 .tb-seg input:focus-visible { outline: none; }
 /* Stacked, set by a measurement when a segment would cut its label: ordinary radios, one per line. */
 .tb-seg[data-stack] { flex-direction: column; gap: 0.125rem; overflow: visible; padding: 0.25rem 0.375rem; background: none; }
@@ -35,6 +35,16 @@ legend.tb-label { padding: 0; margin-bottom: 0.25rem; }
 .tb-seg[data-stack] .tb-seg-opt:has(:checked) { background: none; color: var(--tb-fg); }
 .tb-seg[data-stack] .tb-seg-opt input { position: static; opacity: 1; width: 1rem; height: 1rem; flex: none; accent-color: var(--tb-accent); }
 `;
+
+/*
+ * Whether the reader is using the keyboard, for the group's ring. WebKit never matches :focus-visible on a
+ * radio, after Tab or an arrow key alike, so a Safari reader moving through the segments by keyboard saw no
+ * ring at all: CI's WebKit run read "none" where Chromium and Firefox read "solid". So the group also draws
+ * it while it holds focus and the last thing the reader did was press a key.
+ */
+let keys = false;
+addEventListener("keydown", () => (keys = true), true);
+addEventListener("pointerdown", () => (keys = false), true);
 
 /**
  * Fill `group` with a segment per option: a native radio named `name` inside its label, so the arrow keys,
@@ -70,6 +80,7 @@ export function segments(group: HTMLElement, options: readonly SelectOption[], n
 		for (const radio of radios) radio.checked = radio.value === value();
 		fit();
 	};
+	for (const type of ["focusin", "keydown"]) group.addEventListener(type, () => group.toggleAttribute("data-keys", keys));
 	check();
 	return check;
 }

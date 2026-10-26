@@ -6613,6 +6613,8 @@ describe("a segmented select (contract 9, #203)", () => {
 
 	it("is one tab stop whose arrow keys choose, and Enter runs with the choice", async () => {
 		const page = await openNative();
+		await page.locator("#host >> text=Detect from header").click();
+		assert.deepEqual((await read(page)).ring, ["none", "none", "none", "none"], "a click draws no ring, as on any other control");
 		await page.locator('#host >> input[value="little"]').focus();
 		await page.keyboard.press("ArrowRight");
 		let seen = await read(page);

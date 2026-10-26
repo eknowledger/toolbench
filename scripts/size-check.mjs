@@ -362,7 +362,8 @@ const BUDGETS = [
 	/*
 	 * The newer inputs' controls (#203): a segmented select's radios, the measurement that stacks them, and their
 	 * rules. Fetched with a tool's code only by a tool that has one, so every other page pays nothing. Reader
-	 * cost: that reader downloads it. 1,031 measured.
+	 * cost: that reader downloads it. 1,104 measured, 73 of it tracking the keyboard for the ring WebKit
+	 * does not draw on a radio.
 	 */
 	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 1_500 },
 	/*
