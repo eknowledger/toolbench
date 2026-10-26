@@ -21,5 +21,5 @@ export const SDK_CHANGELOG: Record<number, string> = {
 	5: "names for host stylesheets and links: an optional role on any output part and on any field, rendered as data-role; an optional id on any part, rendered as data-part and opened by host.reveal(id); and the muted tone on fields and table cells.",
 	6: "presets and highlighted inputs: an optional sets on a select option, the values choosing it writes into other inputs, with the select following the form afterwards; and an optional lang on a textarea, painted through the host's highlight hook.",
 	7: "graphs: the graph output kind, nodes and edges the runtime lays out and draws, with groups, swimlanes, records and crow's-foot ends, every edge also listed in a table; and an optional grammar on a textarea with lang, the tool's own keywords, comment prefix, operators and string delimiters, with no patterns.",
-	8: "mono on a field, false for the text face.",
+	8: "mono on a field, false for the text face; share on an input, false to keep it out of links.",
 };

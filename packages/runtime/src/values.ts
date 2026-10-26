@@ -33,18 +33,6 @@ export function coerce(spec: InputSpec, value: string | number | boolean): strin
  * Unspecified inputs keep their current value. Unknown ids are ignored: they are not inputs, and
  * writing them into the map would make `run` see keys the tool never declared.
  */
-/**
- * The ids of the inputs a link may carry, in the manifest's order: every input that does not say
- * `share: false` (#211). The ONE rule for both directions, the share button writing a link and a tool
- * reading one as it opens, so the two cannot disagree about which value is private.
- *
- * Read off the spec rather than typed, so a manifest from before the key existed works, where it is absent.
- * TODO(#211): replace with `shareableInputs` from `@toolbench/sdk` once it is on main; same rule, same shape.
- */
-export function shareableInputs(manifest: { readonly inputs?: readonly { readonly id: string; readonly share?: unknown }[] }): string[] {
-	return (manifest.inputs ?? []).filter((input) => input.share !== false).map((input) => input.id);
-}
-
 export function applyPartialValues(inputs: readonly InputSpec[], current: InputValues, partial: InputValues): InputValues {
 	const next: InputValues = { ...current };
 	for (const spec of inputs) {

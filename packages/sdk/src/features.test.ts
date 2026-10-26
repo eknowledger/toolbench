@@ -26,6 +26,7 @@ const INPUT_SINCE: Since = {
 	control: 4,
 	lang: 6,
 	grammar: 7,
+	share: 8,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1 };
@@ -110,8 +111,8 @@ describe("the version each feature arrived in (#170)", () => {
 	 */
 	it("dates each manifest feature where the version history puts it", () => {
 		assert.deepEqual(
-			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar },
-			{ samples: 3, control: 4, lang: 6, sets: 6, grammar: 7 },
+			{ samples: TOP_LEVEL_SINCE.samples, control: INPUT_SINCE.control, lang: INPUT_SINCE.lang, sets: OPTION_SINCE.sets, grammar: INPUT_SINCE.grammar, share: INPUT_SINCE.share },
+			{ samples: 3, control: 4, lang: 6, sets: 6, grammar: 7, share: 8 },
 		);
 		assert.deepEqual(
 			Object.fromEntries(Object.entries(KIND_SINCE).filter(([, v]) => v > 1)),
@@ -150,6 +151,14 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 			"inputs[0].options[1].sets",
 			[/version 6/, /declares "sdk": 5/],
 		);
+	});
+
+	// Either value: a v7 host has no rule for the key, so a tool declaring 7 cannot rely on it being honoured.
+	it("refuses share on an input under sdk 7, whichever its value", () => {
+		for (const share of [false, true]) {
+			const m = { ...v1(7), inputs: [{ id: "password", type: "text", label: "Password", default: "", share }] };
+			refuses(m, "inputs[0].share", [/from contract version 8/, /declares "sdk": 7/, /Declare "sdk": 8\./]);
+		}
 	});
 
 	it("refuses a declared kind its sdk cannot express, quoting the kind", () => {

@@ -64,6 +64,9 @@ concern, as it is for typed input. A host that does not want this sets `share: "
 * a worker-mode tool reading `document.cookie` through its own means. See above: not a sandbox;
 * a host choosing to render untrusted Markdown from a tool's `help` field. Rendering that is the host's
   job and its choice of renderer;
+* a host putting an input marked `"share": false` into a link. `share` is a hint the manifest gives a
+  host, so it can keep a credential out of URLs, history and logs; the runtime builds no links and
+  enforces nothing, and following it is the host's code;
 * denial of service by feeding a tool an enormous input, where the manifest declared no bounds. The
   validator requires `min` and `max` on number inputs for this reason; a `textarea` with no `maxLength` is
   the host's decision.

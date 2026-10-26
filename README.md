@@ -220,7 +220,7 @@ tools/reverse/
 
 `sdk` is 1 on purpose, because a v1 manifest still being valid is the compatibility promise made
 concrete: the current contract is 8, and declaring 1 opts out of everything added since (`bytes` in v2,
-`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets and highlighted textareas in v6, graphs and textarea grammars in v7, `mono` on a field in v8). Using one of those means declaring its version: a manifest that uses a feature newer than its `sdk` is refused, with the field and the `sdk` to declare. See [docs/versioning.md](docs/versioning.md).
+`samples` in v3, richer charts in v4, `role` and the `muted` tone in v5, select presets and highlighted textareas in v6, graphs and textarea grammars in v7, `mono` on a field and `share` on an input in v8). Using one of those means declaring its version: a manifest that uses a feature newer than its `sdk` is refused, with the field and the `sdk` to declare. See [docs/versioning.md](docs/versioning.md).
 
 **2. Register it.** Once per site:
 
@@ -609,7 +609,8 @@ The page's own parameters stay, and any parameter of this tool's already in the 
 The tool's id in each name is what lets several tools share one address; the same tool twice on one page
 reads the same parameters. A tool opening on a page with such parameters starts with those values, and
 they count as its starting values, so Reset goes back to them. An input marked `share: false` is never
-written or read. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
+written or read; a host building its own links gets the same rule from `shareableInputs(manifest)` in
+`@toolbench/sdk`, which is the one the button uses. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
 refuses, the link is shown, selected, to copy by hand. The element then dispatches `tool-share` with
 `{ url, values }`.
 
