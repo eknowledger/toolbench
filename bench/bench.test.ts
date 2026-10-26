@@ -6154,3 +6154,73 @@ describe("a field's face (contract 8, #209)", () => {
 		await page.close();
 	});
 });
+
+describe("names and tokens for one input (contract 8, #224)", () => {
+	async function open() {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=input-help`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-field-row").first().waitFor({ timeout: 15_000 });
+		return page;
+	}
+
+	/*
+	 * Written from the input-help manifest by hand. An allowlist: a row carries its class and these three
+	 * names and nothing else, so an attribute added later by accident shows up here.
+	 */
+	it("names every row by id and type, and by role where the input has one", async () => {
+		const page = await open();
+		const rows = await page.evaluate(() =>
+			[...(document.querySelector("#host")?.shadowRoot?.querySelectorAll(".tb-field-row") ?? [])].map((row) =>
+				Object.fromEntries([...row.attributes].map((a) => [a.name, a.value])),
+			),
+		);
+		assert.deepEqual(rows, [
+			{ class: "tb-field-row", "data-input": "values", "data-type": "textarea", "data-role": "data" },
+			{ class: "tb-field-row", "data-input": "unit", "data-type": "select" },
+			{ class: "tb-field-row", "data-input": "slo", "data-type": "number", "data-role": "threshold" },
+			{ class: "tb-field-row", "data-input": "strict", "data-type": "toggle", "data-role": "advanced" },
+		]);
+		await page.close();
+	});
+
+	it("draws the controls and descriptions from the four tokens, which default to today's colours", async () => {
+		const page = await open();
+		const read = () =>
+			page.evaluate(() => {
+				const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+				const css = (selector: string, prop: string) => getComputedStyle(root.querySelector(selector) as Element).getPropertyValue(prop);
+				// A probe resolves a token to a colour the same way the control does.
+				const probe = (value: string) => {
+					const span = document.createElement("span");
+					span.style.color = value;
+					root.querySelector(".tb")?.append(span);
+					const out = getComputedStyle(span).color;
+					span.remove();
+					return out;
+				};
+				return {
+					area: [css(".tb-textarea", "background-color"), css(".tb-textarea", "border-top-color"), css(".tb-textarea", "color")],
+					select: [css(".tb-select", "background-color"), css(".tb-input", "background-color")],
+					desc: css(".tb-desc", "color"),
+					today: [probe("var(--tb-surface)"), probe("var(--tb-border)"), probe("var(--tb-fg)"), probe("var(--tb-faint)")],
+				};
+			});
+		const before = await read();
+		const [surface, border, fg, faint] = before.today;
+		assert.deepEqual(before.area, [surface, border, fg], "unset, the textarea is drawn as before");
+		assert.deepEqual(before.select, [surface, surface]);
+		assert.equal(before.desc, faint);
+		await page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement;
+			host.style.setProperty("--tb-input-bg", "rgb(1, 2, 3)");
+			host.style.setProperty("--tb-input-border", "rgb(4, 5, 6)");
+			host.style.setProperty("--tb-input-fg", "rgb(7, 8, 9)");
+			host.style.setProperty("--tb-desc-fg", "rgb(10, 11, 12)");
+		});
+		const after = await read();
+		assert.deepEqual(after.area, ["rgb(1, 2, 3)", "rgb(4, 5, 6)", "rgb(7, 8, 9)"]);
+		assert.deepEqual(after.select, ["rgb(1, 2, 3)", "rgb(1, 2, 3)"]);
+		assert.equal(after.desc, "rgb(10, 11, 12)");
+		await page.close();
+	});
+});

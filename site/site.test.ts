@@ -348,6 +348,30 @@ describe("the site in a browser", () => {
 	});
 
 	/*
+	 * The input-styles card (#224): the gallery's sheet sets --tb-input-border on the row whose role is
+	 * "threshold", so that one control's border is the accent and the textarea's is still the border colour.
+	 */
+	it("the input-styles card recolours one input through its row", async () => {
+		const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+		await page.goto(`${origin}gallery.html#input-styles`);
+		const host = page.locator("#input-styles tool-host");
+		await host.locator(".tb-textarea").waitFor({ timeout: 10_000 });
+		const seen = await host.evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot;
+			const border = (s: string) => getComputedStyle(root.querySelector(s) as Element).borderTopColor;
+			const probe = document.createElement("span");
+			probe.style.color = "var(--tb-accent)";
+			root.querySelector(".tb")?.append(probe);
+			const accent = getComputedStyle(probe).color;
+			probe.remove();
+			return { slo: border('[data-role="threshold"] .tb-input'), values: border('[data-input="values"] .tb-textarea'), accent };
+		});
+		assert.equal(seen.slo, seen.accent, "the threshold input takes the accent border");
+		assert.notEqual(seen.values, seen.accent, "and no other input does");
+		await page.close();
+	});
+
+	/*
 	 * A graph wider than its card was drawn past the card's right edge and cut off, with no scrollbar, because
 	 * the runtime's frame clips and the graph's container grew to the drawing. Every graph, at a desktop and a
 	 * phone width, must fit inside its frame, and the wide ones must offer full size, which scrolls.

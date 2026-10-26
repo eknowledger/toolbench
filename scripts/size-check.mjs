@@ -184,8 +184,13 @@ const BUDGETS = [
 	 * code, and the three attributes; about 43 of it is the bench registry's entries for the `share-private`
 	 * fixture. The button, the link writer, the clipboard and the button's styles are the share chunk, below,
 	 * not here. 26_000 would have left the build 346 over.
+	 *
+	 * Raised from 26_500 to 27_000 by names and colours for one input (#224), in the commit that crossed it:
+	 * 26,428 to 26,569 measured, 141 bytes, the bench registry naming the input-help fixture among them. The rest
+	 * is the four form tokens and the rules reading them, the three attributes on each row, and the role check
+	 * with its row in the version table. 26_500 would have left the build 69 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 27_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -232,8 +237,11 @@ const BUDGETS = [
 	 * Raised from 4_500 to 5_000 by the grammar fixture (#163): 4,237 to 4,649 measured. Bench-only.
 	 *
 	 * Raised from 5_000 to 5_500 by the wide-output fixture (#194): 4,649 to 5,013 measured. Bench-only.
+	 *
+	 * Raised from 5_500 to 6_000 by contract v8's fixtures, in the commit that crossed it: 5,753 with
+	 * field-faces (#209) and input-help (#224), four inputs of four types. Bench-only.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 5_500, deployOnly: true },
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 6_000, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -446,6 +454,8 @@ const BUDGETS = [
 	{ label: "bench fixture: wide-output", pattern: /^tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	// Fields in both faces (#209) on screen for the browser tests and the gallery. 231 measured.
 	{ label: "bench fixture: field-faces", pattern: /^tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// A form whose inputs carry names and read the form tokens (#224). 449 measured.
+	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
 	{ label: "bench page: tool", pattern: /^tool-[A-Za-z0-9_-]{8}\.js$/, budget: 7_000, deployOnly: true },
@@ -481,6 +491,7 @@ const BUDGETS = [
 	{ label: "worker copy: bench fixture grammar-input", pattern: /^worker-tool-grammar-input-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	{ label: "worker copy: bench fixture wide-output", pattern: /^worker-tool-wide-output-[^/]+\.js$/, budget: 1_500, deployOnly: true },
 	{ label: "worker copy: bench fixture field-faces", pattern: /^worker-tool-field-faces-[^/]+\.js$/, budget: 500, deployOnly: true },
+	{ label: "worker copy: bench fixture input-help", pattern: /^worker-tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 ];
 
 let files;

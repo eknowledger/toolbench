@@ -761,6 +761,12 @@ interface InputBase {
 	 * @default true
 	 */
 	share?: boolean;
+	/**
+	 * A name for this input, rendered as `data-role` on its `.tb-field-row`, so a host stylesheet can style
+	 * "the credential" or "the advanced ones" without naming each id. The runtime gives it no meaning, as
+	 * with a result part's `role`. Contract version 8.
+	 */
+	role?: string;
 }
 
 export type InputSpec =

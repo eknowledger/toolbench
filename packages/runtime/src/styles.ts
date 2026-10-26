@@ -63,6 +63,11 @@ export const STYLES = /* css */ `
      light page, which is 3.18:1 on #d97706; a bright accent wants dark text instead, black being 9.78:1
      on #f59e0b. Defaults to the surface, so nothing changes unless a host sets it. */
   --tb-accent-ink: var(--tb-bg);
+  /* The form's colours (#224), so one input can be recoloured through its row. Today's values by default. */
+  --tb-input-bg: var(--tb-surface);
+  --tb-input-border: var(--tb-border);
+  --tb-input-fg: var(--tb-fg);
+  --tb-desc-fg: var(--tb-faint);
 
   /* Series colours. A chart uses six, then they repeat: a chart needing seven is a chart needing a
      rethink. A graph's categories can name all eight, because seven teams in a dependency graph are not. */
@@ -135,14 +140,14 @@ export const STYLES = /* css */ `
 .tb-field-row { display: grid; gap: 0.25rem; }
 .tb-label { font-size: 0.82rem; font-weight: 600; color: var(--tb-muted); }
 .tb-unit { font-weight: 400; color: var(--tb-faint); }
-.tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
+.tb-desc { margin: 0; font-size: 0.78rem; color: var(--tb-desc-fg); }
 .tb-input, .tb-textarea, .tb-select {
   width: 100%;
   font: inherit;
   font-size: 0.9rem;
-  color: var(--tb-fg);
-  background: var(--tb-surface);
-  border: 1px solid var(--tb-border);
+  color: var(--tb-input-fg);
+  background: var(--tb-input-bg);
+  border: 1px solid var(--tb-input-border);
   border-radius: 8px;
   padding: 0.4375rem 0.5625rem;
 }
