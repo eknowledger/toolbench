@@ -27,6 +27,7 @@ export {
 	type Field,
 	type InputSpec,
 	type InputType,
+	type InputValue,
 	type InputValues,
 	type LoadedTool,
 	type Manifest,

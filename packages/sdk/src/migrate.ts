@@ -139,10 +139,12 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		from: 8,
 		/*
-		 * 8 -> 9 added `control: "segmented"` on a select (#203).
+		 * 8 -> 9 added `control: "segmented"` on a select (#203), and the `multiselect` input type (#204).
 		 *
 		 * Identity on both halves. A v8 select has no `control` and is a dropdown, and an absent `control` still
-		 * means exactly that. Nothing an older tool wrote changes meaning, and no output changed at all.
+		 * means exactly that. A v8 manifest cannot declare a multiselect, so none of its values is a list, and
+		 * widening `InputValues` to hold one changes nothing a v8 tool receives. Nothing an older tool wrote
+		 * changes meaning, and no output changed at all.
 		 */
 		manifest: (m) => m,
 		output: (o) => o,

@@ -53,6 +53,9 @@ export const LATER = {
 	// A value of `control`, because the key is older than most of its values.
 	"control.slider": 4,
 	"control.segmented": 9,
+	"control.checkboxes": 9,
+	"control.chips": 9,
+	"type.multiselect": 9,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,
 	"kinds.pie": 4,

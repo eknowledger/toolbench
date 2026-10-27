@@ -27,7 +27,7 @@ import { assertCases, testCtx } from "./testing.ts";
 import type { Case, Manifest, Tool } from "./types.ts";
 import { outputFeatureProblem } from "./features.ts";
 import { upgradeManifest } from "./migrate.ts";
-import { validateManifest } from "./validate.ts";
+import { checkCaseLists, validateManifest } from "./validate.ts";
 
 /** One tool as it exists on disk, validated. */
 export interface ToolOnDisk {
@@ -126,6 +126,12 @@ export function readTool(id: string, root: string): ToolOnDisk {
 			 */
 			const newer = outputFeatureProblem(testCase.expect, declaredSdk);
 			if (newer) throw new ToolDirectoryError(`case "${testCase.name}" expects ${newer}`, id);
+			// A list the form could never hold is a case testing a reader nobody can be (#204).
+			try {
+				checkCaseLists(manifest.inputs, Object(testCase.input) as Record<string, unknown>);
+			} catch (error) {
+				throw new ToolDirectoryError(`case "${testCase.name}": ${error instanceof Error ? error.message : String(error)}`, id);
+			}
 		}
 
 		return { id, root, entry: join(root, manifest.runtime.entry), manifest, declaredSdk, cases };

@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-29.4%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-30.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -66,7 +66,7 @@ that produces it:
 | Section | What it shows |
 |---|---|
 | [Display modes](https://eknowledger.github.io/toolbench/gallery.html#modes) | A tool on its own page, a card that loads nothing until it is opened, and a tool inside an article |
-| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a segmented select, a date picker, a colour picker, a secret, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
+| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a segmented select, a date picker, a colour picker, a secret, several choices as checkboxes or chips, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
 | [Running and failing](https://eknowledger.github.io/toolbench/gallery.html#running) | Worker mode with a timeout, a tool that spins, throws or rejects its input, and the `deprecated` and `retired` states |
 | [Charts](https://eknowledger.github.io/toolbench/gallery.html#charts) | Every chart kind, each with the result that draws it |
 
@@ -595,6 +595,25 @@ input says `"share": true`, and a value shorter than `minLength` is refused befo
 ⚠️ Do not return the value in a result: a result is on screen, announced, and in the `tool-run` event.
 Contract version 9.
 
+**An input can take several choices.** A `multiselect` hands `run` a `string[]` of the chosen option
+values, in the options' order:
+
+```jsonc
+{ "id": "types", "type": "multiselect", "label": "Record types", "default": ["A", "MX"], "min": 1,
+  "options": [{ "value": "A", "label": "A" }, { "value": "MX", "label": "MX" }, { "value": "TXT", "label": "TXT" }] }
+```
+
+Up to six options are native checkboxes, more are chips that wrap, and `"control"` picks either. A count
+line under the group says how many are chosen against `min` and `max`. At `max` the rest are marked
+unavailable but stay in the tab order, so a keyboard reader still reaches the reason. Below `min`, Run is
+refused with "Record types: pick at least one." under the input, and the tool is not called. Samples,
+presets and cases give the list as a JSON array. The checkboxes and chips are a chunk of their own, about
+1.4 KB, fetched only by a tool that has one. Contract version 9.
+
+**An error is shown under the input it names.** A result `{ kind: "error", input }` marks that control
+invalid and shows the field's name and the message beneath it, "Measurements: No measurements yet. Paste
+some numbers.", as well as in the result.
+
 **A textarea can be highlighted.** Give a `textarea` input a `lang`, and a host that passes `highlight`
 to `defineToolHost` paints what the reader types with the same hook `code` results use, so a site keeps
 one highlighter:
@@ -634,7 +653,10 @@ host.run();                                            // optional
 
 Unspecified inputs keep their current value. Out-of-range numbers are clamped, an invalid `select`
 falls back to that input's default, and a string longer than `maxLength` is cut: a host is not more
-trustworthy than a reader. An existing result goes stale, the same as typing. This works before the
+trustworthy than a reader. A list is taken whole or not at all: a multiselect given an unknown option, a
+repeat or more than `max` falls back to its whole default. ⚠️ Since contract version 9 a value can be a
+list, a multiselect's `string[]`, so host code that treats every entry of `values` as a string, a number
+or a boolean, `String(value)` into a query string for one, needs to handle an array. An existing result goes stale, the same as typing. This works before the
 form has opened, so a card can be prefilled. A shareable `?in=…` deep link is then a host feature,
 with no further contract change.
 
@@ -663,7 +685,11 @@ The tool's id in each name is what lets several tools share one address; the sam
 reads the same parameters. A tool opening on a page with such parameters starts with those values, and
 they count as its starting values, so Reset goes back to them. An input marked `share: false` is never
 written or read; a host building its own links gets the same rule from `shareableInputs(manifest)` in
-`@toolbench/sdk`, which is the one the button uses. A check mark and "Link copied" show for two seconds and are announced; if the clipboard
+`@toolbench/sdk`, which is the one the button uses. A list is one parameter per item,
+`?dns.types=A&dns.types=MX`, and an empty one is the bare key, `?dns.types=`, so it does not read back as
+the default. A link longer than 2,000 characters, which old proxies and chat previews cut, leaves out the
+list inputs adding most to it until it fits, and the note says which: "Link copied, without Regions: too
+long for a link". A check mark and "Link copied" show for two seconds and are announced; if the clipboard
 refuses, the link is shown, selected, to copy by hand. The element then dispatches `tool-share` with
 `{ url, values }`.
 
@@ -841,7 +867,7 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 29.4 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 30.5 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |

@@ -194,6 +194,15 @@ export const STYLES = /* css */ `
 }
 .tb-input[aria-invalid="true"], .tb-textarea[aria-invalid="true"], .tb-select[aria-invalid="true"] { border-color: var(--tb-bad); }
 .tb-toggle-row { display: flex; align-items: center; gap: 0.5rem; }
+/* Without it the toggle was the one control on the form in the browser's own blue (#204). */
+.tb-checkbox { accent-color: var(--tb-accent); }
+/* The message under an input an error names (#204), the field's name first. The mark is a glyph in a disc,
+   so the colour is not the only thing saying it is an error. It wraps anywhere, as the result's error does:
+   without it a message quoting a long token pushed the form 774px wide in a 320px tool. */
+.tb-field-msg { display: flex; gap: 0.375rem; align-items: baseline; margin: 0; font-size: 0.78rem; color: var(--tb-bad); overflow-wrap: anywhere; }
+.tb-field-msg::before { content: "!"; flex: none; width: 0.95rem; height: 0.95rem; border-radius: 50%; background: var(--tb-bad); color: var(--tb-bg); font-size: 0.66rem; font-weight: 700; line-height: 0.95rem; text-align: center; transform: translateY(0.1em); }
+/* How many are chosen of how many allowed, under a list input. */
+.tb-count { margin: 0; font-size: 0.78rem; color: var(--tb-desc-fg); font-variant-numeric: tabular-nums; }
 /* A slider takes the width and the number box keeps its own, so the value always shows beside the track. */
 .tb-slider-row { display: flex; align-items: center; gap: 0.75rem; }
 .tb-slider-row .tb-input { width: 7rem; flex: none; }

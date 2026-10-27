@@ -736,3 +736,83 @@ describe("inputProblem", () => {
 		assert.equal(inputProblem({ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9 }, 400), undefined);
 	});
 });
+
+describe("validateManifest: a multiselect (contract 9, #204)", () => {
+	const types = (extra: Record<string, unknown> = {}) => ({
+		id: "types",
+		type: "multiselect",
+		label: "Record types",
+		default: ["A", "AAAA"],
+		options: ["A", "AAAA", "MX", "TXT"].map((value) => ({ value, label: value })),
+		...extra,
+	});
+	const withTypes = (extra: Record<string, unknown> = {}, rest: Record<string, unknown> = {}) => (m: Record<string, unknown>) => {
+		m.inputs = [types(extra)];
+		Object.assign(m, rest);
+	};
+
+	it("accepts options, a default list, min, max and either control", () => {
+		const m = validateManifest({ ...good(), inputs: [types({ min: 1, max: 3, control: "chips" })] });
+		const input = m.inputs[0];
+		assert.ok(input?.type === "multiselect");
+		assert.deepEqual(input.default, ["A", "AAAA"]);
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [types({ control: "checkboxes" })] }));
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [types({ default: [] })] }), "no min means none chosen is allowed");
+	});
+
+	it("holds the options to a select's rules, and refuses a preset on one", () => {
+		failsWith(withTypes({ options: [{ value: "A", label: "A" }], default: [] }), "inputs[0].options", "at least two options");
+		failsWith(withTypes({ options: [{ value: "A", label: "A" }, { value: "A", label: "Also A" }], default: [] }), "inputs[0].options", "unique");
+		failsWith(withTypes({ options: [{ value: "A", label: "A", sets: { value: 2 } }, { value: "MX", label: "MX" }], default: [] }), "inputs[0].options[0].sets", "several at once");
+	});
+
+	it("needs a default that is a list of its option values, each once", () => {
+		failsWith(withTypes({ default: "A" }), "inputs[0].default", "list of option values");
+		failsWith(withTypes({ default: ["A", "SOA"] }), "inputs[0].default[1]", '"SOA" is not one of the options');
+		failsWith(withTypes({ default: ["A", "MX", "A"] }), "inputs[0].default[2]", String.raw`already chosen at inputs\[0\].default\[0\]`);
+	});
+
+	it("bounds min and max by each other and by the options, and the default by both", () => {
+		failsWith(withTypes({ min: 3, max: 2 }), "inputs[0].min", String.raw`min \(3\) is above max \(2\)`);
+		failsWith(withTypes({ max: 5 }), "inputs[0].max", String.raw`max \(5\) is more than the 4 options`);
+		failsWith(withTypes({ max: 0, default: [] }), "inputs[0].max", "at least 1");
+		failsWith(withTypes({ min: -1 }), "inputs[0].min", "whole number");
+		failsWith(withTypes({ min: 1.5 }), "inputs[0].min", "whole number");
+		failsWith(withTypes({ min: 3 }), "inputs[0].default", String.raw`2 chosen, fewer than min \(3\)`);
+		failsWith(withTypes({ max: 1 }), "inputs[0].default", String.raw`2 chosen, more than max \(1\)`);
+	});
+
+	// The one rule a reader can break, by unticking the last box, so the runtime asks before Run.
+	it("is refused before Run below min, naming the input", () => {
+		const spec = types({ min: 1 }) as unknown as Parameters<typeof inputProblem>[0];
+		assert.equal(inputProblem(spec, []), "Record types: pick at least one.");
+		assert.equal(inputProblem(types({ min: 2 }) as unknown as Parameters<typeof inputProblem>[0], ["A"]), "Record types: pick at least 2.");
+		assert.equal(inputProblem(spec, ["A"]), undefined);
+	});
+
+	it("takes checkboxes or chips as its control, and nothing else", () => {
+		failsWith(withTypes({ control: "segmented" }), "inputs[0].control", 'must be "checkboxes" or "chips" when present, got "segmented"');
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 10, control: "chips" }]; }, "inputs[0].control", "slider");
+	});
+
+	it("checks a sample's list as it checks the default", () => {
+		const sample = (input: unknown) => withTypes({ min: 1, max: 3 }, { samples: [{ label: "Mail", input: { types: input } }] });
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [types({ min: 1, max: 3 })], samples: [{ label: "Mail", input: { types: ["MX", "TXT"] } }] }));
+		failsWith(sample("MX"), "samples[0].input.types", "list of option values");
+		failsWith(sample(["MX", "SOA"]), "samples[0].input.types[1]", '"SOA" is not one of the options');
+		failsWith(sample([]), "samples[0].input.types", String.raw`0 chosen, fewer than min \(1\)`);
+		failsWith(sample(["A", "AAAA", "MX", "TXT"]), "samples[0].input.types", String.raw`4 chosen, more than max \(3\)`);
+	});
+
+	it("lets a preset write a list, and compares the default option's list by its values", () => {
+		const preset = (sets: unknown) => ({
+			id: "profile",
+			type: "select",
+			label: "Profile",
+			default: "web",
+			options: [{ value: "web", label: "Web", sets: { types: sets } }, { value: "mail", label: "Mail", sets: { types: ["MX", "TXT"] } }, { value: "custom", label: "Custom" }],
+		});
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [preset(["A", "AAAA"]), types()] }), "an equal list written anew is the default");
+		failsWith((m) => { m.inputs = [preset(["A"]), types()]; }, "inputs[0].options[0].sets.types", String.raw`defaults to \["A","AAAA"\]`);
+	});
+});

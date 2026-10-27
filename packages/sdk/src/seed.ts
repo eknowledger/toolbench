@@ -37,9 +37,10 @@ export class SeedError extends Error {
 
 /** The input a card's form will show: every declared default, and nothing else. A secret has none, and opens empty. */
 export function defaultInputs(loaded: Pick<LoadedTool, "manifest">): InputValues {
-	const input: Record<string, string | number | boolean> = {};
-	for (const spec of loaded.manifest.inputs) input[spec.id] = spec.type === "secret" ? "" : spec.default;
-	return input as InputValues;
+	const input: InputValues = {};
+	// A copy: a tool that sorts the list it was given would otherwise sort the manifest's default (#204).
+	for (const spec of loaded.manifest.inputs) input[spec.id] = spec.type === "secret" ? "" : structuredClone(spec.default);
+	return input;
 }
 
 /**

@@ -183,6 +183,9 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A select has two or more options", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }]) },
 	{ rule: "Option values are unique", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }, { value: "fast", label: "Also fast" }]) },
 	{ rule: "A select's default is one of its options", change: (m) => (input(m, 1).default = "slow") },
+	{ rule: "A multiselect's default is a list of its options, each once", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast", "slow"] }) },
+	{ rule: "A multiselect's `min` is not above its `max`", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast"], min: 2, max: 1 }) },
+	{ rule: "`control` on a multiselect is `\"checkboxes\"` or `\"chips\"`", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast"], control: "segmented" }) },
 	{ rule: "`lang` only on a textarea", change: (m) => (input(m, 2).lang = "json") },
 	{ rule: "`grammar` needs `lang` beside it", change: (m) => Object.assign(input(m, 2), { type: "textarea", grammar: { keywords: ["on"] } }) },
 	{ rule: "`share` is `true` or `false`", change: (m) => (input(m, 2).share = "no") },
@@ -200,6 +203,7 @@ const EXAMPLES: Record<string, { from: string; id: string; gallery?: string }> =
 	date: { from: "bench/fixtures/native-inputs", id: "captured", gallery: "native-inputs" },
 	color: { from: "bench/fixtures/native-inputs", id: "accent", gallery: "native-inputs" },
 	secret: { from: "bench/fixtures/native-inputs", id: "token", gallery: "native-inputs" },
+	multiselect: { from: "bench/fixtures/multiselect", id: "regions", gallery: "multiselect" },
 };
 
 const SUMMARY: Record<string, string> = {
@@ -211,6 +215,7 @@ const SUMMARY: Record<string, string> = {
 	date: "A day, a time of day, or both, in the browser's own picker",
 	color: "A colour, typed as hex or picked in the system's picker",
 	secret: "A password, a token or a key, with no default and kept out of links",
+	multiselect: "Several choices from a fixed list, as checkboxes or chips",
 };
 /** The type of the value `run` gets for an input of this kind. */
 const RECEIVES: Record<string, string> = {
@@ -222,6 +227,7 @@ const RECEIVES: Record<string, string> = {
 	date: "string, `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`, within `min..max`",
 	color: "string, a lowercase `#rrggbb`",
 	secret: "string, empty until typed, at least `minLength` characters",
+	multiselect: "string[], the chosen option values in the options' order, `min` to `max` of them",
 };
 
 /**
@@ -268,7 +274,8 @@ export async function inputsReference(): Promise<string> {
 	const option = members(block(types, "export interface SelectOption"));
 	const grammar = members(block(types, "export interface TextareaGrammar"));
 
-	const attrTable = (attrs: Attr[], prefix: string) => attributeTable(attrs, (a) => at(`${prefix}.${a.name}`));
+	// An attribute of a type that arrived later arrived with it: a multiselect's `min` is v9, though a number's is v1.
+	const attrTable = (attrs: Attr[], prefix: string, type = "") => attributeTable(attrs, (a) => Math.max(at(`${prefix}.${a.name}`), at(`type.${type}`)));
 
 	const out: string[] = [];
 	out.push(
@@ -280,10 +287,10 @@ export async function inputsReference(): Promise<string> {
 		"|---|---|---|---|---|",
 		...specs.map((s) => {
 			const req = s.attrs.filter((a) => a.required).map((a) => `\`${a.name}\``);
-			const opt = s.attrs.filter((a) => !a.required).map((a) => `\`${a.name}\`${at(`inputs.${a.name}`) > 1 ? ` (v${at(`inputs.${a.name}`)})` : ""}`);
+			const opt = s.attrs.filter((a) => !a.required).map((a) => `\`${a.name}\`${at(`inputs.${a.name}`) > Math.max(1, at(`type.${s.type}`)) ? ` (v${at(`inputs.${a.name}`)})` : ""}`);
 			// A select's presets live on its options, so the summary would otherwise say it has nothing optional.
 			if (s.type === "select") for (const a of option.filter((o) => !o.required)) opt.push(`\`options[].${a.name}\` (v${at(`options.${a.name}`)})`);
-			return `| [\`${s.type}\`](#${s.type}) | ${RECEIVES[s.type] ?? ""} | ${req.join(" ")} | ${opt.join(" ") || "none"} | ${SUMMARY[s.type] ?? ""} |`;
+			return `| [\`${s.type}\`](#${s.type})${at(`type.${s.type}`) > 1 ? ` (v${at(`type.${s.type}`)})` : ""} | ${RECEIVES[s.type] ?? ""} | ${req.join(" ")} | ${opt.join(" ") || "none"} | ${SUMMARY[s.type] ?? ""} |`;
 		}),
 		"",
 		"## Common attributes",
@@ -293,7 +300,7 @@ export async function inputsReference(): Promise<string> {
 		attrTable(common, "inputs"),
 	);
 	for (const s of specs) {
-		out.push("", `## ${s.type}`, "", `**Type:** ${RECEIVES[s.type]}. Takes the common attributes, plus:`, "", attrTable(s.attrs, "inputs"));
+		out.push("", `## ${s.type}`, "", `**Type:** ${RECEIVES[s.type]}. Takes the common attributes, plus:`, "", attrTable(s.attrs, "inputs", s.type));
 		if (s.type === "select") out.push("", "### Option attributes", "", "Each entry of `options`.", "", attrTable(option, "options"));
 		if (s.type === "textarea") out.push("", "### Grammar attributes", "", "The keys of `grammar`. Each is optional, and a grammar needs at least one. Patterns are not allowed: a regular expression from a tool could hang the page it is on.", "", attrTable(grammar, "grammar"));
 		out.push("", "### Example", "", exampleInput(s.type));

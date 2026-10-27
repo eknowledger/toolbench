@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { InputSpec, InputValues } from "@toolbench/sdk";
 import { shareableInputs } from "@toolbench/sdk";
-import { applyPartialValues, coerce } from "./values.ts";
+import { applyPartialValues, coerce, fromQuery } from "./values.ts";
 
 const numberSpec = {
 	id: "arrivals",
@@ -145,5 +145,59 @@ describe("shareableInputs: the one rule the share button writes and reads by (#2
 
 	it("survives a manifest with no inputs", () => {
 		assert.deepEqual(shareableInputs({}), []);
+	});
+});
+
+const typesSpec = {
+	id: "types",
+	type: "multiselect",
+	label: "Record types",
+	default: ["A", "AAAA"],
+	options: ["A", "AAAA", "MX", "TXT"].map((value) => ({ value, label: value })),
+	min: 1,
+	max: 3,
+} as const satisfies InputSpec;
+
+describe("coerce: a multiselect (#204)", () => {
+	it("keeps the chosen values in the options' order, whatever order they arrive in", () => {
+		assert.deepEqual(coerce(typesSpec, ["TXT", "A"]), ["A", "TXT"]);
+	});
+
+	it("falls back to the whole default for an unknown option, a repeat, too many, or no list at all", () => {
+		for (const bad of [["A", "SOA"], ["A", "A"], ["A", "AAAA", "MX", "TXT"], "A", 3]) {
+			assert.deepEqual(coerce(typesSpec, bad as never), ["A", "AAAA"], JSON.stringify(bad));
+		}
+	});
+
+	it("keeps fewer than min, which the form can hold too: Run refuses it, the value is not rewritten", () => {
+		assert.deepEqual(coerce(typesSpec, []), []);
+	});
+
+	it("never hands out the manifest's own array, so editing the form cannot change the default", () => {
+		const value = coerce(typesSpec, "bad" as never) as string[];
+		assert.notEqual(value, typesSpec.default);
+	});
+});
+
+describe("fromQuery: a link's values for one tool (#227, #204)", () => {
+	const specs: readonly InputSpec[] = [numberSpec, toggleSpec, typesSpec, unboundedText];
+	const read = (query: string) => fromQuery("dns", specs, new URLSearchParams(query));
+
+	it("reads each input under the tool's id, and nothing of another tool's", () => {
+		assert.deepEqual(read("dns.arrivals=12&other.arrivals=4&dns.note=hi"), { arrivals: "12", note: "hi" });
+	});
+
+	it("reads a toggle as true only from the word true", () => {
+		assert.deepEqual(read("dns.wide=true"), { wide: true });
+		assert.deepEqual(read("dns.wide=yes"), { wide: false });
+	});
+
+	it("reads every repeat of a multiselect's key, and the bare key as none chosen", () => {
+		assert.deepEqual(read("dns.types=MX&dns.types=TXT"), { types: ["MX", "TXT"] });
+		assert.deepEqual(read("dns.types="), { types: [] });
+	});
+
+	it("keeps the last of a repeated single value, as the link reader always has", () => {
+		assert.deepEqual(read("dns.note=a&dns.note=b"), { note: "b" });
 	});
 });

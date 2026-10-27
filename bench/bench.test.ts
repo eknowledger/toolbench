@@ -6999,3 +6999,243 @@ describe("a secret input (contract 9, #203)", () => {
 		await page.close();
 	});
 });
+
+/*
+ * A multiselect (#204), on the bench's `multiselect` fixture: six record types, which are drawn as checkboxes,
+ * at least one; fourteen regions, drawn as chips, at most four. Every expectation below is written from that
+ * manifest by hand, not read back from the runtime.
+ */
+describe("a multiselect (contract 9, #204)", () => {
+	type HostApi = HTMLElement & { values: Record<string, unknown> };
+	async function open(query = "", width = 1280): Promise<Page> {
+		const page = await browser.newPage({ viewport: { width, height: 1000 } });
+		await page.addInitScript(() => {
+			const w = window as unknown as { copied: string[]; requests: string[] };
+			w.copied = [];
+			const stub = { writeText: (text: string) => (w.copied.push(text), Promise.resolve()) };
+			Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => stub });
+		});
+		await page.goto(`${BASE}/tool.html?id=multiselect${query}`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		return page;
+	}
+	const read = (page: Page) =>
+		page.evaluate(() => {
+			const root = document.querySelector("#host")?.shadowRoot as ShadowRoot;
+			const attrs = (e: Element | null) => Object.fromEntries([...(e?.attributes ?? [])].map((a) => [a.name, a.value]));
+			const row = (id: string) => root.querySelector(`[data-input="${id}"]`) as HTMLElement;
+			const boxes = [...row("types").querySelectorAll<HTMLInputElement>("input")];
+			const chips = [...row("regions").querySelectorAll<HTMLButtonElement>("button")];
+			return {
+				rows: ["types", "regions"].map((id) => `${row(id).tagName.toLowerCase()}.${row(id).className}`),
+				children: ["types", "regions"].map((id) => [...row(id).children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`)),
+				legends: ["types", "regions"].map((id) => row(id).querySelector("legend")?.textContent),
+				groups: [attrs(root.querySelector("#in-types")), attrs(root.querySelector("#in-regions"))],
+				boxes: boxes.map((b) => [b.closest("label")?.className, b.type, b.value, b.closest("label")?.textContent, b.checked]),
+				chips: chips.map((c) => [c.className, c.type, c.textContent, c.getAttribute("aria-pressed"), c.getAttribute("aria-disabled")]),
+				counts: [root.querySelector("#in-types-count")?.textContent, root.querySelector("#in-regions-count")?.textContent],
+				described: chips.map((c) => c.getAttribute("aria-describedby")),
+				errors: ["types", "regions"].map((id) => {
+					const slot = root.querySelector(`#in-${id}-err`) as HTMLElement;
+					return [slot.className, slot.textContent, slot.getBoundingClientRect().height > 1];
+				}),
+				invalid: [root.querySelector("#in-types")?.getAttribute("aria-invalid"), root.querySelector("#in-regions")?.getAttribute("aria-invalid")],
+				status: root.querySelector(".tb-status")?.textContent ?? "",
+				answer: [...root.querySelectorAll(".tb-out-fields dd")].map((d) => d.textContent),
+				values: (document.querySelector("#host") as HTMLElement & { values: Record<string, unknown> }).values,
+				focused: (root.activeElement as HTMLElement | null)?.textContent ?? "",
+			};
+		});
+	const box = (page: Page, value: string) => page.locator(`#host >> input[value="${value}"]`);
+	const chip = (page: Page, label: string) => page.locator(`#host >> button.tb-chip:text-is("${label}")`);
+	const REGIONS = ["us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1", "eu-west-1", "eu-west-2", "eu-central-1", "eu-north-1", "ap-south-1", "ap-northeast-1", "ap-southeast-1", "ap-southeast-2", "sa-east-1"];
+	const DEFAULT_REGIONS = ["us-east-1", "us-west-2", "eu-west-1"];
+
+	it("draws six options as checkboxes and fourteen as chips, each group named by its legend", async () => {
+		const page = await open();
+		const seen = await read(page);
+		assert.deepEqual(seen.rows, ["fieldset.tb-field-row", "fieldset.tb-field-row"]);
+		assert.deepEqual(seen.children, [
+			["legend.tb-label", "div.tb-checks", "p.tb-desc", "p.tb-count", "p.tb-sr"],
+			["legend.tb-label", "div.tb-chips", "p.tb-desc", "p.tb-count", "p.tb-sr"],
+		]);
+		assert.deepEqual(seen.legends, ["Record types", "Regions"]);
+		assert.deepEqual(seen.groups, [
+			{ class: "tb-checks", id: "in-types", role: "group", "aria-labelledby": "in-types-label", "aria-describedby": "in-types-desc in-types-count in-types-err" },
+			{ class: "tb-chips", id: "in-regions", role: "group", "aria-labelledby": "in-regions-label", "aria-describedby": "in-regions-desc in-regions-count in-regions-err" },
+		]);
+		assert.deepEqual(seen.boxes, ["A", "AAAA", "MX", "TXT", "CNAME", "NS"].map((v, i) => ["tb-check", "checkbox", v, v, i < 3]));
+		assert.deepEqual(seen.chips, REGIONS.map((r) => ["tb-chip", "button", r, String(DEFAULT_REGIONS.includes(r)), null]));
+		assert.deepEqual(seen.counts, ["3 selected, at least 1", "3 selected, at most 4"]);
+		assert.deepEqual(seen.values, { types: ["A", "AAAA", "MX"], regions: DEFAULT_REGIONS });
+		await page.close();
+	});
+
+	it("hands run the chosen values in the options' order, whichever was clicked first", async () => {
+		const page = await open();
+		await box(page, "TXT").click();
+		await box(page, "A").click();
+		await chip(page, "ca-central-1").click();
+		await chip(page, "us-east-1").click();
+		let seen = await read(page);
+		assert.deepEqual(seen.values, { types: ["AAAA", "MX", "TXT"], regions: ["us-west-2", "ca-central-1", "eu-west-1"] });
+		assert.deepEqual(seen.counts, ["3 selected, at least 1", "3 selected, at most 4"]);
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").waitFor({ timeout: 10_000 });
+		seen = await read(page);
+		assert.deepEqual(seen.answer, ['["AAAA","MX","TXT"]', '["us-west-2","ca-central-1","eu-west-1"]', "9"]);
+		await page.close();
+	});
+
+	it("at max marks the rest unavailable, focusable and saying why, and a press on one changes nothing", async () => {
+		const page = await open();
+		await chip(page, "ap-south-1").click();
+		let seen = await read(page);
+		const chosen = [...DEFAULT_REGIONS, "ap-south-1"];
+		assert.deepEqual(seen.chips.map((c) => [c[2], c[3], c[4]]), REGIONS.map((r) => [r, String(chosen.includes(r)), chosen.includes(r) ? null : "true"]));
+		assert.equal(seen.counts[1], "4 selected, the most allowed. Deselect one to choose another.");
+		assert.deepEqual(seen.described, REGIONS.map((r) => (chosen.includes(r) ? null : "in-regions-count")), "an unavailable chip is described by the reason");
+		// Forced: Playwright will not click a control marked aria-disabled, and a reader can.
+		await chip(page, "us-east-2").click({ force: true });
+		await chip(page, "us-east-2").focus();
+		assert.equal((await read(page)).focused, "us-east-2", "still in the tab order");
+		await page.keyboard.press("Space");
+		seen = await read(page);
+		assert.deepEqual(seen.values.regions, ["us-east-1", "us-west-2", "eu-west-1", "ap-south-1"], "neither a click nor Space chose it");
+		await chip(page, "us-east-1").click();
+		seen = await read(page);
+		assert.deepEqual(seen.chips.map((c) => c[4]), REGIONS.map(() => null), "one deselected, every chip is available again");
+		assert.equal(seen.counts[1], "3 selected, at most 4");
+		await page.close();
+	});
+
+	it("toggles with Space from the keyboard, and Enter runs the tool, as from any single-line control", async () => {
+		const page = await open();
+		await box(page, "NS").focus();
+		await page.keyboard.press("Space");
+		await chip(page, "sa-east-1").focus();
+		await page.keyboard.press("Space");
+		assert.deepEqual((await read(page)).values, { types: ["A", "AAAA", "MX", "NS"], regions: ["us-east-1", "us-west-2", "eu-west-1", "sa-east-1"] });
+		await page.keyboard.press("Enter");
+		await page.locator("#host >> .tb-out-fields").waitFor({ timeout: 10_000 });
+		const seen = await read(page);
+		assert.equal(seen.chips.find((c) => c[2] === "sa-east-1")?.[3], "true", "Enter did not toggle the chip it was pressed on");
+		assert.deepEqual(seen.answer.at(-1), "16");
+		await page.close();
+	});
+
+	it("refuses Run below min with a visible message under the group, naming it, and does not call the tool", async () => {
+		const page = await open();
+		for (const value of ["A", "AAAA", "MX"]) await box(page, value).click();
+		await page.locator("#host >> .tb-run").click();
+		let seen = await read(page);
+		assert.deepEqual(seen.errors[0], ["tb-field-msg", "Record types: pick at least one.", true]);
+		assert.deepEqual(seen.invalid, ["true", null]);
+		assert.equal(seen.status, "error: Record types: pick at least one.", "refused before run as any input the runtime checks is");
+		assert.deepEqual(seen.answer, [], "the tool was not run");
+		const colour = await page.locator("#host >> #in-types-err").evaluate((e) => getComputedStyle(e).color);
+		assert.equal(colour, await probeColour(page, "var(--tb-bad)"));
+		await box(page, "MX").click();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-fields").waitFor({ timeout: 10_000 });
+		seen = await read(page);
+		assert.deepEqual(seen.errors[0], ["tb-sr", "", false], "the next run clears it");
+		assert.deepEqual(seen.invalid, [null, null]);
+		await page.close();
+	});
+
+	it("shows the tool's own error on a list under that list, naming it", async () => {
+		const page = await open();
+		for (const region of DEFAULT_REGIONS) await chip(page, region).click();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-out-error").waitFor({ timeout: 10_000 });
+		const seen = await read(page);
+		assert.deepEqual(seen.errors[1], ["tb-field-msg", "Regions: choose a region to ask from.", true]);
+		assert.deepEqual(seen.invalid, [null, "true"]);
+		await page.close();
+	});
+
+	it("writes each choice as a repeat of its key, reads them back, and opens on the default for a list it cannot use", async () => {
+		const page = await open();
+		await box(page, "TXT").click();
+		await page.locator('#host >> [part~="share"]').click();
+		const copied = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
+		assert.deepEqual(copied, [
+			`${BASE}/tool.html?id=multiselect&multiselect.types=A&multiselect.types=AAAA&multiselect.types=MX&multiselect.types=TXT&multiselect.regions=us-east-1&multiselect.regions=us-west-2&multiselect.regions=eu-west-1`,
+		]);
+		await page.close();
+		const linked = await open("&multiselect.types=TXT&multiselect.types=MX&multiselect.regions=");
+		assert.deepEqual((await read(linked)).values, { types: ["MX", "TXT"], regions: [] }, "the bare key is none chosen");
+		await linked.close();
+		for (const bad of ["&multiselect.types=SOA", "&multiselect.types=A&multiselect.types=A", "&multiselect.regions=us-east-1&multiselect.regions=us-east-2&multiselect.regions=us-west-1&multiselect.regions=us-west-2&multiselect.regions=eu-west-1"]) {
+			const fallback = await open(bad);
+			assert.deepEqual((await read(fallback)).values, { types: ["A", "AAAA", "MX"], regions: DEFAULT_REGIONS }, bad);
+			await fallback.close();
+		}
+	});
+
+	it("puts the defaults back on Reset, focusing the first chosen checkbox", async () => {
+		const page = await open();
+		await box(page, "A").click();
+		await page.locator("#host >> .tb-reset").click();
+		const seen = await read(page);
+		assert.deepEqual(seen.values.types, ["A", "AAAA", "MX"]);
+		assert.equal(await page.evaluate(() => (document.querySelector("#host")?.shadowRoot?.activeElement as HTMLInputElement | null)?.value), "A");
+		await page.close();
+	});
+
+	it("fills from a sample, which writes both lists", async () => {
+		const page = await open();
+		await page.locator('#host >> .tb-sample:text-is("Mail only")').click();
+		const seen = await read(page);
+		assert.deepEqual(seen.values, { types: ["MX", "TXT"], regions: ["eu-west-1"] });
+		assert.deepEqual(seen.boxes.map((b) => b[4]), [false, false, true, true, false, false]);
+		await page.close();
+	});
+
+	it("fetches its controls with the tool's code, and a tool without a multiselect does not", async () => {
+		const chunks = async (id: string) => {
+			const page = await browser.newPage();
+			const seen: string[] = [];
+			page.on("request", (r) => seen.push(new URL(r.url()).pathname));
+			await page.goto(`${BASE}/tool.html?id=${id}`, { waitUntil: "load" });
+			await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+			await page.close();
+			return seen.filter((p) => /\/choices-[^/]+\.js$/.test(p)).length;
+		};
+		assert.equal(await chunks("multiselect"), 1);
+		assert.equal(await chunks("percentiles"), 0);
+	});
+});
+
+describe("a visible message under the input an error names (#204)", () => {
+	it("shows the field's name and the tool's message under it, in the error colour", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
+		await page.evaluate(() => {
+			const host = document.querySelector("#host") as HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+			host.values = { values: "" };
+			return host.run();
+		});
+		const seen = await page.evaluate(() => {
+			const slot = document.querySelector("#host")?.shadowRoot?.querySelector("#in-values-err") as HTMLElement;
+			return { className: slot.className, text: slot.textContent, visible: slot.checkVisibility(), colour: getComputedStyle(slot).color, after: slot.previousElementSibling?.className };
+		});
+		assert.deepEqual([seen.className, seen.text, seen.visible], ["tb-field-msg", "Measurements: No measurements yet. Paste some numbers.", true]);
+		assert.equal(seen.colour, await probeColour(page, "var(--tb-bad)"));
+		await page.close();
+	});
+});
+
+// The mockup found it: the toggle was the one control still in the browser's own blue.
+describe("a toggle in the accent colour (#204)", () => {
+	it("draws the checkbox with accent-color set to the runtime's accent", async () => {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/tool.html?id=styled-output`, { waitUntil: "load" });
+		await page.locator("#host >> .tb-checkbox").waitFor({ timeout: 15_000 });
+		const accent = await page.locator("#host >> .tb-checkbox").evaluate((e) => getComputedStyle(e).accentColor);
+		assert.equal(accent, await probeColour(page, "var(--tb-accent)"));
+		await page.close();
+	});
+});

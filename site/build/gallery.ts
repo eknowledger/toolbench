@@ -236,6 +236,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/native-inputs`, "order"), input(`${FIX}/native-inputs`, "captured"), input(`${FIX}/native-inputs`, "accent"), input(`${FIX}/native-inputs`, "token")],
 			},
 			{
+				id: "multiselect",
+				title: "Several choices",
+				text: "A <code>multiselect</code> hands <code>run</code> a list. Up to six options are checkboxes and more are chips; <code>min</code> and <code>max</code> bound the list, and Run below <code>min</code> is refused under the input.",
+				demo: `<tool-host tool="multiselect" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/multiselect`, "types"), input(`${FIX}/multiselect`, "regions")],
+			},
+			{
 				id: "highlighted-input",
 				title: "A highlighted textarea",
 				text: "A textarea with a <code>lang</code> is painted by the host's highlighter, the same hook that paints code results. Caret, selection and undo stay the browser's own.",

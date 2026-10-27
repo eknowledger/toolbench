@@ -1,0 +1,56 @@
+{
+	"sdk": 9,
+	"id": "multiselect",
+	"name": "Probe plan",
+	"blurb": "Which record types to ask for, and from which regions: several choices as checkboxes and as chips.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "types",
+			"type": "multiselect",
+			"label": "Record types",
+			"description": "The records to ask each resolver for.",
+			"default": ["A", "AAAA", "MX"],
+			"min": 1,
+			"options": [
+				{ "value": "A", "label": "A" },
+				{ "value": "AAAA", "label": "AAAA" },
+				{ "value": "MX", "label": "MX" },
+				{ "value": "TXT", "label": "TXT" },
+				{ "value": "CNAME", "label": "CNAME" },
+				{ "value": "NS", "label": "NS" }
+			]
+		},
+		{
+			"id": "regions",
+			"type": "multiselect",
+			"label": "Regions",
+			"description": "Each chosen region asks every record type.",
+			"default": ["us-east-1", "us-west-2", "eu-west-1"],
+			"max": 4,
+			"options": [
+				{ "value": "us-east-1", "label": "us-east-1" },
+				{ "value": "us-east-2", "label": "us-east-2" },
+				{ "value": "us-west-1", "label": "us-west-1" },
+				{ "value": "us-west-2", "label": "us-west-2" },
+				{ "value": "ca-central-1", "label": "ca-central-1" },
+				{ "value": "eu-west-1", "label": "eu-west-1" },
+				{ "value": "eu-west-2", "label": "eu-west-2" },
+				{ "value": "eu-central-1", "label": "eu-central-1" },
+				{ "value": "eu-north-1", "label": "eu-north-1" },
+				{ "value": "ap-south-1", "label": "ap-south-1" },
+				{ "value": "ap-northeast-1", "label": "ap-northeast-1" },
+				{ "value": "ap-southeast-1", "label": "ap-southeast-1" },
+				{ "value": "ap-southeast-2", "label": "ap-southeast-2" },
+				{ "value": "sa-east-1", "label": "sa-east-1" }
+			]
+		}
+	],
+	"samples": [
+		{ "label": "Mail only", "input": { "types": ["MX", "TXT"], "regions": ["eu-west-1"] } }
+	]
+}

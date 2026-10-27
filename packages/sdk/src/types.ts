@@ -906,6 +906,34 @@ export type InputSpec =
 			minLength?: number;
 			/** The most characters the control accepts, not below `minLength`. */
 			maxLength?: number;
+	  })
+	| (InputBase & {
+			/**
+			 * Several choices from a fixed list (#204): `run` receives the chosen option values as a `string[]`, in
+			 * the options' order, never more than `max` and never fewer than `min`. A reader below `min` is told so
+			 * when they press Run, and the tool is not called. Contract version 9.
+			 */
+			type: "multiselect";
+			/** The option values the form opens with chosen, each once, between `min` and `max` of them. `[]` for none. */
+			default: string[];
+			/** Two or more choices, with unique values. An option here takes no `sets`: several presets at once have no single meaning. */
+			options: SelectOption[];
+			/**
+			 * The fewest a reader may choose. `1` is what makes "pick at least one" a rule.
+			 * @default 0
+			 */
+			min?: number;
+			/**
+			 * The most a reader may choose. At it, the rest are marked unavailable, with the reason beside them.
+			 * @default the number of options
+			 */
+			max?: number;
+			/**
+			 * How the choices are drawn: `checkboxes`, a native checkbox per option, or `chips`, a row of toggle
+			 * buttons that wraps, for a long list of short values. A hint, like a number's `slider`.
+			 * @default checkboxes up to 6 options, chips above
+			 */
+			control?: "checkboxes" | "chips";
 	  });
 
 /**
@@ -949,10 +977,17 @@ export interface SelectOption {
 
 export type InputType = InputSpec["type"];
 
-export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color", "secret"];
+export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color", "secret", "multiselect"];
+
+/**
+ * One input's value: a string, a number or a boolean for the single-value types, and a `string[]` for
+ * a multiselect (contract version 9). Widened, never narrowed, so a tool's own `type Input = { ... }` of
+ * single values still satisfies `InputValues`.
+ */
+export type InputValue = string | number | boolean | string[];
 
 /** The shape a tool's `run` receives: one entry per declared input, keyed by id. */
-export type InputValues = Record<string, string | number | boolean>;
+export type InputValues = Record<string, InputValue>;
 
 // ---------------------------------------------------------------------------
 // Capabilities: what a tool is allowed to do
