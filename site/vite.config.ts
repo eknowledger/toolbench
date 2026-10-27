@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { toolbench } from "@toolbench/runtime/vite";
 import { defineConfig } from "vite";
 import { siteContent } from "./build/plugin.ts";
 
@@ -44,7 +45,8 @@ function chunk(id: string, prefix: string): string | null {
 
 export default defineConfig({
 	base: base(),
-	plugins: [siteContent()],
+	// Every tool.json validated here, at build time, so no reader downloads the validator for it.
+	plugins: [toolbench(), siteContent()],
 	// ⚠️ Vite defaults workers to iife, which cannot split one file per tool: fine in dev, fails the build.
 	worker: { format: "es", rollupOptions: { output: { manualChunks: (id: string) => chunk(id, "worker-tool-") } } },
 	build: {

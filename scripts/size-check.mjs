@@ -260,8 +260,31 @@ const BUDGETS = [
 	 *
 	 * Lowered from 31_500 to 30_500 when the bytes renderer and its rules became a chunk: 30,950 to 30,154.
 	 * Shorter developer messages, one tone rule and `plural()` took 119 more, to 30,035, inside it.
+	 *
+	 * ⚠️ Lowered from 30_500 to 24_500 when manifests began to be checked at build time (#259): 30,035 to 23,902
+	 * measured, 6,133 bytes. `validateManifest` and every rule above marked as validation, the manifest half of
+	 * the migration chain and the feature check are the validation chunk, below, which a source fetches only for
+	 * a manifest the build did not check, and the checks before a run are a chunk of their own. The manifests the
+	 * bench inlines are emitted frozen at every level and marked, which takes part of that back.
 	 */
-	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 30_500, deployOnly: true },
+	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 24_500, deployOnly: true },
+	/*
+	 * Manifest validation (#259): `validateManifest`, `upgradeManifest` and the feature check, for manifests the
+	 * build did not check. Fetched by a source's first `list()` or `load()` only when one of its manifests is
+	 * unmarked, so reader cost for a host whose manifests come from a server, before its first card paints; a
+	 * site built with `@toolbench/runtime/vite` or `toolbench-manifests` never fetches it. 7,395 measured when it
+	 * held the checks before a run as well.
+	 *
+	 * Lowered from 8_000 to 7_000 when those left for their own chunk (#259): 6,865 measured.
+	 */
+	{ label: "manifest validation", pattern: /^validation-[^/]+\.js$/, budget: 7_000 },
+	/*
+	 * The checks before a run (#259), apart from validation once that became the fallback for manifests the
+	 * build did not see: fetched with a tool's code when it activates, so reader cost on every page where a tool
+	 * is opened. 722 measured. In boot instead they cost 462 bytes there, on every page, opened or not. 800 is the
+	 * first budget it fits.
+	 */
+	{ label: "checks before a run", pattern: /^checks-[^/]+\.js$/, budget: 800 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -304,7 +327,9 @@ const BUDGETS = [
 	 * Bench-only. 8,229 with the rows fixture.
 	 */
 	// Lowered from 8_500 to 7_000 by `json: { namedExports: false }`, each manifest no longer written twice: 8,229 to 6,373.
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_000, deployOnly: true },
+	// Raised from 7_000 to 7_500 when manifests began to be checked at build time (#259): 6,373 to 7,110 measured,
+	// 737 bytes, every fixture manifest emitted frozen at every level and marked as checked. Bench-only.
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_500, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
@@ -332,8 +357,10 @@ const BUDGETS = [
 	 * the same reason as the theme switch: a consumer does not download it.
 	 */
 	{ label: "bench highlighter", pattern: /^bench-highlight-[^/]+\.js$/, budget: 1_500, deployOnly: true },
-	// `?wide=` and `?wideToggle=` as host options, for the wide-graph tests (#198). 165 measured.
-	{ label: "bench host options", pattern: /^bench-host-options-[^/]+\.js$/, budget: 500, deployOnly: true },
+	// `?wide=` and `?wideToggle=` as host options, for the wide-graph tests (#198). 165 measured. 485 with the share
+	// options (#227) and `?badManifest=` (#259), the registry with a malformed tool for the validation tests. 554 with
+	// `?manifests=json` (#259), the registry as fetched JSON, so the tests can still reach the validation chunk.
+	{ label: "bench host options", pattern: /^bench-host-options-[^/]+\.js$/, budget: 600, deployOnly: true },
 	/*
 	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
 	 * rather than deployOnly, because a reader of a chart tool genuinely downloads it: the saving is that
@@ -476,6 +503,9 @@ const BUDGETS = [
 	 * Raised to 18_750 by #201: a seed's graph is laid out before the paint, so the chunks its layout asks for
 	 * part way through (the search, the repair) are fetched first, and that layout is kept for the draw. 74
 	 * bytes, 18,484 to 18,558.
+	 *
+	 * 18,554 to 18,599 when `GRAPH_COLORS` moved from the SDK's types.ts to its graph.ts (#259): the list was in
+	 * boot, and is now here, where it is read. Inside the budget.
 	 */
 	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_750 },
 	{ label: "graph: tree and radial", pattern: /^graph-tree-[^/]+\.js$/, budget: 2_250 },
@@ -724,8 +754,13 @@ function pageAssets(html) {
  *
  * Lowered to 26_500 when the bytes renderer and its rules became a chunk of their own: 26,845 to 26,056.
  * Shorter developer messages, one tone rule and a `plural()` helper took 103 more, to 25,953, inside it.
+ *
+ * Lowered to 20_000 when the page's build began checking its manifest with `toolbench()` (#259): 25,953 to
+ * 19,479 measured, the validator out of the entry chunk, and the page fetches no validation chunk either,
+ * which the browser test above holds. A host that skips the plugin loads the same entry and then the
+ * validation chunk, 6,797 more here, before its card paints.
  */
-const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 26_500 };
+const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 20_000 };
 {
 	let html = null;
 	try {
@@ -800,8 +835,13 @@ const SITE = join(import.meta.dirname, "..", "site", "dist");
 /*
  * Lowered to 38_000 when the bytes renderer became a chunk of its own, a runtime saving every consumer gets
  * too: 38,041 to 37,256 measured.
+ *
+ * Lowered to 31_000 when the site's build began checking its manifests (#259): 37,157 to 30,528 measured,
+ * 6,629 bytes, the validator out of the runtime's chunk. ⚠️ The page fetches no validation chunk in its place,
+ * which no tag would name and this line would not see: checked in Chrome, with every request before the first
+ * paint recorded, not assumed. A site without the plugin would fetch it, 6,831 bytes, before its cards paint.
  */
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 38_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 31_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
@@ -865,6 +905,11 @@ if (process.argv.includes("--update")) {
 		// The bench's own boot chunk, beside the published figure so the difference stays visible.
 		["README.md", /(\| Bench page[^|]*\| )[\d.]+ KB/, kb(find("bench page, boot"))],
 		["docs/architecture.md", /(\| Bench page[^|]*\| )[\d.]+ KB/, kb(find("bench page, boot"))],
+		// A page whose manifests the build did not check pays this beside the runtime (#259), so it is published beside it.
+		["README.md", /(\| Manifest validation[^|]*\| )[\d.]+ KB/, kb(find("manifest validation"))],
+		["docs/architecture.md", /(\| Manifest validation[^|]*\| )[\d.]+ KB/, kb(find("manifest validation"))],
+		["README.md", /(\| Checks before a run[^|]*\| )[\d.]+ KB/, kb(find("checks before a run"))],
+		["docs/architecture.md", /(\| Checks before a run[^|]*\| )[\d.]+ KB/, kb(find("checks before a run"))],
 		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 		["README.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],

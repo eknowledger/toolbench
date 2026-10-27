@@ -6,13 +6,14 @@
  */
 import { defineToolHost, RegistrySource } from "@toolbench/runtime";
 import { hostHighlight } from "./highlight.ts";
-import { hostShare, hostWide } from "./host-options.ts";
+import { hostRegistry, hostShare, hostWide } from "./host-options.ts";
 import { registry } from "./registry.ts";
 import { installThemeControl } from "./theme.ts";
 
 installThemeControl();
 
-export const source = new RegistrySource(registry);
+// `hostRegistry` adds a malformed tool under `?badManifest=link`, for the test that a source refuses it.
+export const source = new RegistrySource(hostRegistry(location.search, registry));
 
 // Which highlighter, including the deliberately broken ones a browser test needs. Chosen inside
 // highlight.ts so the query-param read and those hooks stay out of the chunk the README publishes.

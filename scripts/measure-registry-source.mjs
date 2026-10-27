@@ -1,15 +1,16 @@
 /**
- * Time `RegistrySource` construction at a few hundred tools.
+ * Time `RegistrySource` validation at a few hundred tools: construction and the first `list()`.
  *
- * The constructor validates and migrates every manifest. That is deliberate: a malformed
- * tool is a startup error that names the field. It is also linear in tool count, on the
- * main thread, before first paint. Issue #17 asked for a number rather than a shrug,
- * before anyone rewrites the constructor to be lazy.
+ * The first `list()` validates and migrates every manifest, and the constructor did until the
+ * validator became a chunk of its own (#259). That is deliberate: a malformed tool rejects with an
+ * error that names the field. It is also linear in tool count, on the main thread, before first
+ * paint. Issue #17 asked for a number rather than a shrug.
  *
  *   pnpm measure:registry
  *
  * Generation sits outside the timed region. The headline figure in docs/architecture.md
- * §15 is the median of the timed constructions of 500 synthetic manifests, after warmup.
+ * §15 is the median of the timed runs over 500 synthetic manifests, after warmup. The
+ * warmup also loads the validation module, so its import is not in the timed figure.
  *
  * The manifests are already objects, which is what a host hands the constructor after
  * the bundler has parsed `tool.json`. JSON.parse is not part of this cost.
@@ -31,7 +32,7 @@ const DEFAULT_ITERATIONS = 21;
 
 const USAGE = `Usage: pnpm measure:registry [--count N] [--warmup N] [--iterations N]
 
-Time RegistrySource construction on N synthetic manifests (default ${COUNT}).
+Time RegistrySource construction and first list() on N synthetic manifests (default ${COUNT}).
 
 Generation is outside the timed region. The printed median is what docs/architecture.md
 §15 quotes, after warmup. Does not assert a budget: this is a measurement, not a gate.
@@ -48,7 +49,7 @@ export function syntheticManifest(index, sdk = SDK_VERSION) {
 		sdk,
 		id,
 		name: `Synth ${index}`,
-		blurb: "A synthetic tool used only to time RegistrySource construction.",
+		blurb: "A synthetic tool used only to time RegistrySource validation.",
 		version: "1.0.0",
 		capabilities: ["pure"],
 		runtime: { entry: "index.ts", thread: "main" },
@@ -71,9 +72,9 @@ export function syntheticManifest(index, sdk = SDK_VERSION) {
 	};
 }
 
-/** `load()` is not part of construction. Calling it here means the bench is measuring the wrong thing. */
+/** A tool's `load()` is not part of validation. Calling it here means the bench is measuring the wrong thing. */
 function idleLoad() {
-	return Promise.reject(new Error("measure-registry-source: load() is not part of construction and should not run"));
+	return Promise.reject(new Error("measure-registry-source: load() is not part of validation and should not run"));
 }
 
 export function syntheticEntries(count, sdk = SDK_VERSION) {
@@ -100,22 +101,24 @@ function ms(n) {
 }
 
 /**
- * Time `new RegistrySource(entries)` only. The instance is read after each construction so
- * a JIT cannot treat the constructor as dead.
+ * Time `new RegistrySource(entries)` and its first `list()`, which is where the validation runs. The
+ * instance is read after each run so a JIT cannot treat the work as dead.
  */
-export function timeConstruction(Source, entries, { warmup = DEFAULT_WARMUP, iterations = DEFAULT_ITERATIONS } = {}) {
-	if (entries.length === 0) throw new Error("timeConstruction needs at least one entry");
+export async function timeValidation(Source, entries, { warmup = DEFAULT_WARMUP, iterations = DEFAULT_ITERATIONS } = {}) {
+	if (entries.length === 0) throw new Error("timeValidation needs at least one entry");
 	const firstId = syntheticManifest(0).id;
 	for (let i = 0; i < warmup; i++) {
 		const source = new Source(entries);
-		if (source.manifest(firstId)?.id !== firstId) throw new Error("warmup construction lost an id");
+		await source.list();
+		if (source.manifest(firstId)?.id !== firstId) throw new Error("warmup validation lost an id");
 	}
 	const samples = [];
 	for (let i = 0; i < iterations; i++) {
 		const t0 = performance.now();
 		const source = new Source(entries);
+		await source.list();
 		const t1 = performance.now();
-		if (source.manifest(firstId)?.id !== firstId) throw new Error("timed construction lost an id");
+		if (source.manifest(firstId)?.id !== firstId) throw new Error("timed validation lost an id");
 		samples.push(t1 - t0);
 	}
 	return {
@@ -136,7 +139,7 @@ export function runtimeLine() {
 
 export function formatReport(result, { runtime = runtimeLine(), sdk = SDK_VERSION } = {}) {
 	return [
-		"RegistrySource construction",
+		"RegistrySource construction and first list()",
 		`  ${runtime}`,
 		`  ${result.count} synthetic manifests (contract ${sdk}, two inputs: number + select)`,
 		`  warmup ${result.warmup}, timed ${result.iterations}`,
@@ -181,7 +184,7 @@ export async function main(argv = process.argv.slice(2), io = process) {
 		}
 		const Source = await loadRegistrySource();
 		const entries = syntheticEntries(count);
-		const result = timeConstruction(Source, entries, { warmup, iterations });
+		const result = await timeValidation(Source, entries, { warmup, iterations });
 		io.stdout.write(formatReport(result));
 		return 0;
 	} catch (error) {

@@ -16,7 +16,6 @@ export {
 	CAPABILITIES,
 	INPUT_TYPES,
 	OUTPUT_KINDS,
-	GRAPH_COLORS,
 	type Capability,
 	type Case,
 	type ByteRange,
@@ -64,13 +63,16 @@ export {
 	type ToolModule,
 } from "./types.ts";
 
-export { ManifestError, describeSdkVersion, inputProblem, validateManifest } from "./validate.ts";
+export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
+export { inputProblem } from "./inputs.ts";
+export { VALIDATED_KEY } from "./brand.ts";
 export { isSafeLinkHref } from "./links.ts";
 export { shareableInputs } from "./share.ts";
-export { graphProblem } from "./graph.ts";
+export { GRAPH_COLORS, graphProblem } from "./graph.ts";
 export { checkManifestFeatures, outputFeatureProblem } from "./features.ts";
 
 export { SeedError, defaultInputs, seed, serialiseSeed, type SeedOptions } from "./seed.ts";
-export { MIGRATIONS, VersionError, canLoad, upgradeManifest, upgradeOutput, type Migration } from "./migrate.ts";
+export { MIGRATIONS, VersionError, canLoad, upgradeOutput, type Migration } from "./migrate.ts";
+export { upgradeManifest } from "./upgrade.ts";
 export { assertCases, compare, runCases, testCtx, type CaseResult, type RunCasesOptions } from "./testing.ts";
 export { SDK_CHANGELOG, SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";

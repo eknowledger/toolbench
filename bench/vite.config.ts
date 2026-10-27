@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { toolbench, type ToolbenchViteApi } from "@toolbench/runtime/vite";
 import { defineConfig, type Plugin } from "vite";
 
 /**
@@ -80,8 +82,17 @@ function toolChunk(id: string, prefix: string): string | null {
  * that injects it from JavaScript has already lost the property that makes a seed worth having.
  */
 function seedCards(): Plugin {
+	/*
+	 * The manifest check is the toolbench plugin's, through its `api`, so a seeded tool is validated once, by the
+	 * same code, and a bad one fails with the same message naming its file. This plugin used to call the
+	 * validator itself, and in development its error for a seeded tool came first, naming no file.
+	 */
+	let manifests: ToolbenchViteApi | undefined;
 	return {
 		name: "toolbench-seed-cards",
+		configResolved(config) {
+			manifests = config.plugins.find((p) => p.name === "toolbench:validate-manifest")?.api as ToolbenchViteApi | undefined;
+		},
 		async transformIndexHtml(html) {
 			// Only the cards actually marked for seeding, so a page pays nothing for tools it does not seed.
 			const cards = [...html.matchAll(/<tool-host tool="([^"]+)"([^>]*data-seed\b[^>]*)>/g)].map((m) => ({
@@ -91,12 +102,13 @@ function seedCards(): Plugin {
 			}));
 			if (cards.length === 0) return html;
 
-			const { seed, serialiseSeed, upgradeManifest, validateManifest } = await import("@toolbench/sdk");
+			if (!manifests) throw new Error("seedCards needs toolbench() in the same plugins list: it checks the manifests");
+			const { seed, serialiseSeed } = await import("@toolbench/sdk");
 			let out = html;
 			for (const { id, parts } of cards) {
-				const manifest = validateManifest(
-					upgradeManifest((await import(`../tools/${id}/tool.json`, { with: { type: "json" } })).default),
-				);
+				// The path Vite gives the module, so its transform finds this check in the plugin's cache.
+				const file = resolve(import.meta.dirname, "..", "tools", id, "tool.json");
+				const manifest = manifests.check(file, readFileSync(file, "utf8"));
 				const tool = (await import(`../tools/${id}/index.ts`)).default;
 				/*
 				 * Deliberately NOT wrapped in try/catch. seed() throws when a tool crashes on its own
@@ -129,7 +141,8 @@ function seedCards(): Plugin {
 
 export default defineConfig({
 	base: benchBase(),
-	plugins: [seedCards()],
+	// Every tool.json validated here, at build time, so no reader downloads the validator for it.
+	plugins: [toolbench(), seedCards()],
 	/*
 	 * Each `tool.json` is imported for its default export only. By default Vite also emits every top-level key
 	 * as a named export, and the object behind them frozen in a namespace, so each manifest the registry inlines

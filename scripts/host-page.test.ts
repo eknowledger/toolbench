@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { upgradeManifest } from "../packages/sdk/src/migrate.ts";
+import { upgradeManifest } from "../packages/sdk/src/upgrade.ts";
 import { validateManifest } from "../packages/sdk/src/validate.ts";
 import { SDK_VERSION } from "../packages/sdk/src/version.ts";
 import tool from "../bench/host/echo/index.ts";

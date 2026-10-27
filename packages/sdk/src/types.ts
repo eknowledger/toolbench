@@ -346,11 +346,7 @@ export interface Venn {
  */
 export type GraphColor = Tone | "accent" | "muted" | "series-1" | "series-2" | "series-3" | "series-4" | "series-5" | "series-6" | "series-7" | "series-8";
 
-/**
- * Every `GraphColor`, as data: the union is closed only to TypeScript, so the runtime and the fixture runner
- * check a value against this list. The first four are the tones.
- */
-export const GRAPH_COLORS: readonly GraphColor[] = ["normal", "warn", "bad", "good", "accent", "muted", "series-1", "series-2", "series-3", "series-4", "series-5", "series-6", "series-7", "series-8"];
+// Every `GraphColor` as data, `GRAPH_COLORS`, is in graph.ts, with the only code that reads it.
 
 /**
  * A node's outline. `rect`, `rounded`, `pill`, `circle`, `ellipse`, `diamond` and `point` are drawn by the

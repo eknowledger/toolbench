@@ -3,7 +3,31 @@
  * test can load a page under each host default. Its own chunk, as the highlighter is: a test instrument must
  * not be counted in `boot`.
  */
-import type { ToolHostConfig } from "@toolbench/runtime";
+import type { RegistryEntry, ToolHostConfig } from "@toolbench/runtime";
+
+/**
+ * `?badManifest=link`: the registry with one more tool, a copy of percentiles whose link is a `javascript:`
+ * URL, so a test can see the source refuse it in `list()` (#259), naming the field on every host, with nothing
+ * drawn from any manifest. The link scheme is the case because that refusal is a security property.
+ *
+ * `?manifests=json`: every manifest put through `JSON.parse(JSON.stringify(...))`, which is what a manifest
+ * fetched from a server is. JSON cannot carry the build plugin's brand, so the source validates them all in the
+ * browser, from the validation chunk, and a test can see that path still holds.
+ */
+export function hostRegistry(search: string, registry: Record<string, RegistryEntry>): Record<string, RegistryEntry> {
+	const query = new URLSearchParams(search);
+	const base = registry.percentiles;
+	let out = registry;
+	if (query.get("badManifest") === "link" && base) {
+		// A spread copy, which drops the brand because the plugin defines it non-enumerable, so this one is checked.
+		const manifest = { ...(base.manifest as object), id: "bad-link", links: [{ label: "Run", href: "javascript:alert(1)" }] };
+		out = { ...out, "bad-link": { manifest, load: base.load } };
+	}
+	if (query.get("manifests") === "json") {
+		out = Object.fromEntries(Object.entries(out).map(([id, entry]) => [id, { ...entry, manifest: JSON.parse(JSON.stringify(entry.manifest)) }]));
+	}
+	return out;
+}
 
 export function hostWide(search: string): Pick<ToolHostConfig, "wide" | "wideToggle"> {
 	const query = new URLSearchParams(search);
