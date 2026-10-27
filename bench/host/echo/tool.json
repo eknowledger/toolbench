@@ -1,0 +1,11 @@
+{
+	"sdk": 9,
+	"id": "echo",
+	"name": "Echo",
+	"blurb": "Says back what it was given.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"kinds": ["fields", "error"],
+	"inputs": [{ "id": "text", "type": "text", "label": "Text", "default": "hello" }]
+}
