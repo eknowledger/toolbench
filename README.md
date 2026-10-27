@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-26.0%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-19.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -243,6 +243,60 @@ defineToolHost({
   // wide: "fit", wideToggle: true,
 });
 ```
+
+**Check the manifests when you build, not in the reader's browser.** A manifest bundled into your site
+cannot change between the build and the visit, so the runtime need not check it again. With Vite, add the
+plugin:
+
+```ts
+// vite.config.ts
+import { toolbench } from "@toolbench/runtime/vite";
+
+export default defineConfig({ plugins: [toolbench()] });
+```
+
+With any other bundler, or none, run the command before you bundle and import its registry:
+
+```sh
+npx toolbench-manifests src/tools --out src/generated/tools
+```
+
+```ts
+import { registry } from "./generated/tools/index.js";
+defineToolHost({ source: new RegistrySource(registry) });
+```
+
+Either way a bad manifest fails the build with the validator's message and the file's path (in `vite dev`,
+Vite's error overlay), and every manifest reaches the page checked, frozen and marked. `RegistrySource` uses
+a marked manifest as it is, so the page never downloads the validator: 6.6 KB less before the first paint on
+the project site's landing page, and it paints as soon as it did when the validator was in the runtime chunk
+(measured in Chrome at a 100 ms round trip).
+
+A manifest the build did not check (fetched from a server, built by your code, or imported without the plugin)
+is validated in the browser, on the source's first `list()` or `load()`, from a chunk of its own, and nothing
+is drawn until it has run. Fetched then, that chunk paints the first card about 110 ms later. If your
+manifests come from a server, preload it, so it is fetched beside the runtime:
+
+```ts
+toolbench({ preloadValidation: true }) // a <link rel="modulepreload"> for the chunk, and what it imports, on every built page
+```
+
+Without Vite, the chunk is the module `@toolbench/runtime/validation`: preload the file your bundler emits for
+it and the files that one imports (its manifest or metafile names them), or, serving the package's files
+unbundled, its own path:
+
+```html
+<link rel="modulepreload" href="/node_modules/@toolbench/runtime/dist/validation.js">
+```
+
+Preloaded, the bench and the landing page painted no later than they do with the validator in the runtime chunk,
+over HTTP/2. Over HTTP/1.1 the landing page was about 75 ms later: with the two preloads it asks for seven files at once, and a
+browser opens six connections to one origin, so one waited a round trip.
+
+> ⚠️ **A bad manifest does not throw from `new RegistrySource()`.** `list()` and `load()` reject with the
+> `ManifestError`, naming the field, and every `<tool-host>` on the page shows that message. Await
+> `source.list()` where you would have caught it. `source.manifest(id)` answers from construction when every
+> manifest is marked, and is otherwise `undefined` until `list()` has resolved.
 
 With a bundler that supports directory globs, the source is a loop over the glob instead of a literal
 map. [`bench/src/registry.ts`](bench/src/registry.ts) is the version this repository uses, and it
@@ -888,8 +942,10 @@ bench:
 
 | | Transfer |
 |---|---|
-| Runtime, as a host loads it, once per page that uses a tool | 26.0 KB |
-| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 30.0 KB |
+| Runtime, as a host loads it, once per page that uses a tool | 19.5 KB |
+| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 23.9 KB |
+| Manifest validation, only for a page with manifests not checked at build time, before the first paint | 6.9 KB |
+| Checks before a run, once per page where a tool is opened, with its code | 0.7 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |

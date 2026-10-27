@@ -26,7 +26,7 @@ import { defaultInputs } from "./seed.ts";
 import { assertCases, testCtx } from "./testing.ts";
 import type { Case, Manifest, Tool } from "./types.ts";
 import { outputFeatureProblem } from "./features.ts";
-import { upgradeManifest } from "./migrate.ts";
+import { upgradeManifest } from "./upgrade.ts";
 import { checkCaseLists, validateManifest } from "./validate.ts";
 
 /** One tool as it exists on disk, validated. */

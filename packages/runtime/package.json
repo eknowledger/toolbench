@@ -44,6 +44,14 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "default": "./dist/worker.js"
+    },
+    "./validation": {
+      "types": "./dist/validation.d.ts",
+      "default": "./dist/validation.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     }
   },
   "files": [

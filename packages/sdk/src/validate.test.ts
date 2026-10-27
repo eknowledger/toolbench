@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ManifestError, inputProblem, validateManifest } from "./validate.ts";
+import { inputProblem } from "./inputs.ts";
+import { ManifestError, validateManifest } from "./validate.ts";
 import { SDK_VERSION } from "./version.ts";
 
 /** A manifest that passes, so each test can break exactly one thing. */

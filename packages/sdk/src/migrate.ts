@@ -25,9 +25,14 @@
  *  - **Old fixtures run forever.** Every tool's cases are checked against the current runtime in CI,
  *    which is what turns this file from a good intention into a tested claim.
  */
-import { checkManifestFeatures } from "./features.ts";
 import type { Manifest, Output } from "./types.ts";
 import { SDK_VERSION } from "./version.ts";
+
+/*
+ * ⚠️ `upgradeManifest` is in upgrade.ts, not here. A host's runtime upgrades every output it draws, so this
+ * module ships in the chunk every page loads, and a bundler splits by module: with the manifest half here,
+ * the feature check and the whole validator came with it, though only the validation chunk calls them.
+ */
 
 export interface Migration {
 	/** Migrates a manifest from `from` to `from + 1`. */
@@ -168,7 +173,8 @@ export class VersionError extends Error {
  * migration tests caught it, which is the argument for testing a compatibility mechanism before the
  * day you need it.
  */
-function chainFrom(version: number, migrations: readonly Migration[], currentVersion: number): Migration[] {
+/** Internal: shared with upgrade.ts, and not exported from the package. */
+export function chainFrom(version: number, migrations: readonly Migration[], currentVersion: number): Migration[] {
 	const steps: Migration[] = [];
 	for (let v = version; v < currentVersion; v++) {
 		const step = migrations.find((m) => m.from === v);
@@ -181,47 +187,6 @@ function chainFrom(version: number, migrations: readonly Migration[], currentVer
 		steps.push(step);
 	}
 	return steps;
-}
-
-/**
- * Read a raw manifest of any supported version and return one shaped for the current contract.
- *
- * `migrations` is injectable so the chain itself can be tested without shipping a fake version.
- */
-export function upgradeManifest(
-	raw: unknown,
-	migrations: readonly Migration[] = MIGRATIONS,
-	currentVersion: number = SDK_VERSION,
-): Record<string, unknown> {
-	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-		throw new VersionError("A manifest must be an object.");
-	}
-	const manifest = raw as Record<string, unknown>;
-	const declared = manifest.sdk;
-	if (typeof declared !== "number" || !Number.isInteger(declared) || declared < 1) {
-		throw new VersionError(
-			`A manifest must declare an integer contract version, e.g. { "sdk": ${currentVersion} }. Got ${JSON.stringify(declared)}.`,
-		);
-	}
-	if (declared > currentVersion) {
-		throw new VersionError(
-			`This tool needs contract version ${declared}; this runtime speaks ${currentVersion}. ` +
-				"Upgrade @toolbench/runtime, or lower the tool's sdk if it does not use the newer features.",
-		);
-	}
-	/*
-	 * ⚠️ Here, before the chain stamps the current version over `sdk`, because this is the last moment the
-	 * declaration exists (#170). A manifest declaring 4 that used v6's `lang` validated after the stamp, and
-	 * a v4 runtime then loaded it and ignored the key. Every caller passes through here, so every one refuses.
-	 */
-	checkManifestFeatures(manifest);
-
-	let out = manifest;
-	for (const step of chainFrom(declared, migrations, currentVersion)) {
-		out = step.manifest(out);
-		out = { ...out, sdk: step.from + 1 };
-	}
-	return { ...out, sdk: currentVersion };
 }
 
 /** Carry an output produced by a tool written against `declaredVersion` up to the current shape. */

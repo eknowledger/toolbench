@@ -39,6 +39,22 @@ input marked `share: false`, or a `secret` input that does not say `share: true`
 link the button writes and the link a tool reads. What a tool does with a crafted input is the tool's
 concern, as it is for typed input. A host that does not want this sets `share: "none"`.
 
+**A manifest checked at build time is marked, and the mark is a promise about origin, not a sandbox.**
+`@toolbench/runtime/vite` and `toolbench-manifests` validate each `tool.json` when the site is built and emit
+it frozen at every level, carrying a non-enumerable `Symbol.for("toolbench.validated")`. `RegistrySource`
+uses a manifest that is both marked and frozen without validating it again. What the mark guarantees:
+
+* a manifest that arrives as data, from `fetch`, `JSON.parse`, a CMS or `postMessage`, is never marked,
+  because JSON cannot carry a symbol, so it is always validated in the browser before anything is drawn;
+* a copy, `{ ...manifest }` with a field changed, is unmarked, because the mark is not enumerable;
+* a marked manifest cannot be changed after the build, because it is frozen, and an unfrozen object
+  carrying the symbol is treated as unmarked.
+
+What it does not guarantee: script on the page can make its own frozen object with the symbol, because
+`Symbol.for` is a global registry. That script already runs with the page's authority, as the host is
+first-party code, so forging the mark gives it nothing it lacked. The element's own link check still runs on
+every link it draws, marked or not.
+
 **In scope**, and worth reporting:
 
 * an XSS path through tool output, a manifest, or a seed. Every node is built through the three helpers
@@ -52,6 +68,8 @@ concern, as it is for typed input. A host that does not want this sets `share: "
 * a way for one tool on a page to reach another tool's state or results;
 * a way to escape the shadow root and alter the host page's DOM;
 * the manifest validator accepting something that then causes unsafe behaviour downstream;
+* a way for data, rather than page script, to reach `RegistrySource` marked, or for a marked manifest to
+  change after the build;
 * a prototype-pollution path through `upgradeManifest`, `validateManifest` or the fixture comparison,
   all of which walk untrusted-shaped JSON;
 * a way to make the runtime fetch or execute code from a location the host did not configure;

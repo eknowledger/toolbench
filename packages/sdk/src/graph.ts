@@ -15,7 +15,17 @@
  * whose expected output is a graph with a dangling edge would otherwise pass in Node and draw a message on
  * every page.
  */
-import { GRAPH_COLORS, type Graph } from "./types.ts";
+import type { Graph, GraphColor } from "./types.ts";
+
+/**
+ * Every `GraphColor`, as data: the union is closed only to TypeScript, so the runtime and the fixture runner
+ * check a value against this list. The first four are the tones.
+ *
+ * ⚠️ Here and not in types.ts, whose other lists only the validator reads. A bundler splits by module, so a
+ * list in types.ts read by the graph chunk and the validation chunk became a third chunk of its own, 242
+ * bytes, that every page fetched to validate its manifests.
+ */
+export const GRAPH_COLORS: readonly GraphColor[] = ["normal", "warn", "bad", "good", "accent", "muted", "series-1", "series-2", "series-3", "series-4", "series-5", "series-6", "series-7", "series-8"];
 
 const TONES = GRAPH_COLORS.slice(0, 4);
 

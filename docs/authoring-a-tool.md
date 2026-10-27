@@ -1103,7 +1103,7 @@ choice of defaults visible to every reader who never presses Run.
 | `interface Input` instead of `type Input` | `Tool<Input>` does not compile, with an unhelpful message about index signatures | Use a `type` alias. TypeScript gives type aliases an implicit index signature; interfaces do not |
 | Returning a bare `fields` when the answer is also a table | Half the answer is missing | `group` |
 | Putting the chart first in a group | The card shows a chart with no context | Order by what works alone |
-| Forgetting `"error"` in `kinds` | Validation fails at startup | Add it. Every tool can be given bad input |
+| Forgetting `"error"` in `kinds` | The build fails naming the file and `kinds`, with the toolbench plugin or command; without them every host on the page shows the error | Add it. Every tool can be given bad input |
 | Catching your own bug and returning `error` | The reader goes looking for a mistake they did not make | Throw. Bugs and bad input are different |
 | Unbounded loop on the main thread | The page freezes and nothing can stop it | `min`/`max` on the input, and `thread: "worker"` |
 | `timeoutMs` with `thread: "main"` | Validation fails | Move to a worker or bound the input. A main-thread timeout cannot fire |

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { LATER, OUTPUT_SINCE, checkManifestFeatures, outputFeatureProblem } from "./features.ts";
-import { upgradeManifest } from "./migrate.ts";
+import { upgradeManifest } from "./upgrade.ts";
 import { CAPABILITIES, INPUT_TYPES, OUTPUT_KINDS, type Output } from "./types.ts";
 import { INPUT_KEYS, ManifestError, RUNTIME_KEYS, TOP_LEVEL_KEYS, validateManifest } from "./validate.ts";
 import { SDK_VERSION } from "./version.ts";

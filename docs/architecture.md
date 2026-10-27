@@ -140,7 +140,12 @@ toolbench/
 │   │   └── src/
 │   │       ├── types.ts            the contract: Output, InputSpec, Manifest, Ctx, Tool
 │   │       ├── validate.ts         manifest validation and the cross-field invariants
-│   │       ├── migrate.ts          version migration chain
+│   │       ├── inputs.ts           inputProblem, the checks before a run, apart so a page can have them without the validator
+│   │       ├── build.ts            a tool.json checked at build time and written as a frozen, marked module. Exported at ./build
+│   │       ├── cli.ts, bin.ts      `toolbench-manifests`, build.ts for any bundler
+│   │       ├── brand.ts            the mark's key, apart so boot can read it without build.ts
+│   │       ├── migrate.ts          version migration chain, and the output half of it
+│   │       ├── upgrade.ts          upgradeManifest, the manifest half, apart so boot does not carry it
 │   │       ├── seed.ts             build-time seeding, and safe serialisation for a script tag
 │   │       ├── fixtures.ts         the tool-directory walk. Node-only, exported at ./fixtures
 │   │       ├── testing.ts          fixture runner and result comparison
@@ -156,6 +161,9 @@ toolbench/
 │           ├── worker.ts           createToolWorker, the worker side of the protocol
 │           ├── protocol.ts         message types and error classes
 │           ├── sources.ts          ToolSource interface, RegistrySource
+│           ├── validation.ts       manifest validation for manifests the build did not check, a chunk fetched by list()
+│           ├── checks.ts           the checks before a run, a chunk fetched with a tool's code
+│           ├── vite.ts             @toolbench/runtime/vite, build.ts as a Vite plugin
 │           ├── styles.ts           the shadow stylesheet and the theming surface
 │           ├── dom.ts              three element helpers, so no framework is needed
 │           ├── controls.ts         the newer inputs' controls, a chunk fetched only by a tool with one
@@ -337,7 +345,9 @@ timeoutMs: is only meaningful with runtime.thread = "worker". On the main thread
 
 The cross-field invariants at the bottom of the file are the interesting part; §8 lists them.
 
-**`migrate.ts`** holds the migration chain: two steps today, `1 → 2` and `2 → 3`, with every half the
+**`migrate.ts`** holds the migration chain, and `upgradeOutput`; `upgradeManifest` is beside it in
+`upgrade.ts`, because the runtime upgrades outputs in the chunk every page loads and validates manifests in
+a chunk of its own, and a bundler splits by module. The chain: two steps today, `1 → 2` and `2 → 3`, with every half the
 identity function. The machinery was built before anything needed it, and tested with synthetic versions,
 which is why the first real entry was a five-line change rather than a design exercise under pressure. It
 repaid that twice over: while still synthetic, the tests caught a bug where the chain silently did
@@ -469,9 +479,33 @@ export interface ToolSource {
 }
 ```
 
-`RegistrySource` is the implementation hosts use. It validates and migrates every manifest on
-construction, so a malformed tool is a startup error with a field name rather than a mystery at render
-time, and it refuses two tools claiming the same id.
+`RegistrySource` is the implementation hosts use. Every manifest it hands out has been migrated and
+validated, so a malformed tool rejects `list()` and `load()` with a field name rather than becoming a
+mystery at render time, and it refuses two tools claiming the same id. There are two paths to that (#259):
+
+* **Checked at build time.** `@toolbench/runtime/vite` and the `toolbench-manifests` command run the
+  validator in Node, through one implementation, `@toolbench/sdk/build`, and fail the build with its message
+  and the file. They emit the validated manifest frozen at every level and carrying a non-enumerable
+  `Symbol.for("toolbench.validated")`. When every entry is such a manifest, the constructor indexes them,
+  refusing a repeated id, which no single file can show, and the validator is never downloaded.
+* **Checked in the browser.** Any other manifest, from a server, a CMS or a host without the build step,
+  sends the source to the `validation` chunk on its first `list()` or `load()`. Marked manifests pass through
+  it as they are. A host whose manifests come from a server preloads that chunk (`preloadValidation` in the
+  plugin, or `@toolbench/runtime/validation`), so it is fetched beside the runtime.
+
+`isMarked` accepts the mark only on a frozen object. The mark is the build's word that the object has not
+changed since it was checked, and an unfrozen object could have been. JSON cannot carry a symbol, so data
+can never arrive marked; page code can forge one, but page code already runs with the page's authority
+(SECURITY.md).
+
+⚠️ The constructor never throws, on either path, which it did until #259: the browser path cannot await the
+chunk there. Every `<tool-host>` on the page shows the rejection instead. A manifest reaches the element only
+through `list()`, so nothing is ever drawn from one that has not been validated, which is the property the
+link-scheme defect in §14 depends on.
+
+The checks before a run (`inputProblem`) are needed whichever path a manifest took, because readers type
+values, so they are a chunk of their own, `checks`, fetched with a tool's code when it activates: 722 bytes.
+In the runtime chunk they measured 462 bytes more, on every page, opened or not.
 
 **`render/`** holds one function per result kind plus the dispatcher. The dispatcher ends with:
 
@@ -572,11 +606,11 @@ sequenceDiagram
     participant S as ToolSource
 
     H->>S: new RegistrySource(entries)
-    Note over S: every manifest is migrated and validated here,<br/>duplicate ids refused
     H->>CE: defineToolHost({source, workerFactory, pageUrl})
     CE->>EL: connectedCallback
     EL->>EL: read inline seed if present
     EL->>S: list()
+    Note over S: every manifest marked at build time: ready,<br/>else on the first call: fetch the validation chunk,<br/>migrate and validate, refuse duplicate ids
     S-->>EL: manifests
     EL->>EL: find by id, seed input values from defaults
     EL->>EL: paint the facade
@@ -588,7 +622,8 @@ sequenceDiagram
 ```
 
 The sequence shows registration, from the host's script to a painted facade. Nothing has been downloaded
-except the manifest data, which was already in the page's bundle.
+but the manifest data, which was already in the page's bundle, and, only for manifests the build did not check,
+the validation chunk, once per page.
 
 ### 7.2 Activation
 
@@ -729,7 +764,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | `manifest.sdk` is a version this SDK can read | `migrate.ts`, `validate.ts` | A tool from the future renders half correctly |
 | Nothing a manifest uses, and nothing its cases or samples return, is newer than its declared `sdk` | `features.ts`, called by `upgradeManifest` before it stamps the current version, and by `validateManifest`; outputs by the tool-directory harness | A runtime of the declared version loads the tool and silently drops what it does not know: presets, highlighting, a part's name |
 | `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the directory name | `validate.ts`, `tools/cases.test.ts` | Derived links and routes point at the wrong tool |
-| No two tools share an `id` | `RegistrySource` constructor | One silently shadows the other |
+| No two tools share an `id` | `indexEntries` in the runtime's `sources.ts`, on either path to a validated source, and `toolbench-manifests` across the files it is given | One silently shadows the other |
 | Input ids are unique | `validate.ts` | Two inputs answering to one id makes a form ambiguous and a fixture unreadable |
 | A number input declares `min` and `max` | `validate.ts` | An unbounded input turns a bounded computation into a hang |
 | A select has two or more options and its default is one of them | `validate.ts` | A control with one choice, or none selected |
@@ -938,14 +973,14 @@ Eight layers. Each catches something the others structurally cannot.
 
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
-| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 234 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 152 |
+| `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 238 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 172 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 29 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
-| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 49 |
+| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 50 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 305 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 310 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -1049,8 +1084,10 @@ page fetches anything to paint that the row does not count. Every other row is a
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime, as a host loads it | 26.0 KB | What a host's page pays to use any tool at all, once per page: the runtime's entry chunk with one manifest inlined and Vite's helpers. The published figure, and the README's badge |
-| Bench page's boot chunk | 30.0 KB | The bench's `boot`: the same runtime plus the seven example manifests `registry.ts` inlines, the registry and the bench's page wiring, none of which a host downloads. Until the host page existed this was the published figure, and its history is the runtime's. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk) |
+| Runtime, as a host loads it | 19.5 KB | What a host's page pays to use any tool at all, once per page: the runtime's entry chunk with one manifest inlined and Vite's helpers, the manifest checked at build time by `toolbench()`. The published figure, and the README's badge. 26.0 KB before the build checked manifests; a host that skips the plugin loads 6.8 KB more (6,797 bytes), the validation chunk, before its card paints |
+| Bench page's boot chunk | 23.9 KB | The bench's `boot`: the same runtime plus the seven example manifests `registry.ts` inlines, the registry and the bench's page wiring, none of which a host downloads. Until the host page existed this was the published figure, and its history is the runtime's. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk). It fell 6.1 KB (6,133 bytes) when manifests began to be checked at build time (#259): the validator left it, for a chunk only unchecked manifests fetch (the row below), and the checks before a run left for a chunk of their own. The manifests the bench inlines are emitted frozen and marked instead, which takes part of that back |
+| Manifest validation | 6.9 KB | Its own chunk, fetched by a `RegistrySource`'s first `list()` or `load()` only when a manifest is unmarked, so only by a page whose manifests the build did not check, before its first card paints: `validateManifest`, `upgradeManifest` and the feature check. A site built with the Vite plugin or `toolbench-manifests` never fetches it. Fetched, it is one more request: in Chrome at a 100 ms round trip, every card painted 104 to 111 ms later than with the validator in boot. Preloaded with what it imports (`preloadValidation`), no later than that over HTTP/2, and on the landing page about 75 ms later over HTTP/1.1, whose six connections per origin its seventh request exceeds. 6,865 bytes |
+| Checks before a run | 0.7 KB | `inputProblem`, fetched with a tool's code when it activates, so a reader who opens nothing never pays it. In boot it measured 462 bytes, on every page. 722 bytes |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Bytes renderer | 1.3 KB | Its own chunk, fetched when a `bytes` result is drawn, before a seed holding one paints, or with the code of a tool declaring the kind. If it cannot be fetched the result says "The byte view could not be loaded." in its place. In boot it measured 796 bytes, renderer and rules |
@@ -1156,6 +1193,7 @@ is here because the guards look arbitrary without it.
 | `percentiles` treated a thousands grouping as extra measurements | Pasting `1,204 980 1,100 1,340` was read as seven measurements (1, 204, 980, 1, 100, 1, 340), so the result showed min 1 and mean 232.4 with no error. Every figure on screen was wrong and all of them looked reasonable | A comma between digits is refused as `{ kind: "error" }` naming the token, in the same style as `"18ms" is not a number`. Fixtures assert the refusal and lock `12, 14, 15` as still valid |
 | One undo took back one character in Chrome | Once a result was on screen, every keystroke re-sent "inputs changed" to the status line, and assigning `textContent` replaces the text node even when the text is the same. Chrome ends an undo group at a node insertion anywhere in the document, so typing `abc def` and a newline into a textarea took 7 presses of undo to take back instead of 1. Firefox and WebKit grouped it as one either way. Found while measuring the textarea highlighting overlay, which has the same hazard | The status line is written only when its text changes. Browser test types a burst after a run and asserts one undo restores it, on all three engines; it fails without the guard |
 | A manifest link could run script in the host page | The validator checked only that `links[].href` was a string, and the element wrote it straight into `<a href>`. A manifest from any `ToolSource` carrying `javascript:alert(document.cookie)` rendered a link that ran in the host's origin when a reader followed it. A check matching the scheme as text was no fix: the URL parser strips tab and newline anywhere and leading controls and space, so `java\tscript:` reads as a relative path to a pattern and as `javascript:` to the browser | `isSafeLinkHref` in the SDK refuses control characters and spaces, then asks `URL` for the protocol and allows only `http:`, `https:` and `mailto:`. The validator refuses anything else by field, and the element renders a refused link as its label in plain text, for a source that never validated. Node tests cover each bypass |
+| A copy of a build-checked manifest would have skipped validation | The build marks each manifest it validated with `Symbol.for("toolbench.validated")`, and the first version assigned it with `Object.assign`, which makes an enumerable property. A spread copies own enumerable symbols, so `{ ...manifest, links: [{ label: "Run", href: "javascript:alert(1)" }] }` kept the mark, and `RegistrySource` would have used it unchecked. The bench's own link-refusal fixture is exactly that copy. Found by reading the fixture before the test had run | The mark is defined with `Object.defineProperty`, non-enumerable, so a spread copy is unmarked. Every object in an emitted manifest is also frozen, and `isMarked` requires it, so a marked manifest cannot be changed after the build either (security review). Node tests cover the spread copy, a change at each depth and an unfrozen object carrying the symbol; a browser test refuses the fixture on every host |
 | A code result could add any class to its element | `lang` became `class="language-<lang>"` verbatim, and a class attribute is a list, so `json tb-hidden` wrote a class the tool chose, which a host's or the runtime's stylesheet then applied | `languageClass` writes the class only for one token of word characters, `+`, `#`, `.` and `-`. A Node test covers spaces, tabs and newlines |
 | A graph's colour was written into an inline style | A node or edge `color` became `style="--c:var(--tb-<color>)"`. The union is closed only to TypeScript, so a tool could send `x);background:url(https://example.com/?leak)`, and the element carried a background rule fetched from another origin | A colour is a `data-color` attribute, written only for a value on `GRAPH_COLORS`, and the graph's stylesheet maps each to `--c`; an unknown one is drawn in the default colour. `graphProblem` refuses it in fixtures. A browser test renders the string and asserts no style carries it, the stroke is the default and no request leaves for that origin |
 | The graph layout's time budget was one laptop's | `lays out every family in under 50 ms` failed on the GitHub runner, Node 24 and 26 alike, with `calls (orthogonal) 82.4 ms`; the same family takes 22.8 ms on the M3 Pro the 50 ms was set on. Nothing in the layout was wrong: a wall-clock budget holds only on the machine it was measured on | The test times a fixed, seeded workload shaped like the layout (objects sorted and hashed as layering does, a typed-array heap search as the router does) before every round of layouts, and scales the 50 ms by the fastest of its five runs against the 11.1 ms recorded beside it, never below 1; the layout is judged by its fastest too, because contention only adds time. Interleaved because a shared runner's speed changes within seconds: one calibrated CI run had the call graph at 41.3 ms on one leg and 81.5 ms on the other. Skipped only under V8 coverage, which took the call graph from 23 to 133 ms and the reference nowhere. The figures print as test diagnostics |
@@ -1184,16 +1222,19 @@ Known and accepted, with what each costs.
   it is not painted at all.
 * **The chart is deliberately simple.** No tooltips, no zoom, no time axis. It draws what `Chart`
   describes.
-* **`RegistrySource` is eager about manifests.** Every manifest is parsed and validated at startup,
-  so a malformed tool is a startup error that names the field. Measured 2026-09-19 with
-  `pnpm measure:registry` on Node v24.21.0 (linux x64, Intel Xeon): 500 synthetic current-contract
-  manifests, two inputs each. Three consecutive process runs, 21 timed constructions after 5
-  warmups, had medians of 0.71 ms, 0.98 ms and 0.77 ms (lowest sample 0.47 ms, highest 1.96 ms).
-  Under a millisecond at several hundred tools, so the constructor stays eager. Revisit if a host
-  is in the thousands. Re-measured on review, Node v26.7.0 on an Apple M3 Pro: median 0.33 ms over the
-  same 500. Two machines an order of magnitude apart in this figure both land well under the bar, which
-  is what makes the conclusion safe to rest on rather than a property of one laptop. The script times `new RegistrySource` only. Generation sits outside the
-  timed region, and so does JSON.parse: a host already has objects when it constructs the source.
+* **`RegistrySource` validates every manifest at once.** All of them, on the first `list()`, so a
+  malformed tool rejects that call naming the field. Measured 2026-09-19 with `pnpm measure:registry` on
+  Node v24.21.0 (linux x64, Intel Xeon): 500 synthetic current-contract manifests, two inputs each. Three
+  consecutive process runs, 21 timed constructions after 5 warmups, had medians of 0.71 ms, 0.98 ms and
+  0.77 ms (lowest sample 0.47 ms, highest 1.96 ms). Re-measured 2026-10-26 on Node v26.7.0, Apple M3 Pro,
+  when validation moved into `list()` (#259): the constructor before the move had medians of 2.31, 2.30 and
+  2.15 ms in three runs, and the constructor plus the first `list()` after it 2.06, 2.05 and 2.01 ms (lowest
+  sample 1.82 ms, highest 2.75 ms). A review on the same chip had measured 0.33 ms; what grew it since was
+  not measured. Still a
+  few milliseconds at several hundred tools, so validation stays all-at-once. Revisit if a host is in the
+  thousands. The script times construction and the first `list()`, after a warmup that has already fetched
+  the validation module. Generation sits outside the timed region, and so does JSON.parse: a host already
+  has objects when it constructs the source.
 * **A page whose tool draws a chart downloads one extra chunk.** The `series` renderer is no longer in
   `boot`: it is about 2.0 KB fetched only when a manifest declares `series`. `render` stays synchronous,
   because `<tool-host>` awaits the chunk during `#prepare` rather than at first use. The cost is one request

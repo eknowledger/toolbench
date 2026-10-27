@@ -37,7 +37,14 @@
     "./fixtures": {
       "types": "./dist/fixtures.d.ts",
       "default": "./dist/fixtures.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "default": "./dist/build.js"
     }
+  },
+  "bin": {
+    "toolbench-manifests": "./dist/bin.js"
   },
   "files": [
     "dist"
