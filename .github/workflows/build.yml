@@ -118,14 +118,16 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ matrix.browser }}
 
+      - name: Install the browser and its system packages
+        # Its own step so its duration shows on its own in the job's timing, not folded into the tests'.
+        run: pnpm exec playwright install --with-deps "${{ matrix.browser }}"
+
       - name: The runtime, in a real browser
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
           # Bundled Chromium, not a system Chrome the runner does not have.
           CHROME_CHANNEL: chromium
-        run: |
-          pnpm exec playwright install --with-deps "$PLAYWRIGHT_BROWSER"
-          pnpm test:bench
+        run: pnpm test:bench
 
       - name: Check documented test counts
         # The Count column in docs/architecture.md §12 is checked here rather than trusted. Before 0.7.0
