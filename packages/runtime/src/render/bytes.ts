@@ -8,7 +8,7 @@
 import type { ByteRange, Output } from "@toolbench/sdk";
 import { el } from "../dom.ts";
 import { adoptStyles } from "../styles.ts";
-import type { RenderOptions } from "./index.ts";
+import { plural, type RenderOptions } from "./index.ts";
 
 const STYLES = /* css */ `
 .tb-out-bytes { margin: 0; }
@@ -169,7 +169,7 @@ export function renderBytes(output: Extract<Output, { kind: "bytes" }>, options:
 							"li",
 							attrs.get(range),
 							el("span", { class: "tb-bytes-swatch" }),
-							`${range.label}: ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
+							`${range.label}: ${plural(range.len, "byte")} at 0x${hex(offset + range.at, 4)}`,
 						),
 					),
 				)

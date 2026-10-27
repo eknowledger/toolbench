@@ -120,6 +120,9 @@ export class ChartRendererMissing extends Error {
 	}
 }
 
+/** "1 row", "2 rows": a count and its noun, for every summary and notice that states one. */
+export const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
 export const isLazyKind = (kind: string): kind is LazyKind => (LAZY_KINDS as readonly string[]).includes(kind);
 
 /*
@@ -232,8 +235,7 @@ const REST_ID = "tb-rest";
  * is the difference between this and the `link` notice.
  */
 export function discloseLabel(hidden: number, expanded: boolean): string {
-	const noun = `result${hidden === 1 ? "" : "s"}`;
-	return expanded ? `Hide ${hidden} ${noun}` : `Show ${hidden} more ${noun}`;
+	return `${expanded ? "Hide" : "Show"} ${plural(hidden, expanded ? "result" : "more result")}`;
 }
 
 /**
@@ -293,7 +295,7 @@ function draw(output: Output, options: RenderOptions): HTMLElement {
 						"div",
 						{ class: "tb-group" },
 						...shown.map((part) => render(part, options)),
-						el("p", { class: "tb-more" }, `+${rest.length} more result${rest.length === 1 ? "" : "s"} on the full tool`),
+						el("p", { class: "tb-more" }, `+${plural(rest.length, "more result")} on the full tool`),
 					);
 				}
 				/*
@@ -409,7 +411,7 @@ function renderFields(fields: Field[], options: RenderOptions): HTMLElement {
 	if (hidden > 0 && options.more !== "expand") {
 		// "fields" rather than a bare count: a group can also be truncated in a card, and two
 		// unlabelled "+2 more" lines next to each other are a puzzle rather than information.
-		sections.push(el("p", { class: "tb-more" }, `+${hidden} more field${hidden === 1 ? "" : "s"}`));
+		sections.push(el("p", { class: "tb-more" }, `+${plural(hidden, "more field")}`));
 	}
 	return el("div", { class: "tb-out-fields" }, ...sections);
 }

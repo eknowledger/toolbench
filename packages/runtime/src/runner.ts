@@ -80,10 +80,7 @@ export class Runner {
 		const useWorker = loaded.manifest.runtime.thread === "worker" && this.#options.workerFactory !== undefined;
 
 		if (loaded.manifest.runtime.thread === "worker" && !useWorker) {
-			console.warn(
-				`[toolbench] "${loaded.manifest.id}" asked for a worker but no workerFactory was configured; ` +
-					"running on the main thread. See the README section on worker mode.",
-			);
+			console.warn(`[toolbench] "${loaded.manifest.id}" wants a worker but no workerFactory is set; running on the main thread.`);
 		}
 
 		return useWorker ? this.#runInWorker(loaded, input, hooks, seq) : this.#runOnMainThread(loaded, input, hooks, seq);
@@ -125,10 +122,7 @@ export class Runner {
 			 */
 			this.#fail(
 				seq,
-				new Error(
-					`"${loaded.manifest.id}" has no module on this thread. Pass the result of source.load(id), ` +
-						"or configure a workerFactory so it runs in a worker.",
-				),
+				new Error(`"${loaded.manifest.id}" has no module on this thread: pass source.load(id), or set a workerFactory.`),
 			);
 			return promise;
 		}
