@@ -889,9 +889,9 @@ bench:
 | | Transfer |
 |---|---|
 | Runtime, as a host loads it, once per page that uses a tool | 26.8 KB |
-| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 31.9 KB |
+| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 30.9 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
-| Worker entry, only for pages with a worker-mode tool | 5.6 KB |
+| Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |
@@ -903,6 +903,11 @@ bench:
 
 Reproduce with `pnpm bench:build && node scripts/size-check.mjs`. CI runs the same check against a
 budget, so these numbers cannot rot.
+
+The runtime's figure is on Vite's defaults. Two settings take 268 bytes off that page, measured, and the
+bench uses both: `json: { namedExports: false }`, since Vite otherwise writes each imported `tool.json`
+twice, and `build: { modulePreload: { polyfill: false } }`, since every browser the runtime supports
+preloads modules natively.
 
 ## Browser and runtime support
 
