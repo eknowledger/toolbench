@@ -6,7 +6,7 @@
  * open with a link's values before anything awaits; drawing the button, writing a link and the clipboard
  * are here.
  */
-import type { InputSpec, InputValue, InputValues, Manifest } from "@toolbench/sdk";
+import type { InputSpec, InputValue, InputValues, Manifest, Row } from "@toolbench/sdk";
 import { el, svg } from "./dom.ts";
 import type { ToolHostConfig } from "./element.ts";
 import { adoptStyles } from "./styles.ts";
@@ -50,7 +50,9 @@ export function linkFor(id: string, values: InputValues, inputs: readonly InputS
 		// A list is its key once per item, and none is the bare key: left out, it would read back as the default (#204).
 		if (Array.isArray(value)) {
 			if (value.length === 0) query.set(key, "");
-			for (const item of value) query.append(key, item);
+			// Rows are a key per column, zipped by position on the way back: `rl.limits.path=/a&rl.limits.path=/b`.
+			else if (spec.type === "rows") for (const column of spec.columns) for (const row of value as Row[]) query.append(`${key}.${column.id}`, String(row[column.id]));
+			else for (const item of value as string[]) query.append(key, item);
 		} else query.set(key, String(value));
 	}
 	return url.href;

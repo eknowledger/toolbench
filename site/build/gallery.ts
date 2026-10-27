@@ -243,6 +243,13 @@ export const GROUPS: Group[] = [
 				code: () => [input(`${FIX}/multiselect`, "types"), input(`${FIX}/multiselect`, "regions")],
 			},
 			{
+				id: "rows",
+				title: "Rows to add and reorder",
+				text: "A <code>rows</code> input is a list the reader edits, and <code>run</code> gets one object per row. Arrow keys on a handle move a row; <code>maxRows</code> is required. The rate-limits example tool has two columns.",
+				demo: `<tool-host tool="rows" mode="embed"></tool-host>`,
+				code: () => [input(`${FIX}/rows`, "hosts"), input("tools/rate-limits", "limits")],
+			},
+			{
 				id: "highlighted-input",
 				title: "A highlighted textarea",
 				text: "A textarea with a <code>lang</code> is painted by the host's highlighter, the same hook that paints code results. Caret, selection and undo stay the browser's own.",

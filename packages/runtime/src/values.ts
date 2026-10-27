@@ -13,7 +13,7 @@
  * `validateManifest` already refuses a sample outside those bounds, so for samples this is a
  * backstop rather than the guard. A host-set value never went through that check.
  */
-import type { InputSpec, InputValue, InputValues } from "@toolbench/sdk";
+import type { InputSpec, InputValue, InputValues, Row, RowColumn } from "@toolbench/sdk";
 
 export function coerce(spec: InputSpec, value: InputValue): InputValue {
 	switch (spec.type) {
@@ -32,16 +32,46 @@ export function coerce(spec: InputSpec, value: InputValue): InputValue {
 			return String(value).trim().toLowerCase();
 		case "multiselect": {
 			// In the options' order, so two ways of choosing the same set are one value to Reset, presets and a link.
-			const chosen = Array.isArray(value) ? spec.options.map((option) => option.value).filter((v) => value.includes(v)) : [];
+			const chosen = Array.isArray(value) ? spec.options.map((option) => option.value).filter((v) => (value as unknown[]).includes(v)) : [];
 			const whole = Array.isArray(value) && chosen.length === value.length && chosen.length <= (spec.max ?? Infinity);
 			// A copy either way: the form edits this array, and the manifest's default must not change with it.
 			return whole ? chosen : [...spec.default];
+		}
+		case "rows": {
+			const rows = Array.isArray(value) && value.length <= spec.maxRows ? value.map((row) => cells(spec.columns, row)) : undefined;
+			return rows?.every(Boolean) ? (rows as Row[]) : structuredClone(spec.default);
 		}
 		default: {
 			const text = String(value);
 			return spec.maxLength !== undefined ? text.slice(0, spec.maxLength) : text;
 		}
 	}
+}
+
+/**
+ * One row brought to its columns (#204), or `undefined` for a row that cannot be used: a missing cell, an
+ * unknown option, a number that is not one, a toggle that is neither true nor false. A number is clamped and
+ * a text cut, as typing does; a key that is no column is dropped. Text from a link reads as typed.
+ */
+export function cells(columns: readonly RowColumn[], row: unknown): Row | undefined {
+	const given = Object(row) as Record<string, unknown>;
+	const out: Row = {};
+	for (const column of columns) {
+		const v = given[column.id];
+		if (v === undefined || v === null || typeof v === "object") return undefined;
+		if (column.type === "number") {
+			const n = v === "" ? Number.NaN : Number(v);
+			if (!Number.isFinite(n)) return undefined;
+			out[column.id] = Math.min(column.max, Math.max(column.min, n));
+		} else if (column.type === "toggle") {
+			if (v !== true && v !== false && v !== "true" && v !== "false") return undefined;
+			out[column.id] = v === true || v === "true";
+		} else if (column.type === "select") {
+			if (!column.options.some((option) => option.value === String(v))) return undefined;
+			out[column.id] = String(v);
+		} else out[column.id] = String(v).slice(0, column.maxLength);
+	}
+	return out;
 }
 
 /**
@@ -71,9 +101,25 @@ export function applyPartialValues(inputs: readonly InputSpec[], current: InputV
 export function fromQuery(id: string, inputs: readonly InputSpec[], query: URLSearchParams): InputValues {
 	const found: InputValues = {};
 	for (const spec of inputs) {
-		const all = query.getAll(`${id}.${spec.id}`);
+		const key = `${id}.${spec.id}`;
+		const all = query.getAll(key);
 		const last = all.at(-1);
+		/*
+		 * Rows are a key per column, `rl.limits.path`, zipped by position. Columns of different lengths are a
+		 * link someone cut or edited, so they are left unusable, and `coerce` opens the input on its default.
+		 */
+		if (spec.type === "rows" && last === undefined) {
+			const columns = spec.columns.map((column) => query.getAll(`${key}.${column.id}`));
+			const n = columns[0]?.length ?? 0;
+			if (n === 0) continue;
+			found[spec.id] = columns.every((c) => c.length === n) ? Array.from({ length: n }, (_, r) => Object.fromEntries(spec.columns.map((column, c) => [column.id, columns[c]?.[r] ?? ""]))) : "";
+			continue;
+		}
 		if (last === undefined) continue;
+		if (spec.type === "rows") {
+			found[spec.id] = [];
+			continue;
+		}
 		found[spec.id] = spec.type === "multiselect" ? all.filter(Boolean) : spec.type === "toggle" ? last === "true" : last;
 	}
 	return found;

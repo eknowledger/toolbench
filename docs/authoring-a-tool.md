@@ -323,7 +323,7 @@ or that presents a deprecated one as current, is a field that lies.
 
 ## 4. Inputs
 
-Nine types. Each generates a labelled control with its description wired to `aria-describedby`.
+Ten types. Each generates a labelled control with its description wired to `aria-describedby`.
 
 ```jsonc
 { "id": "text",  "type": "text",     "label": "Pattern", "default": "^a.*z$", "maxLength": 200 }
@@ -337,6 +337,9 @@ Nine types. Each generates a labelled control with its description wired to `ari
 { "id": "key",   "type": "secret",   "label": "API key", "minLength": 16 }
 { "id": "types", "type": "multiselect", "label": "Record types", "default": ["A", "MX"], "min": 1,
   "options": [{ "value": "A", "label": "A" }, { "value": "MX", "label": "MX" }, { "value": "TXT", "label": "TXT" }] }
+{ "id": "limits", "type": "rows", "label": "Limits", "maxRows": 8, "minRows": 1,
+  "columns": [{ "id": "path", "type": "text", "label": "Path" }, { "id": "limit", "type": "number", "label": "Limit", "min": 1, "max": 10000, "unit": "req/s" }],
+  "default": [{ "path": "/api", "limit": 500 }] }
 ```
 
 Things the validator will hold you to, and why:
@@ -386,6 +389,21 @@ Things the validator will hold you to, and why:
   within `min..max`, and so does a case in `cases.json`; anything else is refused naming the item. A shared
   link writes one parameter per choice, `?dns.types=A&dns.types=MX`, and reading a list with an unknown
   option, a repeat or more than `max` opens on the whole default instead.
+* **`rows` for a list the reader edits** (contract version 9): hosts to check, or paths and their limits.
+  `run` gets a `Row[]`, one object per row keyed by column id, even with one column, so declare
+  `type Input = { limits: Row[] }` with `Row` from the SDK, and read `limits.map((r) => r.path)`. `columns`
+  takes one to four, each a `text`, `number`, `select` or `toggle` with that type's own keys (`maxLength`,
+  `min`/`max`/`step`, `options`), a `label` and an optional `unit`, and no `default`: a new row's cell is
+  empty, the number nearest 0 in range, the first option, or off. `maxRows` is required, at most 50, for
+  the reason a number's `max` is; `minRows` defaults to 0, and below it Run is refused with "Limits: add at
+  least one row." under the input. The reader adds a row with Add, removes one with its cross, and moves
+  one with the arrow keys on its handle, Alt and an arrow from a cell, or by dragging the handle. At
+  `maxRows` Add stays focusable, marked unavailable, with the reason beside it. Number cells arrive
+  clamped. `default`, samples, presets and cases give rows as JSON objects with a value for every column and
+  nothing else, checked cell by cell. A link writes one key per column, zipped by position,
+  `?rl.limits.path=%2Fapi&rl.limits.limit=500`, and a link whose columns differ in length, or with more than
+  `maxRows`, opens on the whole default. Refuse a row from your own code with `row` on the error, its index
+  from 0, and the message is shown under that row: "Limits, row 2: Path "/api" is already in row 1."
 * **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
   host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
   behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a
@@ -765,7 +783,8 @@ return {
 
 The input named by `input` is marked invalid and the message is shown under it, after the field's name:
 "Measurements: No measurements yet. Paste some numbers." So write the message to follow a name and a colon, and do not
-repeat the field's name in it.
+repeat the field's name in it. For a `rows` input, `row` names the row at fault, counted from 0, and the
+message is shown under that row as "Limits, row 2: ...".
 
 Write the message so it says what is wrong, where, and what would be right. `"nope" is not a number`
 beats `Invalid input`. Never abbreviate an error; a browser test asserts that an error never ends in an

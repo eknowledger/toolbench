@@ -56,6 +56,10 @@ export const LATER = {
 	"control.checkboxes": 9,
 	"control.chips": 9,
 	"type.multiselect": 9,
+	"type.rows": 9,
+	"inputs.columns": 9,
+	"inputs.minRows": 9,
+	"inputs.maxRows": 9,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,
 	"kinds.pie": 4,
@@ -81,6 +85,7 @@ export const OUTPUT_SINCE: Since = {
 	"column wrap": 8,
 	"column rowHeader": 8,
 	"cell wrap": 8,
+	"error row": 9,
 	"chart thresholds": 4,
 	"chart readout": 4,
 	"chart id": 4,
@@ -175,6 +180,7 @@ export function outputFeatureProblem(output: Output, declared: number): string |
 			if (field.tone === "muted") use("field tone muted", `${at}.fields[${i}].tone`);
 			if (field.mono !== undefined) use("field mono", `${at}.fields[${i}].mono`);
 		});
+		if (part.kind === "error" && part.row !== undefined) use("error row", `${at}.row`);
 		if (part.kind === "table") {
 			if (part.link !== undefined) use("table link", `${at}.link`);
 			list(part.columns).forEach((column, c) => {

@@ -24,6 +24,20 @@ describe("linkFor: the default link (#227, #204)", () => {
 	it("writes none chosen as the bare key, so a reader's empty choice does not read back as the default", () => {
 		assert.equal(linkFor("dns", { types: [] }, specs, "https://x.test/p"), "https://x.test/p?dns.types=");
 	});
+
+	it("writes rows as one key per column, each repeated once per row, and no rows as the bare key", () => {
+		const limits = {
+			id: "limits",
+			type: "rows",
+			label: "Limits",
+			maxRows: 4,
+			columns: [{ id: "path", type: "text", label: "Path" }, { id: "on", type: "toggle", label: "On" }],
+			default: [],
+		} as const satisfies InputSpec;
+		const rows = [{ path: "/api", on: true }, { path: "/login", on: false }];
+		assert.equal(linkFor("rl", { limits: rows }, [limits], "https://x.test/p"), "https://x.test/p?rl.limits.path=%2Fapi&rl.limits.path=%2Flogin&rl.limits.on=true&rl.limits.on=false");
+		assert.equal(linkFor("rl", { limits: [] }, [limits], "https://x.test/p"), "https://x.test/p?rl.limits=");
+	});
 });
 
 describe("fitLink: a link short enough to survive a chat preview (#204)", () => {

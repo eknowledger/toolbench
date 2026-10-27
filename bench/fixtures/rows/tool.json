@@ -1,0 +1,26 @@
+{
+	"sdk": 9,
+	"id": "rows",
+	"name": "Host names",
+	"blurb": "A list of host names to check, one per row: a rows input with one column.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"kinds": ["table", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "hosts",
+			"type": "rows",
+			"label": "Hosts",
+			"description": "One host per row. Arrow keys on a handle move its row.",
+			"minRows": 1,
+			"maxRows": 8,
+			"columns": [{ "id": "host", "type": "text", "label": "Host", "maxLength": 253, "dir": "ltr" }],
+			"default": [{ "host": "example.com" }, { "host": "api.example.com" }, { "host": "status.example.net" }]
+		}
+	],
+	"samples": [
+		{ "label": "A space in one", "input": { "hosts": [{ "host": "example.com" }, { "host": "api.exa mple.com" }] } }
+	]
+}

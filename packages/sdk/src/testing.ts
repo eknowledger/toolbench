@@ -245,6 +245,9 @@ function subset(actual: Output, testCase: Case): string | undefined {
 		if (expected.input !== undefined && actual.input !== expected.input) {
 			return `output.input: expected "${expected.input}", got ${show(actual.input)}`;
 		}
+		if (expected.row !== undefined && actual.row !== expected.row) {
+			return `output.row: expected ${expected.row}, got ${show(actual.row)}`;
+		}
 		return undefined;
 	}
 	// For every other kind, subset has no defined meaning — fall back to exact rather than pretend.

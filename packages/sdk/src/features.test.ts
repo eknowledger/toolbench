@@ -32,11 +32,14 @@ const INPUT_SINCE: Since = {
 	details: 8,
 	mode: 9,
 	minLength: 9,
+	columns: 9,
+	minRows: 9,
+	maxRows: 9,
 };
 const OPTION_SINCE: Since = { value: 1, label: 1, sets: 6 };
 /* The values of `control`, which arrived after the key: each value is a control the runtime has to know. */
 const CONTROL_SINCE: Since = { slider: 4, segmented: 9, checkboxes: 9, chips: 9 };
-const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1, date: 9, color: 9, secret: 9, multiselect: 9 };
+const INPUT_TYPE_SINCE: Since = { text: 1, textarea: 1, number: 1, select: 1, toggle: 1, date: 9, color: 9, secret: 9, multiselect: 9, rows: 9 };
 const CAPABILITY_SINCE: Since = { pure: 1 };
 const KIND_SINCE: Since = {
 	fields: 1, text: 1, code: 1, table: 1, series: 1, group: 1, error: 1,
@@ -193,6 +196,13 @@ describe("a manifest using a feature newer than its sdk is refused (#170)", () =
 	});
 
 	// A v8 runtime does not know the type at all, and would refuse it as an unknown type rather than explain.
+	// maxRows is required, so it is the first newer thing a rows input has, as a secret's minLength is.
+	it("refuses rows under sdk 8, at its first key from 9", () => {
+		const limits = { id: "limits", type: "rows", label: "Limits", maxRows: 4, columns: [{ id: "path", type: "text", label: "Path" }], default: [] };
+		refuses({ ...v1(8), inputs: [limits] }, "inputs[0].maxRows", [/is from contract version 9/, /Declare "sdk": 9\./]);
+		assert.doesNotThrow(() => checkManifestFeatures({ ...v1(9), inputs: [limits] }));
+	});
+
 	it("refuses a multiselect under sdk 8, and its control values with it", () => {
 		const types = { id: "types", type: "multiselect", label: "Types", default: [], options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] };
 		refuses({ ...v1(8), inputs: [types] }, "inputs[0].type", [/"multiselect" is from contract version 9/, /declares "sdk": 8/, /Declare "sdk": 9\./]);
@@ -253,6 +263,12 @@ describe("a result using a feature newer than its tool's sdk is reported (#170)"
 	 * declares it needs, and a rule that let one value of a key through under an older sdk would be a
 	 * second rule for an author to remember.
 	 */
+	it("sees row on an error, at version 9", () => {
+		const error: Output = { kind: "error", message: "is already in row 1.", input: "limits", row: 1 };
+		assert.equal(outputFeatureProblem(error, 8), 'output.row: error row is from contract version 9, but the tool declares "sdk": 8. Declare "sdk": 9.');
+		assert.equal(outputFeatureProblem(error, 9), undefined);
+	});
+
 	it("sees wrap on a column and on a cell, at version 8", () => {
 		const table: Output = { kind: "table", columns: [{ label: "Note", wrap: "prose" }, { label: "Date" }], rows: [["a", { text: "2025-02-27", wrap: "none" }]] };
 		assert.equal(

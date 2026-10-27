@@ -201,3 +201,55 @@ describe("fromQuery: a link's values for one tool (#227, #204)", () => {
 		assert.deepEqual(read("dns.note=a&dns.note=b"), { note: "b" });
 	});
 });
+
+const limitsSpec = {
+	id: "limits",
+	type: "rows",
+	label: "Limits",
+	maxRows: 2,
+	columns: [
+		{ id: "path", type: "text", label: "Path", maxLength: 6 },
+		{ id: "limit", type: "number", label: "Limit", min: 1, max: 100 },
+		{ id: "scheme", type: "select", label: "Scheme", options: [{ value: "https", label: "HTTPS" }, { value: "http", label: "HTTP" }] },
+		{ id: "on", type: "toggle", label: "On" },
+	],
+	default: [{ path: "/", limit: 10, scheme: "https", on: true }],
+} as const satisfies InputSpec;
+const DEFAULT_ROWS = [{ path: "/", limit: 10, scheme: "https", on: true }];
+
+describe("coerce: rows (#204)", () => {
+	it("clamps a number cell and cuts a text cell, as typing does, and drops a key that is no column", () => {
+		assert.deepEqual(coerce(limitsSpec, [{ path: "/api/v1", limit: 500, scheme: "http", on: false, burst: 3 }] as never), [{ path: "/api/v", limit: 100, scheme: "http", on: false }]);
+	});
+
+	it("reads a cell written as text, as a link writes it", () => {
+		assert.deepEqual(coerce(limitsSpec, [{ path: "/a", limit: "20", scheme: "http", on: "false" }] as never), [{ path: "/a", limit: 20, scheme: "http", on: false }]);
+	});
+
+	it("falls back to the whole default for a missing cell, an unknown option, a number that is none, or too many rows", () => {
+		const row = { path: "/a", limit: 5, scheme: "https", on: true };
+		for (const bad of [[{ path: "/a", limit: 5, scheme: "https" }], [{ ...row, scheme: "ftp" }], [{ ...row, limit: "lots" }], [{ ...row, on: "yes" }], [row, row, row], "nope", [3]]) {
+			assert.deepEqual(coerce(limitsSpec, bad as never), DEFAULT_ROWS, JSON.stringify(bad));
+		}
+	});
+
+	it("keeps no rows, which the form can hold too", () => {
+		assert.deepEqual(coerce(limitsSpec, []), []);
+	});
+});
+
+describe("fromQuery: rows, one key per column zipped by position (#204)", () => {
+	const read = (query: string) => fromQuery("rl", [limitsSpec], new URLSearchParams(query));
+
+	it("zips each column's repeats into rows", () => {
+		assert.deepEqual(read("rl.limits.path=%2Fa&rl.limits.limit=5&rl.limits.scheme=https&rl.limits.on=true&rl.limits.path=%2Fb&rl.limits.limit=6&rl.limits.scheme=http&rl.limits.on=false"), {
+			limits: [{ path: "/a", limit: "5", scheme: "https", on: "true" }, { path: "/b", limit: "6", scheme: "http", on: "false" }],
+		});
+	});
+
+	it("reads the bare key as no rows, and columns of different lengths as a list it cannot use", () => {
+		assert.deepEqual(read("rl.limits="), { limits: [] });
+		const uneven = read("rl.limits.path=%2Fa&rl.limits.path=%2Fb&rl.limits.limit=5&rl.limits.scheme=https&rl.limits.on=true");
+		assert.deepEqual(coerce(limitsSpec, uneven.limits as never), DEFAULT_ROWS);
+	});
+});

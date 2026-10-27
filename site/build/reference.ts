@@ -186,6 +186,10 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A multiselect's default is a list of its options, each once", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast", "slow"] }) },
 	{ rule: "A multiselect's `min` is not above its `max`", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast"], min: 2, max: 1 }) },
 	{ rule: "`control` on a multiselect is `\"checkboxes\"` or `\"chips\"`", change: (m) => Object.assign(input(m, 1), { type: "multiselect", default: ["fast"], control: "segmented" }) },
+	{ rule: "Rows declare `maxRows`, from 1 to 50", change: (m) => Object.assign(input(m, 2), { type: "rows", columns: [{ id: "host", type: "text", label: "Host" }], default: [] }) },
+	{ rule: "Rows have one to four columns", change: (m) => Object.assign(input(m, 2), { type: "rows", maxRows: 5, columns: [], default: [] }) },
+	{ rule: "A column has no `default`; the rows input's `default` gives every row a value", change: (m) => Object.assign(input(m, 2), { type: "rows", maxRows: 5, columns: [{ id: "host", type: "text", label: "Host", default: "a" }], default: [] }) },
+	{ rule: "Every default row has a value for every column", change: (m) => Object.assign(input(m, 2), { type: "rows", maxRows: 5, columns: [{ id: "host", type: "text", label: "Host" }, { id: "port", type: "number", label: "Port", min: 1, max: 65535 }], default: [{ host: "a" }] }) },
 	{ rule: "`lang` only on a textarea", change: (m) => (input(m, 2).lang = "json") },
 	{ rule: "`grammar` needs `lang` beside it", change: (m) => Object.assign(input(m, 2), { type: "textarea", grammar: { keywords: ["on"] } }) },
 	{ rule: "`share` is `true` or `false`", change: (m) => (input(m, 2).share = "no") },
@@ -204,6 +208,7 @@ const EXAMPLES: Record<string, { from: string; id: string; gallery?: string }> =
 	color: { from: "bench/fixtures/native-inputs", id: "accent", gallery: "native-inputs" },
 	secret: { from: "bench/fixtures/native-inputs", id: "token", gallery: "native-inputs" },
 	multiselect: { from: "bench/fixtures/multiselect", id: "regions", gallery: "multiselect" },
+	rows: { from: "tools/rate-limits", id: "limits", gallery: "rows" },
 };
 
 const SUMMARY: Record<string, string> = {
@@ -216,6 +221,7 @@ const SUMMARY: Record<string, string> = {
 	color: "A colour, typed as hex or picked in the system's picker",
 	secret: "A password, a token or a key, with no default and kept out of links",
 	multiselect: "Several choices from a fixed list, as checkboxes or chips",
+	rows: "A list the reader adds to, removes from and reorders: hosts, or paths and their limits",
 };
 /** The type of the value `run` gets for an input of this kind. */
 const RECEIVES: Record<string, string> = {
@@ -228,6 +234,7 @@ const RECEIVES: Record<string, string> = {
 	color: "string, a lowercase `#rrggbb`",
 	secret: "string, empty until typed, at least `minLength` characters",
 	multiselect: "string[], the chosen option values in the options' order, `min` to `max` of them",
+	rows: "Row[], one object per row keyed by column id, `minRows` to `maxRows` of them, even for one column",
 };
 
 /**
@@ -273,6 +280,7 @@ export async function inputsReference(): Promise<string> {
 		});
 	const option = members(block(types, "export interface SelectOption"));
 	const grammar = members(block(types, "export interface TextareaGrammar"));
+	const column = members(block(types, "export interface RowColumnBase"));
 
 	// An attribute of a type that arrived later arrived with it: a multiselect's `min` is v9, though a number's is v1.
 	const attrTable = (attrs: Attr[], prefix: string, type = "") => attributeTable(attrs, (a) => Math.max(at(`${prefix}.${a.name}`), at(`type.${type}`)));
@@ -302,6 +310,7 @@ export async function inputsReference(): Promise<string> {
 	for (const s of specs) {
 		out.push("", `## ${s.type}`, "", `**Type:** ${RECEIVES[s.type]}. Takes the common attributes, plus:`, "", attrTable(s.attrs, "inputs", s.type));
 		if (s.type === "select") out.push("", "### Option attributes", "", "Each entry of `options`.", "", attrTable(option, "options"));
+		if (s.type === "rows") out.push("", "### Column attributes", "", "Each entry of `columns`: a `type` of `text`, `number`, `select` or `toggle`, that type's own keys (`maxLength`; `min`, `max` and `step`; `options`), and these. A column takes no `default`.", "", attrTable(column, "inputs", "rows"));
 		if (s.type === "textarea") out.push("", "### Grammar attributes", "", "The keys of `grammar`. Each is optional, and a grammar needs at least one. Patterns are not allowed: a regular expression from a tool could hang the page it is on.", "", attrTable(grammar, "grammar"));
 		out.push("", "### Example", "", exampleInput(s.type));
 	}
