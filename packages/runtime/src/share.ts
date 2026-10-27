@@ -132,8 +132,9 @@ export function shareBar(host: HTMLElement, manifest: Manifest, values: () => In
  * ⚠️ The accessible name stays as it is and only the icon changes. Renaming a focused control has some
  * screen readers read the new name over the announcement, the reason the Copy button keeps its label too.
  *
- * A refused or missing clipboard puts the link itself in the note, selected, so the reader can copy it with
- * the keyboard. That note stays: the link it shows is still the one to copy.
+ * A refused or missing clipboard is tried once more with `execCommand("copy")`, and only if that fails too
+ * puts the link itself in the note, selected, so the reader can copy it with the keyboard. That note stays:
+ * the link it shows is still the one to copy.
  */
 function wireShare(button: HTMLButtonElement, note: HTMLElement, link: () => { url: string; values: InputValues; left: string[] }, done: (message: string, url: string, values: InputValues) => void): void {
 	adoptStyles(button, "share", () => STYLES);
@@ -148,7 +149,10 @@ function wireShare(button: HTMLButtonElement, note: HTMLElement, link: () => { u
 			clearTimeout(timer);
 			button.toggleAttribute("data-copied", ok);
 			path?.setAttribute("d", ok ? CHECK : idle);
-			note.textContent = ok ? copied : url;
+			// Said where it is why (#264): on plain HTTP there is no clipboard to write to, and the link alone is selected.
+			const link = el("span", {}, url);
+			if (ok) note.textContent = copied;
+			else note.replaceChildren(...(insecure() ? ["Copying needs HTTPS: "] : []), link);
 			if (ok) {
 				// About two seconds, then back to the link: "copied" would otherwise outlast whatever the reader copies next.
 				// Six when something was left out, which is a sentence to read rather than a word to glance at.
@@ -157,11 +161,39 @@ function wireShare(button: HTMLButtonElement, note: HTMLElement, link: () => { u
 					path?.setAttribute("d", idle);
 					note.textContent = "";
 				}, left.length > 0 ? 6000 : 2000);
-			} else getSelection()?.selectAllChildren(note);
-			done(ok ? copied : "Copy failed. The link is selected, so you can copy it yourself", url, values);
+			} else getSelection()?.selectAllChildren(link);
+			done(ok ? copied : `${insecure() ? "Copying needs HTTPS" : "Copy failed"}. The link is selected, so you can copy it yourself`, url, values);
 		};
 		const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
-		if (!clipboard?.writeText) settle(false);
-		else clipboard.writeText(url).then(() => settle(true), () => settle(false));
+		if (!clipboard?.writeText) settle(execCopy(url, button));
+		else clipboard.writeText(url).then(() => settle(true), () => settle(execCopy(url, button)));
 	});
+}
+
+/** Whether this page is plain HTTP, or another origin a browser gives no clipboard. */
+const insecure = () => typeof isSecureContext === "boolean" && !isSecureContext;
+
+/**
+ * ⚠️ The copy for a page with no Clipboard API (#264): plain HTTP, a LAN address, a private preview. There
+ * `navigator.clipboard` is undefined, so the button copied nothing, and a reader who pasted got whatever they
+ * had copied before, which looked like a wrong link. `execCommand("copy")` still works there, on a selection
+ * made during the click, so the text goes into a box beside `back`, selected, and focus returns to `back`.
+ * The same few lines are in the copy chunk, which this chunk does not load.
+ */
+function execCopy(text: string, back: HTMLElement): boolean {
+	const box = el("textarea", { readonly: "", "aria-hidden": "true", tabindex: "-1" });
+	// Set through the style object, which a page's style-src policy allows where a style attribute is refused.
+	box.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0";
+	box.value = text;
+	back.after(box);
+	box.select();
+	let ok = false;
+	try {
+		ok = document.execCommand("copy");
+	} catch {
+		ok = false;
+	}
+	box.remove();
+	back.focus({ preventScroll: true });
+	return ok;
 }
