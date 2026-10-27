@@ -259,6 +259,7 @@ const BUDGETS = [
 	 * exports, and no modulepreload polyfill. 31,944 to 30,950 measured, 994 bytes, none of them the runtime's.
 	 *
 	 * Lowered from 31_500 to 30_500 when the bytes renderer and its rules became a chunk: 30,950 to 30,154.
+	 * Shorter developer messages, one tone rule and `plural()` took 119 more, to 30,035, inside it.
 	 */
 	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 30_500, deployOnly: true },
 	/*
@@ -722,6 +723,7 @@ function pageAssets(html) {
  * every chunk of the bench together by 677.
  *
  * Lowered to 26_500 when the bytes renderer and its rules became a chunk of their own: 26,845 to 26,056.
+ * Shorter developer messages, one tone rule and a `plural()` helper took 103 more, to 25,953, inside it.
  */
 const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 26_500 };
 {

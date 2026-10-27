@@ -76,9 +76,7 @@ export class RegistrySource implements ToolSource {
 		if (!entry) throw new ToolNotFoundError(id, [...this.#entries.keys()]);
 		const module = await entry.load();
 		if (typeof module?.default?.run !== "function") {
-			throw new Error(
-				`"${id}" does not default-export a tool. A tool module looks like: export default { run(input, ctx) { … } }`,
-			);
+			throw new Error(`"${id}" must default-export { run(input, ctx) }.`);
 		}
 		return { manifest: entry.manifest, tool: module.default };
 	}

@@ -35,7 +35,7 @@
 import type { InputSpec, InputValues, Manifest, Output, Row, Sample, SelectOption } from "@toolbench/sdk";
 import { defaultInputs, inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
-import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
+import { ChartRendererMissing, isLazyKind, plural, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
 import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
@@ -576,7 +576,7 @@ export class ToolHost extends HTMLElement {
 	connectedCallback(): void {
 		live.add(this.#restyle);
 		if (!config) {
-			this.#fatal("No tool source configured. Call defineToolHost({ source }) before using <tool-host>.");
+			this.#fatal("No source: call defineToolHost({ source }) before using <tool-host>.");
 			return;
 		}
 		this.#readInlineSeed();
@@ -1867,7 +1867,7 @@ export class ToolHost extends HTMLElement {
 		try {
 			this.#seed = JSON.parse(script.textContent) as Output;
 		} catch {
-			console.warn("[toolbench] a seed script was present but is not valid JSON; ignoring it.");
+			console.warn("[toolbench] ignored a seed script that is not valid JSON.");
 		}
 	}
 
@@ -1987,15 +1987,15 @@ function primaryOnly(inputs: InputSpec[]): InputSpec[] {
 function summarise(output: Output, brief = false): string {
 	switch (output.kind) {
 		case "fields":
-			return `${output.fields.length} field${output.fields.length === 1 ? "" : "s"}`;
+			return plural(output.fields.length, "field");
 		case "table":
-			return `table, ${output.rows.length} row${output.rows.length === 1 ? "" : "s"}`;
+			return `table, ${plural(output.rows.length, "row")}`;
 		case "series":
 			return `chart, ${output.chart.series.length} series`;
 		case "heatmap":
 			return `heatmap, ${output.heatmap.y.length} by ${output.heatmap.x.length}`;
 		case "pie":
-			return `${output.pie.donut ? "donut" : "pie"} chart, ${output.pie.slices.length} slice${output.pie.slices.length === 1 ? "" : "s"}`;
+			return `${output.pie.donut ? "donut" : "pie"} chart, ${plural(output.pie.slices.length, "slice")}`;
 		case "radar":
 			return `radar chart, ${output.radar.axes.length} axes, ${output.radar.series.length} series`;
 		case "treemap":
@@ -2005,19 +2005,19 @@ function summarise(output: Output, brief = false): string {
 		case "graph": {
 			// What the figure says of itself, so a screen reader hears the same name the picture carries.
 			const { label, nodes, edges } = output.graph;
-			return `Graph, ${label}: ${nodes.length} node${nodes.length === 1 ? "" : "s"}, ${edges.length} edge${edges.length === 1 ? "" : "s"}`;
+			return `Graph, ${label}: ${plural(nodes.length, "node")}, ${plural(edges.length, "edge")}`;
 		}
 		case "bytes": {
 			// The named ranges are the useful part: "84 bytes" tells a screen-reader user nothing they
 			// can act on, whereas the field names are the reason they ran the tool.
 			const named = output.highlight?.length ?? 0;
-			const size = `${output.bytes.length} byte${output.bytes.length === 1 ? "" : "s"}`;
+			const size = plural(output.bytes.length, "byte");
 			/*
 			 * "ranges", not "fields". The first wording made a group of fields plus bytes announce
 			 * itself as "4 fields, 19 bytes, 4 fields marked", where the two counts of "fields" meant
 			 * different things and neither was wrong on its own.
 			 */
-			return named > 0 ? `${size}, ${named} range${named === 1 ? "" : "s"} marked` : size;
+			return named > 0 ? `${size}, ${plural(named, "range")} marked` : size;
 		}
 		case "text":
 		case "code":

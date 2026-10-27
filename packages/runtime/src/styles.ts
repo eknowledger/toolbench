@@ -155,11 +155,7 @@ export const STYLES = /* css */ `
    weight sets them apart for a reader who cannot tell the colours apart. Muted keeps the normal weight:
    in bold, a grey read as emphasis, the opposite of receding. */
 :is(.tb-desc, .tb-details-body) [data-tone] { font-weight: 600; }
-:is(.tb-desc, .tb-details-body) [data-tone="good"] { color: var(--tb-good); }
-:is(.tb-desc, .tb-details-body) [data-tone="warn"] { color: var(--tb-warn); }
-:is(.tb-desc, .tb-details-body) [data-tone="bad"] { color: var(--tb-bad); }
-:is(.tb-desc, .tb-details-body) [data-tone="accent"] { color: var(--tb-accent-text); }
-:is(.tb-desc, .tb-details-body) [data-tone="muted"] { color: var(--tb-faint); font-weight: inherit; }
+:is(.tb-desc, .tb-details-body) [data-tone="muted"] { font-weight: inherit; }
 /* An input's details (#215): a quiet disclosure under the hint, its marker drawn like .tb-disclose's. The
    summary is 24px tall for WCAG 2.5.8; the body is set off by a rule, not a box, so it reads as the hint's
    continuation. */
@@ -307,10 +303,6 @@ export const STYLES = /* css */ `
 /* The face comes from .tb-mono, which the dd carries unless the field says mono: false (#209). The size
    stays here and outranks .tb-mono's 0.82rem, so an address and a sentence in one list share a size. */
 .tb-field dd { margin: 0; font-size: 0.85rem; word-break: break-word; }
-.tb-field[data-tone="bad"] dd .tb-value { color: var(--tb-bad); }
-.tb-field[data-tone="warn"] dd .tb-value { color: var(--tb-warn); }
-.tb-field[data-tone="good"] dd .tb-value { color: var(--tb-good); }
-.tb-field[data-tone="muted"] dd .tb-value { color: var(--tb-faint); }
 .tb-note { color: var(--tb-faint); margin-left: 0.5ch; }
 .tb-field-group h4 { margin: 0.5rem 0 0.25rem; font-size: 0.75rem; text-transform: none; color: var(--tb-faint); font-weight: 600; }
 .tb-more { margin: 0; font-size: 0.78rem; color: var(--tb-faint); }
@@ -377,17 +369,12 @@ export const STYLES = /* css */ `
 }
 .tb-out-table th { color: var(--tb-muted); font-size: 0.78rem; font-weight: 600; }
 .tb-out-table td[data-align="end"], .tb-out-table th[data-align="end"] { text-align: end; }
-/* A row header (#214) is the row's name. Before the tones, which reach it at equal specificity. */
+/* A row header (#214) is the row's name. The tones, below, outrank it, so a toned row header keeps its tone. */
 .tb-out-table th[scope=row]{color:var(--tb-fg);font-size:inherit}
 .tb-out-table th[scope=row][data-align=end]{text-align:end}
-.tb-out-table tr > [data-tone="bad"] { color: var(--tb-bad); }
 /* A row a chart's readout is on (#124), in a table linked to it: a wash and a rule, never colour alone. */
 .tb-out-table tr.tb-hot > * { background: var(--tb-accent-bg); }
 .tb-out-table tr.tb-hot > :first-child { box-shadow: inset 3px 0 0 var(--tb-accent); }
-.tb-out-table tr > [data-tone="warn"] { color: var(--tb-warn); }
-/* good matched a field value and was unstyled on a cell (#156); muted lets the routine cells recede. */
-.tb-out-table tr > [data-tone="good"] { color: var(--tb-good); }
-.tb-out-table tr > [data-tone="muted"] { color: var(--tb-faint); }
 /* The narrow layout (#213, #214), only where data-wrap says which cells are prose. width, not only a floor,
    or prose ran on one line. :where so the linked-row wash still reaches a sticky row header. */
 @container (max-width:34rem){
@@ -426,6 +413,16 @@ export const STYLES = /* css */ `
    so a tool page with no chart does not download them. */
 
 /* The bytes rules live in the bytes chunk (render/bytes.ts), adopted when a dump is first drawn. */
+
+/* One tone mechanism: data-tone names its colour once, here, and one rule says where each kind wears it: the
+   words in help text, a field's value, a table cell. "normal" sets nothing, so a field or a cell left at it
+   keeps the colour its own rules give it. Four sets of per-tone rules before this, with the same colours. */
+[data-tone="good"] { --_tb-tone: var(--tb-good); }
+[data-tone="warn"] { --_tb-tone: var(--tb-warn); }
+[data-tone="bad"] { --_tb-tone: var(--tb-bad); }
+[data-tone="muted"] { --_tb-tone: var(--tb-faint); }
+[data-tone="accent"] { --_tb-tone: var(--tb-accent-text); }
+:is(.tb-desc, .tb-details-body) [data-tone], .tb-field:not([data-tone="normal"]) dd .tb-value, .tb-out-table tr > [data-tone]:not([data-tone="normal"]) { color: var(--_tb-tone); }
 
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
 /* Ordinary content, clickable as a whole; the hint inside it is the button (#98, #105). */
