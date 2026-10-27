@@ -3419,6 +3419,86 @@ describe("the published runtime figure", () => {
 	});
 });
 
+describe("the bytes renderer is its own chunk", () => {
+	const bytesChunk = /\/assets\/bytes-[A-Za-z0-9_-]+\.js$/;
+	const scriptsOf = (page: Page) => {
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		return scripts;
+	};
+	/** A closed card seeded with a dump, on a page whose own tool draws no bytes, so nothing else fetched the chunk. */
+	async function seededBytesCard(page: Page): Promise<Locator> {
+		await page.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await page.evaluate(async () => {
+			await customElements.whenDefined("tool-host");
+			const host = document.createElement("tool-host");
+			host.id = "seeded-bytes";
+			host.setAttribute("tool", "utf8-bytes");
+			host.setAttribute("mode", "card");
+			// The inline form a host's build writes, read when the card connects.
+			const script = document.createElement("script");
+			script.type = "application/json";
+			script.setAttribute("data-toolbench-seed", "");
+			script.textContent = JSON.stringify({ kind: "bytes", bytes: [72, 105, 0, 255], highlight: [{ at: 0, len: 2, label: "greeting" }] });
+			host.append(script);
+			document.body.prepend(host);
+		});
+		const card = page.locator("#seeded-bytes");
+		await card.locator(".tb-facade").waitFor({ timeout: 15_000 });
+		return card;
+	}
+
+	it("is fetched by a page that draws a dump, which it draws styled, and not by one that draws none", async () => {
+		const plain = await browser.newPage();
+		const before = scriptsOf(plain);
+		await plain.goto(`${BASE}/tool.html?id=percentiles`, { waitUntil: "load" });
+		await plain.locator("#host").scrollIntoViewIfNeeded();
+		await plain.locator("#host >> .tb-run").click();
+		await plain.locator("#host >> .tb-output > *").first().waitFor({ timeout: 15_000 });
+		assert.deepEqual(before.filter((url) => bytesChunk.test(url)), [], "percentiles returns no bytes");
+		await plain.close();
+
+		const page = await browser.newPage();
+		const scripts = scriptsOf(page);
+		await page.goto(`${BASE}/tool.html?id=utf8-bytes`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-bytes-row").first().waitFor({ timeout: 15_000 });
+		assert.equal(scripts.filter((url) => bytesChunk.test(url)).length, 1);
+		const drawn = await page.evaluate(() => {
+			const root = document.querySelector("#host")!.shadowRoot!;
+			const mark = root.querySelector(".tb-bytes-hex .tb-byte[data-series]") as Element;
+			return { grid: getComputedStyle(root.querySelector(".tb-bytes-grid-inner") as Element).display, mark: getComputedStyle(mark).backgroundColor };
+		});
+		// The chunk's rules arrived with it: one grid for the dump, and a range filled with its series colour.
+		assert.equal(drawn.grid, "grid");
+		assert.notEqual(drawn.mark, "rgba(0, 0, 0, 0)");
+		await page.close();
+	});
+
+	it("draws a closed seeded card's dump, its chunk fetched before the paint", async () => {
+		const page = await browser.newPage();
+		const card = await seededBytesCard(page);
+		const facade = card.locator(".tb-facade");
+		assert.equal(await facade.locator(".tb-bytes-row").count(), 1);
+		assert.equal((await facade.locator(".tb-bytes-ascii").textContent())?.replace(/\s/g, ""), "Hi..");
+		assert.equal(await facade.locator(".tb-bytes-legend li").textContent(), "greeting: 2 bytes at 0x0000");
+		assert.doesNotMatch(String(await facade.textContent()), /could not be loaded/);
+		await page.close();
+	});
+
+	it("says the byte view, not the chart, could not be loaded when its chunk is refused", async () => {
+		const page = await browser.newPage();
+		await page.route(bytesChunk, (route) => route.abort());
+		const card = await seededBytesCard(page);
+		assert.equal(await card.locator(".tb-facade .tb-status").textContent(), "The byte view could not be loaded.");
+		assert.equal(await card.locator(".tb-out-error").count(), 0, "no error box in place of the card");
+		await page.close();
+	});
+});
+
 describe("page mode", () => {
 	it("renders the chart and keeps it — a late progress frame must not overwrite the result", async () => {
 		const page = await browser.newPage();

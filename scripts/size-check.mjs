@@ -257,8 +257,10 @@ const BUDGETS = [
 	 * The whitespace collapse took it from 32,338 to 31,944. Lowered from 32_500 to 31_500 by two lines in the
 	 * bench's Vite config: `json: { namedExports: false }`, since every manifest was also emitted as named
 	 * exports, and no modulepreload polyfill. 31,944 to 30,950 measured, 994 bytes, none of them the runtime's.
+	 *
+	 * Lowered from 31_500 to 30_500 when the bytes renderer and its rules became a chunk: 30,950 to 30,154.
 	 */
-	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 31_500, deployOnly: true },
+	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 30_500, deployOnly: true },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -410,6 +412,13 @@ const BUDGETS = [
 	 * Reader cost: that reader downloads it. 576 measured, 63 of them the formula guard.
 	 */
 	{ label: "copy action", pattern: /^copy-[^/]+\.js$/, budget: 1_000 },
+	/*
+	 * The bytes kind's renderer and its rules, a chunk of its own on the chart kinds' pattern: fetched when a dump
+	 * is drawn, before a seed holding one paints, or with the code of a tool that declares the kind. Built into
+	 * boot they cost every page 796 bytes there, and 789 of the host's figure, for a kind most tools never return.
+	 * Reader cost: a reader of a bytes tool downloads it. 1,344 measured.
+	 */
+	{ label: "bytes renderer", pattern: /^bytes-[^/]+\.js$/, budget: 1_750 },
 	/*
 	 * The share button (#227): drawing it, its styles, the default link writer, the clipboard write and its
 	 * fallback, and the words for each outcome. Fetched with a tool's code when the tool draws the button, so
@@ -711,8 +720,10 @@ function pageAssets(html) {
  * Lowered to 27_000 when the build began collapsing the whitespace in the runtime's stylesheets as well as
  * stripping their comments: 27,242 to 26,845, 397 bytes. The bench's boot fell by 394, 32,338 to 31,944, and
  * every chunk of the bench together by 677.
+ *
+ * Lowered to 26_500 when the bytes renderer and its rules became a chunk of their own: 26,845 to 26,056.
  */
-const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 27_000 };
+const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 26_500 };
 {
 	let html = null;
 	try {
@@ -784,7 +795,11 @@ const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.
  * rate-limits manifest. 37_000 would have been 1,448 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 39_000 }];
+/*
+ * Lowered to 38_000 when the bytes renderer became a chunk of its own, a runtime saving every consumer gets
+ * too: 38,041 to 37,256 measured.
+ */
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 38_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
@@ -852,6 +867,7 @@ if (process.argv.includes("--update")) {
 		["README.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
+		["docs/architecture.md", /(\| Bytes renderer[^|]*\| )[\d.]+ KB/, kb(find("bytes renderer"))],
 		/*
 		 * ⚠️ The per-tool rows, which this block did not own until a tool was added and somebody checked.
 		 *

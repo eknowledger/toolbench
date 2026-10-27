@@ -1902,12 +1902,11 @@ function lazyKindsIn(output: Output | undefined): LazyKind[] {
 
 /**
  * What a reader is told is missing. A graph is not a chart: a card that lost its graph said "The chart could
- * not be loaded.", naming something it never had (#201).
+ * not be loaded.", naming something it never had (#201). Nor is a hex dump, since its renderer became a chunk.
  */
 function missingNoun(kinds: readonly LazyKind[]): string {
-	const graph = kinds.includes("graph");
-	const chart = kinds.some((kind) => kind !== "graph");
-	return graph && chart ? "chart and the graph" : graph ? "graph" : "chart";
+	const named = (kind: LazyKind) => (kind === "graph" ? "graph" : kind === "bytes" ? "byte view" : "chart");
+	return ["chart", "graph", "byte view"].filter((noun) => kinds.some((kind) => named(kind) === noun)).join(" and the ");
 }
 
 /**
