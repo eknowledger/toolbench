@@ -697,8 +697,12 @@ function pageAssets(html) {
  * would reproduce.
  *
  * 27_500 against 27,242 measured, leaving 258.
+ *
+ * Lowered to 27_000 when the build began collapsing the whitespace in the runtime's stylesheets as well as
+ * stripping their comments: 27,242 to 26,845, 397 bytes. The bench's boot fell by 394, 32,338 to 31,944, and
+ * every chunk of the bench together by 677.
  */
-const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 27_500 };
+const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 27_000 };
 {
 	let html = null;
 	try {
