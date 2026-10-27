@@ -210,8 +210,17 @@ const BUDGETS = [
 	 * one `control` rule for a number and a select, the version rows, and the red border an invalid dropdown
 	 * lacked. The segments, their measurement and their rules are the controls chunk, below, not here: in boot
 	 * they measured 762 together. 28_000 would have left the build 297 over.
+	 *
+	 * Raised from 28_500 to 29_000 by the date input (#203), in the commit that crossed it: 28,291 to 28,938
+	 * measured, 647 bytes, after trimming it by 38. Most of it is one parser and its four messages: a day
+	 * that must exist, a time from 00:00 to 23:59, the three modes' formats, and "Captured at must be on or
+	 * before ..., got ...". It is here because validation is here: a manifest's min, default and max go
+	 * through it when the registry is read, and the element calls the same function before every run,
+	 * because a native picker lets a reader type past max and hands over nothing mid-entry. The rest is the
+	 * picker's attributes on the text input's branch, the loop in run, and keeping a date in an error message
+	 * on one line. 28_500 would have left the build 438 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 28_500 },
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 29_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -495,7 +504,7 @@ const BUDGETS = [
 	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// A six-column table whose columns say how they wrap (#213). 681 measured.
 	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
-	// The newer input types (#203) on screen for the browser tests and the gallery. 210 measured.
+	// The newer input types (#203) on screen for the browser tests and the gallery. 227 measured.
 	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
@@ -618,9 +627,12 @@ for (const file of unclaimed) {
  *
  * Raised to 34_500 by the What's new page (#248): main measured 33,987 and this build 34,250, for the
  * "New in" line on the landing page and the What's new link in every page's header.
+ *
+ * Raised to 35_500 by the date input (#203): 34,480 to 35,153 measured, the same parser, messages and check
+ * before run as boot's line above, which every consumer pays too. 34_500 would have been 653 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 34_500 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 35_500 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

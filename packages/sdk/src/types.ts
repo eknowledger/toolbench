@@ -865,6 +865,24 @@ export type InputSpec =
 			type: "toggle";
 			/** Whether the form opens with it on. */
 			default: boolean;
+	  })
+	| (InputBase & {
+			type: "date";
+			/**
+			 * What the reader picks, in the browser's own picker: a day, a time of day, or both. `run` gets
+			 * `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`, local time, with no zone. Contract version 9.
+			 * @default "date"
+			 */
+			mode?: "date" | "time" | "datetime";
+			/** The value the form opens with, written in the mode's format, within `min..max`. */
+			default: string;
+			/**
+			 * The earliest value, in the mode's format. A value before it is refused before `run`, with a
+			 * message naming the input, so `run` can trust the range.
+			 */
+			min?: string;
+			/** The latest value, in the mode's format, not before `min`. */
+			max?: string;
 	  });
 
 /**
@@ -908,7 +926,7 @@ export interface SelectOption {
 
 export type InputType = InputSpec["type"];
 
-export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle"];
+export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date"];
 
 /** The shape a tool's `run` receives: one entry per declared input, keyed by id. */
 export type InputValues = Record<string, string | number | boolean>;

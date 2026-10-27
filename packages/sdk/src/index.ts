@@ -60,7 +60,7 @@ export {
 	type ToolModule,
 } from "./types.ts";
 
-export { ManifestError, describeSdkVersion, validateManifest } from "./validate.ts";
+export { ManifestError, describeSdkVersion, inputProblem, validateManifest } from "./validate.ts";
 export { isSafeLinkHref } from "./links.ts";
 export { shareableInputs } from "./share.ts";
 export { graphProblem } from "./graph.ts";

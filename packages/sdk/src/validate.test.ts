@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ManifestError, validateManifest } from "./validate.ts";
+import { ManifestError, inputProblem, validateManifest } from "./validate.ts";
 import { SDK_VERSION } from "./version.ts";
 
 /** A manifest that passes, so each test can break exactly one thing. */
@@ -610,5 +610,68 @@ describe("validateManifest: a segmented select (contract 9, #203)", () => {
 		failsWith((m) => { m.inputs = [order({ control: "slider" })]; }, "inputs[0].control", 'must be "segmented" when present, got "slider"');
 		failsWith((m) => { m.inputs = [order({ control: "tabs" })]; }, "inputs[0].control", 'got "tabs"');
 		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 10, control: "segmented" }]; }, "inputs[0].control", "slider");
+	});
+});
+
+describe("validateManifest: a date input (contract 9, #203)", () => {
+	const captured = (extra: Record<string, unknown> = {}) => ({
+		id: "captured",
+		type: "date",
+		label: "Captured at",
+		mode: "datetime",
+		default: "2026-10-25T14:30",
+		min: "2020-01-01T00:00",
+		max: "2026-10-25T23:59",
+		...extra,
+	});
+	const withDate = (extra: Record<string, unknown>) => (m: Record<string, unknown>) => { m.inputs = [captured(extra)]; };
+
+	it("accepts each mode with a default, and min and max, in its own format", () => {
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [captured()] }));
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ id: "day", type: "date", label: "Day", default: "2024-02-29" }] }), "mode defaults to date");
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ id: "at", type: "date", label: "At", mode: "time", default: "09:30", min: "09:00", max: "17:00" }] }));
+	});
+	it("refuses a value that does not parse in the mode, naming the field and the format", () => {
+		failsWith(withDate({ default: "2026-10-25" }), "inputs[0].default", 'must be written YYYY-MM-DDTHH:MM in mode "datetime", got "2026-10-25"');
+		failsWith(withDate({ mode: "date", default: "2026-02-30", min: undefined, max: undefined }), "inputs[0].default", "YYYY-MM-DD");
+		failsWith(withDate({ mode: "time", default: "24:00", min: undefined, max: undefined }), "inputs[0].default", 'HH:MM in mode "time"');
+		failsWith(withDate({ min: "2020-01-01" }), "inputs[0].min", "YYYY-MM-DDTHH:MM");
+		failsWith(withDate({ max: 2026 }), "inputs[0].max", "got 2026");
+		failsWith(withDate({ mode: "week" }), "inputs[0].mode", 'one of "date", "time", "datetime"');
+	});
+	it("holds min to default to max", () => {
+		failsWith(withDate({ default: "2019-12-31T23:59" }), "inputs[0].default", "Captured at must be on or after 2020-01-01T00:00, got 2019-12-31T23:59");
+		failsWith(withDate({ default: "2026-10-26T00:00" }), "inputs[0].default", "on or before 2026-10-25T23:59, got 2026-10-26T00:00");
+		failsWith(withDate({ min: "2027-01-01T00:00", default: "2027-01-01T00:00" }), "inputs[0].default", "on or before 2026-10-25T23:59");
+	});
+	it("refuses mode on any other input", () => {
+		failsWith((m) => { m.inputs = [{ id: "name", type: "text", label: "Name", default: "", mode: "date" }]; }, "inputs[0].mode", "only a date");
+	});
+	it("checks a sample and a preset like a reader's value, so neither ships a date the form refuses", () => {
+		const m = { ...good(), inputs: [captured()], samples: [{ label: "Late", input: { captured: "2026-11-02T09:30" } }] };
+		assert.throws(() => validateManifest(m), /samples\[0\]\.input\.captured: Captured at must be on or before 2026-10-25T23:59, got 2026-11-02T09:30\./);
+		assert.throws(() => validateManifest({ ...m, samples: [{ label: "Bad", input: { captured: 5 } }] }), /must be a date and time as YYYY-MM-DDTHH:MM, got 5/);
+		assert.doesNotThrow(() => validateManifest({ ...m, samples: [{ label: "Early", input: { captured: "2020-01-01T00:00" } }] }));
+	});
+});
+
+/*
+ * The messages a reader sees when the runtime refuses a value before `run` (#203), written from the mockup by
+ * hand: the label, what was wrong, and what arrived.
+ */
+describe("inputProblem", () => {
+	const at = { id: "captured", type: "date", label: "Captured at", mode: "datetime", default: "2026-10-25T14:30", min: "2020-01-01T00:00", max: "2026-10-25T23:59" } as const;
+	it("says what is wrong with a date, time or both, naming the input", () => {
+		assert.equal(inputProblem(at, "2026-11-02T09:30"), "Captured at must be on or before 2026-10-25T23:59, got 2026-11-02T09:30.");
+		assert.equal(inputProblem(at, "2019-06-01T08:00"), "Captured at must be on or after 2020-01-01T00:00, got 2019-06-01T08:00.");
+		assert.equal(inputProblem(at, ""), "Captured at needs a date and time, as YYYY-MM-DDTHH:MM.");
+		assert.equal(inputProblem(at, "2026-10-25 14:30"), 'Captured at must be a date and time as YYYY-MM-DDTHH:MM, got "2026-10-25 14:30".');
+		assert.equal(inputProblem({ id: "d", type: "date", label: "Day", default: "2024-02-29" }, "2025-02-29"), 'Day must be a date as YYYY-MM-DD, got "2025-02-29".');
+		assert.equal(inputProblem({ id: "t", type: "date", label: "Start", mode: "time", default: "09:00" }, ""), "Start needs a time, as HH:MM.");
+	});
+	it("finds nothing in a good value, or in an input the form already holds to its rules", () => {
+		assert.equal(inputProblem(at, "2026-10-25T23:59"), undefined);
+		assert.equal(inputProblem(at, "2020-01-01T00:00"), undefined);
+		assert.equal(inputProblem({ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9 }, 400), undefined);
 	});
 });

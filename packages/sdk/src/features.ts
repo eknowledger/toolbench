@@ -44,6 +44,8 @@ export const LATER = {
 	"inputs.share": 8,
 	"inputs.role": 8,
 	"inputs.details": 8,
+	"inputs.mode": 9,
+	"type.date": 9,
 	"options.sets": 6,
 	// A value of `control`, because the key is older than most of its values.
 	"control.slider": 4,

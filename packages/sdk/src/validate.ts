@@ -111,6 +111,40 @@ function validateGrammar(raw: unknown, path: string): void {
 	}
 }
 
+/*
+ * Dates (#203): each mode's format as a message writes it, and the reading of one. A day must exist, so
+ * 2025-02-29 is refused; a time runs 00:00 to 23:59. Values in one format compare as strings, which is why
+ * the range checks below are plain `<`.
+ */
+const DATE_FORMATS = { date: "YYYY-MM-DD", time: "HH:MM", datetime: "YYYY-MM-DDTHH:MM" };
+type DateMode = keyof typeof DATE_FORMATS;
+const isTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+const isDay = (v: string) => {
+	const day = new Date(`${v}T00:00Z`);
+	return /^\d{4}-\d\d-\d\d$/.test(v) && !Number.isNaN(+day) && day.toISOString().startsWith(v);
+};
+const isDate = (mode: DateMode, v: unknown): v is string =>
+	typeof v === "string" && (mode === "date" ? isDay(v) : mode === "time" ? isTime(v) : v[10] === "T" && isDay(v.slice(0, 10)) && isTime(v.slice(11)));
+
+/**
+ * What is wrong with a value of an input whose rules the browser does not hold a reader to, as the sentence
+ * the reader sees, naming the input by its label; `undefined` when nothing is. The runtime refuses a value
+ * this finds before calling `run`, showing it as an error on that input, so `run` can trust the format and
+ * the range. A native date control lets a reader type a day outside `min..max`, and empties itself while a
+ * date is half typed. Validation applies it to samples and presets too. Contract version 9.
+ */
+export function inputProblem(spec: InputSpec, value: unknown): string | undefined {
+	if (spec.type === "date") {
+		const mode = spec.mode ?? "date";
+		const noun = mode === "datetime" ? "a date and time" : `a ${mode}`;
+		if (value === "") return `${spec.label} needs ${noun}, as ${DATE_FORMATS[mode]}.`;
+		if (!isDate(mode, value)) return `${spec.label} must be ${noun} as ${DATE_FORMATS[mode]}, got ${JSON.stringify(value)}.`;
+		if (spec.min && value < spec.min) return `${spec.label} must be on or after ${spec.min}, got ${value}.`;
+		if (spec.max && value > spec.max) return `${spec.label} must be on or before ${spec.max}, got ${value}.`;
+	}
+	return undefined;
+}
+
 function validateInput(raw: unknown, path: string): InputSpec {
 	const o = obj(raw, path);
 	misplaced(o, "input", `${path}.`);
@@ -128,6 +162,7 @@ function validateInput(raw: unknown, path: string): InputSpec {
 	// An empty disclosure would offer the reader "More" and open on nothing.
 	if (o.details !== undefined && (typeof o.details !== "string" || o.details === "")) fail(`${path}.details`, "must be a non-empty string");
 	const type = oneOf(o.type, INPUT_TYPES, `${path}.type`);
+	if (o.mode !== undefined && type !== "date") fail(`${path}.mode`, `only a date input has a mode; on a ${type} input it would be ignored`);
 	// The control each type can ask for: a number's slider (v4), a select's segments (v9). On any other type it is ignored, as it always was.
 	const control = type === "number" ? "slider" : type === "select" ? "segmented" : undefined;
 	if (control && o.control !== undefined && o.control !== control) fail(`${path}.control`, `control must be "${control}" when present, got ${JSON.stringify(o.control)}`);
@@ -185,6 +220,18 @@ function validateInput(raw: unknown, path: string): InputSpec {
 		}
 		case "toggle": {
 			if (typeof o.default !== "boolean") fail(`${path}.default`, "a toggle input needs a boolean default");
+			break;
+		}
+		case "date": {
+			const mode = o.mode === undefined ? "date" : oneOf(o.mode, ["date", "time", "datetime"] as const, `${path}.mode`);
+			for (const key of ["min", "default", "max"]) {
+				if ((key === "default" || o[key] !== undefined) && !isDate(mode, o[key])) {
+					fail(`${path}.${key}`, `must be written ${DATE_FORMATS[mode]} in mode "${mode}", got ${JSON.stringify(o[key])}`);
+				}
+			}
+			// Held to what a reader is held to, so the form never opens refusing its own default.
+			const problem = inputProblem(o as unknown as InputSpec, o.default);
+			if (problem) fail(`${path}.default`, problem);
 			break;
 		}
 	}
@@ -267,6 +314,11 @@ function checkPayload(payload: Record<string, unknown>, byId: Map<string, InputS
 			case "toggle": {
 				if (typeof value !== "boolean") fail(where, `must be true or false, because "${key}" is a toggle`);
 				break;
+			}
+			default: {
+				// A sample or a preset is held to what the runtime holds a reader's value to before `run`.
+				const problem = inputProblem(spec, value);
+				if (problem) fail(where, problem);
 			}
 		}
 	}
@@ -389,7 +441,7 @@ function validateSamples(raw: unknown, specs: InputSpec[]): void {
  */
 export const TOP_LEVEL_KEYS = ["sdk", "id", "name", "blurb", "version", "capabilities", "inputs", "kinds", "runtime", "status", "card", "cardFields", "autoRun", "timeoutMs", "help", "tags", "links", "samples", "reset"];
 export const RUNTIME_KEYS = ["entry", "thread"];
-export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details"];
+export const INPUT_KEYS = ["type", "label", "description", "unit", "primary", "dir", "default", "min", "max", "step", "control", "options", "rows", "maxLength", "lang", "grammar", "share", "role", "details", "mode"];
 
 function misplaced(o: Record<string, unknown>, where: "manifest" | "runtime" | "input", path: string): void {
 	const belongs = (key: string): string | undefined => {

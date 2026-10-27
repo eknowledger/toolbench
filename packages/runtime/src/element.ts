@@ -33,7 +33,7 @@
  *    "go now", and is wrong anyway for anything slow.
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
-import { isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
+import { inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -857,12 +857,23 @@ export class ToolHost extends HTMLElement {
 		this.#setBusy(true);
 		this.#say("running…");
 		try {
-			const output = await runner.run(loaded, this.#values, {
-				onProgress: (fraction, partial) => {
-					this.#setProgress(fraction);
-					if (partial && resets === this.#resets) this.#draw(partial);
-				},
-			});
+			// A value the form cannot hold a reader to, a date out of range say, is refused here, naming its input (#203).
+			let refused: Output | undefined;
+			for (const spec of this.#manifest?.inputs ?? []) {
+				const message = inputProblem(spec, this.#values[spec.id]);
+				if (message) {
+					refused = { kind: "error", message, input: spec.id };
+					break;
+				}
+			}
+			const output =
+				refused ??
+				(await runner.run(loaded, this.#values, {
+					onProgress: (fraction, partial) => {
+						this.#setProgress(fraction);
+						if (partial && resets === this.#resets) this.#draw(partial);
+					},
+				}));
 			if (resets !== this.#resets) return;
 			this.#setBusy(false);
 			this.#draw(output);
@@ -1444,16 +1455,17 @@ export class ToolHost extends HTMLElement {
 				break;
 			}
 			default: {
-				const input = el("input", {
-					class: "tb-input",
-					id,
-					type: "text",
-					spellcheck: "false",
-					autocapitalize: "off",
-					autocomplete: "off",
-					dir: spec.dir ?? "auto",
-					...(spec.maxLength !== undefined ? { maxlength: spec.maxLength } : {}),
-				});
+				/*
+				 * A date (#203) is the browser's own picker, dark on a dark page because `color-scheme` is inherited.
+				 * It lets a reader type a day outside min..max and empties itself while a date is half typed, so the
+				 * value is checked before `run`, by `inputProblem`, rather than trusted.
+				 */
+				const input = el(
+					"input",
+					spec.type === "date"
+						? { class: "tb-input", id, type: spec.mode === "datetime" ? "datetime-local" : (spec.mode ?? "date"), min: spec.min, max: spec.max, dir: "ltr" }
+						: { class: "tb-input", id, type: "text", spellcheck: "false", autocapitalize: "off", autocomplete: "off", dir: spec.dir ?? "auto", maxlength: spec.maxLength },
+				);
 				input.value = String(this.#values[spec.id] ?? spec.default);
 				input.addEventListener("input", () => {
 					this.#values[spec.id] = input.value;

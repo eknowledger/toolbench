@@ -3,7 +3,8 @@
  *
  * Used by typed input, by sample buttons, and by the host `values` setter. A host is not more
  * trustworthy than a reader, so the three paths share this: a number outside min/max is clamped,
- * an invalid select falls back to the default, and a string longer than maxLength is cut.
+ * an invalid select falls back to the default, and a string longer than maxLength is cut. A date is
+ * kept as written, and refused before `run` if it is not one.
  *
  * `validateManifest` already refuses a sample outside those bounds, so for samples this is a
  * backstop rather than the guard. A host-set value never went through that check.
@@ -20,6 +21,9 @@ export function coerce(spec: InputSpec, value: string | number | boolean): strin
 			return Boolean(value);
 		case "select":
 			return spec.options.some((option) => option.value === String(value)) ? String(value) : spec.default;
+		// As written, in range or not: the check before `run` names what arrived rather than a substitute.
+		case "date":
+			return String(value);
 		default: {
 			const text = String(value);
 			return spec.maxLength !== undefined ? text.slice(0, spec.maxLength) : text;
