@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-19.5%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-19.8%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -723,7 +723,9 @@ host.run();                                            // optional
 
 Unspecified inputs keep their current value. Out-of-range numbers are clamped, an invalid `select`
 falls back to that input's default, and a string longer than `maxLength` is cut: a host is not more
-trustworthy than a reader. A list is taken whole or not at all: a multiselect given an unknown option, a
+trustworthy than a reader. What a reader types, and what a shared link carries, is not clamped: a number
+outside its range stays in the box, marked, and Run refuses it, so reading `values` can give a number
+outside `min..max`, or the box's text when it is empty or not a number. A list is taken whole or not at all: a multiselect given an unknown option, a
 repeat or more than `max` falls back to its whole default, and so does a rows list with a cell its column
 cannot hold or more than `maxRows`. ⚠️ Since contract version 9 a value can be a list, a multiselect's
 `string[]` or a rows input's `Row[]`, so host code that treats every entry of `values` as a string, a number
@@ -942,10 +944,10 @@ bench:
 
 | | Transfer |
 |---|---|
-| Runtime, as a host loads it, once per page that uses a tool | 19.5 KB |
-| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 23.9 KB |
+| Runtime, as a host loads it, once per page that uses a tool | 19.8 KB |
+| Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 24.2 KB |
 | Manifest validation, only for a page with manifests not checked at build time, before the first paint | 6.9 KB |
-| Checks before a run, once per page where a tool is opened, with its code | 0.7 KB |
+| Checks before a run, once per page where a tool is opened, with its code | 0.9 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |

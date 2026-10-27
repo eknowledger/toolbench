@@ -1,8 +1,9 @@
 /**
  * Bring a value arriving from outside the form into what its spec allows.
  *
- * Used by typed input, by sample buttons, by the host `values` setter and by a shared link. A host is not
- * more trustworthy than a reader, so the paths share this: a number outside min/max is clamped, an invalid
+ * Used by sample buttons and the host `values` setter, and by typing and a shared link through `written`. A
+ * host is not more trustworthy than a reader, so the paths share this: a number outside min/max is clamped
+ * (but see `written`), an invalid
  * select falls back to the default, and a string longer than maxLength is cut. A date is kept as written,
  * and refused before `run` if it is not one.
  *
@@ -15,7 +16,7 @@
  */
 import type { InputSpec, InputValue, InputValues, Row, RowColumn } from "@toolbench/sdk";
 
-export function coerce(spec: InputSpec, value: InputValue): InputValue {
+export function coerce(spec: InputSpec, value: InputValue, asWritten = false): InputValue {
 	switch (spec.type) {
 		case "number": {
 			const n = Number(value);
@@ -38,7 +39,7 @@ export function coerce(spec: InputSpec, value: InputValue): InputValue {
 			return whole ? chosen : [...spec.default];
 		}
 		case "rows": {
-			const rows = Array.isArray(value) && value.length <= spec.maxRows ? value.map((row) => cells(spec.columns, row)) : undefined;
+			const rows = Array.isArray(value) && value.length <= spec.maxRows ? value.map((row) => cells(spec.columns, row, asWritten)) : undefined;
 			return rows?.every(Boolean) ? (rows as Row[]) : structuredClone(spec.default);
 		}
 		default: {
@@ -49,11 +50,25 @@ export function coerce(spec: InputSpec, value: InputValue): InputValue {
 }
 
 /**
+ * A value as the reader typed it, or as a link carried it (#262): a number is kept as written, in range or
+ * not, and an empty or unreadable box is the string it holds, so `inputProblem` refuses it before `run` and
+ * names what is on screen. Clamped here, 99999 under a max of 5000 ran and was shared as 5000 while the box
+ * still said 99999, and an emptied box ran on the min. Every other type is `coerce`.
+ */
+export function written(spec: InputSpec, value: InputValue): InputValue {
+	// A rows input's number cells the same way, each refused with its row named.
+	if (spec.type !== "number") return coerce(spec, value, true);
+	const n = value === "" ? Number.NaN : Number(value);
+	return Number.isFinite(n) ? n : String(value);
+}
+
+/**
  * One row brought to its columns (#204), or `undefined` for a row that cannot be used: a missing cell, an
  * unknown option, a number that is not one, a toggle that is neither true nor false. A number is clamped and
  * a text cut, as typing does; a key that is no column is dropped. Text from a link reads as typed.
+ * `asWritten`, for typing and a link (#262), keeps a number cell as written, and an empty one as its text.
  */
-export function cells(columns: readonly RowColumn[], row: unknown): Row | undefined {
+export function cells(columns: readonly RowColumn[], row: unknown, asWritten = false): Row | undefined {
 	const given = Object(row) as Record<string, unknown>;
 	const out: Row = {};
 	for (const column of columns) {
@@ -61,8 +76,9 @@ export function cells(columns: readonly RowColumn[], row: unknown): Row | undefi
 		if (v === undefined || v === null || typeof v === "object") return undefined;
 		if (column.type === "number") {
 			const n = v === "" ? Number.NaN : Number(v);
-			if (!Number.isFinite(n)) return undefined;
-			out[column.id] = Math.min(column.max, Math.max(column.min, n));
+			if (asWritten) out[column.id] = Number.isFinite(n) ? n : String(v);
+			else if (!Number.isFinite(n)) return undefined;
+			else out[column.id] = Math.min(column.max, Math.max(column.min, n));
 		} else if (column.type === "toggle") {
 			if (v !== true && v !== false && v !== "true" && v !== "false") return undefined;
 			out[column.id] = v === true || v === "true";
@@ -80,19 +96,19 @@ export function cells(columns: readonly RowColumn[], row: unknown): Row | undefi
  * Unspecified inputs keep their current value. Unknown ids are ignored: they are not inputs, and
  * writing them into the map would make `run` see keys the tool never declared.
  */
-export function applyPartialValues(inputs: readonly InputSpec[], current: InputValues, partial: InputValues): InputValues {
+export function applyPartialValues(inputs: readonly InputSpec[], current: InputValues, partial: InputValues, bring = coerce): InputValues {
 	const next: InputValues = { ...current };
 	for (const spec of inputs) {
 		const value = partial[spec.id];
 		if (value === undefined) continue;
-		next[spec.id] = coerce(spec, value);
+		next[spec.id] = bring(spec, value);
 	}
 	return next;
 }
 
 /**
  * What the default link on this page says a tool's inputs are (#227): each input under `<tool id>.<input id>`,
- * as the share button writes it. Uncoerced: `applyPartialValues` does that, as for any value from outside.
+ * as the share button writes it. Uncoerced: `applyPartialValues` does that with `written`, as typing does.
  *
  * A multiselect is every repeat of its key, and the bare key alone (`dns.types=`) is none chosen, because an
  * option value is never empty (#204). A toggle is true only for the word `true`; `Boolean("false")` is not.

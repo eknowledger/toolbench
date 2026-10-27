@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { InputSpec, InputValues } from "@toolbench/sdk";
 import { shareableInputs } from "@toolbench/sdk";
-import { applyPartialValues, coerce, fromQuery } from "./values.ts";
+import { applyPartialValues, cells, coerce, fromQuery, written } from "./values.ts";
 
 const numberSpec = {
 	id: "arrivals",
@@ -251,5 +251,32 @@ describe("fromQuery: rows, one key per column zipped by position (#204)", () => 
 		assert.deepEqual(read("rl.limits="), { limits: [] });
 		const uneven = read("rl.limits.path=%2Fa&rl.limits.path=%2Fb&rl.limits.limit=5&rl.limits.scheme=https&rl.limits.on=true");
 		assert.deepEqual(coerce(limitsSpec, uneven.limits as never), DEFAULT_ROWS);
+	});
+});
+
+describe("written: a value as typed, or as a link carried it (#262)", () => {
+	it("keeps a number as written, in range or not, for the check before run to refuse", () => {
+		assert.equal(written(numberSpec, "99999"), 99999);
+		assert.equal(written(numberSpec, "0"), 0);
+		assert.equal(written(numberSpec, 12.5), 12.5);
+	});
+	it("keeps an empty or unreadable box as its text, not the min that Number(\"\") clamped to", () => {
+		assert.equal(written(numberSpec, ""), "");
+		assert.equal(written(numberSpec, "abc"), "abc");
+	});
+	it("keeps a rows input's number cells as written too, where coerce clamps them", () => {
+		const limit = { id: "limit", type: "number", label: "Limit", min: 1, max: 10000 } as const;
+		assert.deepEqual(cells([limit], { limit: "9999999" }, true), { limit: 9999999 });
+		assert.deepEqual(cells([limit], { limit: "" }, true), { limit: "" });
+		assert.deepEqual(cells([limit], { limit: "9999999" }), { limit: 10000 });
+		assert.equal(cells([limit], { limit: "" }), undefined);
+	});
+	it("is coerce for every other type", () => {
+		assert.equal(written(selectSpec, "bogus"), "nearest");
+		assert.equal(written(textSpec, "x".repeat(20)), "xxxxxxxx");
+	});
+	it("is what applyPartialValues uses when asked, and a host's write is still clamped", () => {
+		assert.equal(applyPartialValues([numberSpec], { arrivals: 800 }, { arrivals: "99999" }, written).arrivals, 99999);
+		assert.equal(applyPartialValues([numberSpec], { arrivals: 800 }, { arrivals: 99999 }).arrivals, 5000);
 	});
 });

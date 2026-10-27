@@ -731,10 +731,36 @@ describe("inputProblem", () => {
 		assert.equal(inputProblem(token, "tb_live_9f2c7a41"), undefined);
 		assert.equal(inputProblem({ id: "token", type: "secret", label: "Token" }, ""), undefined, "with no minLength, empty is a value");
 	});
+	it("says a number is outside its range, or is not one, rather than leaving it to a clamp (#262)", () => {
+		const loss = { id: "loss", type: "number", label: "Packet loss", default: 1, min: 0, max: 99 } as const;
+		assert.equal(inputProblem(loss, 999), "Packet loss must be between 0 and 99, got 999.");
+		assert.equal(inputProblem(loss, -1), "Packet loss must be between 0 and 99, got -1.");
+		assert.equal(inputProblem(loss, ""), "Packet loss needs a number between 0 and 99.");
+		assert.equal(inputProblem(loss, "1e"), "Packet loss needs a number between 0 and 99.");
+		assert.equal(inputProblem(loss, 0), undefined);
+		assert.equal(inputProblem(loss, 99), undefined);
+		assert.equal(inputProblem(loss, 12.5), undefined, "step is the arrow keys' increment, not a rule");
+	});
+	it("says which row of a rows input holds a number cell out of range, or an empty one", () => {
+		const limits = {
+			id: "limits",
+			type: "rows",
+			label: "Limits",
+			maxRows: 8,
+			columns: [
+				{ id: "path", type: "text", label: "Path" },
+				{ id: "limit", type: "number", label: "Limit", min: 1, max: 10000 },
+			],
+			default: [],
+		} as const;
+		assert.equal(inputProblem(limits, [{ path: "/a", limit: 5 }, { path: "/b", limit: 9999999 }]), "Limits, row 2: Limit must be between 1 and 10000, got 9999999.");
+		assert.equal(inputProblem(limits, [{ path: "/a", limit: "" }]), "Limits, row 1: Limit needs a number between 1 and 10000.");
+		assert.equal(inputProblem(limits, [{ path: "/a", limit: 10000 }]), undefined);
+	});
 	it("finds nothing in a good value, or in an input the form already holds to its rules", () => {
 		assert.equal(inputProblem(at, "2026-10-25T23:59"), undefined);
 		assert.equal(inputProblem(at, "2020-01-01T00:00"), undefined);
-		assert.equal(inputProblem({ id: "n", type: "number", label: "N", default: 1, min: 0, max: 9 }, 400), undefined);
+		assert.equal(inputProblem({ id: "t", type: "toggle", label: "T", default: false }, true), undefined);
 	});
 });
 
