@@ -33,7 +33,7 @@
  *    "go now", and is wrong anyway for anything slow.
  */
 import type { InputSpec, InputValues, Manifest, Output, Row, Sample, SelectOption } from "@toolbench/sdk";
-import { defaultInputs, inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
+import { defaultInputs, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -247,6 +247,12 @@ let controls: typeof import("./controls.ts") | undefined;
 let picker: typeof import("./choices.ts") | undefined;
 /** A rows input's list (#204), once a tool that has one has activated. */
 let lister: typeof import("./rows.ts") | undefined;
+/*
+ * The checks before a run (#203), in the validation chunk, once any tool has activated. Every tool waits on
+ * them, since a rule for a new input type should not depend on a list here remembering it. On a page whose
+ * `RegistrySource` has listed its tools the chunk is already in, so nothing is fetched.
+ */
+let checks: typeof import("./validation.ts") | undefined;
 const loadShare = () => (shareLoad ??= import("./share.ts").then((module) => void (sharer = module)));
 
 /** Defines the element. Call once, with the source your host provides. */
@@ -767,7 +773,10 @@ export class ToolHost extends HTMLElement {
 				!picker && this.#manifest?.inputs.some((input) => input.type === "multiselect")
 					? import("./choices.ts").then((module) => void (picker = module), () => undefined)
 					: undefined;
+			// Fatal if it fails, as the tool's code is: `run` is promised the values these refuse.
+			const checked = checks ? undefined : import("./validation.ts").then((module) => void (checks = module));
 			this.#loaded = await this.#resolve(cfg);
+			await checked;
 			await chart;
 			await paint;
 			await share;
@@ -878,7 +887,7 @@ export class ToolHost extends HTMLElement {
 			// A value the form cannot hold a reader to, a date out of range say, is refused here, naming its input (#203).
 			let refused: Output | undefined;
 			for (const spec of this.#manifest?.inputs ?? []) {
-				const message = inputProblem(spec, this.#values[spec.id]);
+				const message = checks?.inputProblem(spec, this.#values[spec.id]);
 				if (message) {
 					refused = { kind: "error", message, input: spec.id };
 					break;

@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { upgradeManifest } from "../packages/sdk/src/migrate.ts";
+import { upgradeManifest } from "../packages/sdk/src/upgrade.ts";
 import { validateManifest } from "../packages/sdk/src/validate.ts";
 import { SDK_VERSION } from "../packages/sdk/src/version.ts";
 import {
@@ -16,7 +16,7 @@ import {
 	loadRegistrySource,
 	syntheticEntries,
 	syntheticManifest,
-	timeConstruction,
+	timeValidation,
 } from "./measure-registry-source.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -43,7 +43,7 @@ describe("syntheticEntries", () => {
 	});
 });
 
-describe("RegistrySource construction", () => {
+describe("RegistrySource construction and first list()", () => {
 	it(`accepts ${COUNT} synthetic tools and keeps every id`, async () => {
 		const RegistrySource = await loadRegistrySource();
 		const entries = syntheticEntries(COUNT);
@@ -54,15 +54,15 @@ describe("RegistrySource construction", () => {
 		assert.equal(source.manifest("synth-0499")?.id, "synth-0499");
 	});
 
-	it("refuses two tools that claim the same id, so this is the real constructor", async () => {
+	it("refuses two tools that claim the same id, so this is the real source", async () => {
 		const RegistrySource = await loadRegistrySource();
 		const [entry] = syntheticEntries(1);
-		assert.throws(() => new RegistrySource([entry, entry]), /unique/);
+		await assert.rejects(new RegistrySource([entry, entry]).list(), /unique/);
 	});
 
-	it("returns a finite median without treating the constructor as dead code", async () => {
+	it("returns a finite median without treating the validation as dead code", async () => {
 		const RegistrySource = await loadRegistrySource();
-		const result = timeConstruction(RegistrySource, syntheticEntries(COUNT), {
+		const result = await timeValidation(RegistrySource, syntheticEntries(COUNT), {
 			warmup: 1,
 			iterations: 3,
 		});

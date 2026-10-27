@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-32.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-25.6%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -243,6 +243,19 @@ defineToolHost({
   // wide: "fit", wideToggle: true,
 });
 ```
+
+`RegistrySource` validates every manifest on its first `list()` or `load()`, from a chunk of its own
+fetched then, and nothing is drawn until it has run.
+
+> ⚠️ **A bad manifest no longer throws from `new RegistrySource()`.** Since validation left the chunk every
+> page loads, the constructor accepts anything; `list()` and `load()` reject with the same `ManifestError`,
+> naming the field, and every `<tool-host>` on the page shows that message. A host that caught the
+> constructor's error should await `source.list()` instead. `source.manifest(id)` is `undefined` until
+> `list()` has resolved.
+
+The validation chunk is one more request before the first card paints: 110 ms later on the project
+site's landing page with a 100 ms round trip, measured in Chrome. A `<link rel="modulepreload">` for it
+in your page's HTML fetches it alongside the runtime instead, which measured within 6 ms of before.
 
 With a bundler that supports directory globs, the source is a loop over the glob instead of a literal
 map. [`bench/src/registry.ts`](bench/src/registry.ts) is the version this repository uses, and it
@@ -885,7 +898,8 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 32.3 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 25.6 KB |
+| Manifest validation, once per page whose `RegistrySource` lists its tools, before the first paint | 7.4 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.6 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |

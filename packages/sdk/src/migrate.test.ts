@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canLoad, MIGRATIONS, type Migration, upgradeManifest, upgradeOutput, VersionError } from "./migrate.ts";
+import { canLoad, MIGRATIONS, type Migration, upgradeOutput, VersionError } from "./migrate.ts";
+import { upgradeManifest } from "./upgrade.ts";
 import type { Output } from "./types.ts";
 import { SDK_CHANGELOG, SDK_VERSION, SUPPORTED_SDK_VERSIONS } from "./version.ts";
 

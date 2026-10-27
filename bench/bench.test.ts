@@ -3924,6 +3924,93 @@ describe("failure paths", () => {
 	});
 });
 
+/*
+ * Manifest validation is a chunk of its own (#259), fetched by the source's first `list()`, and it is a
+ * security property that nothing is drawn from a manifest before it has run: a `javascript:` link once
+ * rendered as a working link. So these hold the chunk back and look at the page, rather than trusting that
+ * `list()` awaits it.
+ */
+describe("manifest validation, a chunk of its own (#259)", () => {
+	const isValidation = (url: string) => /\/assets\/validation-[^/]+\.js$/.test(url);
+
+	it("refuses a bad manifest in list(), naming the field on every host, and draws nothing from any manifest", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/index.html?badManifest=link`, { waitUntil: "load" });
+		const expected = "links[0].href: must be an http, https or mailto URL, or a relative path, with no spaces or control characters";
+		await page.waitForFunction(
+			() => [...document.querySelectorAll("tool-host")].every((host) => host.shadowRoot?.querySelector(".tb-error-message")),
+			null,
+			{ timeout: 10_000 },
+		);
+		const seen = await page.evaluate(() =>
+			[...document.querySelectorAll("tool-host")].map((host) => ({
+				message: host.shadowRoot?.querySelector(".tb-error-message")?.textContent ?? "",
+				role: host.shadowRoot?.querySelector(".tb-out-error")?.getAttribute("role") ?? "",
+				facades: host.shadowRoot?.querySelectorAll(".tb-facade, .tb-form, a").length ?? -1,
+			})),
+		);
+		assert.ok(seen.length > 5, `the page has its hosts: ${seen.length}`);
+		for (const host of seen) assert.deepEqual(host, { message: expected, role: "alert", facades: 0 });
+		assert.deepEqual(scripts.filter((url) => /\/assets\/tool-[a-z-]+-[^/]+\.js$/.test(url)), [], "no tool's code is fetched for a refused source");
+		await page.close();
+	});
+
+	it("draws no card until the chunk has arrived, and every card once it has", async () => {
+		const page = await browser.newPage();
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route(/\/assets\/validation-[^/]+\.js$/, async (route) => {
+			await held;
+			await route.continue();
+		});
+		// Not "load": WebKit holds the load event for a module import still in flight, so it never fired here.
+		await page.goto(`${BASE}/index.html`, { waitUntil: "domcontentloaded" });
+		await page.waitForFunction(() => customElements.get("tool-host") !== undefined);
+		// Anything in a host's root but its stylesheets, so a part drawn under a new class name still counts.
+		const drawn = () =>
+			page.evaluate(() => [...document.querySelectorAll("tool-host")].filter((host) => [...(host.shadowRoot?.children ?? [])].some((child) => child.tagName !== "STYLE" && child.textContent?.trim())).length);
+		// Long enough for every card to have painted without the hold: they paint within a frame of the element being defined.
+		await page.waitForTimeout(500);
+		assert.equal(await drawn(), 0, "a host painted from a manifest that had not been validated");
+		release();
+		await page.waitForFunction(
+			() => [...document.querySelectorAll("tool-host")].every((host) => [...(host.shadowRoot?.children ?? [])].some((child) => child.tagName !== "STYLE" && child.textContent?.trim())),
+			null,
+			{ timeout: 10_000 },
+		);
+		// Counted now, not before the release: the bench adds some hosts from script after the document parses.
+		assert.equal(await drawn(), await page.locator("tool-host").count());
+		await page.close();
+	});
+
+	it("is fetched once for a page of hosts, and not again to open a tool and run it", async () => {
+		const page = await browser.newPage();
+		const scripts: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script") scripts.push(request.url());
+		});
+		await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+		const host = page.locator("tool-host[tool=percentiles][data-seed]");
+		await host.locator(".tb-facade").waitFor();
+		assert.equal(scripts.filter(isValidation).length, 1, `one validation chunk for ${await page.locator("tool-host").count()} hosts: ${scripts.join(", ")}`);
+
+		// Opening a tool fetches the checks before a run with its code; on this page they are already in.
+		await host.locator(".tb-facade").click();
+		await host.locator(".tb-form").waitFor();
+		const before = scripts.length;
+		const ran = host.evaluate((el) => new Promise<boolean>((resolve) => el.addEventListener("tool-run", (event) => resolve((event as CustomEvent<{ ok: boolean }>).detail.ok), { once: true })));
+		await host.locator(".tb-run").click();
+		assert.equal(await ran, true, "the run went through the checks and succeeded");
+		assert.equal(scripts.filter(isValidation).length, 1, "the validation chunk is fetched once");
+		assert.deepEqual(scripts.slice(before), [], "the first Run waits on no request");
+		await page.close();
+	});
+});
+
 describe("lifecycle status", () => {
 	it("refuses to activate a retired tool, explains, and renders its links", async () => {
 		const page = await browser.newPage();

@@ -140,7 +140,8 @@ toolbench/
 │   │   └── src/
 │   │       ├── types.ts            the contract: Output, InputSpec, Manifest, Ctx, Tool
 │   │       ├── validate.ts         manifest validation and the cross-field invariants
-│   │       ├── migrate.ts          version migration chain
+│   │       ├── migrate.ts          version migration chain, and the output half of it
+│   │       ├── upgrade.ts          upgradeManifest, the manifest half, apart so boot does not carry it
 │   │       ├── seed.ts             build-time seeding, and safe serialisation for a script tag
 │   │       ├── fixtures.ts         the tool-directory walk. Node-only, exported at ./fixtures
 │   │       ├── testing.ts          fixture runner and result comparison
@@ -156,6 +157,7 @@ toolbench/
 │           ├── worker.ts           createToolWorker, the worker side of the protocol
 │           ├── protocol.ts         message types and error classes
 │           ├── sources.ts          ToolSource interface, RegistrySource
+│           ├── validation.ts       manifest validation and the checks before a run, a chunk fetched by list()
 │           ├── styles.ts           the shadow stylesheet and the theming surface
 │           ├── dom.ts              three element helpers, so no framework is needed
 │           ├── controls.ts         the newer inputs' controls, a chunk fetched only by a tool with one
@@ -335,7 +337,9 @@ timeoutMs: is only meaningful with runtime.thread = "worker". On the main thread
 
 The cross-field invariants at the bottom of the file are the interesting part; §8 lists them.
 
-**`migrate.ts`** holds the migration chain: two steps today, `1 → 2` and `2 → 3`, with every half the
+**`migrate.ts`** holds the migration chain, and `upgradeOutput`; `upgradeManifest` is beside it in
+`upgrade.ts`, because the runtime upgrades outputs in the chunk every page loads and validates manifests in
+a chunk of its own, and a bundler splits by module. The chain: two steps today, `1 → 2` and `2 → 3`, with every half the
 identity function. The machinery was built before anything needed it, and tested with synthetic versions,
 which is why the first real entry was a five-line change rather than a design exercise under pressure. It
 repaid that twice over: while still synthetic, the tests caught a bug where the chain silently did
@@ -467,9 +471,14 @@ export interface ToolSource {
 }
 ```
 
-`RegistrySource` is the implementation hosts use. It validates and migrates every manifest on
-construction, so a malformed tool is a startup error with a field name rather than a mystery at render
-time, and it refuses two tools claiming the same id.
+`RegistrySource` is the implementation hosts use. It validates and migrates every manifest on its first
+`list()` or `load()`, so a malformed tool rejects that call with a field name rather than becoming a
+mystery at render time, and it refuses two tools claiming the same id.
+
+⚠️ Not on construction, which it was until #259. The validator is the `validation` chunk, fetched by that
+first call, so the constructor has nothing to validate with and no longer throws. Every `<tool-host>` on the
+page shows the rejection instead. A manifest reaches the element only through `list()`, so nothing is ever
+drawn from one that has not been validated, which is the property the link-scheme defect in §14 depends on.
 
 **`render/`** holds one function per result kind plus the dispatcher. The dispatcher ends with:
 
@@ -570,11 +579,11 @@ sequenceDiagram
     participant S as ToolSource
 
     H->>S: new RegistrySource(entries)
-    Note over S: every manifest is migrated and validated here,<br/>duplicate ids refused
     H->>CE: defineToolHost({source, workerFactory, pageUrl})
     CE->>EL: connectedCallback
     EL->>EL: read inline seed if present
     EL->>S: list()
+    Note over S: first call only: fetch the validation chunk,<br/>migrate and validate every manifest,<br/>refuse duplicate ids
     S-->>EL: manifests
     EL->>EL: find by id, seed input values from defaults
     EL->>EL: paint the facade
@@ -586,7 +595,7 @@ sequenceDiagram
 ```
 
 The sequence shows registration, from the host's script to a painted facade. Nothing has been downloaded
-except the manifest data, which was already in the page's bundle.
+but the manifest data, which was already in the page's bundle, and the validation chunk, once per page.
 
 ### 7.2 Activation
 
@@ -727,7 +736,7 @@ Rules the rest of the system relies on. Each is checked once, in one place, and 
 | `manifest.sdk` is a version this SDK can read | `migrate.ts`, `validate.ts` | A tool from the future renders half correctly |
 | Nothing a manifest uses, and nothing its cases or samples return, is newer than its declared `sdk` | `features.ts`, called by `upgradeManifest` before it stamps the current version, and by `validateManifest`; outputs by the tool-directory harness | A runtime of the declared version loads the tool and silently drops what it does not know: presets, highlighting, a part's name |
 | `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the directory name | `validate.ts`, `tools/cases.test.ts` | Derived links and routes point at the wrong tool |
-| No two tools share an `id` | `RegistrySource` constructor | One silently shadows the other |
+| No two tools share an `id` | `validateEntries` in the runtime's `validation.ts`, on a `RegistrySource`'s first `list()` | One silently shadows the other |
 | Input ids are unique | `validate.ts` | Two inputs answering to one id makes a form ambiguous and a fixture unreadable |
 | A number input declares `min` and `max` | `validate.ts` | An unbounded input turns a bounded computation into a hang |
 | A select has two or more options and its default is one of them | `validate.ts` | A control with one choice, or none selected |
@@ -937,13 +946,13 @@ Eight layers. Each catches something the others structurally cannot.
 | Layer | Where it runs | What it covers | Count |
 |---|---|---|---|
 | `packages/sdk/src/*.test.ts` | Node | Manifest validation and every invariant, the migration chain both synthetically and against the real `1 → 3` steps, seeding, the tool-directory harness's failure modes, and fixture comparison including its guard rails | 234 |
-| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 150 |
+| `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 155 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 29 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
-| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 43 |
+| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 44 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 301 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 304 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -1043,7 +1052,8 @@ table cannot quietly stop being true.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 32.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk) |
+| Runtime plus the bench's own wiring | 25.6 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk). It fell 6.8 KB (6,772 bytes) when manifest validation became a chunk of its own (#259), the row below, which a page that lists its tools still fetches |
+| Manifest validation | 7.4 KB | Its own chunk, fetched by a `RegistrySource`'s first `list()` or `load()`, so once per page that lists tools, before its first card paints: `validateManifest`, `upgradeManifest`, the feature check, duplicate ids and the checks before a run. With boot it is 623 bytes more than boot was alone, because two chunks compress worse than one, and one more request: on the project site's landing page at a 100 ms round trip, every card painted 110 ms later, and within 6 ms of before with a `modulepreload` for it in the HTML. 7,395 bytes |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
@@ -1174,16 +1184,19 @@ Known and accepted, with what each costs.
   it is not painted at all.
 * **The chart is deliberately simple.** No tooltips, no zoom, no time axis. It draws what `Chart`
   describes.
-* **`RegistrySource` is eager about manifests.** Every manifest is parsed and validated at startup,
-  so a malformed tool is a startup error that names the field. Measured 2026-09-19 with
-  `pnpm measure:registry` on Node v24.21.0 (linux x64, Intel Xeon): 500 synthetic current-contract
-  manifests, two inputs each. Three consecutive process runs, 21 timed constructions after 5
-  warmups, had medians of 0.71 ms, 0.98 ms and 0.77 ms (lowest sample 0.47 ms, highest 1.96 ms).
-  Under a millisecond at several hundred tools, so the constructor stays eager. Revisit if a host
-  is in the thousands. Re-measured on review, Node v26.7.0 on an Apple M3 Pro: median 0.33 ms over the
-  same 500. Two machines an order of magnitude apart in this figure both land well under the bar, which
-  is what makes the conclusion safe to rest on rather than a property of one laptop. The script times `new RegistrySource` only. Generation sits outside the
-  timed region, and so does JSON.parse: a host already has objects when it constructs the source.
+* **`RegistrySource` validates every manifest at once.** All of them, on the first `list()`, so a
+  malformed tool rejects that call naming the field. Measured 2026-09-19 with `pnpm measure:registry` on
+  Node v24.21.0 (linux x64, Intel Xeon): 500 synthetic current-contract manifests, two inputs each. Three
+  consecutive process runs, 21 timed constructions after 5 warmups, had medians of 0.71 ms, 0.98 ms and
+  0.77 ms (lowest sample 0.47 ms, highest 1.96 ms). Re-measured 2026-10-26 on Node v26.7.0, Apple M3 Pro,
+  when validation moved into `list()` (#259): the constructor before the move had medians of 2.31, 2.30 and
+  2.15 ms in three runs, and the constructor plus the first `list()` after it 2.06, 2.05 and 2.01 ms (lowest
+  sample 1.82 ms, highest 2.75 ms). A review on the same chip had measured 0.33 ms; what grew it since was
+  not measured. Still a
+  few milliseconds at several hundred tools, so validation stays all-at-once. Revisit if a host is in the
+  thousands. The script times construction and the first `list()`, after a warmup that has already fetched
+  the validation module. Generation sits outside the timed region, and so does JSON.parse: a host already
+  has objects when it constructs the source.
 * **A page whose tool draws a chart downloads one extra chunk.** The `series` renderer is no longer in
   `boot`: it is about 2.0 KB fetched only when a manifest declares `series`. `render` stays synchronous,
   because `<tool-host>` awaits the chunk during `#prepare` rather than at first use. The cost is one request

@@ -245,7 +245,24 @@ const BUDGETS = [
 	 * after a removal and the narrow layout are the rows chunk, below, fetched only by a tool with a rows
 	 * input: 3,314 measured. 30_500 would have left the build 1,838 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 32_500 },
+	/*
+	 * ⚠️ Lowered from 32_500 to 26_000 when manifest validation left this chunk (#259): 32,338 to 25,566
+	 * measured, 6,772 bytes. `validateManifest` and every rule above marked as validation, the manifest half of
+	 * the migration chain, the feature check and the checks before a run are the validation chunk, below, which
+	 * `RegistrySource` fetches on its first `list()`. Read that line before quoting this one: a page that lists
+	 * its tools still downloads both, 623 bytes more in total than before, because two chunks compress worse
+	 * than one. The saving is for a page that loads the runtime and lists nothing, and for a host whose own
+	 * source validates elsewhere. 8 bytes of the figure are the bench passing its registry through `hostRegistry`.
+	 */
+	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 26_000 },
+	/*
+	 * Manifest validation (#259): `validateManifest`, `upgradeManifest` and the feature check, the duplicate-id
+	 * check, and the checks before a run, which `<tool-host>` also asks for with a tool's code. Fetched by a
+	 * source's first `list()` or `load()`, so reader cost: every page that lists tools through `RegistrySource`
+	 * downloads it before its first card paints. 7,395 measured. Split in two, the checks before a run were 722
+	 * of their own and the pair 250 more than one chunk, a saving only a host with its own `ToolSource` would see.
+	 */
+	{ label: "manifest validation", pattern: /^validation-[^/]+\.js$/, budget: 8_000 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -314,7 +331,8 @@ const BUDGETS = [
 	 * the same reason as the theme switch: a consumer does not download it.
 	 */
 	{ label: "bench highlighter", pattern: /^bench-highlight-[^/]+\.js$/, budget: 1_500, deployOnly: true },
-	// `?wide=` and `?wideToggle=` as host options, for the wide-graph tests (#198). 165 measured.
+	// `?wide=` and `?wideToggle=` as host options, for the wide-graph tests (#198). 165 measured. 485 with the share
+	// options (#227) and `?badManifest=` (#259), the registry with a malformed tool for the validation tests.
 	{ label: "bench host options", pattern: /^bench-host-options-[^/]+\.js$/, budget: 500, deployOnly: true },
 	/*
 	 * The chart renderer, fetched only by a page whose tool declares `series`. Counted as reader cost
@@ -451,6 +469,9 @@ const BUDGETS = [
 	 * Raised to 18_750 by #201: a seed's graph is laid out before the paint, so the chunks its layout asks for
 	 * part way through (the search, the repair) are fetched first, and that layout is kept for the draw. 74
 	 * bytes, 18,484 to 18,558.
+	 *
+	 * 18,554 to 18,600 when `GRAPH_COLORS` moved from the SDK's types.ts to its graph.ts (#259): the list was in
+	 * boot, and is now here, where it is read. Inside the budget.
 	 */
 	{ label: "graph: base", pattern: /^graph-[A-Za-z0-9_-]{8}\.js$/, budget: 18_750 },
 	{ label: "graph: tree and radial", pattern: /^graph-tree-[^/]+\.js$/, budget: 2_250 },
@@ -707,9 +728,16 @@ for (const file of unclaimed) {
  * Raised to 39_000 by rows (#204), in the commit that crossed it: 36,659 to 38,448 measured, the same
  * validation, element and values as boot's line above, and the landing page's registry inlining the
  * rate-limits manifest. 37_000 would have been 1,448 bytes over.
+ *
+ * ⚠️ Raised to 39_500 by lazy validation (#259), which took 6,706 bytes out of the HTML's scripts: 38,448 to
+ * 31,742 measured. The validation chunk is fetched by the page's source before its first card paints, so it is
+ * counted here, 7,364, though no tag in the HTML names it. Left out, this line would have reported the landing
+ * page 7.4 KB lighter than it is. Together 39,106, 658 more than before; 39_000 would have been 106 over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 39_000 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 39_500 }];
+// Fetched by every page whose source lists tools, before its first paint, and named by no tag in the HTML (#259).
+const SITE_ALWAYS = [/^validation-[^/]+\.js$/];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");
@@ -733,7 +761,8 @@ if (siteHtml !== null) {
 			...[...text.matchAll(/<link[^>]*rel="(?:stylesheet|modulepreload)"[^>]*href="([^"]+)"|<link[^>]*href="([^"]+)"[^>]*rel="(?:stylesheet|modulepreload)"/g)].map((m) => m[1] ?? m[2]),
 		];
 		// Asset URLs carry the Pages prefix in a production build; the files sit under dist/assets either way.
-		const files = [...new Set(refs.filter((r) => r.includes("/assets/")).map((r) => r.slice(r.indexOf("/assets/") + 1)))];
+		const always = readdirSync(join(SITE, "assets")).filter((f) => SITE_ALWAYS.some((p) => p.test(f))).map((f) => `assets/${f}`);
+		const files = [...new Set([...refs.filter((r) => r.includes("/assets/")).map((r) => r.slice(r.indexOf("/assets/") + 1)), ...always])];
 		const size = files.reduce((sum, f) => sum + gzipSync(readFileSync(join(SITE, f))).length, 0);
 		const over = size > budget;
 		if (over) failed++;
@@ -775,6 +804,9 @@ if (process.argv.includes("--update")) {
 		["README.md", /(runtime-)[\d.]+(%20KB%20gzip)/, kb(find("runtime + host wiring")).replace(" KB", "")],
 		["README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
 		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
+		// Every page that lists tools pays this beside the runtime (#259), so it is published beside it.
+		["README.md", /(\| Manifest validation[^|]*\| )[\d.]+ KB/, kb(find("manifest validation"))],
+		["docs/architecture.md", /(\| Manifest validation[^|]*\| )[\d.]+ KB/, kb(find("manifest validation"))],
 		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 		["README.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],

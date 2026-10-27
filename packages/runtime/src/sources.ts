@@ -16,7 +16,7 @@
  * fetching JavaScript in the browser.
  */
 import type { LoadedTool, Manifest, ToolModule } from "@toolbench/sdk";
-import { upgradeManifest, validateManifest } from "@toolbench/sdk";
+import type { Validated } from "./validation.ts";
 
 export interface ToolSource {
 	/** Every tool this source can offer, already validated and brought up to the current contract. */
@@ -46,34 +46,44 @@ export class ToolNotFoundError extends Error {
  * The everyday source: a map of ids to entries, which a host builds however it likes: by hand, or
  * from a bundler's directory glob.
  *
- * Validation happens once, on construction, so a malformed manifest is a startup error with a field
- * name in it rather than a mystery at render time.
+ * Every manifest is upgraded and validated once, by the first `list()` or `load()`, so a malformed one
+ * rejects that call with a `ManifestError` naming the field, rather than becoming a mystery at render time.
+ *
+ * ⚠️ Not in the constructor, where it was until the validator left the chunk every page loads (#259): a
+ * constructor cannot await the validation chunk, so it no longer throws on a bad manifest. `list()` rejects
+ * with the same message instead, and every `<tool-host>` on the page shows it.
  */
 export class RegistrySource implements ToolSource {
-	#entries = new Map<string, { manifest: Manifest; load(): Promise<ToolModule> }>();
+	#raw: readonly RegistryEntry[];
+	#entries: Validated | undefined;
+	#ready: Promise<Validated> | undefined;
 
 	constructor(entries: Record<string, RegistryEntry> | RegistryEntry[]) {
-		const list = Array.isArray(entries) ? entries : Object.values(entries);
-		for (const entry of list) {
-			const manifest = validateManifest(upgradeManifest(entry.manifest));
-			if (this.#entries.has(manifest.id)) {
-				/*
-				 * Two tools claiming one id is not a small problem: the second silently wins, and every
-				 * link derived from the id then points at the wrong source. Better to refuse.
-				 */
-				throw new Error(`Two tools declare the id "${manifest.id}". Ids must be unique within a source.`);
-			}
-			this.#entries.set(manifest.id, { manifest, load: entry.load });
-		}
+		this.#raw = Array.isArray(entries) ? entries : Object.values(entries);
+	}
+
+	/*
+	 * Once per source. A refused manifest stays refused, but a chunk that failed to arrive is asked for again
+	 * by the next call, because a dropped request says nothing about the manifests.
+	 */
+	#validated(): Promise<Validated> {
+		return (this.#ready ??= import("./validation.ts").then(
+			(module) => (this.#entries = module.validateEntries(this.#raw)),
+			(error: unknown) => {
+				this.#ready = undefined;
+				throw error;
+			},
+		));
 	}
 
 	async list(): Promise<Manifest[]> {
-		return [...this.#entries.values()].map((e) => e.manifest);
+		return [...(await this.#validated()).values()].map((e) => e.manifest);
 	}
 
 	async load(id: string): Promise<LoadedTool> {
-		const entry = this.#entries.get(id);
-		if (!entry) throw new ToolNotFoundError(id, [...this.#entries.keys()]);
+		const entries = await this.#validated();
+		const entry = entries.get(id);
+		if (!entry) throw new ToolNotFoundError(id, [...entries.keys()]);
 		const module = await entry.load();
 		if (typeof module?.default?.run !== "function") {
 			throw new Error(
@@ -83,8 +93,8 @@ export class RegistrySource implements ToolSource {
 		return { manifest: entry.manifest, tool: module.default };
 	}
 
-	/** Synchronous lookup, for a host rendering a card list without awaiting. */
+	/** Synchronous lookup, for a host rendering a card list without awaiting. `undefined` until `list()` has resolved. */
 	manifest(id: string): Manifest | undefined {
-		return this.#entries.get(id)?.manifest;
+		return this.#entries?.get(id)?.manifest;
 	}
 }

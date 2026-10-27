@@ -3,7 +3,19 @@
  * test can load a page under each host default. Its own chunk, as the highlighter is: a test instrument must
  * not be counted in `boot`.
  */
-import type { ToolHostConfig } from "@toolbench/runtime";
+import type { RegistryEntry, ToolHostConfig } from "@toolbench/runtime";
+
+/**
+ * `?badManifest=link`: the registry with one more tool, a copy of percentiles whose link is a `javascript:`
+ * URL, so a test can see the source refuse it in `list()` (#259), naming the field on every host, with nothing
+ * drawn from any manifest. The link scheme is the case because that refusal is a security property.
+ */
+export function hostRegistry(search: string, registry: Record<string, RegistryEntry>): Record<string, RegistryEntry> {
+	const base = registry.percentiles;
+	if (new URLSearchParams(search).get("badManifest") !== "link" || !base) return registry;
+	const manifest = { ...(base.manifest as object), id: "bad-link", links: [{ label: "Run", href: "javascript:alert(1)" }] };
+	return { ...registry, "bad-link": { manifest, load: base.load } };
+}
 
 export function hostWide(search: string): Pick<ToolHostConfig, "wide" | "wideToggle"> {
 	const query = new URLSearchParams(search);
