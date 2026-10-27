@@ -25,6 +25,8 @@ jobs:
     name: build and measure
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      playwright: ${{ steps.playwright.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -35,6 +37,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      - name: Read the installed Playwright version
+        # The browser jobs below run in the Playwright image for exactly this version. Read from what the
+        # lockfile installed rather than written into the image tag, so a Playwright bump moves the image
+        # with it: an image one version behind holds browser builds the library does not know, and every
+        # launch fails with "Executable doesn't exist". The pattern check keeps anything but a plain
+        # version out of the image reference.
+        id: playwright
+        run: |
+          version=$(node -p 'require("playwright/package.json").version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "unexpected Playwright version: $version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build packages
         run: pnpm build
@@ -89,6 +103,19 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # ⚠️ In the Playwright image, not on the bare runner, because `playwright install --with-deps` fetched
+    # its system packages from the runner's Ubuntu mirror, and in about one job in nine that mirror ran at
+    # 53 to 234 kB/s: 4 to 18 minutes for 26 to 117 MB, and twice a WebKit job cancelled at the timeout
+    # before its tests finished (#276). The image has the packages and all three browsers already, so
+    # there is no apt step and no browser download left to be slow.
+    #
+    # The tag comes from the build job, which reads it from the installed Playwright, so it cannot fall
+    # behind a Playwright bump. `--user 1001` is the runner's own user: the workspace is mounted from the
+    # host and owned by it, and Firefox refuses to start when HOME belongs to another user. `--ipc=host`
+    # because Docker's default 64 MB /dev/shm is too small for Chromium, per Playwright's docs.
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.build.outputs.playwright }}-noble
+      options: --user 1001 --ipc=host
     strategy:
       fail-fast: false
       matrix:
@@ -110,17 +137,12 @@ jobs:
           name: built
           path: .
 
-      - name: Cache the browser binaries
-        # A --with-deps install is most of this job's wall clock. Keyed on the Playwright version,
-        # because that is what decides which browser builds are wanted.
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ matrix.browser }}
-
       - name: Install the browser and its system packages
-        # Its own step so its duration shows on its own in the job's timing, not folded into the tests'.
-        run: pnpm exec playwright install --with-deps "${{ matrix.browser }}"
+        # A no-op that finishes in about a second, because the image already holds this version's browsers
+        # in PLAYWRIGHT_BROWSERS_PATH. Kept as its own step so that stays visible: if it ever takes minutes,
+        # the image and the library have stopped matching and it is downloading. No --with-deps, which
+        # would need root and would go back to the apt mirror this container exists to avoid.
+        run: pnpm exec playwright install "${{ matrix.browser }}"
 
       - name: The runtime, in a real browser
         env:
