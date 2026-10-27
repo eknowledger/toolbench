@@ -35,7 +35,7 @@ see, this is the wrong design for the same reason worker mode is not a sandbox.
 tool opens with the values its page's address carries (#227), so anyone who can send a reader a link
 chooses that reader's starting inputs. They go through the same clamping and refusal as typing, run the
 tool only as opening it would (an `autoRun` tool computes its first answer from them), and never reach an
-input marked `share: false`; one rule decides that for both the
+input marked `share: false`, or a `secret` input that does not say `share: true`; one rule decides that for both the
 link the button writes and the link a tool reads. What a tool does with a crafted input is the tool's
 concern, as it is for typed input. A host that does not want this sets `share: "none"`.
 
@@ -65,6 +65,8 @@ concern, as it is for typed input. A host that does not want this sets `share: "
 * a worker-mode tool reading `document.cookie` through its own means. See above: not a sandbox;
 * a host choosing to render untrusted Markdown from a tool's `help` field. Rendering that is the host's
   job and its choice of renderer;
+* a tool returning a `secret` input's value in its result. The docs say not to, and the runtime cannot tell
+  an echo from an answer;
 * a host putting an input marked `"share": false` into a link. `share` is a hint the manifest gives a
   host, so it can keep a credential out of URLs, history and logs; the runtime builds no links and
   enforces nothing, and following it is the host's code;

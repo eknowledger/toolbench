@@ -5,10 +5,11 @@
  * page whose tools use none of them pays nothing for their code or their rules: in the boot chunk they
  * measured 762 gzipped bytes for the segments alone. The form is not drawn until the tool's code is here,
  * so waiting for this costs no time. Without it each input still works as the plain control the runtime
- * draws itself: a segmented select is a dropdown, and a colour is its hex box with no swatch.
+ * draws itself: a segmented select is a dropdown, a colour is its hex box with no swatch, and a secret is its
+ * password field with no eye.
  */
 import type { SelectOption } from "@toolbench/sdk";
-import { el } from "./dom.ts";
+import { el, svg } from "./dom.ts";
 import { adoptStyles } from "./styles.ts";
 
 /*
@@ -42,6 +43,14 @@ legend.tb-label { padding: 0; margin-bottom: 0.25rem; }
 .tb-swatch::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .tb-swatch::-moz-color-swatch { border: 0; border-radius: 5px; }
 .tb-swatch:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+/* A secret: the eye inside the field's end edge, and the face kept mono while the value shows. */
+.tb-secret-row { position: relative; }
+.tb-secret-row .tb-input { font-family: var(--tb-mono); padding-inline-end: 2.5rem; }
+.tb-eye { position: absolute; inset-block: 0; inset-inline-end: 0.25rem; margin-block: auto; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--tb-muted); cursor: pointer; }
+.tb-eye:hover { color: var(--tb-fg); }
+.tb-eye:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 0; }
+.tb-eye svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tb-eye:not([aria-pressed="true"]) .tb-eye-slash { display: none; }
 `;
 
 /*
@@ -83,6 +92,27 @@ export function swatch(box: HTMLInputElement, label: string, value: () => string
 		pick(picker.value);
 	});
 	return { row: el("div", { class: "tb-color-row" }, picker, box), sync };
+}
+
+/**
+ * The button that shows and hides a secret's `field` (#203), inside its end edge. A toggle, so `aria-pressed`
+ * says whether the value shows, and its name says what pressing does, "Show API token" or "Hide API token":
+ * an icon says nothing to a screen reader. Shown, the eye is struck through. Returns the row holding both.
+ */
+export function eye(field: HTMLInputElement, label: string): HTMLElement {
+	adoptStyles(field, "controls", () => STYLES);
+	const button = el(
+		"button",
+		{ class: "tb-eye", type: "button", "aria-pressed": "false", "aria-label": `Show ${label}`, "aria-controls": field.id },
+		svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" }), svg("circle", { cx: 12, cy: 12, r: 3 }), svg("path", { class: "tb-eye-slash", d: "M3 3l18 18" })),
+	);
+	button.addEventListener("click", () => {
+		const show = field.type === "password";
+		field.type = show ? "text" : "password";
+		button.setAttribute("aria-pressed", String(show));
+		button.setAttribute("aria-label", `${show ? "Hide" : "Show"} ${label}`);
+	});
+	return el("div", { class: "tb-secret-row" }, field, button);
 }
 
 export function segments(group: HTMLElement, options: readonly SelectOption[], name: string, value: () => string, choose: (value: string) => void): () => void {

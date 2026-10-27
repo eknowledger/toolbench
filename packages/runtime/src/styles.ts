@@ -146,7 +146,10 @@ export const STYLES = /* css */ `
 :is(div.tb-desc, .tb-details-body) > * + * { margin-top: 0.35rem; }
 :is(.tb-desc, .tb-details-body) ul { padding-inline-start: 1.1rem; }
 :is(.tb-desc, .tb-details-body) li + li { margin-top: 0.15rem; }
-:is(.tb-desc, .tb-details-body) code { font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
+/* On one line, so code moves to the next line whole: 2026-10-25T14:30 broke after "2026-10-" at 390 (#203). Not
+   an inline block, which did the same but left the full stop after it alone on the next line. Code in help is
+   an identifier or a value; one longer than a phone's line belongs in a result. */
+:is(.tb-desc, .tb-details-body) code { white-space: nowrap; font-family: var(--tb-mono); font-size: 0.95em; padding: 0 0.2em; border-radius: 4px; background: var(--tb-surface); border: 1px solid var(--tb-border); color: var(--tb-fg); }
 :is(.tb-desc, .tb-details-body) strong { font-weight: 650; color: var(--tb-muted); }
 /* A tone colours words the text already says, so colour is never the only carrier (WCAG 1.4.1), and the
    weight sets them apart for a reader who cannot tell the colours apart. Muted keeps the normal weight:

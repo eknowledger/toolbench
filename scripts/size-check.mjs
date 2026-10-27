@@ -379,8 +379,12 @@ const BUDGETS = [
 	 * cost: that reader downloads it. 1,104 measured, 73 of it tracking the keyboard for the ring WebKit
 	 * does not draw on a radio, and 1,360 with a colour's swatch, kept in step with its hex box,
 	 * and its rules.
+	 *
+	 * Raised from 1_500 to 2_000 by the secret's eye (#203), in the commit that crossed it: 1,360 to 1,795
+	 * measured, the button with its icon, its pressed state and its two names, and the rules placing it inside
+	 * the field. 1_500 would have left it 295 over.
 	 */
-	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 1_500 },
+	{ label: "native controls", pattern: /^controls-[^/]+\.js$/, budget: 2_000 },
 	/*
 	 * The graph kind (#152): a base chunk and eleven fetched on demand, so a page pays for the graphs it draws.
 	 *
@@ -510,7 +514,7 @@ const BUDGETS = [
 	{ label: "bench fixture: input-help", pattern: /^tool-input-help-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// A six-column table whose columns say how they wrap (#213). 681 measured.
 	{ label: "bench fixture: narrow-table", pattern: /^tool-narrow-table-[^/]+\.js$/, budget: 1_000, deployOnly: true },
-	// The newer input types (#203) on screen for the browser tests and the gallery. 241 measured.
+	// The newer input types (#203) on screen for the browser tests and the gallery. 267 measured.
 	{ label: "bench fixture: native-inputs", pattern: /^tool-native-inputs-[^/]+\.js$/, budget: 500, deployOnly: true },
 	{ label: "bench page: index", pattern: /^index-[^/]+\.js$/, budget: 1_000, deployOnly: true },
 	// Exactly an 8-character hash after "tool-", hyphens allowed: a tool's chunk is tool-<id>-<hash>, always longer.
@@ -636,9 +640,12 @@ for (const file of unclaimed) {
  *
  * Raised to 35_500 by the date input (#203): 34,480 to 35,153 measured, the same parser, messages and check
  * before run as boot's line above, which every consumer pays too. 34_500 would have been 653 bytes over.
+ *
+ * Raised to 36_000 by the secret input (#203): 35,299 to 35,600 measured, the same refusals and link rule as
+ * boot's line above. 35_500 would have been 100 bytes over.
  */
 const SITE = join(import.meta.dirname, "..", "site", "dist");
-const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 35_500 }];
+const SITE_PAGES = [{ label: "site landing page, JS and CSS", page: "index.html", budget: 36_000 }];
 let siteHtml = null;
 try {
 	siteHtml = readFileSync(join(SITE, "index.html"), "utf8");

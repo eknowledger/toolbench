@@ -784,7 +784,7 @@ interface InputBase {
 	 * server logs, chat previews and referrer headers. A privacy hint for hosts, not access control: the
 	 * runtime builds no links and does not enforce it, and `host.values` still writes the input. Contract
 	 * version 8.
-	 * @default true
+	 * @default true, and false on a secret
 	 */
 	share?: boolean;
 	/**
@@ -892,6 +892,20 @@ export type InputSpec =
 			 * system's picker in the swatch beside it. Contract version 9.
 			 */
 			default: string;
+	  })
+	| (InputBase & {
+			/**
+			 * A password, a token or a key, in a password field with a button to show it (#203). It has no
+			 * `default`, and no sample or preset may set it: a manifest is published, so a value in it would be
+			 * every reader's. The form opens empty, and a seed or a sample run sees `""`. `share` is `false`
+			 * unless the input says `true`. Do not return the value in a result: a result is on screen,
+			 * announced to a screen reader, and in a host's `tool-run` event. Contract version 9.
+			 */
+			type: "secret";
+			/** The fewest characters `run` accepts. A shorter value is refused before `run`, naming the input. */
+			minLength?: number;
+			/** The most characters the control accepts, not below `minLength`. */
+			maxLength?: number;
 	  });
 
 /**
@@ -935,7 +949,7 @@ export interface SelectOption {
 
 export type InputType = InputSpec["type"];
 
-export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color"];
+export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color", "secret"];
 
 /** The shape a tool's `run` receives: one entry per declared input, keyed by id. */
 export type InputValues = Record<string, string | number | boolean>;

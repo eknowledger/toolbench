@@ -45,6 +45,8 @@ export const LATER = {
 	"inputs.role": 8,
 	"inputs.details": 8,
 	"inputs.mode": 9,
+	"inputs.minLength": 9,
+	"type.secret": 9,
 	"type.date": 9,
 	"type.color": 9,
 	"options.sets": 6,

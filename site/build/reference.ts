@@ -177,6 +177,9 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A date's default is within `min..max`", change: (m) => (m.inputs = [{ id: "day", type: "date", label: "Day", default: "2019-12-31", min: "2020-01-01" }]) },
 	{ rule: "`mode` only on a date", change: (m) => (input(m, 2).mode = "date") },
 	{ rule: "A colour's default is a lowercase `#rrggbb`", change: (m) => (m.inputs = [{ id: "tint", type: "color", label: "Tint", default: "#15A" }]) },
+	{ rule: "A secret has no default", change: (m) => (m.inputs = [{ id: "key", type: "secret", label: "Key", default: "" }]) },
+	{ rule: "A secret's `minLength` is not above its `maxLength`", change: (m) => (m.inputs = [{ id: "key", type: "secret", label: "Key", minLength: 32, maxLength: 16 }]) },
+	{ rule: "No sample or preset sets a secret", change: (m) => Object.assign(m, { inputs: [{ id: "key", type: "secret", label: "Key" }], samples: [{ label: "Mine", input: { key: "hunter2" } }] }) },
 	{ rule: "A select has two or more options", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }]) },
 	{ rule: "Option values are unique", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }, { value: "fast", label: "Also fast" }]) },
 	{ rule: "A select's default is one of its options", change: (m) => (input(m, 1).default = "slow") },
@@ -196,6 +199,7 @@ const EXAMPLES: Record<string, { from: string; id: string; gallery?: string }> =
 	toggle: { from: "bench/fixtures/styled-output", id: "" },
 	date: { from: "bench/fixtures/native-inputs", id: "captured", gallery: "native-inputs" },
 	color: { from: "bench/fixtures/native-inputs", id: "accent", gallery: "native-inputs" },
+	secret: { from: "bench/fixtures/native-inputs", id: "token", gallery: "native-inputs" },
 };
 
 const SUMMARY: Record<string, string> = {
@@ -206,6 +210,7 @@ const SUMMARY: Record<string, string> = {
 	toggle: "On or off",
 	date: "A day, a time of day, or both, in the browser's own picker",
 	color: "A colour, typed as hex or picked in the system's picker",
+	secret: "A password, a token or a key, with no default and kept out of links",
 };
 /** The type of the value `run` gets for an input of this kind. */
 const RECEIVES: Record<string, string> = {
@@ -216,6 +221,7 @@ const RECEIVES: Record<string, string> = {
 	toggle: "boolean",
 	date: "string, `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`, within `min..max`",
 	color: "string, a lowercase `#rrggbb`",
+	secret: "string, empty until typed, at least `minLength` characters",
 };
 
 /**

@@ -33,7 +33,7 @@
  *    "go now", and is wrong anyway for anything slow.
  */
 import type { InputSpec, InputValues, Manifest, Output, Sample, SelectOption } from "@toolbench/sdk";
-import { inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
+import { defaultInputs, inputProblem, isSafeLinkHref, shareableInputs } from "@toolbench/sdk";
 import { el, fill } from "./dom.ts";
 import { ChartRendererMissing, isLazyKind, loadRenderers, prepareOutput, render, unknownOutput, type LazyKind, type RenderOptions } from "./render/index.ts";
 import { ToolCrashError, ToolTimeoutError, WorkerUnavailableError } from "./protocol.ts";
@@ -630,7 +630,7 @@ export class ToolHost extends HTMLElement {
 				return;
 			}
 			this.#manifest = manifest;
-			const defaults = Object.fromEntries(manifest.inputs.map((input) => [input.id, input.default]));
+			const defaults = defaultInputs({ manifest });
 			/*
 			 * A host may have written `values` while `list()` was in flight (queued) or in the gap
 			 * after `#manifest` was set but before this assignment (already merged into `#values`).
@@ -748,7 +748,7 @@ export class ToolHost extends HTMLElement {
 			const share = this.#shares ? loadShare().catch(() => undefined) : undefined;
 			// The newer inputs' controls (#203). A failed fetch leaves each the plain control the runtime draws itself.
 			const native =
-				!controls && this.#manifest?.inputs.some((input) => input.type === "color" || (input.type === "select" && input.control === "segmented"))
+				!controls && this.#manifest?.inputs.some((input) => input.type === "color" || input.type === "secret" || (input.type === "select" && input.control === "segmented"))
 					? import("./controls.ts").then((module) => void (controls = module), () => undefined)
 					: undefined;
 			this.#loaded = await this.#resolve(cfg);
@@ -1464,9 +1464,18 @@ export class ToolHost extends HTMLElement {
 					"input",
 					spec.type === "date"
 						? { class: "tb-input", id, type: spec.mode === "datetime" ? "datetime-local" : (spec.mode ?? "date"), min: spec.min, max: spec.max, dir: "ltr" }
-						: { class: "tb-input", id, type: "text", spellcheck: "false", autocapitalize: "off", autocomplete: "off", dir: spec.type === "color" ? "ltr" : (spec.dir ?? "auto"), maxlength: spec.type === "color" ? 7 : spec.maxLength },
+						: {
+								class: "tb-input",
+								id,
+								type: spec.type === "secret" ? "password" : "text",
+								spellcheck: "false",
+								autocapitalize: "off",
+								autocomplete: "off",
+								dir: spec.type === "text" ? (spec.dir ?? "auto") : "ltr",
+								maxlength: spec.type === "color" ? 7 : spec.maxLength,
+							},
 				);
-				input.value = String(this.#values[spec.id] ?? spec.default);
+				input.value = String(this.#values[spec.id]);
 				input.addEventListener("input", () => {
 					// A colour is lowercased and trimmed, so `run` gets #rrggbb however it was typed.
 					this.#values[spec.id] = coerce(spec, input.value);
@@ -1485,6 +1494,8 @@ export class ToolHost extends HTMLElement {
 					placed = swatch.row;
 					this.#painters.set(spec.id, swatch.sync);
 				}
+				// A secret's eye (#203), from the same chunk. Without it, the password field alone.
+				if (spec.type === "secret" && controls) placed = controls.eye(input, spec.label);
 				break;
 			}
 		}

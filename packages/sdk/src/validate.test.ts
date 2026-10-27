@@ -673,6 +673,37 @@ describe("validateManifest: a colour input (contract 9, #203)", () => {
 	});
 });
 
+describe("validateManifest: a secret input (contract 9, #203)", () => {
+	const token = (extra: Record<string, unknown> = {}) => ({ id: "token", type: "secret", label: "API token", minLength: 16, maxLength: 64, ...extra });
+	const withToken = (extra: Record<string, unknown>) => (m: Record<string, unknown>) => { m.inputs = [token(extra)]; };
+	it("accepts a secret with no default, and with no bounds at all", () => {
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [token()] }));
+		assert.doesNotThrow(() => validateManifest({ ...good(), inputs: [{ id: "token", type: "secret", label: "Token" }] }));
+	});
+	// Any value, an empty one too: a manifest is published, so whatever it holds every reader has.
+	it("refuses a default, even an empty one", () => {
+		failsWith(withToken({ default: "tb_live_9f2c7a41e08b5d36" }), "inputs[0].default", "a secret has no default");
+		failsWith(withToken({ default: "" }), "inputs[0].default", "every reader");
+	});
+	it("refuses a sample or a preset that sets it", () => {
+		const m = { ...good(), inputs: [token()], samples: [{ label: "Mine", input: { token: "tb_live_9f2c7a41e08b5d36" } }] };
+		assert.throws(() => validateManifest(m), /samples\[0\]\.input\.token: is a secret, which a manifest may not set/);
+		const preset = {
+			...good(),
+			inputs: [{ id: "env", type: "select", label: "Env", default: "dev", options: [{ value: "dev", label: "Dev" }, { value: "live", label: "Live", sets: { token: "tb_live_9f2c7a41e08b5d36" } }] }, token()],
+		};
+		assert.throws(() => validateManifest(preset), /inputs\[0\]\.options\[1\]\.sets\.token: is a secret/);
+	});
+	it("holds minLength and maxLength to positive whole numbers, the smaller first", () => {
+		failsWith(withToken({ minLength: 0 }), "inputs[0].minLength", "a whole number above 0, got 0");
+		failsWith(withToken({ maxLength: "64" }), "inputs[0].maxLength", 'got "64"');
+		failsWith(withToken({ minLength: 65 }), "inputs[0].minLength", "65 is above maxLength 64");
+	});
+	it("refuses minLength on any other input", () => {
+		failsWith((m) => { m.inputs = [{ id: "name", type: "text", label: "Name", default: "", minLength: 2 }]; }, "inputs[0].minLength", "only a secret");
+	});
+});
+
 /*
  * The messages a reader sees when the runtime refuses a value before `run` (#203), written from the mockup by
  * hand: the label, what was wrong, and what arrived.
@@ -691,6 +722,13 @@ describe("inputProblem", () => {
 		const accent = { id: "accent", type: "color", label: "Highlight colour", default: "#1f5aa8" } as const;
 		assert.equal(inputProblem(accent, "#1f5ag8"), 'Highlight colour must be a #rrggbb colour, got "#1f5ag8".');
 		assert.equal(inputProblem(accent, "#1f5aa8"), undefined);
+	});
+	it("says a secret is too short, counting what arrived, and never quoting it", () => {
+		const token = { id: "token", type: "secret", label: "API token", minLength: 16 } as const;
+		assert.equal(inputProblem(token, "tb_live_9f2"), "API token must be at least 16 characters, got 11.");
+		assert.equal(inputProblem(token, ""), "API token must be at least 16 characters, got 0.");
+		assert.equal(inputProblem(token, "tb_live_9f2c7a41"), undefined);
+		assert.equal(inputProblem({ id: "token", type: "secret", label: "Token" }, ""), undefined, "with no minLength, empty is a value");
 	});
 	it("finds nothing in a good value, or in an input the form already holds to its rules", () => {
 		assert.equal(inputProblem(at, "2026-10-25T23:59"), undefined);
