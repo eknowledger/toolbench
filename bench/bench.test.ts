@@ -29,7 +29,17 @@ import graphFamilies, { graphs } from "./fixtures/graph-families/index.ts";
 import wideOutput from "./fixtures/wide-output/index.ts";
 
 const PORT = 4173;
-const BASE = `http://localhost:${PORT}`;
+/*
+ * ⚠️ An address, not `localhost`, and the server below is told the same one with `--host`.
+ *
+ * Each side resolved `localhost` on its own. In the Playwright container that CI runs in, vite resolved it
+ * to ::1 and listened only there, while this file's fetch connected to 127.0.0.1 and was refused, so every
+ * engine failed with "vite preview did not start" while the server sat ready on the other address. Naming
+ * one address on both sides leaves nothing to disagree about. 127.0.0.1 is a secure context in all three
+ * engines, as localhost is, so nothing that needs one (the clipboard) changes.
+ */
+const HOST = "127.0.0.1";
+const BASE = `http://${HOST}:${PORT}`;
 
 /**
  * Until every chart on the page is the drawing a reader keeps. A chart is first drawn at a guessed width,
@@ -120,7 +130,7 @@ before(async () => {
 	 * showed locally. Running the bin directly removes the process that swallowed the signal, and the
 	 * group kill in `after` reaches anything vite starts as well.
 	 */
-	server = spawn(process.execPath, [join(import.meta.dirname, "node_modules", "vite", "bin", "vite.js"), "preview", "--port", String(PORT), "--strictPort"], {
+	server = spawn(process.execPath, [join(import.meta.dirname, "node_modules", "vite", "bin", "vite.js"), "preview", "--host", HOST, "--port", String(PORT), "--strictPort"], {
 		cwd: import.meta.dirname,
 		stdio: ["ignore", "ignore", "pipe"],
 		detached: true,
