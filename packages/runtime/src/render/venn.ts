@@ -14,7 +14,7 @@
 import type { Venn } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, fitted, format, middleOf, textWidth, type Fit } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, beside, fitted, format, middleOf, textWidth, type Fit } from "./plot-common.ts";
 
 const H = 320;
 
@@ -264,9 +264,7 @@ function attachRegionReadout(
 		const k = box.width / plotSvg.viewBox.baseVal.width;
 		const x = at?.x ?? box.left + ((sum?.x ?? 0) / Math.max(1, sum?.n ?? 1)) * k;
 		const y = at?.y ?? box.top + ((sum?.y ?? 0) / Math.max(1, sum?.n ?? 1)) * k;
-		card.style.left = `${Math.round(x - frame.left)}px`;
-		card.style.top = `${Math.round(y - frame.top)}px`;
-		card.toggleAttribute("data-flip", x - box.left > box.width / 2);
+		beside(card, frame.width, x - frame.left, y - frame.top, x - box.left > box.width / 2);
 	};
 	const hide = () => {
 		current = -1;

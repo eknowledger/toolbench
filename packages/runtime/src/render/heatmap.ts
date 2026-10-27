@@ -12,7 +12,7 @@
  */
 import type { Heatmap } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
-import { adoptChartStyles, adoptStyles, cut, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, beside, cut, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
 import type { RenderOptions } from "./index.ts";
 
 // Ids are per render: two heatmaps in one shadow root would otherwise share a hatch and a key gradient.
@@ -222,9 +222,7 @@ function attachCellReadout(
 		const frame = figure.getBoundingClientRect();
 		const cx = g.plot.x + (c + 0.5) * g.cellW;
 		const cy = g.plot.y + (r + 0.5) * g.cellH;
-		card.style.left = `${Math.round(box.left - frame.left + cx * (box.width / g.width))}px`;
-		card.style.top = `${Math.round(box.top - frame.top + cy * (box.height / g.height))}px`;
-		card.toggleAttribute("data-flip", cx > g.plot.x + g.plot.w / 2);
+		beside(card, frame.width, box.left - frame.left + cx * (box.width / g.width), box.top - frame.top + cy * (box.height / g.height), cx > g.plot.x + g.plot.w / 2);
 	};
 	const hide = () => {
 		at = null;

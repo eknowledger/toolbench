@@ -184,37 +184,79 @@ function drawChart(chart: Chart, compact: boolean, fit: Fit): HTMLElement {
 		}
 	}
 
-	// Annotations sit under the data: they are context, not the subject.
-	for (const annotation of chart.annotations ?? []) {
-		// On a category axis an annotation names its category; on a numeric one, its value.
-		const at = typeof annotation.x === "string" ? (categories?.indexOf(annotation.x) ?? -1) : annotation.x;
-		if (at < 0) continue;
-		const x = px(at);
-		marks.push(svg("line", { class: "tb-annotation", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		// Flip the label inward where it would run off the chart, which is exactly where "you are here"
-		// lands when a system is nearly saturated, and cut it where neither side has the room.
-		const flip = x + 5 + textWidth(annotation.label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
-		const label = cut(annotation.label, flip ? x - 5 - plot.x : plot.x + plot.w - x - 5, f);
-		marks.push(svg("text", { class: "tb-annotation-label", x: flip ? x - 5 : x + 5, y: plot.y + 2 + ascent, "text-anchor": flip ? "end" : "start" }, label));
-	}
-
 	/*
 	 * Thresholds (#114), under the data like annotations: a rule across the plot and its label at the right
-	 * end, above the line, or below it where the line is near the top.
+	 * end, above the line, or below it where the line is near the top. Before the annotations, so their
+	 * labels can step around these.
 	 */
+	const taken: Box[] = [];
 	for (const threshold of chart.thresholds ?? []) {
 		const scale = threshold.axis === "right" && rightScale ? rightScale : leftScale;
 		const y = py(threshold.y, scale);
 		const tone = threshold.tone ?? "normal";
 		marks.push(svg("line", { class: "tb-threshold", "data-tone": tone, x1: plot.x, x2: plot.x + plot.w, y1: y, y2: y }));
-		const below = y < plot.y + line + 4;
-		labelsOnTop.push(
-			svg(
-				"text",
-				{ class: "tb-threshold-label", "data-tone": tone, x: plot.x + plot.w - 4, y: below ? y + 3 + ascent : y - 3 - descent, "text-anchor": "end" },
-				cut(threshold.label, plot.w - 8, f),
-			),
-		);
+		const label = cut(threshold.label, plot.w - 8, f);
+		const w = textWidth(label, f);
+		/*
+		 * Above its line, or below it near the top; where that meets another threshold's label, the other side,
+		 * then each side again moved left past what it meets (#263). Two thresholds 15 ms apart on a 0 to 400
+		 * axis drew "165 ms, our alert" over "150 ms, G.114 preferred".
+		 */
+		const sides = [y - 3 - line, y + 3].filter((top) => top >= plot.y - 1 && top + line <= plot.y + plot.h + 1);
+		if (y < plot.y + line + 4) sides.reverse();
+		const inside = (b: Box) => b.x0 >= plot.x && b.y0 >= plot.y - 1 && b.y1 <= plot.y + plot.h + 1;
+		// From `at`, moved by `step` past whatever it meets until it meets nothing, or leaves the plot.
+		const slide = (at: Box, step: (hit: Box, at: Box) => Box): Box | undefined => {
+			for (let hit = taken.find((b) => meets(b, at)); hit; hit = taken.find((b) => meets(b, at))) {
+				at = step(hit, at);
+				if (!inside(at)) return undefined;
+			}
+			return at;
+		};
+		let box: Box | undefined;
+		for (const top of sides.length > 0 ? sides : [y - 3 - line]) {
+			const at: Box = { x0: plot.x + plot.w - 4 - w, x1: plot.x + plot.w - 4, y0: top, y1: top + line };
+			// Left, then a line up, then a line down: in a short plot the side of a close neighbour is already its label's.
+			box =
+				slide(at, (hit, a) => ({ ...a, x0: hit.x0 - APART - w, x1: hit.x0 - APART })) ??
+				slide(at, (hit, a) => ({ ...a, y0: hit.y0 - APART - line, y1: hit.y0 - APART })) ??
+				slide(at, (hit, a) => ({ ...a, y0: hit.y1 + APART, y1: hit.y1 + APART + line }));
+			if (box) break;
+		}
+		// Nowhere clear: where it always went, at the right end.
+		box ??= { x0: plot.x + plot.w - 4 - w, x1: plot.x + plot.w - 4, y0: y < plot.y + line + 4 ? y + 3 : y - 3 - line, y1: 0 };
+		taken.push({ ...box, y1: box.y0 + line });
+		labelsOnTop.push(svg("text", { class: "tb-threshold-label", "data-tone": tone, x: box.x1, y: box.y0 + ascent, "text-anchor": "end" }, label));
+	}
+
+	/*
+	 * Annotations sit under the data: they are context, not the subject. A label that would touch one already
+	 * placed, or a threshold's, drops a line, as many as the plot has room for (#263). All at one height, "this
+	 * run" at 40 and "shallowest under 1%" at 50 on a 0 to 200 axis read as "thisshallowest...". Placed left to
+	 * right, so the leftmost of a cluster keeps the top line.
+	 */
+	const lanes = Math.max(1, Math.floor((plot.h - 2) / (line + APART)));
+	const pinned = (chart.annotations ?? [])
+		.map((annotation) => ({ annotation, at: typeof annotation.x === "string" ? (categories?.indexOf(annotation.x) ?? -1) : annotation.x }))
+		.filter(({ at }) => at >= 0)
+		.map(({ annotation, at }) => ({ annotation, x: px(at) }))
+		.sort((a, b) => a.x - b.x);
+	// Every rule before any label: a dropped label crosses its neighbours' rules, and its halo hides them.
+	for (const { x } of pinned) marks.push(svg("line", { class: "tb-annotation", x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
+	for (const { annotation, x } of pinned) {
+		// Flip the label inward where it would run off the chart, which is exactly where "you are here"
+		// lands when a system is nearly saturated, and cut it where neither side has the room.
+		const flip = x + 5 + textWidth(annotation.label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
+		const label = cut(annotation.label, flip ? x - 5 - plot.x : plot.x + plot.w - x - 5, f);
+		const w = textWidth(label, f);
+		const across = flip ? { x0: x - 5 - w, x1: x - 5 } : { x0: x + 5, x1: x + 5 + w };
+		const at = (lane: number): Box => ({ ...across, y0: plot.y + 2 + lane * (line + APART), y1: plot.y + 2 + lane * (line + APART) + line });
+		// The first line clear of everything placed; where none is, the top line, as before.
+		let lane = 0;
+		while (lane < lanes && taken.some((box) => meets(box, at(lane)))) lane++;
+		if (lane === lanes) lane = 0;
+		taken.push(at(lane));
+		marks.push(svg("text", { class: "tb-annotation-label", x: flip ? x - 5 : x + 5, y: plot.y + 2 + ascent + lane * (line + APART), "text-anchor": flip ? "end" : "start" }, label));
 	}
 
 	/*
@@ -422,9 +464,28 @@ function renderHorizontal(chart: Chart, compact: boolean, fit: Fit): HTMLElement
 	const plotTop = narrow && (chart.thresholds ?? []).length > 0 ? Math.ceil(line + 8) : narrow ? 4 : Math.ceil(line + 4);
 	const plot = { x: narrow ? edge : labelRoom + 8, y: plotTop, w: 0, h: n * row };
 	plot.w = W - plot.x - edge;
+	const pv = (value: number) => plot.x + ((value - scale.min) / span(scale)) * plot.w;
+	/*
+	 * A threshold's label that would meet another's goes up a line, and the plot down by as many (#263): on one
+	 * line, "165 ms, our alert" was drawn over "150 ms, G.114 preferred". Placed left to right.
+	 */
+	const placed: { x0: number; x1: number; lane: number }[] = [];
+	const marked = (chart.thresholds ?? [])
+		.map((threshold) => {
+			const x = pv(threshold.y);
+			const flip = x + 4 + textWidth(threshold.label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
+			const label = cut(threshold.label, flip ? x - 4 - plot.x : plot.x + plot.w - x - 4, f);
+			const w = textWidth(label, f);
+			return { threshold, x, flip, label, x0: flip ? x - 4 - w : x + 4, x1: flip ? x - 4 : x + 4 + w, lane: 0 };
+		})
+		.sort((a, b) => a.x0 - b.x0);
+	for (const mark of marked) {
+		while (placed.some((p) => p.lane === mark.lane && p.x0 < mark.x1 + APART && mark.x0 < p.x1 + APART)) mark.lane++;
+		placed.push(mark);
+	}
+	plot.y += Math.max(0, ...placed.map((p) => p.lane)) * (line + APART);
 	// Under the plot: the value labels and the title, each 3 apart, from their measured boxes.
 	const height = Math.ceil(plot.y + plot.h + 3 + line + 3 + line + 2);
-	const pv = (value: number) => plot.x + ((value - scale.min) / span(scale)) * plot.w;
 	// A category's bars: the middle of its row, or under its name on a narrow chart.
 	const pc = (i: number) => (narrow ? plot.y + i * row + line + 3 + (slots.length * thickness) / 2 : plot.y + (i + 0.5) * row);
 
@@ -442,19 +503,11 @@ function renderHorizontal(chart: Chart, compact: boolean, fit: Fit): HTMLElement
 				: svg("text", { class: "tb-tick", x: plot.x - 8, y: pc(i) + middleOf(fit), "text-anchor": "end" }, cut(name, labelRoom - 4, f)),
 		);
 	});
-	for (const threshold of chart.thresholds ?? []) {
-		const x = pv(threshold.y);
+	for (const { threshold, x, flip, label, lane } of marked) {
 		const tone = threshold.tone ?? "normal";
 		marks.push(svg("line", { class: "tb-threshold", "data-tone": tone, x1: x, x2: x, y1: plot.y, y2: plot.y + plot.h }));
-		const label = threshold.label;
-		const flip = x + 4 + textWidth(label, f) > plot.x + plot.w && x - plot.x > plot.x + plot.w - x;
-		top.push(
-			svg(
-				"text",
-				{ class: "tb-threshold-label", "data-tone": tone, x: flip ? x - 4 : x + 4, y: narrow ? plot.y - 3 - descent : plot.y + 2 + ascent, "text-anchor": flip ? "end" : "start" },
-				cut(label, flip ? x - 4 - plot.x : plot.x + plot.w - x - 4, f),
-			),
-		);
+		const y = (narrow ? plot.y - 3 - descent : plot.y + 2 + ascent) - lane * (line + APART);
+		top.push(svg("text", { class: "tb-threshold-label", "data-tone": tone, x: flip ? x - 4 : x + 4, y, "text-anchor": flip ? "end" : "start" }, label));
 	}
 
 	const barThickness = narrow ? thickness : Math.max(2, Math.min((row * 0.7) / Math.max(1, slots.length), 18));
@@ -682,6 +735,16 @@ function xTicksFor(xs: number[], scale: Scale, bars: boolean, count = 5): number
 }
 
 const clamp = (value: number, scale: Scale) => Math.min(scale.max, Math.max(scale.min, value));
+
+/** A label's box, in the drawing's pixels. */
+type Box = { x0: number; x1: number; y0: number; y1: number };
+/*
+ * ⚠️ How far apart two labels' measured boxes must be, either way. Each label is haloed with a 3px stroke, half
+ * of it outside the glyphs, and Firefox counts the stroke in a text's box where Chromium and WebKit do not: at
+ * 2px apart, every staggered label passed in those two and overlapped its neighbour in Firefox on CI.
+ */
+const APART = 5;
+const meets = (a: Box, b: Box) => a.x0 < b.x1 + APART && b.x0 < a.x1 + APART && a.y0 < b.y1 + APART && b.y0 < a.y1 + APART;
 
 function drawSeries(
 	series: Series,

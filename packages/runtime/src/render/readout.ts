@@ -15,6 +15,7 @@
  */
 import type { Chart } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
+import { beside } from "./plot-common.ts";
 
 export interface Geometry {
 	/**
@@ -195,12 +196,7 @@ export function attachReadout(figure: HTMLElement, plotSvg: SVGSVGElement, chart
 		const valueAt = nearest ? nearest.y : h ? g.plot.x + g.plot.w / 2 : g.plot.y + g.plot.h / 2;
 		const vx = h ? valueAt : cx;
 		const vy = h ? cx : valueAt;
-		const left = box.left - frame.left + vx * (box.width / g.width);
-		const top = box.top - frame.top + vy * (box.height / g.height);
-		const flip = vx > g.plot.x + g.plot.w / 2;
-		card.style.left = `${Math.round(left)}px`;
-		card.style.top = `${Math.round(top)}px`;
-		card.toggleAttribute("data-flip", flip);
+		beside(card, frame.width, box.left - frame.left + vx * (box.width / g.width), box.top - frame.top + vy * (box.height / g.height), vx > g.plot.x + g.plot.w / 2);
 	};
 
 	const hide = () => {
@@ -340,9 +336,7 @@ export function attachScatterReadout(figure: HTMLElement, plotSvg: SVGSVGElement
 		live.textContent = `${title}: ${series?.label ?? ""} ${text}`;
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
-		card.style.left = `${Math.round(box.left - frame.left + p.vx * (box.width / g.width))}px`;
-		card.style.top = `${Math.round(box.top - frame.top + p.vy * (box.height / g.height))}px`;
-		card.toggleAttribute("data-flip", p.vx > g.plot.x + g.plot.w / 2);
+		beside(card, frame.width, box.left - frame.left + p.vx * (box.width / g.width), box.top - frame.top + p.vy * (box.height / g.height), p.vx > g.plot.x + g.plot.w / 2);
 	};
 	const hide = () => {
 		current = -1;
@@ -395,3 +389,4 @@ export function attachScatterReadout(figure: HTMLElement, plotSvg: SVGSVGElement
 		}
 	});
 }
+

@@ -12,7 +12,7 @@
 import type { Treemap, TreemapNode } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, cut, fitted, format, lineOf, textWidth, type Fit } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, beside, cut, fitted, format, lineOf, textWidth, type Fit } from "./plot-common.ts";
 
 const MAX_DEPTH = 3;
 
@@ -229,9 +229,7 @@ function attachTileReadout(figure: HTMLElement, plotSvg: SVGSVGElement, treemap:
 		const frame = figure.getBoundingClientRect();
 		const cx = (t.x + t.w / 2) * (box.width / plotSvg.viewBox.baseVal.width);
 		const cy = (t.y + t.h / 2) * (box.height / plotSvg.viewBox.baseVal.height);
-		card.style.left = `${Math.round((at?.x ?? box.left + cx) - frame.left)}px`;
-		card.style.top = `${Math.round((at?.y ?? box.top + cy) - frame.top)}px`;
-		card.toggleAttribute("data-flip", (at ? at.x - box.left : cx) > box.width / 2);
+		beside(card, frame.width, (at?.x ?? box.left + cx) - frame.left, (at?.y ?? box.top + cy) - frame.top, (at ? at.x - box.left : cx) > box.width / 2);
 	};
 	const hide = () => {
 		current = -1;

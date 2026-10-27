@@ -154,6 +154,46 @@ export default {
 						series: [{ label: "Delay", unit: "ms", markers: true, points: [120, 135, 128, 160, 190, 142, 138, 210, 175, 131, 126, 148] }],
 					},
 				};
+			/*
+			 * Annotations a few percent of the axis apart (#263): "this run" at 40 and "shallowest under 1%" at 50
+			 * on a 0 to 200 axis read as "thisshallowest...". Three in a row, and a pair at each edge, where a label
+			 * flips inward or is cut.
+			 */
+			case "annotations-close":
+			case "annotations-three":
+			case "annotations-edge": {
+				const xs = Array.from({ length: 21 }, (_, i) => i * 10);
+				const annotations = {
+					"annotations-close": [
+						{ x: 40, label: "this run" },
+						{ x: 50, label: "shallowest under 1%" },
+					],
+					"annotations-three": [
+						{ x: 40, label: "this run" },
+						{ x: 50, label: "shallowest under 1%" },
+						{ x: 60, label: "deepest buffer" },
+					],
+					"annotations-edge": [
+						{ x: 0, label: "cold start" },
+						{ x: 10, label: "warm" },
+						{ x: 190, label: "knee of the curve" },
+						{ x: 200, label: "saturated at 200" },
+					],
+				}[input.case];
+				return {
+					kind: "series",
+					chart: {
+						xLabel: "Buffer",
+						xUnit: "ms",
+						yLabel: "Loss",
+						yUnit: "%",
+						x: xs,
+						annotations,
+						...(input.case === "annotations-edge" ? { thresholds: [{ y: 9.5, label: "loss budget" }] } : {}),
+						series: [{ label: "Loss", unit: "%", points: xs.map((x) => Math.round(1000 / (x + 10)) / 10) }],
+					},
+				};
+			}
 			case "stacked": {
 				// An illustrative delay budget per path, stage by stage, against a 150 ms line.
 				const stage = (label: string, points: number[]): Series => ({ label, unit: "ms", shape: "bar", stack: "budget", points });
@@ -208,6 +248,27 @@ export default {
 							stage("Decode and play", [15, 15, 15]),
 						],
 					},
+				};
+			}
+			/*
+			 * Two thresholds close together, upright and lying down, and an annotation's label beside a threshold's at
+			 * the top right corner: the labels a sweep for #263 found drawn over each other.
+			 */
+			case "thresholds-close":
+			case "horizontal-thresholds-close": {
+				const thresholds = [
+					{ y: 150, label: "150 ms, G.114 preferred", tone: "warn" as const },
+					{ y: 165, label: "165 ms, our alert", tone: "bad" as const },
+				];
+				if (input.case === "thresholds-close") {
+					return {
+						kind: "series",
+						chart: { xLabel: "Call", yLabel: "Mouth-to-ear delay", yUnit: "ms", x: frames.slice(0, 12), thresholds, series: [{ label: "Delay", unit: "ms", points: [120, 135, 128, 160, 190, 142, 138, 210, 175, 131, 126, 148] }] },
+					};
+				}
+				return {
+					kind: "series",
+					chart: { orientation: "horizontal", xLabel: "Path", yLabel: "Delay", yUnit: "ms", x: ["Same city", "Across a continent", "Through a relay"], thresholds, series: [{ label: "Delay", unit: "ms", shape: "bar", points: [90, 150, 195] }] },
 				};
 			}
 			case "horizontal-grouped":
