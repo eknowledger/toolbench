@@ -323,7 +323,7 @@ or that presents a deprecated one as current, is a field that lies.
 
 ## 4. Inputs
 
-Six types. Each generates a labelled control with its description wired to `aria-describedby`.
+Seven types. Each generates a labelled control with its description wired to `aria-describedby`.
 
 ```jsonc
 { "id": "text",  "type": "text",     "label": "Pattern", "default": "^a.*z$", "maxLength": 200 }
@@ -333,6 +333,7 @@ Six types. Each generates a labelled control with its description wired to `aria
   "options": [{ "value": "fast", "label": "Fast" }, { "value": "exact", "label": "Exact" }] }
 { "id": "trace", "type": "toggle",   "label": "Show trace", "default": false }
 { "id": "day",   "type": "date",     "label": "Day",     "default": "2026-10-25", "min": "2020-01-01" }
+{ "id": "tint",  "type": "color",    "label": "Tint",    "default": "#1f5aa8" }
 ```
 
 Things the validator will hold you to, and why:
@@ -359,6 +360,10 @@ Things the validator will hold you to, and why:
   picker, which lets a reader type a day past `max` and hands over an empty string while a date is half
   typed, so the runtime checks the value first and refuses it on the input, naming it by its label, before
   `run` is called. Samples and presets are held to the same check. `mode` on any other input is refused.
+* **A `color` input for a colour** (contract version 9). The reader types six hex digits in a box, the
+  labelled control, or picks from the system's picker in the swatch beside it; the two follow each other.
+  `run` gets a lowercase `#rrggbb`, never alpha or shorthand, and the `default` must already be in that
+  form. What is typed is trimmed and lowercased, and anything else is refused before `run`.
 * **`"lang"` on a textarea whose text has structure** (contract version 6, `"sdk": 6`): a DSL, a config, a log. The
   host's `highlight(source, lang)` hook, the one that paints `code` results, paints the textarea too,
   behind the real one, so the caret, selection, undo and screen reader stay the browser's. Treat it as a

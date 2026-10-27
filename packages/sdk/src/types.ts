@@ -883,6 +883,15 @@ export type InputSpec =
 			min?: string;
 			/** The latest value, in the mode's format, not before `min`. */
 			max?: string;
+	  })
+	| (InputBase & {
+			type: "color";
+			/**
+			 * The colour the form opens with, as `run` gets every colour: a lowercase `#rrggbb`, with no alpha
+			 * and no shorthand. The reader types it in a hex box, the labelled control, or picks it from the
+			 * system's picker in the swatch beside it. Contract version 9.
+			 */
+			default: string;
 	  });
 
 /**
@@ -926,7 +935,7 @@ export interface SelectOption {
 
 export type InputType = InputSpec["type"];
 
-export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date"];
+export const INPUT_TYPES: readonly InputType[] = ["text", "textarea", "number", "select", "toggle", "date", "color"];
 
 /** The shape a tool's `run` receives: one entry per declared input, keyed by id. */
 export type InputValues = Record<string, string | number | boolean>;

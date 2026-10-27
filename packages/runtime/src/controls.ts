@@ -5,7 +5,7 @@
  * page whose tools use none of them pays nothing for their code or their rules: in the boot chunk they
  * measured 762 gzipped bytes for the segments alone. The form is not drawn until the tool's code is here,
  * so waiting for this costs no time. Without it each input still works as the plain control the runtime
- * draws itself: a segmented select is a dropdown.
+ * draws itself: a segmented select is a dropdown, and a colour is its hex box with no swatch.
  */
 import type { SelectOption } from "@toolbench/sdk";
 import { el } from "./dom.ts";
@@ -34,6 +34,14 @@ legend.tb-label { padding: 0; margin-bottom: 0.25rem; }
 .tb-seg[data-stack] .tb-seg-opt { justify-content: flex-start; white-space: normal; padding: 0.125rem 0.25rem; color: var(--tb-fg); }
 .tb-seg[data-stack] .tb-seg-opt:has(:checked) { background: none; color: var(--tb-fg); }
 .tb-seg[data-stack] .tb-seg-opt input { position: static; opacity: 1; width: 1rem; height: 1rem; flex: none; accent-color: var(--tb-accent); }
+/* A colour: the swatch as tall as the hex box beside it, which is the value. */
+.tb-color-row { display: flex; gap: 0.5rem; }
+.tb-color-row .tb-input { width: 8.5rem; font-family: var(--tb-mono); text-transform: lowercase; }
+.tb-swatch { width: 2.25rem; height: auto; flex: none; padding: 3px; border: 1px solid var(--tb-input-border); border-radius: 8px; background: var(--tb-input-bg); cursor: pointer; }
+.tb-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.tb-swatch::-webkit-color-swatch { border: 0; border-radius: 5px; }
+.tb-swatch::-moz-color-swatch { border: 0; border-radius: 5px; }
+.tb-swatch:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
 `;
 
 /*
@@ -56,6 +64,27 @@ addEventListener("pointerdown", () => (keys = false), true);
  * height: stacking changes the height, so observing that would measure on every toggle. Also on a change of
  * choice, because the chosen label is bold and may not fit where the regular one did.
  */
+/**
+ * The system's colour picker beside a colour's hex `box` (#203), kept in step both ways: a pick writes the box
+ * and is passed to `pick`; a whole colour typed in the box, or `value()` after an assignment, moves the
+ * swatch, and half a colour leaves it where it was, since a colour input would read it as black. Its name
+ * says what it is for, "Highlight colour picker", because a swatch has no text of its own.
+ */
+export function swatch(box: HTMLInputElement, label: string, value: () => string, pick: (value: string) => void): { row: HTMLElement; sync: () => void } {
+	adoptStyles(box, "controls", () => STYLES);
+	const picker = el("input", { class: "tb-swatch", type: "color", "aria-label": `${label} picker` });
+	const sync = () => {
+		if (/^#[0-9a-f]{6}$/.test(value())) picker.value = value();
+	};
+	sync();
+	box.addEventListener("input", sync);
+	picker.addEventListener("input", () => {
+		box.value = picker.value;
+		pick(picker.value);
+	});
+	return { row: el("div", { class: "tb-color-row" }, picker, box), sync };
+}
+
 export function segments(group: HTMLElement, options: readonly SelectOption[], name: string, value: () => string, choose: (value: string) => void): () => void {
 	adoptStyles(group, "controls", () => STYLES);
 	const radios = options.map((option) => {
