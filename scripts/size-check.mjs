@@ -253,8 +253,12 @@ const BUDGETS = [
 	 * with the same runtime: the 5.1 KB between them is the bench's manifests, its registry and its wiring.
 	 * deployOnly so the worst case for one reader counts the runtime once, as a host loads it, rather than
 	 * twice. Still a budget, because a bench-only byte that lands here is still a byte nobody chose.
+	 *
+	 * The whitespace collapse took it from 32,338 to 31,944. Lowered from 32_500 to 31_500 by two lines in the
+	 * bench's Vite config: `json: { namedExports: false }`, since every manifest was also emitted as named
+	 * exports, and no modulepreload polyfill. 31,944 to 30,950 measured, 994 bytes, none of them the runtime's.
 	 */
-	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 32_500, deployOnly: true },
+	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 31_500, deployOnly: true },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -296,7 +300,8 @@ const BUDGETS = [
 	 * measured with the multiselect fixture (#204), its fourteen regions, and the rows fixture still to come.
 	 * Bench-only. 8,229 with the rows fixture.
 	 */
-	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 8_500, deployOnly: true },
+	// Lowered from 8_500 to 7_000 by `json: { namedExports: false }`, each manifest no longer written twice: 8,229 to 6,373.
+	{ label: "bench fixtures", pattern: /^bench-fixtures-[^/]+\.js$/, budget: 7_000, deployOnly: true },
 	/*
 	 * Worker copy raised from 4_000 to 4_500 by the graph-families fixture (#152): 3,716 to 4,020 measured with
 	 * the cases the graph kind's base draws, 4,210 with every family's, and 4,237 with the large graph too.
@@ -317,7 +322,8 @@ const BUDGETS = [
 	 * 7,164 measured with the multiselect fixture, and the rows fixture still to come. Bench-only. 7,414 with
 	 * the rows fixture.
 	 */
-	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 8_000, deployOnly: true },
+	// Lowered from 8_000 to 6_500 by `json: { namedExports: false }`: 7,414 to 6,055.
+	{ label: "bench fixtures, worker copy", pattern: /^worker-bench-fixtures-[^/]+\.js$/, budget: 6_500, deployOnly: true },
 	/*
 	 * The demo highlighter passed to `defineToolHost({ highlight })`. Host-only, split out of `boot` for
 	 * the same reason as the theme switch: a consumer does not download it.
@@ -515,7 +521,11 @@ const BUDGETS = [
 	 * worker's registry inlining the rate-limits manifest as the boot chunk's does, and the rows fixture named
 	 * in it. 5_500 would have left the build 144 over.
 	 */
-	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 6_000 },
+	/*
+	 * Lowered from 6_000 to 5_500 by `json: { namedExports: false }` in the bench's config: 5,644 to 5,109, the
+	 * worker's registry inlining each manifest once rather than twice.
+	 */
+	{ label: "worker entry", pattern: /^tool\.worker-[^/]+\.js$/, budget: 5_500 },
 	{ label: "tool: percentiles", pattern: /^tool-percentiles-[^/]+\.js$/, budget: 2_000 },
 	{ label: "tool: queue-explorer", pattern: /^tool-queue-explorer-[^/]+\.js$/, budget: 2_000 },
 	/*

@@ -131,6 +131,13 @@ export default defineConfig({
 	base: benchBase(),
 	plugins: [seedCards()],
 	/*
+	 * Each `tool.json` is imported for its default export only. By default Vite also emits every top-level key
+	 * as a named export, and the object behind them frozen in a namespace, so each manifest the registry inlines
+	 * was written out twice: 756 gzipped bytes of boot, 1,856 of the fixture chunk and 1,359 of its worker copy,
+	 * measured.
+	 */
+	json: { namedExports: false },
+	/*
 	 * ⚠️ `worker.format` defaults to "iife", which cannot code-split — so a worker that dynamically
 	 * imports anything (ours imports one chunk per tool) builds fine in development and fails the
 	 * production build. Every host that uses worker mode needs this line; it is in the README for that
@@ -166,6 +173,11 @@ export default defineConfig({
 		},
 	},
 	build: {
+		/*
+		 * `<link rel="modulepreload">` is native in every browser the runtime supports, so Vite's polyfill for it
+		 * was code in boot that no supported browser runs, 238 gzipped bytes. The site's build turned it off first.
+		 */
+		modulePreload: { polyfill: false },
 		rollupOptions: {
 			output: {
 				manualChunks: (id: string) => toolChunk(id, "tool-"),
