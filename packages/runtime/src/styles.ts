@@ -425,55 +425,7 @@ export const STYLES = /* css */ `
 /* The chart rules live in the chart chunk (render/chart-styles.ts), adopted when a chart is first drawn,
    so a tool page with no chart does not download them. */
 
-/* ── bytes ────────────────────────────────────────────────────────────────────────────────── */
-.tb-out-bytes { margin: 0; }
-.tb-bytes-caption { color: var(--tb-faint); font-size: 0.78rem; padding-bottom: 0.375rem; }
-.tb-bytes-grid {
-  font-family: var(--tb-mono); font-size: 0.78rem; line-height: 1.6;
-  background: var(--tb-surface); border: 1px solid var(--tb-border); border-radius: 8px;
-  padding: 0.5rem 0.625rem; overflow-x: auto;
-}
-/* ⚠️ ONE grid for the whole dump, with the rows as display:contents.
-   Each row being its own grid was the first version, and the columns then sized per row: a final row
-   with three bytes had a narrower hex column, so its ASCII gutter sat several characters left of the
-   row above. A hex dump whose columns shift is not a hex dump. */
-.tb-bytes-grid-inner { display: grid; grid-template-columns: auto auto auto; gap: 0 0.875rem; justify-content: start; }
-.tb-bytes-row { display: contents; }
-.tb-bytes-offset, .tb-bytes-hex, .tb-bytes-ascii { white-space: pre; }
-.tb-bytes-offset { color: var(--tb-faint); }
-.tb-bytes-hex .tb-byte + .tb-byte { margin-left: 0.5ch; }
-.tb-bytes-ascii { color: var(--tb-muted); }
-/* Tone marks a byte's range. The background carries it rather than the text colour, because two hex
-   digits are too small a target to read a colour from.
-   ⚠️ The normal tone gets a SOLID accent, not the wash. The wash (--tb-accent-bg) was the first choice and
-   it is nearly the surface colour: every two and three-byte highlight was invisible, and only the one
-   range that happened to carry a tone showed up at all. */
-.tb-byte[data-tone] { border-radius: 2px; }
-.tb-byte[data-tone="normal"] { background: var(--tb-accent); color: var(--tb-accent-ink); }
-.tb-byte[data-tone="good"]   { background: var(--tb-good); color: var(--tb-bg); }
-.tb-byte[data-tone="warn"]   { background: var(--tb-warn); color: var(--tb-bg); }
-.tb-byte[data-tone="bad"]    { background: var(--tb-bad); color: var(--tb-bg); }
-/* An untoned range in the next series colour (#148), after the tone rules so it beats "normal" at equal
-   specificity. The page colour as text: the light series are dark and the dark series light, and every
-   pairing measured 5.58:1 or better in both themes. --_tb-range is private, not a theming token. */
-.tb-out-bytes [data-series="1"] { --_tb-range: var(--tb-s1); }
-.tb-out-bytes [data-series="2"] { --_tb-range: var(--tb-s2); }
-.tb-out-bytes [data-series="3"] { --_tb-range: var(--tb-s3); }
-.tb-out-bytes [data-series="4"] { --_tb-range: var(--tb-s4); }
-.tb-out-bytes [data-series="5"] { --_tb-range: var(--tb-s5); }
-.tb-out-bytes [data-series="6"] { --_tb-range: var(--tb-s6); }
-.tb-byte[data-series] { background: var(--_tb-range); color: var(--tb-bg); }
-.tb-bytes-legend {
-  display: flex; flex-wrap: wrap; gap: 0.75rem;
-  margin: 0.5rem 0 0; padding: 0; list-style: none;
-  font-size: 0.78rem; color: var(--tb-muted);
-}
-.tb-bytes-legend li { display: flex; align-items: center; gap: 0.375rem; }
-.tb-bytes-swatch { width: 0.75rem; height: 0.75rem; border-radius: 2px; background: var(--tb-accent); }
-.tb-bytes-legend li[data-tone="good"] .tb-bytes-swatch { background: var(--tb-good); }
-.tb-bytes-legend li[data-tone="warn"] .tb-bytes-swatch { background: var(--tb-warn); }
-.tb-bytes-legend li[data-tone="bad"]  .tb-bytes-swatch { background: var(--tb-bad); }
-.tb-bytes-legend li[data-series] .tb-bytes-swatch { background: var(--_tb-range); }
+/* The bytes rules live in the bytes chunk (render/bytes.ts), adopted when a dump is first drawn. */
 
 /* ── the facade: a card before it is activated ────────────────────────────────────────────── */
 /* Ordinary content, clickable as a whole; the hint inside it is the button (#98, #105). */

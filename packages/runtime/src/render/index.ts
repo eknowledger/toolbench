@@ -12,7 +12,7 @@
  * first few values, but an error is never shortened — a partial error reads as a complete answer,
  * which is the one failure mode worse than showing nothing.
  */
-import type { ByteRange, Cell, Field, Output } from "@toolbench/sdk";
+import type { Cell, Field, Output } from "@toolbench/sdk";
 import { el } from "../dom.ts";
 
 /*
@@ -32,9 +32,10 @@ import { el } from "../dom.ts";
  */
 /**
  * The kinds drawn by code of their own, fetched only when one is drawn: the series chart, the heatmap and
- * the pie (#121, #123), each its own chunk, so a page pays for the kinds it draws and no others.
+ * the pie (#121, #123), each its own chunk, so a page pays for the kinds it draws and no others. `bytes` joined
+ * them when it left the chunk every page loads, where its renderer and rules measured 817 gzipped bytes.
  */
-export const LAZY_KINDS = ["series", "heatmap", "pie", "radar", "treemap", "venn", "graph"] as const;
+export const LAZY_KINDS = ["series", "heatmap", "pie", "radar", "treemap", "venn", "graph", "bytes"] as const;
 export type LazyKind = (typeof LAZY_KINDS)[number];
 
 type Drawer = (output: Output, options: RenderOptions) => HTMLElement;
@@ -67,6 +68,10 @@ const loaders: Record<LazyKind, () => Promise<Drawer>> = {
 	graph: async () => {
 		const { renderGraph } = await import("../graph/graph.ts");
 		return (output, options) => renderGraph((output as Extract<Output, { kind: "graph" }>).graph, options);
+	},
+	bytes: async () => {
+		const { renderBytes } = await import("./bytes.ts");
+		return (output, options) => renderBytes(output as Extract<Output, { kind: "bytes" }>, options);
 	},
 };
 
@@ -263,6 +268,7 @@ function draw(output: Output, options: RenderOptions): HTMLElement {
 		case "treemap":
 		case "venn":
 		case "graph":
+		case "bytes":
 			return lazy(output.kind, output, options);
 		case "group": {
 			/*
@@ -330,8 +336,6 @@ function draw(output: Output, options: RenderOptions): HTMLElement {
 			}
 			return el("div", { class: "tb-group" }, ...output.parts.map((part) => render(part, options)));
 		}
-		case "bytes":
-			return renderBytes(output, options);
 		case "error":
 			return renderError(output);
 		default: {
@@ -515,122 +519,6 @@ function renderTable(
 		table.addEventListener("pointerleave", () => point(null, table));
 	}
 	return el("div", { class: "tb-out-table" }, table, options.copy === false ? null : copyBar("Copy table", () => (copier as typeof import("./copy.ts")).tableToTsv(output), () => table));
-}
-
-/** How many bytes per row. 16 is the convention every hex dump uses, and readers expect it. */
-const BYTES_PER_ROW = 16;
-/** Above this, a card would be a page. The full tool shows everything. */
-const COMPACT_ROWS = 4;
-
-/**
- * Raw bytes the way someone reading a wire format wants them: offset, hex, printable gutter.
- *
- * ⚠️ Two things this does that a `table` cannot, which is why the kind exists.
- *
- * A highlight spans a *byte range*, not cells, so it can start mid-row and wrap. Each byte carries
- * its range's tone, and the legend names every range, because colour alone tells a reader something
- * is interesting without saying what — and tells a screen reader nothing at all.
- *
- * The printable gutter replaces a non-printable byte with `.`, the convention, rather than trying to
- * render control characters. A byte is only shown as itself between 0x20 and 0x7e.
- */
-function renderBytes(output: Extract<Output, { kind: "bytes" }>, options: RenderOptions): HTMLElement {
-	const { bytes, highlight = [], offset = 0 } = output;
-	/*
-	 * One lookup per byte, built once. The alternative is scanning every range per byte, which is
-	 * O(bytes x ranges) and shows up immediately on a packet-sized dump.
-	 */
-	const rangeOf = new Map<number, ByteRange>();
-	for (const range of highlight) {
-		for (let i = range.at; i < range.at + range.len && i < bytes.length; i++) rangeOf.set(i, range);
-	}
-	/*
-	 * A range with no tone takes the next chart series colour, 1 to 6 and then round again (#148). Every one
-	 * used to be the same accent, so a decoder marking eight fields of a message drew eight identical blocks,
-	 * and two adjacent ranges read as one. A tone still wins: it says something about a range, and a `bad`
-	 * field must look bad whatever its neighbours are. Counted over untoned ranges only, so a toned one in
-	 * the middle does not leave a colour unused. The label stays in the legend and the hover, because a
-	 * colour on its own tells a reader nothing about which field it is.
-	 */
-	const attrs = new Map<ByteRange, Record<string, string>>();
-	let untoned = 0;
-	for (const range of highlight) {
-		attrs.set(range, range.tone ? { "data-tone": range.tone } : { "data-tone": "normal", "data-series": String((untoned++ % 6) + 1) });
-	}
-
-	const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW);
-	const rows = options.compact ? Math.min(totalRows, COMPACT_ROWS) : totalRows;
-	const hex = (n: number, width: number) => n.toString(16).padStart(width, "0");
-
-	const lines: HTMLElement[] = [];
-	for (let row = 0; row < rows; row++) {
-		const start = row * BYTES_PER_ROW;
-		const slice = bytes.slice(start, start + BYTES_PER_ROW);
-		lines.push(
-			el(
-				"div",
-				{ class: "tb-bytes-row" },
-				el("span", { class: "tb-bytes-offset" }, hex(offset + start, 8)),
-				el(
-					"span",
-					{ class: "tb-bytes-hex" },
-					...slice.map((byte, i) => {
-						const range = rangeOf.get(start + i);
-						return el(
-							"span",
-							{
-								class: "tb-byte",
-								...(range ? { ...attrs.get(range), title: range.label } : {}),
-							},
-							hex(byte, 2),
-						);
-					}),
-				),
-				el(
-					"span",
-					{ class: "tb-bytes-ascii" },
-					...slice.map((byte, i) => {
-						const range = rangeOf.get(start + i);
-						return el(
-							"span",
-							{ class: "tb-byte", ...(range ? attrs.get(range) : {}) },
-							byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : ".",
-						);
-					}),
-				),
-			),
-		);
-	}
-
-	const hidden = totalRows - rows;
-	return el(
-		"figure",
-		{ class: "tb-out-bytes" },
-		output.caption ? el("figcaption", { class: "tb-bytes-caption" }, output.caption) : null,
-		el("div", { class: "tb-bytes-grid" }, el("div", { class: "tb-bytes-grid-inner" }, ...lines)),
-		// Stands down for a disclosure, for the same reason the field notice does.
-		hidden > 0 && options.more !== "expand"
-			? el("p", { class: "tb-more" }, `+${hidden * BYTES_PER_ROW} more bytes on the full tool`)
-			: null,
-		/*
-		 * The legend is the accessible half of this renderer. A hex grid is a wall of numbers to a
-		 * screen reader, so every named range is also stated as text with its offset and length.
-		 */
-		highlight.length > 0
-			? el(
-					"ul",
-					{ class: "tb-bytes-legend" },
-					...highlight.map((range) =>
-						el(
-							"li",
-							attrs.get(range),
-							el("span", { class: "tb-bytes-swatch" }),
-							`${range.label}: ${range.len} byte${range.len === 1 ? "" : "s"} at 0x${hex(offset + range.at, 4)}`,
-						),
-					),
-				)
-			: null,
-	);
 }
 
 function renderError(output: Extract<Output, { kind: "error" }>): HTMLElement {
