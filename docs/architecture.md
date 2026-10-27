@@ -186,10 +186,11 @@ toolbench/
 │   ├── fixtures/stress/            a tool that misbehaves on purpose
 │   ├── fixtures/retired/           a tool that must not run
 │   ├── fixtures/deprecated/        a tool that still runs, marked
+│   ├── host/                       the smallest host page, measured as the published runtime size
 │   └── src/                        registry, boot, worker entry, page scripts
 ├── scripts/
 │   ├── new-tool.mjs                scaffolds the four files under tools/<id>
-│   └── size-check.mjs              transfer budgets for the built bench
+│   └── size-check.mjs              transfer budgets for the built bench and the host page
 ├── docs/                           this file, authoring, versioning
 └── .github/workflows/             tests.yml, build.yml, pages.yml, release.yml
 ```
@@ -940,10 +941,10 @@ Eight layers. Each catches something the others structurally cannot.
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 150 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 29 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
-| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 43 |
+| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 46 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 301 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 302 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -1037,13 +1038,18 @@ when checking what loaded, because a denylist only catches the leaks you predict
 
 ## 13. Performance budget
 
-Measured with gzip on `bench/dist`, not estimated. Reproduce with `pnpm bench:build && node
-scripts/size-check.mjs`, which is also a CI step: every figure below has a budget, so a number in this
-table cannot quietly stop being true.
+Measured with gzip, not estimated. Reproduce with `pnpm bench:build && node scripts/size-check.mjs`, which
+is also a CI step: every figure below has a budget, so a number in this table cannot quietly stop being true.
+
+The runtime's row is a host's page, not a bench chunk. `bench/host/` is the smallest honest host, built with
+Vite's defaults: an HTML page, `defineToolHost` and `RegistrySource`, and one trivial tool whose manifest it
+imports. The row is everything that page downloads before its card paints, and the browser suite fails if the
+page fetches anything to paint that the row does not count. Every other row is a chunk of `bench/dist`.
 
 | Item | Transfer | Notes |
 |---|---|---|
-| Runtime plus the bench's own wiring | 32.3 KB | One chunk, once per page that uses a tool. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk) |
+| Runtime, as a host loads it | 27.2 KB | What a host's page pays to use any tool at all, once per page: the runtime's entry chunk with one manifest inlined and Vite's helpers. The published figure, and the README's badge |
+| Bench page's boot chunk | 32.3 KB | The bench's `boot`: the same runtime plus the seven example manifests `registry.ts` inlines, the registry and the bench's page wiring, none of which a host downloads. Until the host page existed this was the published figure, and its history is the runtime's. Grew 1.5 KB with contract v2's bytes renderer, 0.9 KB with contract v3's sample row, 0.5 KB with richer cards, 0.6 KB with the host `values` and `run()` API, 0.1 KB with the host `highlight` hook, 0.7 KB with host stylesheets and the styling contract, 0.2 KB with `reveal`, 0.7 KB with select presets and contract v6 (674 bytes, 355 of them validation), 0.3 KB with the painted textarea's wiring (297 bytes; the layer is its own chunk), 0.1 KB with the link and code-class checks (132 bytes), and 1.1 KB with the graph kind (1,083 bytes: 621 of runtime, its loader, summary, shared style adoption and colour list, 462 for the build-order manifest the bench inlines), 0.5 KB with the Copy button on code and table results (525 bytes; the copying is its own chunk), 0.4 KB with refusing a manifest that under-declares its `sdk` (379 bytes), 0.6 KB with validating a tool's textarea grammar (551 bytes; the tokeniser is in the paint chunk), 50 bytes with naming a missing graph as a graph rather than a chart, 0.2 KB with the `tool-input` and `tool-run` events (163 bytes), 0.3 KB with the Reset button (346 bytes), 55 bytes with the `links` attribute, 0.5 KB with reading a shared link and placing the share button (463 bytes, about 43 of them the bench's `share-private` fixture entries; the button is its own chunk), 53 bytes with `mono` on a field and contract v8, 24 bytes with `share` on an input, 0.1 KB (141 bytes) with names and colours for one input, 77 bytes with `wrap` on a table column, 0.4 KB (372 bytes) with row headers, the narrow table, its edge shadows and its caption, 0.6 KB (634 bytes) with markup in an input's description, 0.3 KB (295 bytes) with an input's details behind a disclosure, 30 bytes with hiding Reset for `reset: false`, 0.3 KB (320 bytes) with the segmented select and contract v9 (the segments are their own chunk), 0.6 KB (647 bytes) with the date input, its parser and the check before `run`, 0.1 KB (141 bytes) with the colour input (the swatch is in the controls chunk), and 0.3 KB (303 bytes) with the secret input, its refusals and keeping it out of links (the eye is in the controls chunk), and 1.1 KB (1,085 bytes) with the multiselect, 443 of them validation, and the message under an input an error names (its checkboxes and chips are their own chunk), and 1.9 KB (1,869 bytes) with rows, 540 of them the rate-limits manifest the bench inlines and 672 validation (the list itself is its own chunk) |
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
@@ -1057,8 +1063,10 @@ table cannot quietly stop being true.
 | A page with no tool | 0 bytes | Nothing is imported |
 | A card nobody opens | 0 bytes of tool code | The facade is markup |
 
-Where the budget is spent: this chunk is the runtime (element, runner, every renderer except the chart,
-and `styles.ts`) plus the bench's page wiring.
+Where the budget is spent: the host's chunk is the runtime (element, runner, every renderer not split out,
+validation and `styles.ts`) plus its one manifest. The bench's `boot` is that plus the bench's page wiring, and
+the paragraphs below that follow `boot` describe the bench's chunk, which was the published figure when they
+were written.
 
 **The chart renderer is split out**, which issue #12 asked about and #76 measured before it was taken. The
 shape is the one that keeps `render` synchronous, and that property is what made it worth doing: `<tool-host>`
@@ -1232,8 +1240,8 @@ pnpm bench      # http://localhost:5180
 - [ ] New behaviour has a test in the right layer
 - [ ] Contract change: version bumped, migration added, changelog line written
 - [ ] Public API change: README and the relevant doc updated in the same commit
-- [ ] Transfer size checked if `packages/runtime` grew: `pnpm bench:build`, then gzip
-      `bench/dist/assets/boot-*.js`
+- [ ] Transfer size checked if `packages/runtime` grew: `pnpm bench:build && pnpm size`, which measures the
+      host page in `bench/host/` and the bench's `boot` chunk
 
 ### 16.5 Commit messages
 

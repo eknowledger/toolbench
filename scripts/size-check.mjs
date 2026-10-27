@@ -20,8 +20,10 @@ const ASSETS = join(import.meta.dirname, "..", "bench", "dist", "assets");
 /**
  * Each entry matches one built chunk. `budget` is bytes, gzipped.
  *
- * `boot` is the runtime plus the bench's own wiring, which is the closest honest proxy for "what a
- * page pays to use any tool at all". It is not the runtime alone, and the docs say so.
+ * `boot` is the runtime plus the bench's own wiring: every example's manifest, the bench registry and
+ * Vite's helpers, so it is NOT what a host pays. That figure is HOST_PAGE, below, and it is the one the
+ * README publishes. `boot` is still measured, as "bench page, boot", because it is what the bench's
+ * readers download and because everything the bench adds to it should stay visible.
  */
 const BUDGETS = [
 	/*
@@ -245,7 +247,14 @@ const BUDGETS = [
 	 * after a removal and the narrow layout are the rows chunk, below, fetched only by a tool with a rows
 	 * input: 3,314 measured. 30_500 would have left the build 1,838 over.
 	 */
-	{ label: "runtime + host wiring", pattern: /^boot-[^/]+\.js$/, budget: 32_500 },
+	/*
+	 * ⚠️ Renamed from "runtime + host wiring" and made deployOnly when the README stopped publishing this
+	 * chunk (HOST_PAGE, below, is the published figure now). 32,338 measured against 27,242 for a host's page
+	 * with the same runtime: the 5.1 KB between them is the bench's manifests, its registry and its wiring.
+	 * deployOnly so the worst case for one reader counts the runtime once, as a host loads it, rather than
+	 * twice. Still a budget, because a bench-only byte that lands here is still a byte nobody chose.
+	 */
+	{ label: "bench page, boot", pattern: /^boot-[^/]+\.js$/, budget: 32_500, deployOnly: true },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -659,6 +668,58 @@ for (const file of unclaimed) {
 	failed++;
 }
 
+/** Every asset a built HTML page loads before any tool code: its scripts, module preloads and stylesheets. */
+function pageAssets(html) {
+	const refs = [
+		...[...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]),
+		...[...html.matchAll(/<link[^>]*rel="(?:stylesheet|modulepreload)"[^>]*href="([^"]+)"|<link[^>]*href="([^"]+)"[^>]*rel="(?:stylesheet|modulepreload)"/g)].map((m) => m[1] ?? m[2]),
+	];
+	// Asset URLs carry the Pages prefix in a production build; the files sit under dist/assets either way.
+	return [...new Set(refs.filter((r) => r.includes("/assets/")).map((r) => r.slice(r.indexOf("/assets/") + 1)))];
+}
+
+/*
+ * ⚠️ The published figure: "runtime, as a host loads it".
+ *
+ * `bench/host/` is the smallest honest host, built by `pnpm bench:build` with Vite's defaults into
+ * `bench/dist/host/`: an HTML page, `defineToolHost` and `RegistrySource` from the runtime, and one trivial tool
+ * whose manifest it imports. This line is everything that page downloads before its card paints: today the
+ * runtime's entry chunk, its one inlined manifest and Vite's helpers, which its HTML names.
+ *
+ * ⚠️ What the HTML names is only the right total while the page fetches nothing else to paint. A chunk the
+ * runtime imports on start, before the first card appears, is paid by every host and named by no tag. The
+ * browser suite opens this page and fails unless the scripts it fetched before the card painted are exactly
+ * the ones counted here, so such a chunk cannot arrive without this figure counting it.
+ *
+ * The README used to publish the bench's `boot` chunk instead, 32,338 against 27,242 measured here on the same
+ * tree. The 5.1 KB difference is the bench's: seven example manifests that `registry.ts` inlines, the registry
+ * itself and its page wiring. No host pays for those, so a figure that included them was a figure no host
+ * would reproduce.
+ *
+ * 27_500 against 27,242 measured, leaving 258.
+ */
+const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 27_500 };
+{
+	let html = null;
+	try {
+		html = readFileSync(join(HOST_PAGE.dir, "index.html"), "utf8");
+	} catch {
+		console.error(`✗ ${HOST_PAGE.label}: no build at ${HOST_PAGE.dir}. \`pnpm bench:build\` builds it with the bench.`);
+		failed++;
+	}
+	if (html !== null) {
+		const assets = pageAssets(html);
+		if (assets.length === 0) {
+			console.error(`✗ ${HOST_PAGE.label}: the page loads no asset, so the pattern above stopped matching its markup`);
+			failed++;
+		}
+		const size = assets.reduce((sum, f) => sum + gzipSync(readFileSync(join(HOST_PAGE.dir, f))).length, 0);
+		const over = size > HOST_PAGE.budget;
+		if (over) failed++;
+		rows.unshift({ label: HOST_PAGE.label, size, budget: HOST_PAGE.budget, over, deployOnly: false });
+	}
+}
+
 /*
  * The project site (site/), measured as a page rather than as chunks: everything its landing page loads
  * from the HTML itself, scripts, module preloads and stylesheets, before any tool code is fetched.
@@ -727,13 +788,7 @@ try {
 }
 if (siteHtml !== null) {
 	for (const { label, page, budget } of SITE_PAGES) {
-		const text = readFileSync(join(SITE, page), "utf8");
-		const refs = [
-			...[...text.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]),
-			...[...text.matchAll(/<link[^>]*rel="(?:stylesheet|modulepreload)"[^>]*href="([^"]+)"|<link[^>]*href="([^"]+)"[^>]*rel="(?:stylesheet|modulepreload)"/g)].map((m) => m[1] ?? m[2]),
-		];
-		// Asset URLs carry the Pages prefix in a production build; the files sit under dist/assets either way.
-		const files = [...new Set(refs.filter((r) => r.includes("/assets/")).map((r) => r.slice(r.indexOf("/assets/") + 1)))];
+		const files = pageAssets(readFileSync(join(SITE, page), "utf8"));
 		const size = files.reduce((sum, f) => sum + gzipSync(readFileSync(join(SITE, f))).length, 0);
 		const over = size > budget;
 		if (over) failed++;
@@ -772,9 +827,13 @@ if (process.argv.includes("--update")) {
 		 * figure the refresh tool cannot reach is a figure that rots, which is the whole argument for this
 		 * block existing.
 		 */
-		["README.md", /(runtime-)[\d.]+(%20KB%20gzip)/, kb(find("runtime + host wiring")).replace(" KB", "")],
-		["README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
-		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime + host wiring"))],
+		["README.md", /(runtime-)[\d.]+(%20KB%20gzip)/, kb(find("runtime, as a host loads it")).replace(" KB", "")],
+		["README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime, as a host loads it"))],
+		["docs/architecture.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime, as a host loads it"))],
+		["packages/runtime/README.md", /(\| Runtime[^|]*\| )[\d.]+ KB/, kb(find("runtime, as a host loads it"))],
+		// The bench's own boot chunk, beside the published figure so the difference stays visible.
+		["README.md", /(\| Bench page[^|]*\| )[\d.]+ KB/, kb(find("bench page, boot"))],
+		["docs/architecture.md", /(\| Bench page[^|]*\| )[\d.]+ KB/, kb(find("bench page, boot"))],
 		["README.md", /(\| Worker entry[^|]*\| )[\d.]+ KB/, kb(find("worker entry"))],
 		["README.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],
 		["docs/architecture.md", /(\| Graph kind[^|]*\| )[\d.]+ KB/, kb(find("graph: base"))],

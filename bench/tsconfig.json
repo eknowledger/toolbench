@@ -16,5 +16,5 @@
       "@toolbench/runtime/*": ["../packages/runtime/src/*"]
     }
   },
-  "include": ["*.ts", "src/**/*.ts", "fixtures/*/index.ts"]
+  "include": ["*.ts", "src/**/*.ts", "fixtures/*/index.ts", "host/**/*.ts"]
 }

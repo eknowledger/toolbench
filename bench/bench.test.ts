@@ -3383,6 +3383,32 @@ describe("the chart renderer is its own chunk", () => {
 	});
 });
 
+describe("the published runtime figure", () => {
+	/*
+	 * ⚠️ scripts/size-check.mjs publishes what bench/host's HTML names as the runtime's cost. That is only the total
+	 * while the page fetches nothing else before its card paints: a chunk the runtime imports on start is paid by
+	 * every host and named by no tag. An allowlist of what was fetched, so such a chunk fails here by name.
+	 */
+	it("is every script a host's page fetches before its card paints, and the tool's code waits for a click", async () => {
+		const page = await browser.newPage();
+		const fetched: string[] = [];
+		page.on("request", (request) => {
+			if (request.resourceType() === "script" || request.resourceType() === "stylesheet") fetched.push(request.url().replace(/^.*\/host\//, ""));
+		});
+		await page.goto(`${BASE}/host/index.html`, { waitUntil: "load" });
+		await page.locator("tool-host .tb-facade").waitFor({ timeout: 10_000 });
+		const html = readFileSync(join(import.meta.dirname, "dist", "host", "index.html"), "utf8");
+		const counted = [...html.matchAll(/(?:src|href)="\/host\/(assets\/[^"]+)"/g)].map((m) => m[1]);
+		assert.ok(counted.length > 0, "the host page names no asset");
+		assert.deepEqual([...fetched].sort(), [...counted].sort(), "fetched before the first paint, and not counted in the published figure");
+
+		await page.locator("tool-host .tb-facade").click();
+		await page.locator("tool-host .tb-run").waitFor({ timeout: 10_000 });
+		assert.equal(fetched.length, counted.length + 1, `opening the card fetches the tool's code and nothing else: ${fetched.join(", ")}`);
+		await page.close();
+	});
+});
+
 describe("page mode", () => {
 	it("renders the chart and keeps it — a late progress frame must not overwrite the result", async () => {
 		const page = await browser.newPage();

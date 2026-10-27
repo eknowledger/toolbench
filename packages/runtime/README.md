@@ -64,11 +64,11 @@ neither fires while the tool first opens. `ToolHostEvents` types them.
 
 ## Size
 
-Measured with gzip on a production build:
+Measured with gzip on a minimal page built with Vite's defaults, one tool and nothing else:
 
 | | Transfer |
 |---|---|
-| This package, once per page that uses a tool | ~16 KB |
+| Runtime, once per page that uses a tool | 27.2 KB |
 | Worker entry, only on pages with a worker-mode tool | ~2.8 KB |
 | A typical tool | 1 to 2 KB |
 | A page with no tool | 0 bytes |
