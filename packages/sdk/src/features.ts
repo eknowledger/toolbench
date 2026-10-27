@@ -26,7 +26,7 @@ type Since = Readonly<Record<string, number>>;
 /**
  * Everything a manifest can use that arrived after version 1, keyed by where it sits: a top-level key as
  * itself, then `runtime.`, `inputs.`, `options.` for a select's option, `type.` for an input type,
- * `capabilities.` and `kinds.`. Anything the validator knows that is not here is version 1.
+ * `control.` for a value of an input's `control`, `capabilities.` and `kinds.`. Anything the validator knows that is not here is version 1.
  *
  * ⚠️ Only the later rows ship, because this is in the chunk every page loads: the full table, every key at
  * every version, lives in features.test.ts, which fails when the validator learns a key it has no row for,
@@ -45,6 +45,9 @@ export const LATER = {
 	"inputs.role": 8,
 	"inputs.details": 8,
 	"options.sets": 6,
+	// A value of `control`, because the key is older than most of its values.
+	"control.slider": 4,
+	"control.segmented": 9,
 	"kinds.bytes": 2,
 	"kinds.heatmap": 4,
 	"kinds.pie": 4,
@@ -134,6 +137,7 @@ export function checkManifestFeatures(raw: unknown): void {
 		const o = Object(input) as Record<string, unknown>;
 		keysOf(o, "inputs.", `inputs[${i}].`);
 		see(`inputs[${i}].type`, `type.${o.type}`, `"${o.type}" `);
+		see(`inputs[${i}].control`, `control.${o.control}`, `"${o.control}" `);
 		each(o.options, (option, k) => keysOf(option, "options.", `inputs[${i}].options[${k}].`));
 	});
 	if (first) throw new ManifestError(first[0], `${first[2]}is from contract version ${first[1]}, but the tool declares "sdk": ${declared}. Declare "sdk": ${needs}.`);

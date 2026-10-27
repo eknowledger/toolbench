@@ -17,7 +17,7 @@ A tool is one function and one JSON file. Toolbench builds the form, runs it, an
 
 [![tests](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/tests.yml) [![build](https://github.com/eknowledger/toolbench/actions/workflows/build.yml/badge.svg)](https://github.com/eknowledger/toolbench/actions/workflows/build.yml) [![npm](https://img.shields.io/npm/v/@toolbench/runtime?logo=npm&label=npm)](https://www.npmjs.com/package/@toolbench/runtime) [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.0%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![contract](https://img.shields.io/badge/contract-v8-informational)](docs/versioning.md) [![runtime size](https://img.shields.io/badge/runtime-28.3%20KB%20gzip-brightgreen)](#size-and-cost) [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#install) [![types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](packages/sdk/src/types.ts) [![node](https://img.shields.io/badge/node-%3E%3D24-5FA04E?logo=node.js&logoColor=white)](#browser-and-runtime-support) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
 
@@ -66,7 +66,7 @@ that produces it:
 | Section | What it shows |
 |---|---|
 | [Display modes](https://eknowledger.github.io/toolbench/gallery.html#modes) | A tool on its own page, a card that loads nothing until it is opened, and a tool inside an article |
-| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
+| [Inputs](https://eknowledger.github.io/toolbench/gallery.html#inputs) | Samples, select presets, a slider, a segmented select, a highlighted textarea, help text with lists, code and tones, details behind a disclosure, and `autoRun` |
 | [Running and failing](https://eknowledger.github.io/toolbench/gallery.html#running) | Worker mode with a timeout, a tool that spins, throws or rejects its input, and the `deprecated` and `retired` states |
 | [Charts](https://eknowledger.github.io/toolbench/gallery.html#charts) | Every chart kind, each with the result that draws it |
 
@@ -545,6 +545,19 @@ the select through `values` is taken literally and fills nothing. `sets` is chec
 `input`, and may not name its own select or another preset select; the default option's `sets` must equal
 those inputs' defaults. Contract version 6.
 
+**A select can be a row of segments.** `"control": "segmented"` draws a short choice as one row, the
+chosen option filled with the accent, instead of a dropdown:
+
+```jsonc
+{ "id": "order", "type": "select", "label": "Byte order", "control": "segmented", "default": "little",
+  "options": [{ "value": "little", "label": "Little-endian" }, { "value": "big", "label": "Big-endian" }] }
+```
+
+They are native radios in a fieldset whose legend is the label, so a reader tabs in once and moves with
+the arrow keys. When a segment would cut its label, the row becomes stacked radios, measured as the tool
+resizes. `run` gets the option value, as from a dropdown, and presets work the same way. The controls are
+a chunk of their own, about 1 KB, fetched only by a tool that has one. Contract version 9.
+
 **A textarea can be highlighted.** Give a `textarea` input a `lang`, and a host that passes `highlight`
 to `defineToolHost` paints what the reader types with the same hook `code` results use, so a site keeps
 one highlighter:
@@ -791,9 +804,9 @@ Measured on the built bench with gzip, not estimated:
 
 | | Transfer |
 |---|---|
-| Runtime plus the bench's page wiring, once per page that uses a tool | 28.0 KB |
+| Runtime plus the bench's page wiring, once per page that uses a tool | 28.3 KB |
 | Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
-| Worker entry, only for pages with a worker-mode tool | 5.0 KB |
+| Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |
 | `queue-explorer` tool chunk | 1.2 KB |

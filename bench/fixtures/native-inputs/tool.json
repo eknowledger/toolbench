@@ -1,0 +1,26 @@
+{
+	"sdk": 9,
+	"id": "native-inputs",
+	"name": "Native inputs",
+	"blurb": "The browser's own controls behind the newer input types: a select drawn as segments.",
+	"version": "1.0.0",
+	"capabilities": ["pure"],
+	"runtime": { "entry": "index.ts", "thread": "main" },
+	"kinds": ["fields", "error"],
+	"tags": ["bench"],
+	"inputs": [
+		{
+			"id": "order",
+			"type": "select",
+			"control": "segmented",
+			"label": "Byte order",
+			"description": "How multi-byte fields are read. {muted|Detect} needs a `0xFEFF` mark in the first two bytes.",
+			"default": "little",
+			"options": [
+				{ "value": "little", "label": "Little-endian (x86)" },
+				{ "value": "big", "label": "Big-endian (network)" },
+				{ "value": "auto", "label": "Detect from header" }
+			]
+		}
+	]
+}

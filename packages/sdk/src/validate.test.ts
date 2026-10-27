@@ -591,3 +591,24 @@ describe("validateManifest: grammar on a textarea", () => {
 		failsWith(withGrammar({ strings: "q" }), "inputs[0].grammar.strings", "ASCII punctuation");
 	});
 });
+
+describe("validateManifest: a segmented select (contract 9, #203)", () => {
+	const order = (extra: Record<string, unknown> = {}) => ({
+		id: "order",
+		type: "select",
+		label: "Byte order",
+		default: "little",
+		options: [{ value: "little", label: "Little-endian" }, { value: "big", label: "Big-endian" }],
+		...extra,
+	});
+	it("accepts control: segmented on a select", () => {
+		const m = validateManifest({ ...good(), inputs: [order({ control: "segmented" })] });
+		const input = m.inputs[0];
+		assert.ok(input?.type === "select" && input.control === "segmented");
+	});
+	it("refuses any other control on a select, and segmented on a number", () => {
+		failsWith((m) => { m.inputs = [order({ control: "slider" })]; }, "inputs[0].control", 'must be "segmented" when present, got "slider"');
+		failsWith((m) => { m.inputs = [order({ control: "tabs" })]; }, "inputs[0].control", 'got "tabs"');
+		failsWith((m) => { m.inputs = [{ id: "n", type: "number", label: "N", default: 1, min: 0, max: 10, control: "segmented" }]; }, "inputs[0].control", "slider");
+	});
+});

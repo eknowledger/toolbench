@@ -146,7 +146,7 @@ async function message(change: (m: Record<string, unknown>) => void): Promise<st
 /** A manifest that passes, so each rule can break exactly one thing. */
 function baseManifest(): Record<string, unknown> {
 	return {
-		sdk: 8,
+		sdk: 9,
 		id: "example",
 		name: "Example",
 		blurb: "An example.",
@@ -171,7 +171,8 @@ const RULES: { rule: string; change: (m: Record<string, unknown>) => void }[] = 
 	{ rule: "A number declares `min` and `max`", change: (m) => delete input(m, 0).max },
 	{ rule: "`min` is below `max`", change: (m) => Object.assign(input(m, 0), { min: 10, max: 5, default: 7 }) },
 	{ rule: "A number's default is within `min..max`", change: (m) => (input(m, 0).default = 90) },
-	{ rule: "`control` is `\"slider\"` when present", change: (m) => (input(m, 0).control = "knob") },
+	{ rule: "`control` on a number is `\"slider\"`", change: (m) => (input(m, 0).control = "knob") },
+	{ rule: "`control` on a select is `\"segmented\"`", change: (m) => (input(m, 1).control = "slider") },
 	{ rule: "A select has two or more options", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }]) },
 	{ rule: "Option values are unique", change: (m) => (input(m, 1).options = [{ value: "fast", label: "Fast" }, { value: "fast", label: "Also fast" }]) },
 	{ rule: "A select's default is one of its options", change: (m) => (input(m, 1).default = "slow") },
@@ -195,7 +196,7 @@ const SUMMARY: Record<string, string> = {
 	text: "One line: a name, a pattern, an id",
 	textarea: "Pasted data, a document, source in a notation",
 	number: "A bounded quantity: a rate, a count, a size",
-	select: "A choice from a short fixed list, or a preset that fills other inputs",
+	select: "A choice from a short fixed list, as a dropdown or a row of segments, or a preset that fills other inputs",
 	toggle: "On or off",
 };
 /** The type of the value `run` gets for an input of this kind. */

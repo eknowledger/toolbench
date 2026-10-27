@@ -241,6 +241,8 @@ let painter: typeof import("./paint.ts") | undefined;
 /** The share chunk (#227), and the one fetch of it every host on the page waits on. */
 let sharer: typeof import("./share.ts") | undefined;
 let shareLoad: Promise<void> | undefined;
+/** The newer inputs' controls (#203), once a tool that has one has activated. */
+let controls: typeof import("./controls.ts") | undefined;
 const loadShare = () => (shareLoad ??= import("./share.ts").then((module) => void (sharer = module)));
 
 /** Defines the element. Call once, with the source your host provides. */
@@ -744,10 +746,16 @@ export class ToolHost extends HTMLElement {
 					: undefined;
 			// With the tool's code, so the button is live when the form appears. A failed fetch leaves it disabled.
 			const share = this.#shares ? loadShare().catch(() => undefined) : undefined;
+			// The newer inputs' controls (#203). A failed fetch leaves each the plain control the runtime draws itself.
+			const native =
+				!controls && this.#manifest?.inputs.some((input) => input.type === "select" && input.control === "segmented")
+					? import("./controls.ts").then((module) => void (controls = module), () => undefined)
+					: undefined;
 			this.#loaded = await this.#resolve(cfg);
 			await chart;
 			await paint;
 			await share;
+			await native;
 			this.#runner = new Runner(cfg.workerFactory ? { workerFactory: cfg.workerFactory } : {});
 			this.#loading = false;
 			this.#paint();
@@ -961,8 +969,10 @@ export class ToolHost extends HTMLElement {
 			if (this.#startPrefilled) this.#markStale();
 		}
 		this.#say("inputs reset to their starting values");
-		// The button has just hidden itself, and focus on a hidden button falls to the page.
-		this.#controls.values().next().value?.focus();
+		// The button has just hidden itself, and focus on a hidden button falls to the page. A segmented
+		// select's group cannot take focus, so its chosen radio does.
+		const first = this.#controls.values().next().value;
+		(first?.querySelector<HTMLElement>(":checked") ?? first)?.focus();
 		this.#changed();
 		this.#emit("tool-reset", { values: this.values });
 		if (this.#manifest?.autoRun === true) void this.#run({ focusResult: false });
@@ -1301,9 +1311,12 @@ export class ToolHost extends HTMLElement {
 	#control(spec: InputSpec): HTMLElement {
 		const id = `in-${spec.id}`;
 		const describedBy: string[] = [];
-		const label = el("label", { class: "tb-label", for: id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
+		// A segmented select is a group of radios (#203): a fieldset captioned by its legend, not one labelled
+		// control. Without the controls chunk it is the dropdown, which is what an older runtime draws.
+		const segmented = spec.type === "select" && spec.control === "segmented" && controls !== undefined;
+		const label = el(segmented ? "legend" : "label", { class: "tb-label", for: segmented ? undefined : id, id: `${id}-label` }, spec.label, spec.unit ? el("span", { class: "tb-unit" }, ` (${spec.unit})`) : null);
 		// Names for a host sheet (#224), as a result part has data-kind and data-role: one input, one type, or a role.
-		const row = el("div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
+		const row = el(segmented ? "fieldset" : "div", { class: "tb-field-row", "data-input": spec.id, "data-type": spec.type, "data-role": spec.role || undefined });
 		const desc = spec.description ? help(spec.description, { class: "tb-desc", id: `${id}-desc` }) : null;
 		/*
 		 * The rest of the help (#215), behind a native disclosure: keyboard, state and announcement are the
@@ -1347,19 +1360,29 @@ export class ToolHost extends HTMLElement {
 				break;
 			}
 			case "select": {
+				const choose = (value: string) => {
+					this.#values[spec.id] = value;
+					// A preset fills the form exactly as a sample does: same write, same stale result, same line.
+					const option = spec.options.find((o) => o.value === value);
+					if (option?.sets) this.#fill(option.label, option.sets);
+					else this.#edited(spec.id);
+				};
+				if (segmented && controls) {
+					/*
+					 * The group is the registered control (#203): it carries the description and `aria-invalid`,
+					 * and Enter on one of its radios bubbles to it and runs.
+					 */
+					control = el("div", { class: "tb-seg", id, role: "radiogroup", "aria-labelledby": `${id}-label` });
+					this.#painters.set(spec.id, controls.segments(control, spec.options, id, () => String(this.#values[spec.id]), choose));
+					break;
+				}
 				const select = el("select", { class: "tb-select", id });
 				for (const option of spec.options) {
 					const o = el("option", { value: option.value }, option.label);
 					if (option.value === String(this.#values[spec.id] ?? spec.default)) o.selected = true;
 					select.append(o);
 				}
-				select.addEventListener("change", () => {
-					this.#values[spec.id] = select.value;
-					// A preset fills the form exactly as a sample does: same write, same stale result, same line.
-					const option = spec.options.find((o) => o.value === select.value);
-					if (option?.sets) this.#fill(option.label, option.sets);
-					else this.#edited(spec.id);
-				});
+				select.addEventListener("change", () => choose(select.value));
 				control = select;
 				break;
 			}
@@ -1600,7 +1623,8 @@ export class ToolHost extends HTMLElement {
 			if (!control) continue;
 			const next = this.#values[spec.id];
 			if (spec.type === "toggle") (control as HTMLInputElement).checked = Boolean(next);
-			else (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next ?? "");
+			// A segmented select's group has no value of its own; its painter checks the radio.
+			else if ("value" in control) (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(next ?? "");
 			const slider = this.#sliders.get(spec.id);
 			if (slider) slider.value = String(next ?? "");
 			// Assigning `value` fires no input event, so a painted textarea is repainted here or not at all.
