@@ -41,9 +41,8 @@ jobs:
       - name: Read the installed Playwright version
         # The browser jobs below run in the Playwright image for exactly this version. Read from what the
         # lockfile installed rather than written into the image tag, so a Playwright bump moves the image
-        # with it: an image one version behind holds browser builds the library does not know, and every
-        # launch fails with "Executable doesn't exist". The pattern check keeps anything but a plain
-        # version out of the image reference.
+        # with it: an image one version behind holds browser builds the library does not look for. The
+        # pattern check keeps anything but a plain version out of the image reference.
         id: playwright
         run: |
           version=$(node -p 'require("playwright/package.json").version')
@@ -102,7 +101,10 @@ jobs:
     name: browser (${{ matrix.browser }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # About twice the slowest measured job in the container, so a hang is cut off rather than waited out.
+    # Chromium is longer because it also runs `test:counts` below. Measured on the two runs of #276's PR:
+    # chromium 360 and 514 s, firefox 311 and 268 s, webkit 346 and 336 s.
+    timeout-minutes: ${{ matrix.browser == 'chromium' && 17 || 12 }}
     # ⚠️ In the Playwright image, not on the bare runner, because `playwright install --with-deps` fetched
     # its system packages from the runner's Ubuntu mirror, and in about one job in nine that mirror ran at
     # 53 to 234 kB/s: 4 to 18 minutes for 26 to 117 MB, and twice a WebKit job cancelled at the timeout
@@ -110,9 +112,9 @@ jobs:
     # there is no apt step and no browser download left to be slow.
     #
     # The tag comes from the build job, which reads it from the installed Playwright, so it cannot fall
-    # behind a Playwright bump. `--user 1001` is the runner's own user: the workspace is mounted from the
-    # host and owned by it, and Firefox refuses to start when HOME belongs to another user. `--ipc=host`
-    # because Docker's default 64 MB /dev/shm is too small for Chromium, per Playwright's docs.
+    # behind a Playwright bump. `--user 1001` is the runner's own user, so the workspace and HOME mounted
+    # from the host belong to whoever runs the browsers; it is what Playwright's CI docs give for this
+    # image. `--ipc=host` is their recommendation for Chromium, which can run out of shared memory without.
     container:
       image: mcr.microsoft.com/playwright:v${{ needs.build.outputs.playwright }}-noble
       options: --user 1001 --ipc=host
@@ -137,7 +139,7 @@ jobs:
           name: built
           path: .
 
-      - name: Install the browser and its system packages
+      - name: Check the image holds this Playwright's browser
         # A no-op that finishes in about a second, because the image already holds this version's browsers
         # in PLAYWRIGHT_BROWSERS_PATH. Kept as its own step so that stays visible: if it ever takes minutes,
         # the image and the library have stopped matching and it is downloading. No --with-deps, which
