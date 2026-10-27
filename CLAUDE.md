@@ -99,8 +99,9 @@ both.
 that spends it**, with the reason recorded beside the budget, and the README and architecture size tables
 moved in the same commit. Raising one quietly is the single thing to avoid.
 
-Bench-only code does not belong in the `boot` chunk. That chunk is the number a consumer reads as what
-they pay; give test instruments their own chunk and their own budget line.
+The published figure is the host page in `bench/host` (size-check's "runtime, as a host loads it"): everything
+a minimal host page downloads before its first tool paints. Bench-only code still does not belong in the `boot`
+chunk; give test instruments their own chunk and their own budget line.
 
 ## 9. Traps that have already cost time
 
