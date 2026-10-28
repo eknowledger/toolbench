@@ -12,7 +12,9 @@ on:
 
 concurrency:
   group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a pull request makes the older run worthless, so it is cancelled. On main every run is
+  # kept: the badge shows the last finished run, and a cancelled one reads as failing.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
