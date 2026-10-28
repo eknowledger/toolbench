@@ -68,7 +68,7 @@ Measured with gzip on a minimal page built with Vite's defaults, one tool and no
 
 | | Transfer |
 |---|---|
-| Runtime, once per page that uses a tool | 19.5 KB |
+| Runtime, once per page that uses a tool | 19.8 KB |
 | Worker entry, only on pages with a worker-mode tool | ~2.8 KB |
 | A typical tool | 1 to 2 KB |
 | A page with no tool | 0 bytes |

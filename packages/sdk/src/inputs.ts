@@ -31,6 +31,15 @@ export const isDate = (mode: DateMode, v: unknown): v is string =>
  * that holds anything but a form submit. Validation applies it to samples and presets too. Contract version 9.
  */
 export function inputProblem(spec: InputSpec, value: unknown): string | undefined {
+	/*
+	 * A number box takes 99999 under a max of 5000, and empties itself on "1e" or "abc". The runtime keeps what
+	 * the reader typed or a link carried and refuses it here (#262). Clamping it instead ran and shared 5000
+	 * while the box still said 99999, and an emptied box ran on the min.
+	 */
+	if (spec.type === "number") {
+		if (value === "" || typeof value !== "number" || !Number.isFinite(value)) return `${spec.label} needs a number between ${spec.min} and ${spec.max}.`;
+		if (value < spec.min || value > spec.max) return `${spec.label} must be between ${spec.min} and ${spec.max}, got ${value}.`;
+	}
 	if (spec.type === "date") {
 		const mode = spec.mode ?? "date";
 		const noun = mode === "datetime" ? "a date and time" : `a ${mode}`;
@@ -46,5 +55,15 @@ export function inputProblem(spec: InputSpec, value: unknown): string | undefine
 	// A reader can untick the last box or remove the last row (#204); the form holds the rest of a list's rules itself.
 	if (spec.type === "multiselect" && Array.isArray(value) && value.length < (spec.min ?? 0)) return `${spec.label}: pick at least ${spec.min === 1 ? "one" : spec.min}.`;
 	if (spec.type === "rows" && Array.isArray(value) && value.length < (spec.minRows ?? 0)) return `${spec.label}: add at least ${spec.minRows === 1 ? "one row" : `${spec.minRows} rows`}.`;
+	// A number cell as typed or linked, the same rule as a number input (#262).
+	if (spec.type === "rows" && Array.isArray(value)) {
+		for (const [r, row] of value.entries()) {
+			for (const column of spec.columns) {
+				if (column.type !== "number") continue;
+				const problem = inputProblem({ ...column, default: column.min }, (row as Record<string, unknown>)?.[column.id]);
+				if (problem) return `${spec.label}, row ${r + 1}: ${problem}`;
+			}
+		}
+	}
 	return undefined;
 }

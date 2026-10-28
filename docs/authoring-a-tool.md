@@ -345,8 +345,8 @@ Ten types. Each generates a labelled control with its description wired to `aria
 Things the validator will hold you to, and why:
 
 * **`min` and `max` are required on a number.** They are the only thing between a bounded computation
-  and a hang, and the element clamps to them before your function is called. That means `run` can trust
-  its range and skip the defensive check.
+  and a hang, and the element refuses a value outside them before your function is called. That means
+  `run` can trust its range and skip the defensive check.
 * **A select needs two or more options**, and the default must be one of them. One option is a constant.
 * **`unit` on any number that has one.** `1000` alone is a riddle; `1000 samples` is not.
 * **`"control": "slider"` on a number the reader explores by dragging** (contract version 4, `"sdk": 4`).
@@ -399,7 +399,8 @@ Things the validator will hold you to, and why:
   least one row." under the input. The reader adds a row with Add, removes one with its cross, and moves
   one with the arrow keys on its handle, Alt and an arrow from a cell, or by dragging the handle. At
   `maxRows` Add stays focusable, marked unavailable, with the reason beside it. Number cells arrive
-  clamped. `default`, samples, presets and cases give rows as JSON objects with a value for every column and
+  in range: one typed or linked outside it, or emptied, is refused before Run under its row, "Limits,
+  row 2: Limit must be between 1 and 10000, got 9999999.", and a host's write is clamped. `default`, samples, presets and cases give rows as JSON objects with a value for every column and
   nothing else, checked cell by cell. A link writes one key per column, zipped by position,
   `?rl.limits.path=%2Fapi&rl.limits.limit=500`, and a link whose columns differ in length, or with more than
   `maxRows`, opens on the whole default. Refuse a row from your own code with `row` on the error, its index
@@ -581,10 +582,11 @@ tool. Leave page-specific ones to the host.
   `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are the same payload. Two buttons that do the same thing are
   the copy-paste the label check misses.
 
-⚠️ **The runtime clamps a reader's out-of-range number, and validation rejects an author's.** That looks
-inconsistent until you see who each rule protects. A reader who types 9999 into a field that stops at 1000
-has nowhere better to put that keystroke, and refusing it would leave them holding a form they cannot use,
-so the control clamps and `run` keeps its guarantee that values are in range. An author's sample is static
+⚠️ **The runtime marks a reader's out-of-range number, and validation rejects an author's.** A reader who
+types 9999 into a field that stops at 1000 keeps 9999 on screen, marked with "must be between 1 and 1000,
+got 9999." under it, and Run refuses with that sentence, so `run` keeps its guarantee that values are in
+range. A shared link carries the 9999 and opens marked the same way. It used to clamp, which ran and shared
+1000 while the box still said 9999 (#262). A host's `values` write is still clamped. An author's sample is static
 data that CI reads before any reader sees the tool, so it can be a build error naming the field, fixed
 once. Clamping it instead would ship a button whose label promises one thing and whose value quietly does
 another, and nobody would ever notice.

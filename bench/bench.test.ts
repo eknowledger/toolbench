@@ -4329,6 +4329,155 @@ describe("a slider on a number input (contract 4, #102)", () => {
 	});
 });
 
+describe("a number outside its range is marked, not clamped (#262)", () => {
+	/*
+	 * Typing 99999 into a box declared 1..5000 left 99999 on screen, unmarked, while `run` and the share link
+	 * used 5000; emptying it ran on the min, 1. The messages are written by hand from the issue: the label, the
+	 * range, and what arrived.
+	 */
+	type HostApi = HTMLElement & { values: Record<string, unknown>; run(): Promise<void> };
+	async function open(path = "tool.html?id=queue-explorer") {
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const w = window as unknown as { shared: string[] };
+			w.shared = [];
+			document.addEventListener("tool-share", (event) => w.shared.push((event as CustomEvent<{ url: string }>).detail.url));
+			Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => ({ writeText: () => Promise.resolve() }) });
+		});
+		await page.goto(`${BASE}/${path}`, { waitUntil: "load" });
+		await page.waitForSelector("#host >> .tb-form");
+		return page;
+	}
+	const read = (page: Page, id = "arrivals") =>
+		page.locator("#host").evaluate((el, id) => {
+			const root = el.shadowRoot;
+			const box = root?.querySelector<HTMLInputElement>(`#in-${id}`);
+			const slot = root?.querySelector(`#in-${id}-err`);
+			return {
+				box: box?.value,
+				invalid: box?.getAttribute("aria-invalid") ?? null,
+				error: [slot?.className, slot?.textContent ?? ""],
+				value: (el as HostApi).values[id],
+				fields: root?.querySelectorAll(".tb-out-fields").length ?? -1,
+				shown: root?.querySelector(".tb-output .tb-out-error")?.textContent ?? "",
+			};
+		}, id);
+
+	it("marks a value above max as it is typed, refuses Run with the range, and clears once it is back in range", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-arrivals").fill("99999");
+		const typed = await read(page);
+		assert.equal(typed.box, "99999");
+		assert.equal(typed.invalid, "true", "marked as the reader types, before any Run");
+		assert.deepEqual(typed.error, ["tb-field-msg", "Arrival rate must be between 1 and 5000, got 99999."]);
+		assert.equal(typed.value, 99999, "the form's value is the one on screen, not a clamped 5000");
+
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output .tb-out-error").waitFor({ timeout: 10_000 });
+		const refused = await read(page);
+		assert.equal(refused.fields, 0, "nothing ran on a value the reader did not type");
+		assert.match(refused.shown, /between 1 and 5000, got 99999/);
+
+		await page.locator("#host >> #in-arrivals").fill("4000");
+		const fixed = await read(page);
+		assert.deepEqual([fixed.invalid, fixed.error[1], fixed.value], [null, "", 4000]);
+		await page.close();
+	});
+
+	it("marks a value below min, and an emptied box, rather than running on the min", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-service").fill("0.01");
+		assert.deepEqual((await read(page, "service")).error[1], "Service time must be between 0.1 and 100, got 0.01.");
+		await page.locator("#host >> #in-service").fill("");
+		const empty = await read(page, "service");
+		assert.deepEqual([empty.invalid, empty.error[1], empty.value], ["true", "Service time needs a number between 0.1 and 100.", ""]);
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output .tb-out-error").waitFor({ timeout: 10_000 });
+		assert.equal((await read(page, "service")).fields, 0);
+		await page.close();
+	});
+
+	it("shares the value on screen, and a link carrying it opens with the field marked", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-arrivals").fill("99999");
+		await page.locator('#host >> [part~="share"]').click();
+		const url = (await page.waitForFunction(() => (window as unknown as { shared: string[] }).shared[0]).then((h) => h.jsonValue())) as string;
+		assert.equal(new URL(url).searchParams.get("queue-explorer.arrivals"), "99999", "the link says what the reader saw");
+
+		const opened = await open(`tool.html?id=queue-explorer&queue-explorer.arrivals=99999&queue-explorer.seed=`);
+		const arrivals = await read(opened);
+		assert.deepEqual([arrivals.box, arrivals.invalid, arrivals.error[1]], ["99999", "true", "Arrival rate must be between 1 and 5000, got 99999."]);
+		assert.equal((await read(opened, "seed")).error[1], "Random seed needs a number between 1 and 999999.", "an empty value in a link is empty, not the min");
+		await opened.close();
+		await page.close();
+	});
+
+	it("leaves a host write clamped, as documented, and Reset clears a mark or brings back the one a link opened with", async () => {
+		const page = await open();
+		await page.locator("#host >> #in-arrivals").fill("99999");
+		await page.locator("#host").evaluate((el) => {
+			(el as HostApi).values = { arrivals: 7000 };
+		});
+		const host = await read(page);
+		assert.deepEqual([host.box, host.invalid, host.error[1], host.value], ["5000", null, "", 5000]);
+		await page.locator("#host >> #in-arrivals").fill("");
+		await page.locator("#host >> .tb-reset").click();
+		const reset = await read(page);
+		assert.deepEqual([reset.box, reset.invalid, reset.error[1], reset.value], ["800", null, "", 800]);
+		await page.close();
+
+		const linked = await open("tool.html?id=queue-explorer&queue-explorer.arrivals=99999");
+		await linked.locator("#host >> #in-arrivals").fill("100");
+		await linked.locator("#host >> .tb-reset").click();
+		assert.deepEqual((await read(linked)).error[1], "Arrival rate must be between 1 and 5000, got 99999.", "Reset goes back to what the link opened with, marked again");
+		await linked.close();
+	});
+
+	it("refuses a rows number cell out of range or emptied, under its row, rather than running on a clamp or the old value", async () => {
+		const page = await open("tool.html?id=rate-limits");
+		const rows = () =>
+			page.locator("#host").evaluate((el) => {
+				const root = el.shadowRoot;
+				const lis = [...(root?.querySelectorAll("li.tb-row") ?? [])];
+				return {
+					cells: lis.map((li) => li.querySelector<HTMLInputElement>("input[type=number]")?.value),
+					rowError: lis.map((li) => li.querySelector(".tb-row-msg")?.textContent ?? null),
+					limits: ((el as HostApi).values.limits as { limit: unknown }[]).map((r) => r.limit),
+					tables: root?.querySelectorAll(".tb-out-table").length ?? -1,
+				};
+			});
+		const limit = (n: number) => page.locator(`#host >> li.tb-row >> nth=${n}`).locator("input[type=number]");
+		await limit(1).fill("9999999");
+		assert.deepEqual((await rows()).limits, [5, 9999999], "the value is the one in the cell, not 10000");
+		await page.locator("#host >> .tb-run").click();
+		await page.locator("#host >> .tb-output .tb-out-error").waitFor({ timeout: 10_000 });
+		let seen = await rows();
+		assert.deepEqual(seen.rowError, [null, "Limits, row 2: Limit must be between 1 and 10000, got 9999999."]);
+		assert.equal(seen.tables, 0);
+		await limit(1).fill("");
+		assert.deepEqual((await rows()).limits, [5, ""], "an emptied cell is empty, not the 500 it held before");
+		await page.locator("#host >> .tb-run").click();
+		await page.waitForFunction(() => /row 2: Limit needs a number between 1 and 10000/.test(document.querySelector("#host")?.shadowRoot?.querySelector(".tb-row-msg")?.textContent ?? ""), null, { timeout: 10_000 });
+		await page.close();
+
+		const linked = await open("tool.html?id=rate-limits&rate-limits.limits.path=%2Fa&rate-limits.limits.limit=9999999");
+		const link = await linked.locator("#host").evaluate((el) => ((el as HostApi).values.limits as { limit: unknown }[])[0]?.limit);
+		assert.equal(link, 9999999, "a link's cell is kept as written, for Run to refuse");
+		await linked.close();
+	});
+
+	it("follows a slider: a box past max is marked, and moving the thumb clears it", async () => {
+		const page = await open("tool.html?id=slider");
+		await page.locator("#host >> .tb-slider-row .tb-input").fill("600");
+		assert.equal((await read(page, "rtt")).error[1], "Round-trip time must be between 10 and 500, got 600.");
+		await page.locator("#host >> .tb-slider").focus();
+		await page.keyboard.press("ArrowLeft");
+		const moved = await read(page, "rtt");
+		assert.deepEqual([moved.invalid, moved.error[1], moved.box], [null, "", "490"]);
+		await page.close();
+	});
+});
+
 describe("layout and page-owned controls (#103)", () => {
 	const order = (page: import("playwright").Page) =>
 		page.evaluate(() =>

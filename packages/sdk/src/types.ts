@@ -832,7 +832,7 @@ export type InputSpec =
 			type: "number";
 			/** The value the form opens with, within `min..max`. */
 			default: number;
-			/** The lowest value. Required: the only guard against a runaway value, and `run` receives it clamped. */
+			/** The lowest value. Required: the only guard against a runaway value. A value outside `min..max` is refused before `run`, and a host's write is clamped. */
 			min: number;
 			/** The highest value, above `min`. */
 			max: number;
@@ -940,7 +940,7 @@ export type InputSpec =
 			/**
 			 * A list of rows the reader adds, removes and reorders (#204): hosts, or paths and their limits. `run`
 			 * receives a `Row[]`, one object per row keyed by column id, even for one column, so a list of hosts is
-			 * `rows.map((r) => r.host)`. Number cells arrive clamped, and never fewer rows than `minRows`: a reader
+			 * `rows.map((r) => r.host)`. Number cells arrive in range, and never fewer rows than `minRows`: a reader
 			 * below it is told so when they press Run, and the tool is not called. Contract version 9.
 			 */
 			type: "rows";

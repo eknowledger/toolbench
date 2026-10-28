@@ -283,8 +283,12 @@ const BUDGETS = [
 	 * build did not see: fetched with a tool's code when it activates, so reader cost on every page where a tool
 	 * is opened. 722 measured. In boot instead they cost 462 bytes there, on every page, opened or not. 800 is the
 	 * first budget it fits.
+	 *
+	 * Raised from 800 to 900 by refusing a number outside its range (#262), in the commit that crossed it: 722 to
+	 * 869 measured, 147 bytes, the number rule's two messages and each rows input's number cells checked by row.
+	 * 900 is the first budget it fits.
 	 */
-	{ label: "checks before a run", pattern: /^checks-[^/]+\.js$/, budget: 800 },
+	{ label: "checks before a run", pattern: /^checks-[^/]+\.js$/, budget: 900 },
 	/*
 	 * The bench's theme switch, split out of `boot` on purpose. It is a test instrument, so it must not
 	 * be counted in the figure the README quotes for what a consumer pays. Tracked so it cannot grow
@@ -759,6 +763,10 @@ function pageAssets(html) {
  * 19,479 measured, the validator out of the entry chunk, and the page fetches no validation chunk either,
  * which the browser test above holds. A host that skips the plugin loads the same entry and then the
  * validation chunk, 6,797 more here, before its card paints.
+ *
+ * Refusing a number outside its range (#262) took 287 bytes inside it, 19,479 to 19,766: a typed or linked
+ * number or rows cell kept as written, the box marked as it is typed and only that mark cleared, and the
+ * refusal's row. The rule itself is in the checks chunk, fetched with a tool's code.
  */
 const HOST_PAGE = { label: "runtime, as a host loads it", dir: join(import.meta.dirname, "..", "bench", "dist", "host"), budget: 20_000 };
 {

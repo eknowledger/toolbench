@@ -41,7 +41,7 @@ import { isSuperseded, Runner, type Runnable } from "./runner.ts";
 import { type ToolSource } from "./sources.ts";
 import { applyHostStyles, applyStyles, hostSheetsFor, type HostStyles } from "./styles.ts";
 import { help } from "./markup.ts";
-import { applyPartialValues, coerce, fromQuery } from "./values.ts";
+import { applyPartialValues, coerce, fromQuery, written } from "./values.ts";
 
 export type Mode = "card" | "page" | "embed";
 
@@ -340,6 +340,8 @@ export class ToolHost extends HTMLElement {
 	/** Set by `reveal` to draw every part when a plain `parts` cap hid the one asked for. Cleared with `#expanded`. */
 	#uncapped = false;
 	#controls = new Map<string, HTMLElement>();
+	/** Number inputs `#check` marked, so a fixed value clears its own mark and not a tool's error (#262). */
+	#live = new Set<string>();
 	/** The range control beside a number box that asked for `control: "slider"`, kept in step with it. */
 	#sliders = new Map<string, HTMLInputElement>();
 	/** Repaint for each painted textarea (#153), for values written without a keystroke. */
@@ -651,9 +653,11 @@ export class ToolHost extends HTMLElement {
 			const overlay: InputValues = { ...this.#queued };
 			this.#queued = {};
 			if (this.#hostWroteValues) Object.assign(overlay, this.#values);
-			// A shared link wins over the page's own prefill: it is the reader's, and it is why they came.
-			if (this.#shares) Object.assign(overlay, this.#fromLink(manifest));
-			this.#values = applyPartialValues(manifest.inputs, defaults, overlay);
+			// A shared link wins over the page's own prefill: it is the reader's, and it is why they came. Read as
+			// typing is, so a number out of range opens marked, as it was on the sender's screen (#262).
+			const link = this.#shares ? this.#fromLink(manifest) : {};
+			this.#values = applyPartialValues(manifest.inputs, applyPartialValues(manifest.inputs, defaults, overlay), link, written);
+			Object.assign(overlay, link);
 			if (Object.keys(overlay).length > 0) this.#hostWroteValues = true;
 			// A prefill that arrived before the manifest follows the same preset rule as one after it.
 			this.#follow(Object.keys(overlay));
@@ -887,9 +891,12 @@ export class ToolHost extends HTMLElement {
 			// A value the form cannot hold a reader to, a date out of range say, is refused here, naming its input (#203).
 			let refused: Output | undefined;
 			for (const spec of this.#manifest?.inputs ?? []) {
-				const message = checks?.inputProblem(spec, this.#values[spec.id]);
+				const value = this.#values[spec.id];
+				const message = checks?.inputProblem(spec, value);
 				if (message) {
-					refused = { kind: "error", message, input: spec.id };
+					// A rows cell out of range is shown under its row: the first row that is wrong on its own.
+					const row = spec.type === "rows" && Array.isArray(value) ? (value as Row[]).findIndex((r) => checks?.inputProblem({ ...spec, minRows: 0 }, [r])) : -1;
+					refused = { kind: "error", message, input: spec.id, ...(row >= 0 ? { row } : {}) };
 					break;
 				}
 			}
@@ -1504,11 +1511,15 @@ export class ToolHost extends HTMLElement {
 				});
 				input.value = String(this.#values[spec.id] ?? spec.default);
 				input.addEventListener("input", () => {
-					// Clamped here, not in the tool: min and max are the only guard against an input
-					// that turns a bounded computation into an unbounded one.
-					this.#values[spec.id] = coerce(spec, input.value);
+					/*
+					 * As typed, and refused before `run` by `inputProblem`, not clamped (#262): min and max are the
+					 * only guard against an input that turns a bounded computation into an unbounded one, and a
+					 * clamp kept that guard while running and sharing a value the box did not show.
+					 */
+					this.#values[spec.id] = written(spec, input.value);
 					const slider = this.#sliders.get(spec.id);
 					if (slider) slider.value = String(this.#values[spec.id]);
+					this.#check(spec);
 					this.#edited(spec.id);
 				});
 				control = input;
@@ -1532,6 +1543,7 @@ export class ToolHost extends HTMLElement {
 					slider.addEventListener("input", () => {
 						this.#values[spec.id] = coerce(spec, slider.value);
 						input.value = String(this.#values[spec.id]);
+						this.#check(spec);
 						this.#edited(spec.id);
 					});
 					this.#sliders.set(spec.id, slider);
@@ -1613,7 +1625,16 @@ export class ToolHost extends HTMLElement {
 		// A rows input keeps its count beside Add, inside the list.
 		if (count && !count.parentNode) row.append(count);
 		// The per-input error slot: unseen and empty until an error names this input, then the visible message (#204).
-		row.append(el("p", { class: "tb-sr", id: errorId }));
+		const slot = el("p", { class: "tb-sr", id: errorId });
+		row.append(slot);
+		// A number a link carried out of range opens marked, as the sender's box was (#262). Not yet in the root, so set here.
+		const problem = spec.type === "number" ? checks?.inputProblem(spec, this.#values[spec.id]) : undefined;
+		if (problem) {
+			this.#live.add(spec.id);
+			control.setAttribute("aria-invalid", "true");
+			slot.className = "tb-field-msg";
+			slot.textContent = problem;
+		} else this.#live.delete(spec.id);
 		return row;
 	}
 
@@ -1752,6 +1773,7 @@ export class ToolHost extends HTMLElement {
 			if (slider) slider.value = String(next ?? "");
 			// Assigning `value` fires no input event, so a painted textarea is repainted here or not at all.
 			this.#painters.get(spec.id)?.();
+			this.#check(spec);
 		}
 	}
 
@@ -1802,18 +1824,41 @@ export class ToolHost extends HTMLElement {
 	 * a field near the top. The same text is the control's description, so both hear one sentence.
 	 */
 	#markInvalid(inputId: string | undefined, line = "", rowAt?: number): void {
-		for (const [id, control] of this.#controls) {
-			const invalid = id === inputId;
-			control.toggleAttribute("aria-invalid", invalid);
-			if (invalid) control.setAttribute("aria-invalid", "true");
-			const slot = this.#root.getElementById(`in-${id}-err`);
-			if (!slot) continue;
-			slot.textContent = invalid ? line : "";
-			// Under the row it names, for a rows input; the group still hears it, from the unseen slot.
-			const mark = this.#marks.get(id);
-			mark?.(invalid ? rowAt : undefined, line);
-			slot.className = invalid && !(mark && rowAt !== undefined) ? "tb-field-msg" : "tb-sr";
+		for (const id of this.#controls.keys()) {
+			// A number marked as it was typed stays marked until it is fixed: it is still the reason Run refuses.
+			if (id === inputId) this.#markOne(id, line, rowAt);
+			else if (!this.#live.has(id)) this.#markOne(id, undefined);
 		}
+	}
+
+	/** Mark one input with `line` under it, or clear it when `line` is undefined. */
+	#markOne(id: string, line: string | undefined, rowAt?: number): void {
+		const control = this.#controls.get(id);
+		if (!control) return;
+		const invalid = line !== undefined;
+		control.toggleAttribute("aria-invalid", invalid);
+		if (invalid) control.setAttribute("aria-invalid", "true");
+		const slot = this.#root.getElementById(`in-${id}-err`);
+		if (!slot) return;
+		slot.textContent = line ?? "";
+		// Under the row it names, for a rows input; the group still hears it, from the unseen slot.
+		const mark = this.#marks.get(id);
+		mark?.(invalid ? rowAt : undefined, line ?? "");
+		slot.className = invalid && !(mark && rowAt !== undefined) ? "tb-field-msg" : "tb-sr";
+	}
+
+	/**
+	 * Mark a number box outside its range, or emptied, as the reader types (#262), with the sentence Run would
+	 * refuse with; and clear that mark, and only that one, once the value is back in range. A tool's own error
+	 * on the input is left alone, as typing always has.
+	 */
+	#check(spec: InputSpec): void {
+		if (spec.type !== "number") return;
+		const problem = checks?.inputProblem(spec, this.#values[spec.id]);
+		if (problem) {
+			this.#live.add(spec.id);
+			this.#markOne(spec.id, problem);
+		} else if (this.#live.delete(spec.id)) this.#markOne(spec.id, undefined);
 	}
 
 	#setBusy(busy: boolean): void {

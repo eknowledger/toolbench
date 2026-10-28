@@ -160,9 +160,12 @@ export function rows(box: HTMLElement, spec: Rows, id: string, count: HTMLElemen
 					...attrs,
 				});
 				input.value = String(row[column.id]);
-				// Clamped as a number input is; an empty or half-typed number keeps the last one it was.
+				/*
+				 * As typed, as a number input is (#262), and refused before `run` naming the row. Clamped, 9999999
+				 * under a max of 10000 ran on 10000, and an emptied cell ran on the number it held before.
+				 */
 				input.addEventListener("input", () => {
-					const cell = cells([column], { [column.id]: input.value });
+					const cell = cells([column], { [column.id]: input.value }, true);
 					if (cell) put(cell[column.id] as string | number);
 				});
 				control = input;
