@@ -397,8 +397,15 @@ const BUDGETS = [
 	 * Raised from 9_000 to 9_500 by labels that keep their size (#210): margins measured from the labels,
 	 * thinned ticks, and the narrow layout for horizontal bars with each name above its bars. 8,878 to 9,347,
 	 * measured with the stylesheets' comments stripped (#230), which this chunk never had.
+	 *
+	 * Raised from 9_500 to 10_000 by chart labels that step around each other (#263), in the commit that crossed
+	 * it: 9,346 to 9,934 measured, 588 bytes. Each annotation label's box and the first line clear of the labels
+	 * already placed and of the thresholds', every rule drawn before any label; an upright chart's threshold label
+	 * tries its line's other side and slides left, up or down past what it meets, and a lying-down chart's labels
+	 * take lines above the plot. A readout that stays inside a narrow chart moved its placement to the chart
+	 * common chunk, 2,725 to 2,869 there, so every kind shares it. 9_500 would have left the build 434 over.
 	 */
-	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 9_500 },
+	{ label: "chart renderer", pattern: /^chart-[^/]+\.js$/, budget: 10_000 },
 	/*
 	 * What every chart kind shares: the chart stylesheet and the number format. Fetched with the series
 	 * chart, the heatmap or the pie, whichever a page draws first. 2,925 measured.

@@ -29,7 +29,8 @@ export const CHART_STYLES = /* css */ `
 .tb-tick, .tb-axis-label { fill: var(--tb-faint); font-family: var(--tb-mono); }
 .tb-axis-label { font-family: var(--tb-font); }
 .tb-annotation { stroke: var(--tb-accent); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.8; }
-.tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); }
+/* Haloed as a threshold's label is, so a neighbour's rule does not run through a label dropped a line (#263). */
+.tb-annotation-label { fill: var(--tb-accent-text); font-family: var(--tb-mono); stroke: var(--tb-bg); stroke-width: 3; paint-order: stroke; }
 /* A threshold (#114): a dashed rule in the tone it names, so a limit never reads as a series even where
    its tone shares a series colour, and a label haloed in the surface colour, drawn over the data. */
 .tb-threshold { stroke: var(--tb-muted); stroke-width: 1.25; stroke-dasharray: 6 4; }
@@ -88,7 +89,7 @@ export const CHART_STYLES = /* css */ `
 .tb-bar.tb-hot { stroke: var(--tb-fg); stroke-width: 1.5; }
 .tb-readout {
   position: absolute; z-index: 2; pointer-events: none; transform: translate(12px, -50%);
-  min-width: 9rem; max-width: 16rem; padding: 0.5rem 0.625rem;
+  min-width: 9rem; max-width: min(16rem, calc(100% - 1.25rem - 2px)); padding: 0.5rem 0.625rem;
   background: var(--tb-bg); color: var(--tb-fg); border: 1px solid var(--tb-border); border-radius: 8px;
   box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.35); font-size: 0.78rem; line-height: 1.35;
 }
@@ -298,4 +299,24 @@ export function fitted(draw: (fit: Fit) => HTMLElement): HTMLElement {
 	observer.observe(plotOf(figure));
 	observer.observe(figure);
 	return figure;
+}
+
+/**
+ * Put the card 12px beside the point at `x`, on the `flip` side past the plot's middle, else the side it fits,
+ * and never past the figure's edges. At 330px a line chart's figure is 256px wide and the card at least 9rem, so
+ * in the middle neither side had room and the card reached 36px over the tool's border; a pie's, 130px.
+ * Shared by every readout.
+ */
+export function beside(card: HTMLElement, width: number, x: number, y: number, flip: boolean): void {
+	// Measured at the left edge: an absolute box shrinks to the room right of it, so its width at the last spot is not its width.
+	card.style.left = "0px";
+	const w = card.offsetWidth;
+	const right = x + 12 + w <= width;
+	const left = x - 12 - w >= 0;
+	const before = flip ? left || !right : left && !right;
+	const at = Math.max(0, Math.min(width - w, before ? x - 12 - w : x + 12));
+	// The stylesheet moves the card 12px right of `left`, or its own width and 12px left of it when flipped.
+	card.style.left = `${Math.round(before ? at + w + 12 : at - 12)}px`;
+	card.style.top = `${Math.round(y)}px`;
+	card.toggleAttribute("data-flip", before);
 }

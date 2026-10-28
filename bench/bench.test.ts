@@ -2892,8 +2892,8 @@ describe("the chart readout (#112)", () => {
 	 * Values come from bench/fixtures/discrete-series, worked out by hand: at frame 6 the "markers" case has
 	 * Arrives 150, Released fast 250 and Released timeout 330.
 	 */
-	async function chartCase(value: string) {
-		const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+	async function chartCase(value: string, width = 1100) {
+		const page = await browser.newPage({ viewport: { width, height: 900 } });
 		await page.goto(`${BASE}/tool.html?id=discrete-series`, { waitUntil: "load" });
 		await page.locator("#host >> .tb-form").waitFor({ timeout: 15_000 });
 		await page.evaluate(async (c) => {
@@ -3013,6 +3013,38 @@ describe("the chart readout (#112)", () => {
 		});
 		assert.ok(fits.flipped && fits.right <= fits.edge, `card right ${fits.right}, chart right ${fits.edge}`);
 		await page.close();
+	});
+
+	it("stays inside the chart at a phone's width, wherever it points, for every kind with a readout", async () => {
+		/*
+		 * At 330px a line chart's figure is 256px wide and the card at least 9rem. Placed right of the crosshair
+		 * before the middle and left after it, near the middle neither side had room: 11 of the markers case's 20
+		 * frames put it outside the figure, up to 36px. Measured the same way: a heatmap 32px, a pie 130, a
+		 * treemap and a Venn 28, a scatter 12, a band 2.6.
+		 */
+		const outside: string[] = [];
+		for (const kind of ["markers", "scatter", "band", "heatmap", "pie", "treemap", "venn-three"]) {
+			const page = await chartCase(kind, 330);
+			const box = await page.locator("#host >> .tb-output svg[role=img]").first().boundingBox();
+			assert.ok(box);
+			let worst = 0;
+			for (let i = 1; i < 20; i++) {
+				for (const fy of [0.3, 0.5, 0.7]) {
+					await page.mouse.move(box.x + (box.width * i) / 20, box.y + box.height * fy);
+					const over = await page.evaluate(() => {
+						const readout = [...(document.querySelector("#host")?.shadowRoot?.querySelectorAll<HTMLElement>(".tb-readout") ?? [])].find((r) => !r.hidden);
+						if (!readout) return 0;
+						const f = (readout.closest("figure") as HTMLElement).getBoundingClientRect();
+						const r = readout.getBoundingClientRect();
+						return Math.max(0, f.left - r.left, r.right - f.right);
+					});
+					worst = Math.max(worst, over);
+				}
+			}
+			if (worst > 1) outside.push(`${kind}: ${worst.toFixed(1)}px outside`);
+			await page.close();
+		}
+		assert.deepEqual(outside, []);
 	});
 });
 
@@ -6392,7 +6424,8 @@ describe("chart labels keep their size at any width (#210)", () => {
 	 * A chart was drawn into a 640-unit viewBox and scaled to its panel, text and all: measured, a tick was
 	 * 4.6px at a 330px panel and 22px at 1440, and a pie's slice share 3.2px. Every label of every
 	 * discrete-series case is read here as the reader gets it: font size times the drawing's scale, both
-	 * axes of that scale, and its box against the picture's and against every other label's.
+	 * axes of that scale, and its box against the picture's and against every other label's. Annotations
+	 * included (#263): two and three a few percent of the axis apart, and pairs at both edges of the plot.
 	 */
 	const cases = (JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", "discrete-series", "tool.json"), "utf8")).inputs[0].options as { value: string }[]).map((o) => o.value);
 

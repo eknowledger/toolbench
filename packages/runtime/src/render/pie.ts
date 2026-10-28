@@ -16,7 +16,7 @@
 import type { Pie } from "@toolbench/sdk";
 import { el, svg } from "../dom.ts";
 import type { RenderOptions } from "./index.ts";
-import { adoptChartStyles, adoptStyles, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
+import { adoptChartStyles, adoptStyles, beside, fitted, format, lineOf, middleOf, textWidth, type Fit } from "./plot-common.ts";
 
 const H = 260;
 const MAX_SLICES = 6;
@@ -205,9 +205,7 @@ function attachSliceReadout(figure: HTMLElement, plotSvg: SVGSVGElement, slices:
 		live.textContent = `${slice.label}: ${percent(slice.share)}, ${format(slice.value)}${unit}`;
 		const box = plotSvg.getBoundingClientRect();
 		const frame = figure.getBoundingClientRect();
-		card.style.left = `${Math.round((at?.x ?? box.right) - frame.left)}px`;
-		card.style.top = `${Math.round((at?.y ?? box.top + box.height / 2) - frame.top)}px`;
-		card.removeAttribute("data-flip");
+		beside(card, frame.width, (at?.x ?? box.right) - frame.left, (at?.y ?? box.top + box.height / 2) - frame.top, false);
 	};
 	const hide = () => {
 		current = -1;
