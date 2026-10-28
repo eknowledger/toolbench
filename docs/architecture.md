@@ -977,10 +977,10 @@ Eight layers. Each catches something the others structurally cannot.
 | `packages/runtime/src/*.test.ts` | Node | Coerce and the partial merge used by typing, samples, and the host `values` setter: clamp, refuse, truncate, unknown ids. The graph layout's gates: no overlaps on the eleven families and on seeded layered and force graphs of 30 to 120 nodes, crossings no worse than the reviewed table family by family, centred ports and no corner, 50 ms per family scaled to the machine by a reference workload, the same layout twice, and the search fetched only for the family dense enough to need it | 177 |
 | `tools/cases.test.ts` | Node | Every tool's manifest, that `id` matches its directory, that fixtures exist and are non-empty, that declared `kinds` match the cases, every case, and every sample. Three lines calling `checkToolDirectory`, so it is the same suite a host gets | 29 |
 | `tools/*/‌*.test.ts` | Node | A tool's own properties. The queue explorer asserts that its simulation converges on the closed form, that it is deterministic, and that Little's law holds | 13 |
-| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 55 |
+| `scripts/*.test.ts` | Node | The repo's own tooling, where getting it wrong is silent: that `pnpm new-tool` emits a tool which passes the harness unedited and matches its golden fixtures byte for byte, and that the fixture declares the current contract version rather than a literal | 56 |
 | `site/examples.test.ts` | Node | The site's own example tools, held to the standard of `tools/`: each manifest validates, its id matches its directory, and its fixtures pass. The authoring walkthrough's Base64 decoder is one, so the walkthrough's printed fixture is checked against its own code | 13 |
 | `pnpm test:graph-scale` | Node, its own command and CI step | The graph layout's 250 and 500 node graphs of every kind, with no overlaps. Out of `pnpm test` because they took it from under a second to 25; the floor Node leg of `tests.yml` runs them on every pull request | 8 |
-| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 317 |
+| `bench/bench.test.ts` | Chromium, Firefox and WebKit, against the **built** bench | Everything a unit test cannot see | 324 |
 
 The Count column is measured, not maintained: `pnpm test:counts` runs each layer and reports what the table
 says beside what it found, and `--update` rewrites the cells. It exists because these numbers changed on
@@ -1028,8 +1028,9 @@ production build:
   tool's id and keeps the page's own query, shows and announces "Link copied" for two seconds, dispatches
   `tool-share`, is reached by Tab and pressed by Enter, opens a tool with a link's values without an event,
   reads a toggle's `true` and `false`, never writes or reads a `share: false` input, uses a host's own
-  scheme both ways, shows the link selected when the clipboard refuses or is missing, and puts the link on
-  the real clipboard in Chromium;
+  scheme both ways, copies with `execCommand` when the clipboard refuses or is missing, shows the link
+  selected when that fails too and says copying needs HTTPS on an insecure page, and puts the link on the
+  real clipboard in Chromium, with the Clipboard API and without it;
 * a sample fills the form, sets several inputs at once, leaves the ones it does not name alone, keeps
   focus on the button that was pressed, and draws no row on a card;
 * a select preset fills the inputs it names and leaves the rest, goes stale without running, and passes
@@ -1065,7 +1066,8 @@ production build:
 * a host `highlight` hook replaces the `code` text node with the returned Node, and omitting it keeps
   readable plain text;
 * Copy on a `code` result writes its source exactly and on a `table` writes tab-separated text, from the
-  keyboard, announced; a refused or missing clipboard says so and selects the text instead; a closed card
+  keyboard, announced; a refused or missing clipboard copies the same text with `execCommand`, and where that
+  fails too says so and selects the text instead; a closed card
   has no Copy.
 
 Two habits worth keeping. **Test against the built artifact**, because a minifier deleted a loop that
@@ -1091,8 +1093,8 @@ page fetches anything to paint that the row does not count. Every other row is a
 | Stylesheet | 0.9 KB | |
 | Painted textarea | 1.5 KB | Its own chunk, only on activation of a tool declaring `lang` on a host with a `highlight` hook, or with a `grammar`. 1,500 bytes, 545 of them the grammar's tokeniser |
 | Bytes renderer | 1.3 KB | Its own chunk, fetched when a `bytes` result is drawn, before a seed holding one paints, or with the code of a tool declaring the kind. If it cannot be fetched the result says "The byte view could not be loaded." in its place. In boot it measured 796 bytes, renderer and rules |
-| Copy action | 0.6 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes |
-| Share action | 1.4 KB | Its own chunk, fetched with a tool's code when the tool draws the share button: the button, its styles, the default link writer and the clipboard. 1,436 bytes |
+| Copy action | 0.8 KB | Its own chunk, fetched when the first `code` or `table` result is drawn. Until it arrives the Copy button is shown disabled. 576 bytes, and 828 with the `execCommand` fallback for a page with no Clipboard API (#264) |
+| Share action | 2.0 KB | Its own chunk, fetched with a tool's code when the tool draws the share button: the button, its styles, the default link writer and the clipboard. 1,436 bytes when it was split out, and 1,991 measured with the `execCommand` fallback (#264) |
 | Worker entry | 5.1 KB | Only on pages with a worker-mode tool, and only after activation |
 | Graph kind, base chunk | 18.6 KB | Only on pages that draw a `graph`: layered placement, ports, the router, the drawing, the keyboard model and the edge table. Eleven chunks beside it, from 0.5 to 2.8 KB each, are fetched by the first graph that needs one, and a graph past 100 nodes also fetches the worker's copy of the layout. Each has its own line in `size-check.mjs` |
 | `percentiles` chunk | 1.3 KB | |
@@ -1206,6 +1208,7 @@ is here because the guards look arbitrary without it.
 | Chart annotation labels close together printed over each other (#263) | Every annotation's label sat on one line at the top of the plot, so "this run" at 40 and "shallowest under 1%" at 50 on a 0 to 200 axis read as "thisshallowest..."; at 330px three annotations 10 apart were one smear, and a label flipped inward at the right edge landed on its neighbour's | Each label's box is measured with `textWidth`, and a label that would meet one already placed, or a threshold's, drops a line, left to right, as many lines as the plot has room for. Every rule is drawn before any label, and a label is haloed in the surface colour as a threshold's is, so a neighbour's rule does not run through it. The #210 label test reads three new discrete-series cases, two and three close annotations and pairs at both edges beside a threshold, at 330 and 1440px |
 | Threshold labels close together printed over each other (#263) | Found sweeping the charts for the annotation defect. Thresholds at 150 and 165 ms on a 100 to 250 axis drew "165 ms, our alert" across "150 ms, G.114 preferred" at the right end of an upright chart at 330px with 16px labels, where the two lines are closer than a label is tall; lying down, both labels sat on the one line at the top and overlapped at 330 and 1440px | An upright chart's label tries its line's other side, then slides left, up or down past the label it meets, within the plot. A lying-down chart's labels that would meet take a line each above the plot, and the plot moves down to make room. Two discrete-series cases, upright and lying down, are in the #210 label test, which reported both overlaps first |
 | A chart's readout ran past the tool's border at a phone's width | Found sweeping the charts for #263. At 330px the markers case's figure was 256px wide and the readout card at least 9rem; it was placed beside the crosshair on the right before the plot's middle and on the left after it, so near the middle neither side had room. Pointing at each of the 20 frames, 11 put the card outside the figure, up to 36px past its right edge and over the tool's border. Pointing over a grid the same way: a heatmap 32px, a pie 130, a treemap and a Venn 28, a scatter 12 and a band 2.6, the last two because the card's 16rem cap plus its padding is wider than a 256px figure | One `beside` in the chart common chunk places every readout: on the side it fits, measured at the figure's left edge because an absolute box shrinks to the room right of it, and clamped to the figure when neither side has room; the card's width is capped at the figure's. A browser test points over a grid of seven kinds at 330px and asserts no card is more than 1px outside its figure |
+| The share button and Copy copied nothing on plain HTTP (#264) | Outside a secure context, a staging server, a LAN address or a private preview, `navigator.clipboard` is undefined, so both went straight to their fallback: the share button showed the link selected and "Copy failed", Copy selected the block. Nothing reached the clipboard, so a reader who pasted got whatever they had copied before, which looked like the button had copied a wrong link | A missing or refused clipboard is tried once more with `execCommand("copy")` on the exact text in a hidden text box, selected during the click, then focus returns to the button; on success it is the normal "Link copied" or "Copied". Only if that fails too is the fallback shown, saying "Copying needs HTTPS" on an insecure page, with the link alone selected. Browser tests force `navigator.clipboard` to undefined and to a refusal, record what `execCommand` copies (a table is its tab-separated text, not the drawn table), and in Chromium read the real clipboard back |
 
 ## 15. Limitations
 

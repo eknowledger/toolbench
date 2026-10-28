@@ -763,8 +763,9 @@ written or read; a host building its own links gets the same rule from `shareabl
 `?rl.limits.path=%2Fapi&rl.limits.limit=500`, and an empty one is the bare key, `?dns.types=`, so it does not read back as
 the default. A link longer than 2,000 characters, which old proxies and chat previews cut, leaves out the
 list inputs adding most to it until it fits, and the note says which: "Link copied, without Regions: too
-long for a link". A check mark and "Link copied" show for two seconds and are announced; if the clipboard
-refuses, the link is shown, selected, to copy by hand. The element then dispatches `tool-share` with
+long for a link". A check mark and "Link copied" show for two seconds and are announced. Where the Clipboard
+API is missing, as on plain HTTP, or refuses, the browser's older copy command is tried; if that fails too,
+the link is shown, selected, to copy by hand, with "Copying needs HTTPS" on an insecure page. The element then dispatches `tool-share` with
 `{ url, values }`.
 
 | | Attribute | `defineToolHost` option |
@@ -948,7 +949,7 @@ bench:
 | Bench page's boot chunk, for comparison: the same runtime plus every example's manifest and the bench's wiring | 24.2 KB |
 | Manifest validation, only for a page with manifests not checked at build time, before the first paint | 6.9 KB |
 | Checks before a run, once per page where a tool is opened, with its code | 0.9 KB |
-| Share button, only for pages with a `page` or `embed` tool that draws it | 1.4 KB |
+| Share button, only for pages with a `page` or `embed` tool that draws it | 2.0 KB |
 | Worker entry, only for pages with a worker-mode tool | 5.1 KB |
 | Graph kind, only for pages that draw a `graph`: layered layout, orthogonal edges, drawing and keyboard | 18.6 KB |
 | `percentiles` tool chunk | 1.3 KB |

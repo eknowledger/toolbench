@@ -448,7 +448,8 @@ const BUDGETS = [
 	 * What a Copy button does (#155): the clipboard write, the tab-separated form of a table with spreadsheet
 	 * quoting and its guard against a pasted formula, the fallback that selects the text, and the words for
 	 * each outcome. Fetched when the first code or table result is drawn, so a page with neither pays nothing.
-	 * Reader cost: that reader downloads it. 576 measured, 63 of them the formula guard.
+	 * Reader cost: that reader downloads it. 576 measured, 63 of them the formula guard. 828 with the
+	 * `execCommand("copy")` fallback for a page with no Clipboard API, and its "needs HTTPS" words (#264).
 	 */
 	{ label: "copy action", pattern: /^copy-[^/]+\.js$/, budget: 1_000 },
 	/*
@@ -466,6 +467,10 @@ const BUDGETS = [
 	 *
 	 * 1,724 with list inputs (#204): a list written as repeats of its key, and a link past 2,000 characters
 	 * leaving out its largest lists and the note saying which. Inside the budget.
+	 *
+	 * 1,991 with copying on plain HTTP (#264), 1,739 before: the `execCommand("copy")` fallback in a hidden
+	 * text box, focus back on the button, and the "needs HTTPS" note with the link selected alone. Inside the
+	 * budget, with 9 bytes left.
 	 */
 	{ label: "share action", pattern: /^share-[^/]+\.js$/, budget: 2_000 },
 	/*

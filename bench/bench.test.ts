@@ -200,6 +200,32 @@ async function tabForward(page: Page): Promise<void> {
 	await page.keyboard.press(engineName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab");
 }
 
+/**
+ * The copy fallback a page without the Clipboard API uses (#264), stubbed before any page script runs:
+ * `document.execCommand("copy")` records the text it would copy, the focused text box's value or else the
+ * selection, and succeeds or fails as asked; `real` leaves the browser's own in place. `insecure` makes the
+ * page report what a plain-HTTP origin does, `isSecureContext` false.
+ */
+type Exec = "copies" | "fails" | "real";
+async function stubExec(page: Page, exec: Exec, insecure = false): Promise<void> {
+	await page.addInitScript(
+		({ exec, insecure }: { exec: Exec; insecure: boolean }) => {
+			const w = window as unknown as { execs: string[] };
+			w.execs = [];
+			if (insecure) Object.defineProperty(window, "isSecureContext", { configurable: true, get: () => false });
+			if (exec === "real") return;
+			document.execCommand = (command: string) => {
+				let at: Element | null = document.activeElement;
+				while (at?.shadowRoot?.activeElement) at = at.shadowRoot.activeElement;
+				const text = at instanceof HTMLTextAreaElement ? at.value.slice(at.selectionStart, at.selectionEnd) : (document.getSelection()?.toString() ?? "");
+				w.execs.push(`${command}:${text}`);
+				return exec === "copies";
+			};
+		},
+		{ exec, insecure },
+	);
+}
+
 after(async () => {
 	await browser?.close();
 	await stopServer(server);
@@ -1673,8 +1699,9 @@ describe("the share button (#227)", () => {
 	type HostApi = HTMLElement & { values: Record<string, string | number | boolean> };
 	const DEFAULT_VALUES = "12+14+15+15+16+18+19+21+24+28+31+35+42+51+68+91+140+220+480+1200";
 
-	async function open(path: string, clipboard: Clipboard = "records", form = true): Promise<Page> {
+	async function open(path: string, clipboard: Clipboard = "records", form = true, exec: Exec = "fails", insecure = false): Promise<Page> {
 		const page = await browser.newPage();
+		await stubExec(page, exec, insecure);
 		await page.addInitScript((mode: Clipboard) => {
 			const w = window as unknown as { copied: string[]; events: { type: string; detail: unknown }[] };
 			w.copied = [];
@@ -1868,6 +1895,65 @@ describe("the share button (#227)", () => {
 			await page.close();
 		});
 	}
+
+	/*
+	 * On plain HTTP there is no `navigator.clipboard`, so the button went straight to "Copy failed" and nothing
+	 * reached the clipboard: a reader who pasted got whatever they had copied before (#264).
+	 */
+	const shared = (page: Page) =>
+		page.locator("#host").evaluate((el) => {
+			const root = el.shadowRoot as ShadowRoot & { getSelection?: () => Selection | null };
+			return {
+				execs: (window as unknown as { execs: string[] }).execs,
+				note: root.querySelector(".tb-share-note")?.textContent ?? "",
+				announced: root.querySelector(".tb-announce")?.textContent ?? "",
+				copied: root.querySelector('[part~="share"]')?.hasAttribute("data-copied"),
+				selected: root.getSelection?.()?.toString() ?? document.getSelection()?.toString() ?? "",
+				focused: root.activeElement?.getAttribute("part") ?? "",
+			};
+		});
+	const UTF8_URL = `${BASE}/tool.html?id=utf8-bytes&utf8-bytes.text=H%C3%A9llo%2C+%E4%B8%96%E7%95%8C+%F0%9F%91%8B`;
+	for (const clipboard of ["missing", "refuses"] as const) {
+		it(`copies the link with the older copy command when the clipboard ${clipboard === "missing" ? "does not exist, as on plain HTTP" : "refuses the write"}`, async () => {
+			const page = await open("tool.html?id=utf8-bytes", clipboard, true, "copies", clipboard === "missing");
+			await share(page).click();
+			await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Link copied", null, { timeout: 5_000 });
+			const state = await shared(page);
+			assert.deepEqual(state.execs, [`copy:${UTF8_URL}`], "the link, exactly, and once");
+			assert.deepEqual([state.note, state.copied, state.focused], ["Link copied", true, "share"], "the normal copied state, and focus back on the button");
+			await page.close();
+		});
+	}
+
+	it("says copying needs HTTPS when neither way works on a plain-HTTP page, and leaves the link selected", async () => {
+		const page = await open("tool.html?id=utf8-bytes", "missing", true, "fails", true);
+		await share(page).click();
+		await page.waitForFunction(() => (document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent ?? "").length > 0);
+		const state = await shared(page);
+		assert.equal(state.announced, "Copying needs HTTPS. The link is selected, so you can copy it yourself");
+		assert.equal(state.note, `Copying needs HTTPS: ${UTF8_URL}`);
+		assert.equal(state.selected, UTF8_URL, "the link alone is selected, not the sentence before it");
+		await page.close();
+	});
+
+	it("puts the link on the real clipboard with no Clipboard API (Chromium, which lets an automated page read it back)", async () => {
+		if (engineName !== "chromium") return;
+		const context = await browser.newContext();
+		await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+		const page = await context.newPage();
+		await stubExec(page, "real", true);
+		await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "clipboard", { configurable: true, get: () => undefined }));
+		await page.goto(`${BASE}/tool.html?id=utf8-bytes`, { waitUntil: "load" });
+		await page.locator("#host").scrollIntoViewIfNeeded();
+		await page.waitForSelector("#host >> .tb-form");
+		await page.locator("#host >> .tb-textarea").fill("abc");
+		await share(page).click();
+		await page.waitForFunction(() => document.querySelector("#host")?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Link copied", null, { timeout: 5_000 });
+		const reader = await context.newPage();
+		await reader.goto(`${BASE}/index.html`);
+		assert.equal(await reader.evaluate(() => navigator.clipboard.readText()), `${BASE}/tool.html?id=utf8-bytes&utf8-bytes.text=abc`);
+		await context.close();
+	});
 
 	it("puts the link on the real clipboard (Chromium, the one engine that lets an automated page read it back)", async () => {
 		if (engineName !== "chromium") return;
@@ -5008,8 +5094,9 @@ describe("the Copy action on code and tables (#155)", () => {
 	 * automated page, and it is how the refused and the missing clipboard are produced on demand.
 	 */
 	type Clipboard = "records" | "refuses" | "missing";
-	const open = async (path: string, clipboard: Clipboard) => {
+	const open = async (path: string, clipboard: Clipboard, exec: Exec = "fails", insecure = false) => {
 		const page = await browser.newPage();
+		await stubExec(page, exec, insecure);
 		await page.addInitScript((mode: Clipboard) => {
 			const w = window as unknown as { copied: string[] };
 			w.copied = [];
@@ -5098,6 +5185,38 @@ describe("the Copy action on code and tables (#155)", () => {
 		});
 	}
 
+	// The same as the share button (#264): no clipboard on plain HTTP, so Copy copied nothing.
+	for (const clipboard of ["missing", "refuses"] as const) {
+		it(`copies with the older copy command when the clipboard ${clipboard === "missing" ? "does not exist, as on plain HTTP" : "refuses the write"}, the exact text`, async () => {
+			const page = await open("index.html", clipboard, "copies", clipboard === "missing");
+			const host = page.locator(jsonHost);
+			await host.scrollIntoViewIfNeeded();
+			await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+			await host.locator(".tb-out-code .tb-copy").click();
+			await page.waitForFunction((host) => document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce")?.textContent === "Copied", jsonHost, { timeout: 5_000 });
+			const after = await state(page, jsonHost);
+			assert.deepEqual(await page.evaluate(() => (window as unknown as { execs: string[] }).execs), [`copy:${pretty}`]);
+			assert.equal(after.note, "Copied");
+			assert.equal(await host.evaluate((el) => el.shadowRoot?.activeElement?.className), "tb-copy", "focus back on the button");
+			assert.equal(await host.locator("textarea[aria-hidden]").count(), 0, "the copy's text box is gone");
+			await page.close();
+		});
+	}
+
+	it("says copying needs HTTPS when neither way works on a plain-HTTP page, and selects the text", async () => {
+		const page = await open("index.html", "missing", "fails", true);
+		const host = page.locator(jsonHost);
+		await host.scrollIntoViewIfNeeded();
+		await host.locator(".tb-out-code").waitFor({ timeout: 15_000 });
+		await host.locator(".tb-out-code .tb-copy").click();
+		await page.waitForFunction((host) => (document.querySelector(host)?.shadowRoot?.querySelector(".tb-announce")?.textContent ?? "").length > 0, jsonHost);
+		const after = await state(page, jsonHost);
+		assert.equal(after.announced, "Copying needs HTTPS. The text is selected, so you can copy it yourself");
+		assert.equal(after.note, "Copying needs HTTPS: the text is selected instead");
+		assert.equal(after.selected.trim(), pretty);
+		await page.close();
+	});
+
 	it("copies a table as tab-separated text, header first", async () => {
 		const page = await open("styling.html", "records");
 		const host = page.locator("#audit");
@@ -5119,6 +5238,16 @@ describe("the Copy action on code and tables (#155)", () => {
 		].join("\n");
 		assert.deepEqual((await state(page, "#audit")).copied, [expected]);
 		await page.close();
+
+		// With no clipboard the fallback copies the same tab-separated text, not the table as the page draws it (#264).
+		const plain = await open("styling.html", "missing", "copies", true);
+		const audit = plain.locator("#audit");
+		await audit.scrollIntoViewIfNeeded();
+		await audit.locator('.tb-output [data-kind="table"]').waitFor({ timeout: 15_000 });
+		await audit.locator('[data-kind="table"] .tb-copy').click();
+		await plain.waitForFunction(() => (window as unknown as { execs: string[] }).execs.length === 1, null, { timeout: 5_000 });
+		assert.deepEqual(await plain.evaluate(() => (window as unknown as { execs: string[] }).execs), [`copy:${expected}`]);
+		await plain.close();
 	});
 
 	/*
