@@ -20,16 +20,21 @@ describe("the What's new convention", () => {
 		});
 	}
 
-	const pending = readdirSync(join(ROOT, ".changeset")).filter((f) => f.endsWith(".md") && f !== "README.md");
-	for (const name of pending) {
-		it(`.changeset/${name} follows it`, () => {
+	/*
+	 * ⚠️ One test for every pending changeset, not one test each. A release deletes the changesets it
+	 * consumed, so a test per file made the suite's documented count fall by seventeen the moment 0.15.0
+	 * merged, and main's build failed on a count that no code had changed.
+	 */
+	it("every pending changeset follows it", () => {
+		const pending = readdirSync(join(ROOT, ".changeset")).filter((f) => f.endsWith(".md") && f !== "README.md");
+		for (const name of pending) {
 			const body = readFileSync(join(ROOT, ".changeset", name), "utf8").replace(/^---\n[\s\S]*?\n---\n+/, "");
 			// As changesets will write it: the first line on the bullet, the rest indented beneath.
 			const [first = "", ...rest] = body.trim().split("\n");
 			const entry = `## 9.9.9\n\n### Patch Changes\n\n- ${first}\n${rest.map((l) => (l ? `  ${l}` : "")).join("\n")}\n`;
-			assert.ok((parseChangelog(entry, `.changeset/${name}`).get("9.9.9") ?? []).length > 0);
-		});
-	}
+			assert.ok((parseChangelog(entry, `.changeset/${name}`).get("9.9.9") ?? []).length > 0, `.changeset/${name}`);
+		}
+	});
 
 	/*
 	 * The expected items are written by hand from the convention's text, not printed from the parser: a
