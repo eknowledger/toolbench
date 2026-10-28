@@ -1,5 +1,111 @@
 # @toolbench/runtime
 
+## 0.15.0
+
+### Minor Changes
+
+- [#274](https://github.com/eknowledger/toolbench/pull/274) [`9b80d10`](https://github.com/eknowledger/toolbench/commit/9b80d107096d8c7a04be0ff6392a9c63df44f533) Thanks [@eknowledger](https://github.com/eknowledger)! - **Changed: Smaller pages.** Tools checked at build time no longer ship the manifest checker to readers. ([#259](https://github.com/eknowledger/toolbench/issues/259)) <!-- whats-new: docs=docs-ref-host.html#registrysource -->
+  
+  - With Vite, add `toolbench()` from `@toolbench/runtime/vite`. With any other bundler, or none, run `npx toolbench-manifests <dir> --out <dir>` and pass its `registry` to `RegistrySource`.
+  - A bad manifest fails the build, naming the file and the field. In `vite dev` it shows in Vite's error overlay.
+  - The runtime a minimal Vite host loads falls from 26.8 KB to 19.5 KB gzipped, and is 19.8 KB with the rest of 0.15.0.
+  - Measured in Chrome at a 100 ms round trip: the project site's landing page loads 6.6 KB less before its first paint (50,084 to 43,441 gzipped bytes) and paints as soon as before.
+  - `source.manifest(id)` answers as soon as the source is built, when every manifest was checked at build time.
+  
+  ⚠️ **Heads-up:** without the plugin or the command, manifests are checked in the browser by a chunk the source fetches on its first `list()`, and a page paints about 110 ms later than before, for 0.9 KB more in total. For manifests that come from a server, add `toolbench({ preloadValidation: true })`, or a `<link rel="modulepreload">` for `@toolbench/runtime/validation`. `new RegistrySource()` no longer throws on a bad manifest: `list()` and `load()` reject with the `ManifestError`, and every `<tool-host>` on the page shows it.
+
+- [#254](https://github.com/eknowledger/toolbench/pull/254) [`d209839`](https://github.com/eknowledger/toolbench/commit/d209839d1702df2f4d41fe65ce63312c393a2a02) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Colour input.** A `color` input is a hex box with the system's colour picker beside it, kept in step. ([#203](https://github.com/eknowledger/toolbench/issues/203)) <!-- whats-new: gallery=native-inputs docs=docs-ref-inputs.html#color -->
+  
+  `run` gets a lowercase `#rrggbb`, with no alpha and no shorthand. What a reader types is trimmed and lowercased, and anything else is refused on the input before `run`.
+  
+  - Contract version 9.
+
+- [#253](https://github.com/eknowledger/toolbench/pull/253) [`62517ad`](https://github.com/eknowledger/toolbench/commit/62517ad385c13895608f85d3119a792439672873) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Date input.** A `date` input is the browser's own picker for a day, a time of day, or both. ([#203](https://github.com/eknowledger/toolbench/issues/203)) <!-- whats-new: gallery=native-inputs docs=docs-ref-inputs.html#date -->
+  
+  `mode` is `date`, `time` or `datetime`, and `run` gets `YYYY-MM-DD`, `HH:MM` or `YYYY-MM-DDTHH:MM`. A value that does not parse, or is outside `min..max`, is refused on the input before `run`, with a message naming it. `inputProblem` in `@toolbench/sdk` is that check.
+  
+  - Contract version 9.
+  - Samples and presets are checked the same way.
+  
+  **Fixed: Dates in error messages.** A date in an error message no longer breaks across two lines on a phone.
+
+- [#256](https://github.com/eknowledger/toolbench/pull/256) [`ccb58ef`](https://github.com/eknowledger/toolbench/commit/ccb58efb0828b64c89099839ed37bc70bb8b6aec) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Multiselect.** A `multiselect` input lets a reader choose several options, and `run` gets them as a `string[]`. ([#204](https://github.com/eknowledger/toolbench/issues/204)) <!-- whats-new: gallery=multiselect docs=docs-ref-inputs.html#multiselect -->
+  
+  Up to six options are checkboxes and more are chips; `control` picks either. `min` and `max` bound the list, and Run below `min` is refused with a message under the input. Samples, presets and cases give the list as a JSON array, and a shared link repeats the key once per choice.
+  
+  ⚠️ **Heads-up:** `InputValues` can now hold a `string[]`. Host code that assumes every `host.values` entry is a string, a number or a boolean, such as `String(value)` into a query string, may need updating.
+  
+  **New: Errors under their input.** An error that names an input is now shown under that input, after the field's name. <!-- whats-new: docs=docs-authoring.html#6-errors -->
+  
+  **Fixed: Toggle colour.** A toggle's checkbox is drawn in the accent colour instead of the browser's own blue.
+
+- [#257](https://github.com/eknowledger/toolbench/pull/257) [`c0a57d0`](https://github.com/eknowledger/toolbench/commit/c0a57d0e4d8e1471379b2e0e82ed7dc5536f085e) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Rows input.** A `rows` input is a list the reader adds to, removes from and reorders, and `run` gets a `Row[]`. ([#204](https://github.com/eknowledger/toolbench/issues/204)) <!-- whats-new: gallery=rows docs=docs-ref-inputs.html#rows -->
+  
+  Up to four columns, each a text, number, select or toggle. `maxRows` is required and `minRows` is optional. A row moves with the arrow keys on its handle or by dragging it, and each change is announced. An error can name a row with `row`, and is shown under that row.
+  
+  - A link carries rows as one key per column, and leaves out its largest lists when it would pass 2,000 characters, saying which.
+  - The list is a chunk of its own, fetched only by a tool that has one.
+  
+  ⚠️ **Heads-up:** `InputValues` can now hold a `Row[]`. Host code that assumes every `host.values` entry is a string, a number or a boolean may need updating.
+  
+  **New: Rate limits example.** The `rate-limits` tool matches requests against an ordered list of path limits, for the methods you choose. <!-- whats-new: gallery=tool-rate-limits -->
+
+- [#255](https://github.com/eknowledger/toolbench/pull/255) [`e7a3384`](https://github.com/eknowledger/toolbench/commit/e7a3384604dacc0810a3bdc7f8f66c96486d3e58) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Secret input.** A `secret` input is a password field with a button to show it, kept out of links. ([#203](https://github.com/eknowledger/toolbench/issues/203)) <!-- whats-new: gallery=native-inputs docs=docs-ref-inputs.html#secret -->
+  
+  It has no `default`, and a sample or a preset that sets it is refused, so a token never ships in a manifest. A link neither carries it nor fills it unless it says `"share": true`. `minLength` refuses a shorter value before `run`.
+  
+  - Contract version 9.
+  - Do not return its value in a result: a result is on screen, announced, and in the `tool-run` event.
+
+- [#252](https://github.com/eknowledger/toolbench/pull/252) [`fa7a346`](https://github.com/eknowledger/toolbench/commit/fa7a3468c2c522c0264ad602f00f6818be9fddb6) Thanks [@eknowledger](https://github.com/eknowledger)! - **New: Segmented select.** `"control": "segmented"` draws a select's options as one row of native radio segments. ([#203](https://github.com/eknowledger/toolbench/issues/203)) <!-- whats-new: gallery=native-inputs docs=docs-ref-inputs.html#select -->
+  
+  The chosen option is filled with the accent, and the row becomes stacked radios when a label would not fit. A reader tabs in once and picks with the arrow keys. `run` gets the option value, as from a dropdown.
+  
+  - Contract version 9. A select with no `control` is still a dropdown.
+  - The controls are a chunk of their own, fetched only by a tool that has one.
+
+### Patch Changes
+
+- [#278](https://github.com/eknowledger/toolbench/pull/278) [`58ce205`](https://github.com/eknowledger/toolbench/commit/58ce205560eca9bc72eb8eca1e2e81344e100732) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Annotation labels.** Chart annotations close together no longer print their labels over each other. ([#263](https://github.com/eknowledger/toolbench/issues/263)) <!-- whats-new: docs=docs-ref-results.html#chart -->
+  
+  A label that would meet another, or a threshold's, drops a line, and labels are haloed so a neighbouring annotation's rule does not run through them.
+
+- [#279](https://github.com/eknowledger/toolbench/pull/279) [`fc3f7c5`](https://github.com/eknowledger/toolbench/commit/fc3f7c5c07a5a395e93b96ddf7544a930ee6aa4d) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Copying on plain HTTP.** The share button and Copy now copy on a plain-HTTP page, where the Clipboard API is missing. ([#264](https://github.com/eknowledger/toolbench/issues/264)) <!-- whats-new: gallery=share -->
+  
+  They fall back to the browser's older copy command, also when the Clipboard API refuses the write. If that fails too, the link or the text is selected for the reader, with a note that copying needs HTTPS.
+
+- [#270](https://github.com/eknowledger/toolbench/pull/270) [`b68a0c9`](https://github.com/eknowledger/toolbench/commit/b68a0c9376bd4ae16f94bdfb81c204e3be4788a4) Thanks [@eknowledger](https://github.com/eknowledger)! - **Changed: Smaller stylesheets.** The runtime's built stylesheets drop the whitespace CSS ignores, 0.4 KB less on every page.
+
+- [#255](https://github.com/eknowledger/toolbench/pull/255) [`e7a3384`](https://github.com/eknowledger/toolbench/commit/e7a3384604dacc0810a3bdc7f8f66c96486d3e58) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Code in help text.** Code in an input's description no longer breaks at a hyphen on a phone. ([#203](https://github.com/eknowledger/toolbench/issues/203))
+
+- [#272](https://github.com/eknowledger/toolbench/pull/272) [`73c9c86`](https://github.com/eknowledger/toolbench/commit/73c9c8662b450f3c57328713815a9bc97883172b) Thanks [@eknowledger](https://github.com/eknowledger)! - **Changed: Smaller runtime.** The bytes renderer is a chunk of its own, so a page that draws no hex dump loads 0.8 KB less.
+  
+  A bytes result, or a seed holding one, fetches it before drawing. If it cannot be fetched, the result says "The byte view could not be loaded." and the rest of a group still draws.
+
+- [#277](https://github.com/eknowledger/toolbench/pull/277) [`99f7082`](https://github.com/eknowledger/toolbench/commit/99f7082e98c7f5a3ee57aa80ede825ad36c685da) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Numbers out of range.** A number outside its range is marked as it is typed, and Run refuses it instead of clamping. ([#262](https://github.com/eknowledger/toolbench/issues/262)) <!-- whats-new: docs=docs-ref-inputs.html#number -->
+  
+  The box keeps what the reader typed, with "Arrival rate must be between 1 and 5000, got 99999." under it, and the share link carries that value, so the link opens marked the same way. An emptied box is refused too, where it used to run on the min. `inputProblem` reports both. A host's `values` write is still clamped.
+  
+  ⚠️ **Heads-up:** reading `values` while a reader's number is out of range gives that number, and an empty or unreadable box gives its text, a string.
+
+- [#278](https://github.com/eknowledger/toolbench/pull/278) [`58ce205`](https://github.com/eknowledger/toolbench/commit/58ce205560eca9bc72eb8eca1e2e81344e100732) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Readout on a narrow chart.** A chart's readout stays inside the chart at a phone's width instead of running past the tool's border. <!-- whats-new: docs=docs-ref-results.html#chart -->
+  
+  Every kind with a readout: series, heatmap, pie, treemap and Venn.
+
+- [#277](https://github.com/eknowledger/toolbench/pull/277) [`99f7082`](https://github.com/eknowledger/toolbench/commit/99f7082e98c7f5a3ee57aa80ede825ad36c685da) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Rows number cells.** A rows number cell out of range, or emptied, is refused under its row instead of clamped. ([#262](https://github.com/eknowledger/toolbench/issues/262)) <!-- whats-new: gallery=tool-rate-limits docs=docs-ref-inputs.html#rows -->
+  
+  Typing 9999999 into a cell declared 1 to 10000 ran on 10000, and an emptied cell ran on the number it held before. Run now shows "Limits, row 2: Limit must be between 1 and 10000, got 9999999." under the row, and a link carries the cell as written.
+
+- [#273](https://github.com/eknowledger/toolbench/pull/273) [`7544c34`](https://github.com/eknowledger/toolbench/commit/7544c34322b1121869a6f9dbf7bd03554bbcb342) Thanks [@eknowledger](https://github.com/eknowledger)! - **Changed: Shorter runtime.** Shorter developer messages and one rule for every tone take 0.1 KB more off every page.
+  
+  The console warning for a worker-mode tool with no `workerFactory`, and the errors for a tool module with no default export and for a page with no source, keep their meaning in fewer words.
+
+- [#278](https://github.com/eknowledger/toolbench/pull/278) [`58ce205`](https://github.com/eknowledger/toolbench/commit/58ce205560eca9bc72eb8eca1e2e81344e100732) Thanks [@eknowledger](https://github.com/eknowledger)! - **Fixed: Threshold labels.** Chart thresholds close together no longer print their labels over each other. ([#263](https://github.com/eknowledger/toolbench/issues/263)) <!-- whats-new: docs=docs-ref-results.html#chart -->
+  
+  On an upright chart a label moves to its line's other side, or along or past its neighbour; on a horizontal chart each label takes its own line above the plot.
+- Updated dependencies [[`9b80d10`](https://github.com/eknowledger/toolbench/commit/9b80d107096d8c7a04be0ff6392a9c63df44f533), [`d209839`](https://github.com/eknowledger/toolbench/commit/d209839d1702df2f4d41fe65ce63312c393a2a02), [`62517ad`](https://github.com/eknowledger/toolbench/commit/62517ad385c13895608f85d3119a792439672873), [`ccb58ef`](https://github.com/eknowledger/toolbench/commit/ccb58efb0828b64c89099839ed37bc70bb8b6aec), [`99f7082`](https://github.com/eknowledger/toolbench/commit/99f7082e98c7f5a3ee57aa80ede825ad36c685da), [`c0a57d0`](https://github.com/eknowledger/toolbench/commit/c0a57d0e4d8e1471379b2e0e82ed7dc5536f085e), [`99f7082`](https://github.com/eknowledger/toolbench/commit/99f7082e98c7f5a3ee57aa80ede825ad36c685da), [`e7a3384`](https://github.com/eknowledger/toolbench/commit/e7a3384604dacc0810a3bdc7f8f66c96486d3e58), [`fa7a346`](https://github.com/eknowledger/toolbench/commit/fa7a3468c2c522c0264ad602f00f6818be9fddb6)]:
+  - @toolbench/sdk@0.15.0
+
 ## 0.14.0
 
 ### Minor Changes
